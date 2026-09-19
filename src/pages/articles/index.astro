@@ -8,6 +8,15 @@ const articles = (await getCollection('articles', (a) => !a.data.draft))
 
 const fmt = (d: Date) =>
   `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
+
+// 按年份分组（保持倒序）
+const byYear = new Map<number, typeof articles>();
+for (const a of articles) {
+  const y = a.date.getFullYear();
+  if (!byYear.has(y)) byYear.set(y, []);
+  byYear.get(y)!.push(a);
+}
+const years = [...byYear.keys()].sort((a, b) => b - a);
 ---
 
 <BaseLayout title="随笔 — Traveritas" description="Traveritas 的随笔与记录">
@@ -17,20 +26,40 @@ const fmt = (d: Date) =>
       <p class="lede">想法、记录，与梦的边角料。</p>
     </header>
 
-    <ul class="ledger">
-      {
-        articles.map((a) => (
-          <li>
-            <a href={`/articles/${a.id}/`}>
-              <span class="ledger-date">{fmt(a.date)}</span>
-              <span>
-                <span class="ledger-title">{a.title}</span>
-                {a.description && <span class="ledger-desc">{a.description}</span>}
-              </span>
-            </a>
-          </li>
-        ))
-      }
-    </ul>
+    {
+      years.map((y) => (
+        <section class="year-group">
+          <h2 class="year-label">{y}</h2>
+          <ul class="ledger">
+            {byYear.get(y)!.map((a) => (
+              <li>
+                <a href={`/articles/${a.id}/`}>
+                  <span class="ledger-date">{fmt(a.date)}</span>
+                  <span>
+                    <span class="ledger-title">{a.title}</span>
+                    {a.description && <span class="ledger-desc">{a.description}</span>}
+                  </span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))
+    }
   </div>
 </BaseLayout>
+
+<style>
+  .year-group {
+    margin-bottom: 3rem;
+  }
+
+  .year-label {
+    font-family: var(--font-display);
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--ink-faint);
+    margin: 0 0 0.9rem;
+    letter-spacing: 0.08em;
+  }
+</style>

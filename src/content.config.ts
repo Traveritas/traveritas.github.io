@@ -19,6 +19,7 @@ const projects = defineCollection({
     description: z.string().optional(),
     date: z.coerce.date(),
     status: z.enum(['构想中', '进行中', '已完成']).default('进行中'),
+    cover: z.string().url().optional(),
     links: z.array(z.object({ label: z.string(), href: z.string().url() })).default([]),
     draft: z.boolean().default(false),
   }),

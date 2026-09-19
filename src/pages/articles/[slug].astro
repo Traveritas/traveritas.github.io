@@ -3,19 +3,29 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import { getCollection, render } from 'astro:content';
 
 export async function getStaticPaths() {
-  const articles = await getCollection('articles', (a) => !a.data.draft);
-  return articles.map((a) => ({ params: { slug: a.id }, props: { article: a } }));
+  const articles = (await getCollection('articles', (a) => !a.data.draft)).sort(
+    (a, b) => b.data.date.valueOf() - a.data.date.valueOf(),
+  );
+  return articles.map((a, i) => ({
+    params: { slug: a.id },
+    props: {
+      article: a,
+      // 列表为倒序：较早的一篇在后面，较晚的一篇在前面
+      newer: i > 0 ? articles[i - 1] : undefined,
+      older: i < articles.length - 1 ? articles[i + 1] : undefined,
+    },
+  }));
 }
 
-const { article } = Astro.props;
+const { article, newer, older } = Astro.props;
 const { Content } = await render(article);
-const { title, description, date } = article.data;
+const { title, description, date, tags } = article.data;
 
 const fmt = (d: Date) =>
   `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
 ---
 
-<BaseLayout title={`${title} — Traveritas`} description={description}>
+<BaseLayout title={`${title} — Traveritas`} description={description} type="article">
   <div class="container page-body">
     <article class="prose">
       <header class="prose-head">
@@ -26,6 +36,84 @@ const fmt = (d: Date) =>
       </header>
       <hr class="prose-rule" />
       <Content />
+      {
+        tags.length > 0 && (
+          <nav class="tag-row" aria-label="标签">
+            {tags.map((t) => (
+              <a href={`/tags/${t}/`}>{t}</a>
+            ))}
+          </nav>
+        )
+      }
+      <nav class="adjacent" aria-label="相邻文章">
+        {
+          older && (
+            <a href={`/articles/${older.id}/`} class="adj-item">
+              <span class="adj-label">较早</span>
+              <span class="adj-title">{older.data.title}</span>
+            </a>
+          )
+        }
+        {
+          newer && (
+            <a href={`/articles/${newer.id}/`} class="adj-item adj-right">
+              <span class="adj-label">较晚</span>
+              <span class="adj-title">{newer.data.title}</span>
+            </a>
+          )
+        }
+      </nav>
     </article>
   </div>
 </BaseLayout>
+
+<style>
+  .tag-row {
+    margin-top: 3rem;
+    padding-top: 1.3rem;
+    border-top: 1px solid var(--line);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.6rem;
+    font-size: 0.9rem;
+  }
+
+  .adjacent {
+    margin-top: 2.2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--line);
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .adj-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    text-decoration: none;
+    max-width: 30em;
+  }
+
+  .adj-right {
+    align-items: flex-end;
+    text-align: right;
+  }
+
+  .adj-label {
+    font-size: 0.78rem;
+    color: var(--ink-faint);
+    letter-spacing: 0.12em;
+  }
+
+  .adj-title {
+    font-family: var(--font-display);
+    font-size: 0.98rem;
+    color: var(--ink-soft);
+    transition: color 0.18s ease;
+  }
+
+  .adj-item:hover .adj-title {
+    color: var(--mist-ink);
+  }
+</style>
