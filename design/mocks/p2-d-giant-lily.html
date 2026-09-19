@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>方案 D · 巨花与雾</title>
+<style>
+  :root {
+    --paper: #f8f9f8;
+    --ink: #232930;
+    --ink-soft: #545f6a;
+    --ink-faint: #5f6a75;
+    --line: #dfe4e7;
+    --mist: #a9bdc9;
+    --mist-soft: #ccd8e0;
+    --mist-ink: #4c6a80;
+    --blush: #d8c4c9;
+    --blush-soft: #e9dee1;
+    --blush-ink: #7c6068;
+    --font-display: 'Palatino Linotype', 'Iowan Old Style', Palatino, Georgia,
+      'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', SimSun, serif;
+    --font-body: system-ui, -apple-system, 'PingFang SC', 'Hiragino Sans GB',
+      'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    font-family: var(--font-body);
+    color: var(--ink);
+    background: var(--paper);
+    overflow: hidden;
+  }
+
+  .stage {
+    position: relative;
+    height: 100dvh;
+    overflow: clip;
+    background:
+      radial-gradient(66vw 62vh at 6% 4%, rgba(169, 189, 201, 0.24), transparent 70%),
+      linear-gradient(118deg,
+        rgba(169, 189, 201, 0.16) 0%,
+        rgba(169, 189, 201, 0.04) 30%,
+        rgba(216, 196, 201, 0.10) 52%,
+        rgba(216, 196, 201, 0.26) 100%),
+      var(--paper);
+  }
+
+  /* ── 巨花：俯视百合，梦侧磨砂 ── */
+  .bloom {
+    position: absolute;
+    top: -12vh; right: -10vw;
+    width: 62vw; height: 100vh;
+    z-index: 3;
+    pointer-events: none;
+  }
+
+  /* 梦侧磨砂：斜界（呼应 118° 轴线）+ 羽化边缘，左移至宣言字尾可入雾 */
+  .bloom-frost {
+    position: absolute;
+    inset: 0;
+    clip-path: polygon(0% 0%, 100% 0%, 100% 100%, 12% 100%);
+    background: linear-gradient(to right, rgba(233, 222, 225, 0.04), rgba(233, 222, 225, 0.28));
+    backdrop-filter: blur(9px) saturate(1.05);
+    -webkit-backdrop-filter: blur(9px) saturate(1.05);
+    mask-image: linear-gradient(to right, transparent, black 18%);
+    -webkit-mask-image: linear-gradient(to right, transparent, black 18%);
+  }
+
+  .bloom svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  /* ── 文字碎片 ── */
+  .frag {
+    position: absolute;
+    margin: 0;
+    font-family: var(--font-display);
+    font-weight: 600;
+    line-height: 1.6;
+    letter-spacing: 0.02em;
+    color: var(--ink);
+    z-index: 2;
+  }
+
+  .fx1 { top: 15vh; left: 9vw; font-size: max(1.9rem, 4.6vw); }
+
+  .fx2 {
+    top: 24vh; left: 44vw;
+    font-size: max(0.95rem, 1.5vw);
+    font-weight: 500;
+    letter-spacing: 0.35em;
+    color: var(--ink-faint);
+  }
+
+  .fx3 {
+    top: 52vh; left: 12vw;
+    font-size: max(0.95rem, 1.6vw);
+    font-weight: 500;
+    color: var(--ink-soft);
+  }
+
+  .fx4 { top: 61vh; left: 22vw; font-size: max(1.7rem, 3.6vw); }
+  .fx4 em { font-style: normal; color: var(--mist-ink); }
+
+  .fsub {
+    position: absolute;
+    top: 78vh; left: 23vw;
+    margin: 0;
+    font-size: 0.88rem;
+    letter-spacing: 0.08em;
+    color: var(--ink-faint);
+    z-index: 2;
+  }
+
+  /* ── 竖排导航 ── */
+  .nav {
+    position: absolute;
+    left: 3.5vw; top: 26vh;
+    display: flex;
+    flex-direction: column;
+    gap: 2.4rem;
+    z-index: 6;
+  }
+
+  .nav a {
+    position: relative;
+    writing-mode: vertical-rl;
+    letter-spacing: 0.5em;
+    padding: 0.5rem 0.75rem;
+    color: var(--ink-soft);
+    text-decoration: none;
+    transition: color 0.18s ease;
+  }
+
+  .nav a::after {
+    content: '';
+    position: absolute;
+    top: 45%;
+    left: calc(100% + 0.4rem);
+    width: 1.4rem;
+    height: 1px;
+    background: var(--line);
+    transition: background 0.18s ease, width 0.18s ease;
+  }
+
+  .nav a:hover { color: var(--ink); }
+  .nav a:hover::after { background: var(--mist); width: 2rem; }
+
+  /* ── 站名（临时花形印记） ── */
+  .brand {
+    position: absolute;
+    top: 4.5vh; left: 4vw;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    font-family: var(--font-display);
+    color: var(--ink);
+    text-decoration: none;
+    z-index: 6;
+  }
+
+  .brand svg { width: 18px; height: 18px; color: var(--mist-ink); }
+
+  /* ── 现实锚点 ── */
+  .anchor {
+    position: absolute;
+    top: 26vh; right: 34vw;
+    z-index: 4;
+    margin: 0;
+    padding: 6px;
+    background: rgba(255, 255, 255, 0.74);
+    transform: rotate(1deg);
+  }
+
+  .anchor img {
+    display: block;
+    width: 9vw;
+    min-width: 104px;
+    max-width: 160px;
+    aspect-ratio: 4 / 5;
+    object-fit: cover;
+    filter: grayscale(0.85) contrast(0.88) opacity(0.82);
+  }
+
+  :focus-visible { outline: 2px solid var(--mist-ink); outline-offset: 3px; }
+
+  @media (prefers-reduced-transparency: reduce) {
+    .bloom-frost { background: rgba(233, 222, 225, 0.72); backdrop-filter: none; }
+  }
+
+  @media (max-width: 760px) {
+    body { overflow: auto; }
+    .stage { height: auto; min-height: 100dvh; padding: 24vh 9vw 10vh; }
+    .bloom { top: -6vh; right: -36vw; width: 110vw; height: 56vh; }
+    .frag { position: static; display: block; margin: 0 0 2rem; }
+    .fx1 { font-size: clamp(1.5rem, 7vw, 2rem); }
+    .fx2 { font-size: 0.95rem; }
+    .fx3 { font-size: 1rem; }
+    .fx4 { font-size: clamp(1.4rem, 6.8vw, 1.9rem); }
+    .fsub { position: static; display: block; margin-top: 0.5rem; }
+    .anchor { position: static; margin: 3rem auto 0; }
+    .nav { position: static; margin-top: 2rem; flex-direction: row; gap: 1.8rem; }
+    .nav a { writing-mode: horizontal-tb; letter-spacing: 0.2em; }
+    .nav a::after { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="stage">
+
+  <a class="brand" href="/">
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <g stroke="currentColor" stroke-width="1.1" stroke-linecap="round" fill="none">
+        <path d="M12 12 C 8.8 9.4, 7.9 5.4, 12 2 C 16.1 5.4, 15.2 9.4, 12 12 Z"/>
+        <path d="M12 12 C 8.2 11.2, 5.5 8.2, 6.5 4.2 C 10.4 5.3, 12 8.4, 12 12 Z" transform="rotate(0 12 12)"/>
+        <path d="M12 12 C 15.8 11.2, 18.5 8.2, 17.5 4.2 C 13.6 5.3, 12 8.4, 12 12 Z"/>
+        <path d="M12 12 C 8.8 14.6, 7.9 18.6, 12 22 C 16.1 18.6, 15.2 14.6, 12 12 Z"/>
+        <path d="M12 12 C 8.2 12.8, 5.5 15.8, 6.5 19.8 C 10.4 18.7, 12 15.6, 12 12 Z"/>
+        <path d="M12 12 C 15.8 12.8, 18.5 15.8, 17.5 19.8 C 13.6 18.7, 12 15.6, 12 12 Z"/>
+        <circle cx="12" cy="12" r="1.1" fill="currentColor" stroke="none"/>
+      </g>
+    </svg>
+    <span>Traveritas</span>
+  </a>
+
+  <nav class="nav" aria-label="站内入口">
+    <a href="/articles/">随笔</a>
+    <a href="/projects/">项目</a>
+    <a href="/about/">关于</a>
+  </nav>
+
+  <!-- 巨花：俯视百合。八枚外瓣带长度抖动（不规则），六枚内瓣，
+       花蕊细线伸出到花瓣之外，其中一枚花蕊折断（错位）。梦侧整半磨砂。 -->
+  <div class="bloom" aria-hidden="true">
+    <div class="bloom-frost"></div>
+    <svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <linearGradient id="petal" x1="0" y1="1" x2="0" y2="0">
+          <stop offset="0" stop-color="rgba(216,196,201,0.34)"/>
+          <stop offset="1" stop-color="rgba(216,196,201,0.04)"/>
+        </linearGradient>
+        <linearGradient id="petal-in" x1="0" y1="1" x2="0" y2="0">
+          <stop offset="0" stop-color="rgba(169,189,201,0.26)"/>
+          <stop offset="1" stop-color="rgba(169,189,201,0.03)"/>
+        </linearGradient>
+      </defs>
+      <g transform="translate(50 52)">
+        <!-- 外轮 8 瓣，长度、开角均带抖动（破除等分感） -->
+        <g id="outer">
+          <path d="M 0 -7 C -10 -24, -11.5 -52, 0 -82 C 11.5 -52, 10 -24, 0 -7 Z" fill="url(#petal)" stroke="rgba(76,106,128,0.30)" stroke-width="0.5" transform="rotate(0)"/>
+          <path d="M 0 -7 C -11.2 -23, -12.6 -54, 0 -85 C 12.6 -54, 11.2 -23, 0 -7 Z" fill="url(#petal)" stroke="rgba(76,106,128,0.30)" stroke-width="0.5" transform="rotate(42.5) scale(0.96)"/>
+          <path d="M 0 -7 C -10 -24, -11.5 -52, 0 -82 C 11.5 -52, 10 -24, 0 -7 Z" fill="url(#petal)" stroke="rgba(76,106,128,0.26)" stroke-width="0.5" transform="rotate(90) scale(1.03)"/>
+          <path d="M 0 -7 C -10 -24, -11.5 -52, 0 -82 C 11.5 -52, 10 -24, 0 -7 Z" fill="url(#petal)" stroke="rgba(76,106,128,0.30)" stroke-width="0.5" transform="rotate(137) scale(0.94)"/>
+          <path d="M 0 -7 C -11.2 -23, -12.6 -54, 0 -85 C 12.6 -54, 11.2 -23, 0 -7 Z" fill="url(#petal)" stroke="rgba(76,106,128,0.30)" stroke-width="0.5" transform="rotate(180) scale(1)"/>
+          <path d="M 0 -7 C -10 -24, -11.5 -52, 0 -82 C 11.5 -52, 10 -24, 0 -7 Z" fill="url(#petal)" stroke="rgba(76,106,128,0.27)" stroke-width="0.5" transform="rotate(223) scale(0.98)"/>
+          <path d="M 0 -7 C -10 -24, -11.5 -52, 0 -82 C 11.5 -52, 10 -24, 0 -7 Z" fill="url(#petal)" stroke="rgba(76,106,128,0.30)" stroke-width="0.5" transform="rotate(270) scale(1.04)"/>
+          <path d="M 0 -7 C -10 -24, -11.5 -52, 0 -82 C 11.5 -52, 10 -24, 0 -7 Z" fill="url(#petal)" stroke="rgba(76,106,128,0.30)" stroke-width="0.5" transform="rotate(317.5) scale(0.95)"/>
+        </g>
+        <!-- 内轮 6 瓣 -->
+        <g id="inner">
+          <path d="M 0 -5 C -7 -17, -8 -36, 0 -56 C 8 -36, 7 -17, 0 -5 Z" fill="url(#petal-in)" stroke="rgba(76,106,128,0.24)" stroke-width="0.4" transform="rotate(15)"/>
+          <path d="M 0 -5 C -7 -17, -8 -36, 0 -56 C 8 -36, 7 -17, 0 -5 Z" fill="url(#petal-in)" stroke="rgba(76,106,128,0.24)" stroke-width="0.4" transform="rotate(75) scale(0.97)"/>
+          <path d="M 0 -5 C -7 -17, -8 -36, 0 -56 C 8 -36, 7 -17, 0 -5 Z" fill="url(#petal-in)" stroke="rgba(76,106,128,0.24)" stroke-width="0.4" transform="rotate(135) scale(1.02)"/>
+          <path d="M 0 -5 C -7 -17, -8 -36, 0 -56 C 8 -36, 7 -17, 0 -5 Z" fill="url(#petal-in)" stroke="rgba(76,106,128,0.24)" stroke-width="0.4" transform="rotate(195)"/>
+          <path d="M 0 -5 C -7 -17, -8 -36, 0 -56 C 8 -36, 7 -17, 0 -5 Z" fill="url(#petal-in)" stroke="rgba(76,106,128,0.24)" stroke-width="0.4" transform="rotate(255) scale(0.96)"/>
+          <path d="M 0 -5 C -7 -17, -8 -36, 0 -56 C 8 -36, 7 -17, 0 -5 Z" fill="url(#petal-in)" stroke="rgba(76,106,128,0.24)" stroke-width="0.4" transform="rotate(315) scale(1.01)"/>
+        </g>
+        <!-- 花蕊：细线伸出瓣外，端头小点；一枚折断 -->
+        <g stroke="rgba(76,106,128,0.42)" stroke-width="0.45" fill="none" stroke-linecap="round">
+          <path d="M 0 0 L 2 -92"/><circle cx="2" cy="-92" r="1.5" fill="rgba(76,106,128,0.42)" stroke="none"/>
+          <path d="M 0 0 L 64 -66"/><circle cx="64" cy="-66" r="1.5" fill="rgba(76,106,128,0.42)" stroke="none"/>
+          <path d="M 0 0 L 90 -4"/><circle cx="90" cy="-4" r="1.5" fill="rgba(76,106,128,0.42)" stroke="none"/>
+          <path d="M 0 0 L 58 62"/><circle cx="58" cy="62" r="1.5" fill="rgba(76,106,128,0.42)" stroke="none"/>
+          <path d="M 0 0 L -66 58"/><circle cx="-66" cy="58" r="1.5" fill="rgba(76,106,128,0.42)" stroke="none"/>
+          <path d="M 0 0 L -88 -6"/><circle cx="-88" cy="-6" r="1.5" fill="rgba(76,106,128,0.42)" stroke="none"/>
+          <path d="M 0 0 L -58 -66 L -50 -74" stroke-dasharray="2 3"/>
+        </g>
+        <circle cx="0" cy="0" r="2.6" fill="rgba(76,106,128,0.5)"/>
+      </g>
+    </svg>
+  </div>
+
+  <h1 class="frag-set" aria-label="这里不是梦，也不是现实。它是人在即将醒来时，看见的最后一层世界。" style="position:absolute;inset:0;margin:0;font-weight:inherit;font-size:inherit;z-index:2;">
+    <span aria-hidden="true" style="position:absolute;inset:0;display:block;">
+      <span class="frag fx1">这里不是梦，</span>
+      <span class="frag fx2">也不是现实。</span>
+      <span class="frag fx3">它是人在即将醒来时，</span>
+      <span class="frag fx4">看见的<em>最后一层世界</em>。</span>
+    </span>
+  </h1>
+  <p class="fsub">世界应当始终保留一种感觉：它可能马上消失。</p>
+
+  <figure class="anchor">
+    <img src="https://picsum.photos/seed/xingmeng-anchor/400/500" alt="" loading="lazy" />
+  </figure>
+
+</div>
+</body>
+</html>
