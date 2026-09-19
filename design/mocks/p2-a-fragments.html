@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>方案 A · 碎屑与字</title>
+<style>
+  /* 醒梦 tokens（与站点一致） */
+  :root {
+    --paper: #f8f9f8;
+    --ink: #232930;
+    --ink-soft: #545f6a;
+    --ink-faint: #6f7a85;
+    --line: #dfe4e7;
+    --mist: #a9bdc9;
+    --mist-soft: #ccd8e0;
+    --mist-ink: #4c6a80;
+    --blush: #d8c4c9;
+    --blush-soft: #e9dee1;
+    --font-display: 'Palatino Linotype', 'Iowan Old Style', Palatino, Georgia,
+      'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', SimSun, serif;
+    --font-body: system-ui, -apple-system, 'PingFang SC', 'Hiragino Sans GB',
+      'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body { height: 100%; }
+
+  body {
+    margin: 0;
+    font-family: var(--font-body);
+    color: var(--ink);
+    background: var(--paper);
+    overflow: hidden;
+  }
+
+  /* 底色：两个极淡的雾/粉晕 */
+  .stage {
+    position: relative;
+    height: 100dvh;
+    background:
+      radial-gradient(60vw 46vh at 12% 8%, rgba(169, 189, 201, 0.16), transparent 70%),
+      radial-gradient(56vw 44vh at 88% 92%, rgba(216, 196, 201, 0.16), transparent 70%),
+      var(--paper);
+  }
+
+  /* ── 文字碎片 ── */
+  .frag {
+    position: absolute;
+    margin: 0;
+    font-family: var(--font-display);
+    font-weight: 600;
+    line-height: 1.6;
+    letter-spacing: 0.02em;
+    z-index: 3;
+  }
+
+  .f1 { top: 15vh; left: 9vw; font-size: clamp(2rem, 5vw, 3.6rem); }
+
+  .f2 { top: 24vh; left: 49vw; font-size: clamp(0.95rem, 1.5vw, 1.1rem); color: var(--ink-faint); font-weight: 500; letter-spacing: 0.35em; }
+
+  .f3 { top: 56vh; left: 13vw; font-size: clamp(0.95rem, 1.6vw, 1.25rem); color: var(--ink-soft); font-weight: 500; }
+
+  .f4 { top: 64vh; left: 34vw; font-size: clamp(1.7rem, 4.2vw, 3rem); }
+  .f4 em { font-style: normal; color: var(--mist-ink); }
+
+  /* ── 玻璃碎块 ── */
+  .shard {
+    position: absolute;
+    pointer-events: none;
+  }
+
+  .shard svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  /* 前景大碎块：磨砂玻璃，真实稀释其后文字 */
+  .shard-front {
+    top: 14vh; left: 50vw;
+    width: 42vw; height: 52vh;
+    clip-path: polygon(18% 0%, 86% 9%, 100% 58%, 64% 100%, 8% 88%, 0% 34%);
+    background: rgba(255, 255, 255, 0.34);
+    backdrop-filter: blur(13px) saturate(1.12);
+    -webkit-backdrop-filter: blur(13px) saturate(1.12);
+    z-index: 4;
+  }
+
+  .shard-front .edge {
+    position: absolute;
+    inset: 0;
+    clip-path: polygon(18% 0%, 86% 9%, 100% 58%, 64% 100%, 8% 88%, 0% 34%);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+  }
+
+  /* 背景粉雾碎块（在文字后） */
+  .shard-back {
+    top: 46vh; left: 4vw;
+    width: 26vw; height: 34vh;
+    clip-path: polygon(10% 22%, 58% 0%, 96% 34%, 84% 90%, 22% 100%, 0% 62%);
+    background: rgba(216, 196, 201, 0.2);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    z-index: 1;
+  }
+
+  /* 小漂浮碎块 */
+  .shard-mini {
+    top: 9vh; left: 84vw;
+    width: 7vw; height: 12vh;
+    clip-path: polygon(30% 0%, 100% 30%, 72% 100%, 0% 66%);
+    background: rgba(169, 189, 201, 0.22);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    z-index: 2;
+  }
+
+  /* 现实锚点：被稀释的小照片 */
+  .anchor {
+    position: absolute;
+    top: 50vh; left: 74vw;
+    z-index: 5;
+    transform: rotate(1deg);
+    padding: 6px;
+    background: rgba(255, 255, 255, 0.72);
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.9) inset;
+  }
+
+  .anchor img {
+    display: block;
+    width: 13vw;
+    min-width: 120px;
+    max-width: 210px;
+    aspect-ratio: 4 / 5;
+    object-fit: cover;
+    filter: grayscale(0.85) contrast(0.88) opacity(0.82);
+  }
+
+  .anchor figcaption {
+    font-size: 0.72rem;
+    color: var(--ink-faint);
+    padding-top: 6px;
+    text-align: center;
+    letter-spacing: 0.08em;
+  }
+
+  /* ── 站名与导航（去导航栏化） ── */
+  .brand {
+    position: absolute;
+    top: 4.5vh; left: 4vw;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    font-family: var(--font-display);
+    letter-spacing: 0.02em;
+    color: var(--ink);
+    text-decoration: none;
+    z-index: 6;
+  }
+
+  .brand svg { width: 16px; height: 16px; color: var(--mist-ink); }
+
+  .nav {
+    position: absolute;
+    left: 4vw; bottom: 7vh;
+    display: flex;
+    align-items: center;
+    gap: 1.3rem;
+    z-index: 6;
+  }
+
+  .nav a {
+    color: var(--ink-soft);
+    text-decoration: none;
+    letter-spacing: 0.14em;
+    transition: color 0.18s ease;
+  }
+
+  .nav a:hover { color: var(--ink); }
+
+  .nav .sep {
+    width: 1.6rem;
+    height: 1px;
+    background: var(--line);
+    align-self: center;
+  }
+
+  /* 角落余白处的一行小字 */
+  .aside-note {
+    position: absolute;
+    right: 4vw; bottom: 7vh;
+    writing-mode: vertical-rl;
+    font-size: 0.78rem;
+    letter-spacing: 0.22em;
+    color: var(--ink-faint);
+    z-index: 6;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--mist-ink);
+    outline-offset: 3px;
+  }
+
+  /* 透明度敏感偏好的回退 */
+  @media (prefers-reduced-transparency: reduce) {
+    .shard-front { background: rgba(255, 255, 255, 0.9); backdrop-filter: none; }
+    .shard-back { background: rgba(216, 196, 201, 0.4); backdrop-filter: none; }
+    .shard-mini { background: rgba(169, 189, 201, 0.4); backdrop-filter: none; }
+  }
+
+  /* 窄屏：碎片收拢为纵向流，碎块退为淡装饰 */
+  @media (max-width: 720px) {
+    body { overflow: auto; }
+
+    .stage { height: auto; min-height: 100dvh; padding: 22vh 8vw 18vh; }
+
+    .frag { position: static; display: block; margin: 0 0 2.2rem; }
+    .f1, .f2, .f3, .f4 { font-size: clamp(1.4rem, 7.2vw, 2rem); left: auto; top: auto; }
+    .f2 { color: var(--ink-soft); }
+    .f3 { color: var(--ink-faint); font-size: clamp(1rem, 5vw, 1.2rem); }
+
+    .shard-front { top: 12vh; left: 56vw; width: 46vw; height: 30vh; opacity: 0.9; }
+    .shard-back { display: none; }
+    .shard-mini { display: none; }
+    .anchor { position: static; margin: 3rem auto 0; transform: rotate(1deg); }
+    .aside-note { display: none; }
+    .nav { position: static; margin-top: 2.5rem; }
+  }
+</style>
+</head>
+<body>
+<div class="stage">
+
+  <a class="brand" href="/">
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M12 1.6 19.9 8.7 16.9 22.2 7.3 22.4 4.1 9.5Z" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/>
+      <path d="M12 1.6 9.4 22.3M12 1.6l4.9 20.6M4.1 9.5l15.8-.8" stroke="currentColor" stroke-width="0.55" stroke-opacity="0.5"/>
+    </svg>
+    <span>Traveritas</span>
+  </a>
+
+  <div class="shard shard-back" aria-hidden="true"></div>
+  <div class="shard shard-mini" aria-hidden="true"></div>
+
+  <p class="frag f1">这里不是梦，</p>
+  <p class="frag f2">也不是现实。</p>
+  <p class="frag f3">它是人在即将醒来时，</p>
+  <p class="frag f4">看见的<em>最后一层世界</em>。</p>
+
+  <div class="shard shard-front" aria-hidden="true">
+    <div class="edge"></div>
+    <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+      <path d="M18 0 L44 46 L64 100 M86 9 L62 44 M8 88 L46 48 M0 34 L44 46"
+            stroke="rgba(76,106,128,0.20)" stroke-width="0.35" fill="none"/>
+    </svg>
+  </div>
+
+  <figure class="anchor">
+    <img src="https://picsum.photos/seed/xingmeng-anchor/400/500" alt="一枚来自现实的锚点" loading="lazy" />
+  </figure>
+
+  <nav class="nav" aria-label="站内入口">
+    <a href="/articles/">随笔</a>
+    <span class="sep" aria-hidden="true"></span>
+    <a href="/projects/">项目</a>
+    <span class="sep" aria-hidden="true"></span>
+    <a href="/about/">关于</a>
+  </nav>
+
+  <span class="aside-note">介于醒与梦</span>
+
+</div>
+</body>
+</html>
