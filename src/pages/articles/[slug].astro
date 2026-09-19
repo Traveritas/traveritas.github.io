@@ -1,0 +1,31 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getCollection, render } from 'astro:content';
+
+export async function getStaticPaths() {
+  const articles = await getCollection('articles', (a) => !a.data.draft);
+  return articles.map((a) => ({ params: { slug: a.id }, props: { article: a } }));
+}
+
+const { article } = Astro.props;
+const { Content } = await render(article);
+const { title, description, date } = article.data;
+
+const fmt = (d: Date) =>
+  `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
+---
+
+<BaseLayout title={`${title} — Traveritas`} description={description}>
+  <div class="container page-body">
+    <article class="prose">
+      <header class="prose-head">
+        <h1>{title}</h1>
+        <p class="prose-meta">
+          <time datetime={date.toISOString()}>{fmt(date)}</time>
+        </p>
+      </header>
+      <hr class="prose-rule" />
+      <Content />
+    </article>
+  </div>
+</BaseLayout>

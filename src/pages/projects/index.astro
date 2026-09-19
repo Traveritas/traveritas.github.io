@@ -1,0 +1,39 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getCollection } from 'astro:content';
+
+const projects = (await getCollection('projects', (p) => !p.data.draft))
+  .map(({ id, data }) => ({ id, ...data }))
+  .sort((a, b) => b.date.valueOf() - a.date.valueOf());
+
+const fmt = (d: Date) =>
+  `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
+---
+
+<BaseLayout title="项目 — Traveritas" description="Traveritas 的项目与造物">
+  <div class="container page-body">
+    <header class="page-head">
+      <h1>项目</h1>
+      <p class="lede">正在做、做过、以及还只存在于念头里的东西。</p>
+    </header>
+
+    <ul class="ledger">
+      {
+        projects.map((p) => (
+          <li>
+            <a href={`/projects/${p.id}/`}>
+              <span class="ledger-date">{fmt(p.date)}</span>
+              <span>
+                <span class="ledger-title">
+                  {p.title}
+                  <span class="ledger-status">{p.status}</span>
+                </span>
+                {p.description && <span class="ledger-desc">{p.description}</span>}
+              </span>
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+  </div>
+</BaseLayout>

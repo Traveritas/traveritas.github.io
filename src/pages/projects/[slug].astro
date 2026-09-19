@@ -1,0 +1,43 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getCollection, render } from 'astro:content';
+
+export async function getStaticPaths() {
+  const projects = await getCollection('projects', (p) => !p.data.draft);
+  return projects.map((p) => ({ params: { slug: p.id }, props: { project: p } }));
+}
+
+const { project } = Astro.props;
+const { Content } = await render(project);
+const { title, description, date, status, links } = project.data;
+
+const fmt = (d: Date) =>
+  `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
+---
+
+<BaseLayout title={`${title} — Traveritas`} description={description}>
+  <div class="container page-body">
+    <article class="prose">
+      <header class="prose-head">
+        <h1>{title}</h1>
+        <p class="prose-meta">
+          <span class="status">{status}</span>
+          <time datetime={date.toISOString()}>{fmt(date)}</time>
+        </p>
+      </header>
+      <hr class="prose-rule" />
+      <Content />
+      {
+        links.length > 0 && (
+          <nav class="link-list" aria-label="相关链接">
+            {links.map((l) => (
+              <a href={l.href} target="_blank" rel="noopener">
+                {l.label}
+              </a>
+            ))}
+          </nav>
+        )
+      }
+    </article>
+  </div>
+</BaseLayout>

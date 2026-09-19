@@ -1,0 +1,36 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getCollection } from 'astro:content';
+
+const articles = (await getCollection('articles', (a) => !a.data.draft))
+  .map(({ id, data }) => ({ id, ...data }))
+  .sort((a, b) => b.date.valueOf() - a.date.valueOf());
+
+const fmt = (d: Date) =>
+  `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
+---
+
+<BaseLayout title="随笔 — Traveritas" description="Traveritas 的随笔与记录">
+  <div class="container page-body">
+    <header class="page-head">
+      <h1>随笔</h1>
+      <p class="lede">想法、记录，与梦的边角料。</p>
+    </header>
+
+    <ul class="ledger">
+      {
+        articles.map((a) => (
+          <li>
+            <a href={`/articles/${a.id}/`}>
+              <span class="ledger-date">{fmt(a.date)}</span>
+              <span>
+                <span class="ledger-title">{a.title}</span>
+                {a.description && <span class="ledger-desc">{a.description}</span>}
+              </span>
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+  </div>
+</BaseLayout>
