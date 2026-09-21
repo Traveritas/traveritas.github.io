@@ -1,0 +1,206 @@
+---
+/* 左侧仪表轨（入梦检验式深度表）
+   · night：主页整夜——细轨道 + 琥珀圆点按过夜进度下行，
+     下方 mono 时刻与分期读数（night.ts 驱动）
+   · depth：文章页阅读深度（醒 / 入梦 / 深梦 / 将醒）
+   · station：列表页仅站名
+   < 1200px 隐藏（退化为顶部发丝线）。 */
+interface Props {
+  mode?: 'night' | 'depth' | 'station';
+  station: string;
+  en?: string;
+  depthTarget?: string;
+}
+
+const { mode = 'station', station, en, depthTarget } = Astro.props;
+const nightLabels = ['醒', '浅梦', '深眠', '晨醒'];
+const depthLabels = ['醒', '入梦', '深梦', '将醒'];
+const labels = mode === 'night' ? nightLabels : depthLabels;
+---
+
+<aside class:list={['rail', `rail--${mode}`]} data-depth={depthTarget} aria-hidden="true">
+  <div class="rail-station">
+    <span class="rail-name">{station}</span>
+    {en && <span class="rail-en mono">{en}</span>}
+  </div>
+
+  {
+    (mode === 'night' || mode === 'depth') && (
+      <div class="rail-meter">
+        <i class="rail-track" />
+        <i class="rail-dot" />
+        {labels.map((t, i) => (
+          <span class={`meter-label l${i} mono`}>{t}</span>
+        ))}
+      </div>
+    )
+  }
+
+  {
+    mode === 'night' && (
+      <div class="rail-read mono">
+        <span id="rail-time">23:07</span>
+        <span id="rail-stage">清醒 · β 波</span>
+      </div>
+    )
+  }
+</aside>
+
+<style>
+  .rail {
+    position: fixed;
+    left: 30px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.1rem;
+    pointer-events: none;
+    color: var(--fg-soft);
+    /* 首页滚过首屏才浮现（内页 body 恒带 past-hero） */
+    opacity: 0;
+    visibility: hidden;
+    translate: -8px 0;
+    transition:
+      opacity 0.7s ease,
+      translate 0.7s ease,
+      visibility 0.7s;
+  }
+
+  :global(body.past-hero) .rail {
+    opacity: 1;
+    visibility: visible;
+    translate: 0 0;
+  }
+
+  /* 分期文字换字时淡入，避免跳变 */
+  #rail-stage.swap {
+    animation: stage-in 0.45s ease;
+  }
+
+  @keyframes stage-in {
+    from {
+      opacity: 0;
+    }
+  }
+
+  .rail-station {
+    writing-mode: vertical-rl;
+    display: flex;
+    gap: 0.9rem;
+    align-items: center;
+    padding-left: 0.8rem;
+    border-left: 1px solid var(--line);
+  }
+
+  .rail-name {
+    font-family: var(--font-display);
+    font-size: 0.8rem;
+    letter-spacing: 0.42em;
+  }
+
+  .rail-en {
+    font-size: 0.56rem;
+    letter-spacing: 0.3em;
+    opacity: 0.66;
+  }
+
+  /* 深度表：细轨道 + 琥珀圆点 + 分层标签 */
+  .rail-meter {
+    position: relative;
+    width: 12px;
+    height: 200px;
+  }
+
+  .rail-track {
+    position: absolute;
+    left: 5px;
+    top: 0;
+    width: 1px;
+    height: 100%;
+    background: var(--line);
+  }
+
+  .rail-dot {
+    position: absolute;
+    left: 2.5px;
+    top: 6%;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--amber);
+    box-shadow: 0 0 8px 1px rgba(217, 160, 91, 0.5);
+    transition: top 0.15s linear;
+  }
+
+  .meter-label {
+    position: absolute;
+    left: 14px;
+    font-size: 0.58rem;
+    letter-spacing: 0.2em;
+    opacity: 0.66;
+    writing-mode: vertical-rl;
+    white-space: nowrap;
+  }
+
+  .l0 {
+    top: -2px;
+  }
+  .l1 {
+    top: 30%;
+  }
+  .l2 {
+    top: 60%;
+  }
+  .l3 {
+    top: 94%;
+  }
+
+  .rail-read {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.3rem;
+    /* 定宽：分期文字长短变化不再挤动整列 */
+    width: 7em;
+    font-size: 0.62rem;
+    letter-spacing: 0.12em;
+  }
+
+  #rail-time {
+    color: var(--fg);
+    font-size: 0.72rem;
+  }
+
+  #rail-stage {
+    opacity: 0.72;
+    width: 100%;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  @media (max-width: 1200px) {
+    .rail {
+      display: none;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .rail {
+      transition: none;
+      opacity: 1;
+      visibility: visible;
+      translate: 0 0;
+    }
+
+    #rail-stage.swap {
+      animation: none;
+    }
+
+    .rail-dot {
+      transition: none;
+    }
+  }
+</style>

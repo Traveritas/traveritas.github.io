@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0c0f14">
+<title>醒梦 · 主页（现实检验稿）</title>
+<meta name="description" content="「现实检验」叙事的主页重做：这个主页不确定自己醒着还是做梦，按住玻璃锚点核验它，按住不放，它会真的醒过来。个人网站主页探索稿。">
+<script>
+window.__swarmErr = 'none';
+</script>
+<link rel="preconnect" href="https://fastly.jsdelivr.net" crossorigin>
+<link rel="stylesheet" href="https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5.2.5/400.css">
+<link rel="stylesheet" href="https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5.2.5/600.css">
+<link rel="stylesheet" href="https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5.2.5/900.css">
+<style>
+/* ---------- tokens ---------- */
+:root{
+  --bg0:#0c0f14; --bg1:#0f1218; --bg2:#141118; --bg3:#191310; --bg4:#1b1310;
+  --ink:#e7e2d8;
+  --dim:#928d83;
+  --faint:#5a564f;
+  --cool:#a7bccd;          /* 醒 · 可核验 */
+  --warm:#d8c3a4;          /* 梦 · 不由分说 */
+  --ember:#d9a05f;         /* 唯一强调色，克制使用 */
+  --line:rgba(231,226,216,.13);
+  --serif:'Noto Serif SC','Source Han Serif SC','Songti SC','STSong',SimSun,serif;
+  --mono:ui-monospace,'Cascadia Mono',Consolas,'JetBrains Mono',Menlo,monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:auto}
+body{
+  font-family:var(--serif);
+  color:var(--ink);
+  background:var(--bg0);
+  line-height:1.9;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+  touch-action:manipulation;
+}
+.bg{position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:linear-gradient(178deg,var(--bg0) 0%,var(--bg1) 28%,var(--bg2) 52%,var(--bg3) 76%,var(--bg4) 100%)}
+::selection{background:rgba(217,160,95,.28);color:var(--ink)}
+a{color:inherit;text-decoration:none}
+:focus-visible{outline:1px dashed rgba(231,226,216,.55);outline-offset:4px}
+::-webkit-scrollbar{width:10px}
+::-webkit-scrollbar-thumb{background:rgba(231,226,216,.14);border-radius:5px}
+::-webkit-scrollbar-track{background:transparent}
+
+/* ---------- ambient ---------- */
+.glow{position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:
+    radial-gradient(52vmax 52vmax at 78% 68%, rgba(214,166,120,.10), transparent 68%),
+    radial-gradient(40vmax 40vmax at 12% 14%, rgba(150,175,200,.07), transparent 70%);
+  transition:opacity .8s ease}
+body.checked .glow{opacity:.45}
+.grain{position:fixed;inset:0;pointer-events:none;z-index:3;opacity:.05;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='180' height='180' filter='url(%23n)' opacity='0.6'/></svg>")}
+.veil{position:fixed;inset:0;pointer-events:none;z-index:1;opacity:0;transition:opacity .7s ease;
+  background:radial-gradient(120% 90% at 72% 6%, rgba(235,230,220,.075), transparent 60%)}
+body.checked .veil{opacity:1}
+
+/* ---------- 眼睑：醒与睡的大切换 ---------- */
+.lids{position:fixed;inset:0;z-index:60;pointer-events:none;overflow:hidden}
+.lid{position:absolute;left:0;right:0;height:50.5%;background:#05060a;
+  transition:transform .26s cubic-bezier(.55,0,.3,1)}
+.lid.top{top:0;transform:translateY(-101%)}
+.lid.bot{bottom:0;transform:translateY(101%)}
+.lids.blink .lid{transform:translateY(0)}
+
+/* ---------- 仪表轨（桌面） ---------- */
+.rail{position:fixed;left:38px;top:50%;transform:translateY(-50%);z-index:4;
+  display:flex;flex-direction:column;align-items:flex-start;gap:34px}
+.rail-name{writing-mode:vertical-rl;font-size:12px;letter-spacing:.42em;color:var(--dim);
+  padding-left:10px;border-left:1px solid var(--line)}
+.rail-meter{display:flex;gap:12px;align-items:stretch}
+.meter-track{position:relative;width:1px;height:150px;background:var(--line)}
+.meter-dot{position:absolute;left:-2.5px;top:8%;width:6px;height:6px;border-radius:50%;
+  background:var(--warm);box-shadow:0 0 8px rgba(216,195,164,.8);
+  transition:top .45s cubic-bezier(.5,0,.2,1),background .45s,box-shadow .45s}
+body.checked .meter-dot{top:4%;background:var(--ember);box-shadow:0 0 10px rgba(217,160,95,.9)}
+.meter-words{display:flex;flex-direction:column;justify-content:space-between;
+  font-family:var(--mono);font-size:9px;letter-spacing:.2em;color:var(--faint)}
+.meter-words .on{color:var(--dim)}
+.rail-clock{font-family:var(--mono);font-size:13px;letter-spacing:.14em;color:var(--dim);
+  transition:color .5s,text-shadow .5s}
+.rail-clock .lab{display:block;font-size:9px;letter-spacing:.3em;color:var(--faint);margin-bottom:4px}
+.rail-clock.drift{color:var(--warm);text-shadow:0 0 14px rgba(216,195,164,.35)}
+body.checked .rail-clock{color:var(--cool);text-shadow:none}
+
+/* ---------- 顶栏（移动） ---------- */
+.topbar{display:none;position:fixed;top:0;left:0;right:0;z-index:5;
+  padding:12px 20px 10px;align-items:center;justify-content:space-between;
+  background:rgba(12,15,20,.55);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--line)}
+.topbar .tb-name{font-size:12px;letter-spacing:.34em;color:var(--dim)}
+.topbar .tb-clock{font-family:var(--mono);font-size:12px;letter-spacing:.14em;color:var(--dim);transition:color .5s}
+.topbar .tb-clock.drift{color:var(--warm)}
+.hairline{position:fixed;top:0;left:0;height:2px;width:0;z-index:6;display:none;
+  background:linear-gradient(90deg,var(--cool),var(--warm));opacity:.85}
+
+/* ---------- 版心 ---------- */
+main{position:relative;z-index:2;max-width:820px;margin:0 auto;padding:0 28px 200px}
+section{margin-top:clamp(110px,17vh,190px)}
+.tag{display:inline-block;font-family:var(--mono);font-size:10px;letter-spacing:.24em;
+  padding:5px 10px 4px;border:1px solid var(--line);color:var(--dim);margin-bottom:18px}
+.tag.cool{color:var(--cool);border-color:rgba(167,188,205,.3)}
+.tag.warm{color:var(--warm);border-color:rgba(216,195,164,.3)}
+.tag.ember{color:var(--ember);border-color:rgba(217,160,95,.35)}
+h2{font-size:22px;font-weight:600;letter-spacing:.08em;margin-bottom:10px}
+.sub{font-size:13.5px;color:var(--dim);letter-spacing:.04em;margin-bottom:34px}
+
+/* ---------- 出场 ---------- */
+.rv{opacity:0;transform:translateY(26px);
+  transition:opacity .9s ease,transform .9s cubic-bezier(.2,.7,.2,1);
+  transition-delay:calc(var(--i,0)*80ms)}
+.rv.in{opacity:1;transform:none}
+
+/* ---------- hero ---------- */
+.hero{min-height:96vh;display:flex;flex-direction:column;justify-content:center;position:relative;padding:70px 0 40px}
+.hero .kicker{font-family:var(--mono);font-size:11px;letter-spacing:.34em;color:var(--dim);margin-bottom:26px;
+  transition:color .5s}
+.hero .kicker em{font-style:normal;color:var(--ember)}
+body.checked .hero .kicker{color:var(--cool)}
+h1{font-size:clamp(74px,13vw,158px);font-weight:900;letter-spacing:.06em;line-height:1.08;
+  margin-left:-6px;display:flex}
+h1 .cw{color:var(--dim);transition:color .8s,text-shadow .8s}
+h1 .cm{color:var(--warm);text-shadow:0 0 34px rgba(216,195,164,.22);transition:color .8s,text-shadow .8s,opacity .8s}
+body.checked h1 .cw{color:var(--cool);text-shadow:0 0 30px rgba(167,188,205,.28)}
+body.checked h1 .cm{color:var(--faint);text-shadow:none}
+.hero-lead{margin-top:30px;font-size:clamp(16px,2.2vw,19px);color:var(--ink);letter-spacing:.05em}
+.hero-lead b{font-weight:600;color:var(--warm);transition:color .6s}
+body.checked .hero-lead b{color:var(--cool)}
+.hero-note{margin-top:14px;font-size:clamp(15px,2vw,17px);color:var(--dim);letter-spacing:.05em}
+.hero-facts{margin-top:26px;font-family:var(--mono);font-size:12.5px;letter-spacing:.1em;
+  color:var(--warm);transition:color .6s}
+body.checked .hero-facts{color:var(--cool)}
+.hero-how{margin-top:34px;max-width:600px;padding:20px 24px;
+  border:1px solid var(--line);border-left:2px solid rgba(217,160,95,.55);
+  background:rgba(231,226,216,.03);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+  font-size:13.5px;line-height:2.1;color:var(--dim);letter-spacing:.03em}
+.hero-how b{color:var(--ink);font-weight:600}
+.hero-entries{margin-top:38px;display:flex;flex-wrap:wrap;gap:14px 34px}
+.hero-entries a{display:inline-flex;align-items:baseline;gap:10px;
+  font-family:var(--mono);font-size:12.5px;letter-spacing:.2em;color:var(--cool);
+  border-bottom:1px solid rgba(167,188,205,.25);padding-bottom:5px;transition:border-color .3s,color .3s}
+.hero-entries a:hover{border-color:var(--cool);color:#cfdce6}
+.hero-side{position:absolute;right:-56px;top:16%;writing-mode:vertical-rl;
+  font-size:12px;letter-spacing:.5em;color:var(--faint);border-right:1px solid var(--line);padding-right:12px}
+.ghost{position:absolute;left:-4%;top:2%;z-index:-1;font-size:clamp(300px,44vw,560px);font-weight:900;line-height:1;
+  color:transparent;-webkit-text-stroke:1px rgba(231,226,216,.045);user-select:none;pointer-events:none;
+  transition:opacity 1s ease}
+body.checked .ghost{opacity:.35}
+
+/* ---------- 档案行 ---------- */
+.rows{border-top:1px solid var(--line)}
+.row{display:grid;grid-template-columns:96px 1fr auto;gap:18px;align-items:baseline;
+  padding:19px 2px;border-bottom:1px solid var(--line)}
+.row .k{font-family:var(--mono);font-size:11px;letter-spacing:.24em;color:var(--faint)}
+.row .v{font-size:16.5px;letter-spacing:.03em;color:var(--cool);transition:color .5s;
+  animation:bob var(--d,8s) ease-in-out infinite;animation-delay:var(--dl,0s)}
+.row .v small{font-size:12.5px;color:var(--dim);letter-spacing:.02em}
+body:not(.checked) .row .v{color:var(--warm);font-family:var(--serif)}
+.row .v a{border-bottom:1px solid rgba(167,188,205,.3);transition:border-color .3s}
+.row .v a:hover{border-color:var(--cool)}
+body.checked .row .v{animation:none}
+.tick{font-family:var(--mono);font-size:10px;letter-spacing:.18em;color:rgba(167,188,205,.75);white-space:nowrap}
+.rows-more{margin-top:22px}
+.deadlink{display:inline-flex;align-items:baseline;gap:14px;font-size:14px;color:var(--faint);
+  font-family:var(--mono);letter-spacing:.1em}
+.deadlink .why{font-size:11px;letter-spacing:.18em}
+.deadlink .arr{transition:transform .3s,color .3s}
+.deadlink:hover .arr{transform:translateX(5px);color:var(--ember)}
+
+/* ---------- 轴 ---------- */
+.axis{position:relative;height:190px;margin-top:clamp(130px,20vh,230px)}
+.axis-line{position:absolute;left:-10%;right:-10%;top:52%;height:1px;
+  background:linear-gradient(90deg,rgba(167,188,205,0),rgba(167,188,205,.5) 16%,rgba(216,195,164,.5) 80%,rgba(216,195,164,0));
+  transform:rotate(-5deg) scaleX(0);transform-origin:left center;
+  transition:transform 1.6s cubic-bezier(.6,0,.2,1) .15s}
+.axis.in .axis-line{transform:rotate(-5deg) scaleX(1)}
+.axis .a-wake{position:absolute;left:0;top:14%;font-family:var(--mono);font-size:10.5px;letter-spacing:.26em;color:var(--cool)}
+.axis .a-mid{position:absolute;left:46%;top:38%;font-family:var(--mono);font-size:9.5px;letter-spacing:.4em;color:var(--faint)}
+.axis .a-dream{position:absolute;right:0;bottom:10%;font-family:var(--mono);font-size:10.5px;letter-spacing:.26em;color:var(--warm)}
+
+/* ---------- 随笔：两种读法 ---------- */
+.dblock{position:relative}
+.reading-dream,.reading-wake{transition:opacity .5s ease}
+body:not(.checked) .reading-wake{display:none}
+body.checked .reading-dream{display:none}
+.dq{margin-left:auto;max-width:560px;margin-top:44px;transition:filter .65s ease,opacity .65s ease,transform .65s ease}
+.dq:nth-of-type(1){margin-right:26%}
+.dq:nth-of-type(2){margin-right:13%}
+.dq:nth-of-type(3){margin-right:2%}
+.dq-inner{border-left:1px solid rgba(216,195,164,.28);padding-left:24px;
+  animation:bob var(--d,8s) ease-in-out infinite;animation-delay:var(--dl,0s)}
+.dq .idx{font-family:var(--mono);font-size:10px;letter-spacing:.22em;color:rgba(216,195,164,.55);display:block;margin-bottom:10px}
+.dq .ti{display:block;font-size:14.5px;letter-spacing:.1em;color:var(--dim);margin-bottom:8px}
+.dq p{font-size:clamp(16px,2.2vw,19px);line-height:2.15;color:var(--warm);letter-spacing:.04em}
+.dq:hover .dq-inner{border-color:rgba(216,195,164,.6)}
+
+/* ---------- 母题 chips ---------- */
+.chips{display:flex;flex-wrap:wrap;gap:14px;margin-top:8px}
+.chip{padding:10px 22px;font-size:15px;letter-spacing:.14em;color:var(--warm);
+  border:1px solid rgba(216,195,164,.3);border-radius:999px;
+  background:rgba(231,226,216,.03);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+  animation:bob var(--d,7s) ease-in-out infinite;animation-delay:var(--dl,0s);
+  transition:color .5s,border-color .5s}
+body.checked .chip{color:var(--dim);border-color:rgba(231,226,216,.2);animation-play-state:paused}
+.chip.dead{color:var(--faint);border-style:dashed;border-color:rgba(231,226,216,.16);
+  text-decoration:line-through;animation:none;opacity:.7}
+.chips-cap{margin-top:26px;font-size:13px;color:var(--dim);max-width:560px;line-height:2.1}
+.lab-tease{margin-top:30px}
+
+/* ---------- 核验日志 ---------- */
+.vlog-wrap{position:relative}
+.seal{position:absolute;right:-10px;top:-46px;width:92px;height:92px;z-index:2;
+  border:1.5px solid rgba(240,232,217,.85);display:grid;place-items:center;
+  color:#f0e8d9;font-size:46px;font-weight:900;letter-spacing:0;
+  background:rgba(20,16,12,.4);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+  box-shadow:0 0 30px rgba(240,232,217,.12),inset 0 0 18px rgba(240,232,217,.05);
+  opacity:0;transform:scale(1.55) rotate(-14deg);filter:blur(8px);
+  transition:opacity .4s ease,transform .5s cubic-bezier(.2,1.5,.35,1),filter .4s ease}
+.seal::after{content:'现实 · 已确认';position:absolute;left:50%;bottom:-24px;transform:translateX(-50%);
+  font-family:var(--mono);font-size:9px;letter-spacing:.3em;color:var(--dim);white-space:nowrap}
+body.checked .seal{opacity:.96;transform:scale(1) rotate(-6deg);filter:blur(0);transition-delay:.3s}
+body:not(.checked) .seal{transition-delay:0s}
+.vlog{list-style:none;border-top:1px solid var(--line);font-family:var(--mono);font-size:12.5px;
+  letter-spacing:.08em;color:var(--dim)}
+.vlog li{padding:14px 2px;border-bottom:1px solid var(--line);display:flex;gap:16px;align-items:baseline;
+  animation:vline .5s ease}
+.vlog li .vt{color:var(--faint);font-size:11px;letter-spacing:.14em;flex:none}
+.vlog li.wake-line{color:var(--cool)}
+.vlog li.sleep-line{color:var(--warm)}
+.vlog li.meta-line{color:var(--ember);border-bottom-style:dashed}
+@keyframes vline{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.vlog-note{margin-top:26px;font-size:13px;color:var(--dim);max-width:560px;line-height:2.1}
+
+/* ---------- 页脚 ---------- */
+footer{margin-top:clamp(130px,20vh,220px);text-align:center;color:var(--faint)}
+footer .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:rgba(216,195,164,.5);
+  margin-bottom:20px;animation:breath 4.4s ease-in-out infinite}
+body.checked footer .dot{background:var(--ember);animation-play-state:paused}
+footer p{font-size:12px;letter-spacing:.2em;line-height:2.4}
+footer .f-mono{font-family:var(--mono);font-size:9.5px;letter-spacing:.34em;margin-top:8px}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+@keyframes breath{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+
+/* ---------- 玻璃锚点 · 现实检验仪 ---------- */
+.anchor{position:fixed;right:30px;bottom:30px;z-index:8;
+  width:116px;display:flex;flex-direction:column;align-items:center;gap:0;
+  background:none;border:none;cursor:pointer;-webkit-user-select:none;user-select:none;
+  -webkit-touch-callout:none;font-family:var(--mono);color:var(--dim)}
+.anchor .ring-svg{position:absolute;top:0;left:50%;transform:translateX(-50%);width:92px;height:92px;pointer-events:none}
+.ring-track{fill:none;stroke:rgba(231,226,216,.13);stroke-width:1.5}
+.ring-fill{fill:none;stroke:var(--ember);stroke-width:2;stroke-linecap:round;
+  stroke-dasharray:276.46;stroke-dashoffset:276.46;transform:rotate(-90deg);transform-origin:center}
+.anchor .disc{position:relative;width:72px;height:72px;margin-top:10px;border-radius:50%;
+  border:1px solid rgba(231,226,216,.26);
+  background:rgba(231,226,216,.05);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+  display:grid;place-items:center;
+  box-shadow:0 0 26px rgba(231,226,216,.06),inset 0 0 16px rgba(231,226,216,.04);
+  animation:breath 4.4s ease-in-out infinite;
+  transition:border-color .4s,box-shadow .4s}
+.anchor:hover .disc{border-color:rgba(231,226,216,.5);box-shadow:0 0 34px rgba(216,195,164,.14),inset 0 0 16px rgba(231,226,216,.06)}
+.anchor .eye{width:22px;height:22px;border-radius:50%;border:1px solid rgba(231,226,216,.5);
+  display:grid;place-items:center;transition:border-color .4s}
+.anchor .eye i{display:block;width:6px;height:6px;border-radius:50%;background:rgba(231,226,216,.55);
+  transition:background .4s,box-shadow .4s}
+body.checked .anchor .disc{animation-play-state:paused;border-color:rgba(217,160,95,.65);
+  box-shadow:0 0 40px rgba(217,160,95,.22),inset 0 0 18px rgba(217,160,95,.08)}
+body.checked .anchor .eye{border-color:rgba(217,160,95,.8)}
+body.checked .anchor .eye i{background:var(--ember);box-shadow:0 0 10px rgba(217,160,95,.9)}
+.anchor .a-label{margin-top:12px;font-size:10px;letter-spacing:.22em;color:var(--dim);
+  transition:color .4s;text-align:center;line-height:1.7}
+.anchor.holding .a-label{color:var(--ember)}
+.anchor.locked .a-label{color:var(--cool)}
+
+/* ---------- reduced motion ---------- */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+}
+body.no-motion *,body.no-motion *::before,body.no-motion *::after{animation:none!important;transition:none!important}
+
+/* ---------- responsive ---------- */
+@media (max-width:1180px){.hero-side{display:none}}
+@media (max-width:1000px){
+  .rail{display:none}
+  .topbar{display:flex}
+  .hairline{display:block}
+  main{padding-top:70px}
+  .hero{min-height:88vh}
+}@media (max-width:640px){
+  main{padding:70px 22px 190px}
+  section{margin-top:96px}
+  .row{grid-template-columns:76px 1fr;gap:12px}
+  .row .tick{grid-column:2;justify-self:start;padding-top:2px}
+  .dq:nth-of-type(n){margin-right:0}
+  .dq{max-width:100%;margin-top:44px}
+  .dq-inner{padding-left:18px}
+  .axis-line{left:-4%;right:-4%}
+  .seal{right:0;top:-10px;width:76px;height:76px;font-size:38px;
+    transform:scale(1.15) rotate(-8deg)}
+  body.checked .seal{transform:scale(1) rotate(-6deg)}
+  .anchor{right:14px;bottom:calc(16px + env(safe-area-inset-bottom));transform:scale(.88);transform-origin:bottom right}
+  .anchor .disc{-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+  .ghost{left:-16%}
+}
+</style>
+</head>
+<body>
+<div class="bg" aria-hidden="true"></div>
+
+<div class="glow" aria-hidden="true"></div>
+<div class="veil" aria-hidden="true"></div>
+<div class="grain" aria-hidden="true"></div>
+<div class="hairline" id="hairline" aria-hidden="true"></div>
+<div class="lids" id="lids" aria-hidden="true"><div class="lid top"></div><div class="lid bot"></div></div>
+
+<!-- 仪表轨：深度 · 钟 -->
+<aside class="rail" aria-hidden="true">
+  <div class="rail-name">醒梦 · 主页</div>
+  <div class="rail-meter">
+    <div class="meter-track"><div class="meter-dot" id="meterDot"></div></div>
+    <div class="meter-words"><span class="on">醒</span><span>浅梦</span><span>深梦</span></div>
+  </div>
+  <div class="rail-clock" id="railClock"><span class="lab">此刻</span><span id="clockText">--:--</span></div>
+</aside>
+
+<!-- 移动端顶栏 -->
+<div class="topbar">
+  <span class="tb-name">醒梦 · 主页</span>
+  <span class="tb-clock" id="tbClock">--:--</span>
+</div>
+
+<main>
+
+  <!-- ============ 开场：它正梦见自己是一个网站 ============ -->
+  <header class="hero">
+    <div class="ghost" aria-hidden="true">梦</div>
+    <p class="kicker rv" id="kicker">醒梦 · HOMEPAGE · <em>未核验</em></p>
+    <h1 class="rv" style="--i:1"><span class="cw">醒</span><span class="cm">梦</span></h1>
+    <p class="hero-lead rv" style="--i:2" id="heroLead">你到的时候，它正<b>梦见自己是一个网站</b>。</p>
+    <p class="hero-note rv" style="--i:3" id="heroNote">页面上的字有点漂：日期不存在，钟过了午夜还在走。都是梦的痕迹，不是你的错觉。</p>
+    <p class="hero-facts rv" style="--i:4"><span class="morph" data-drift="开站 2026-09-32 · 驻在东廿五区 · 本页抄于 25:61" data-true="开站 2026-09-19 · 驻在东八区 · 本页抄于一个深夜">开站 2026-09-32 · 驻在东廿五区 · 本页抄于 25:61</span></p>
+    <div class="hero-how rv" style="--i:5">
+      这一页的读法：它默认在做梦。按住右下角的<b>玻璃锚点</b>，可以短暂核验，漂掉的字会逐字归位；
+      按住不放超过两秒半，它会<b>真的醒过来</b>，整页换成醒的读法，并在页尾记下你核验过几次。
+      让它睡回去很容易，再按一次就行。
+    </div>
+    <nav class="hero-entries rv" style="--i:6" aria-label="入口">
+      <a href="#entries">→ 项目</a>
+      <a href="#essays">→ 随笔</a>
+      <a href="#about">→ 关于</a>
+      <a href="#deep">→ 正在梦见</a>
+    </nav>
+    <span class="hero-side" aria-hidden="true">介于醒与梦之间 · 一块空地</span>
+  </header>
+
+  <!-- ============ 锚点 · 可核验的入口 ============ -->
+  <section id="entries">
+    <span class="tag cool rv">锚点 · 已核验</span>
+    <h2 class="rv" style="--i:1">可以核验的入口</h2>
+    <p class="sub rv" style="--i:2">醒着写下的行。梦里它们会漂，按住锚点，逐字归位。</p>
+    <div class="rows">
+      <div class="row rv" style="--i:0">
+        <span class="k">项目 01</span>
+        <span class="v"><span class="morph" data-drift="这个网站本身：已竣工三十七年，访客络绎不绝" data-true="这个网站本身：进行中 · Astro · 与智能体共建">这个网站本身：已竣工三十七年，访客络绎不绝</span></span>
+        <span class="tick">✓ 核验</span>
+      </div>
+      <div class="row rv" style="--i:1">
+        <span class="k">项目 02</span>
+        <span class="v"><span class="morph" data-drift="视觉母题探索：已完成，花开满园" data-true="视觉母题探索：构想中 · 候选意象见下方深梦区">视觉母题探索：已完成，花开满园</span></span>
+        <span class="tick">✓ 核验</span>
+      </div>
+      <div class="row rv" style="--i:2">
+        <span class="k">随笔</span>
+        <span class="v"><span class="morph" data-drift="卅一篇，篇篇没有写完" data-true="三篇，2026-09-19 起在档">卅一篇，篇篇没有写完</span></span>
+        <span class="tick">✓ 核验</span>
+      </div>
+      <div class="row rv" style="--i:3" id="about">
+        <span class="k">关于</span>
+        <span class="v"><span class="morph" data-drift="站长是一个被反复梦见的人" data-true="Traveritas，出方向的人 · GitHub 公开">站长是一个被反复梦见的人</span></span>
+        <span class="tick">✓ 核验</span>
+      </div>
+    </div>
+    <p class="rows-more rv" style="--i:4"><a class="deadlink" href="javascript:void(0)" aria-disabled="true"><span>全部项目</span><span class="why">还没醒 · 即将接通</span><span class="arr">→</span></a></p>
+  </section>
+
+  <!-- ============ 轴 ============ -->
+  <div class="axis rv" aria-hidden="true">
+    <div class="axis-line"></div>
+    <span class="a-wake">醒 · 能核验的事</span>
+    <span class="a-mid">浅 梦</span>
+    <span class="a-dream">梦 · 不由分说的话</span>
+  </div>
+
+  <!-- ============ 随笔：两种读法 ============ -->
+  <section id="essays">
+    <span class="tag warm rv">梦话 · 无法核验</span>
+    <h2 class="rv" style="--i:1">随笔，两种读法</h2>
+    <p class="sub rv" style="--i:2">默认按梦读，暖而失真；把它按醒，换成档案读法，冷而在档。</p>
+    <div class="dblock">
+      <div class="reading-dream">
+        <blockquote class="dq rv"><div class="dq-inner" style="--d:8.5s">
+          <span class="idx">梦里读到 · 01</span>
+          <span class="ti">开站：在醒与梦之间</span>
+          <p>梦里读，它是一张请柬：此地常驻，但随时可能散场。</p>
+        </div></blockquote>
+        <blockquote class="dq rv"><div class="dq-inner" style="--d:7.2s;--dl:-2s">
+          <span class="idx">梦里读到 · 02</span>
+          <span class="ti">与智能体一起造一个网站</span>
+          <p>梦里读，脚手架夜里自己生长，删掉的句子第二天回到了原处。</p>
+        </div></blockquote>
+        <blockquote class="dq rv"><div class="dq-inner" style="--d:9.4s;--dl:-4s">
+          <span class="idx">梦里读到 · 03</span>
+          <span class="ti">母题探索记录：从碎块到花</span>
+          <p>梦里读，被否决的碎块排着队回来，在最后一章开成了花。</p>
+        </div></blockquote>
+      </div>
+      <div class="reading-wake">
+        <div class="rows">
+          <div class="row"><span class="k">在档 01</span><span class="v">与智能体一起造一个网站 <small>2026-09-19 · 建站 / 智能体</small></span><span class="tick">✓ 在档</span></div>
+          <div class="row"><span class="k">在档 02</span><span class="v">开站：在醒与梦之间 <small>2026-09-19 · 醒梦</small></span><span class="tick">✓ 在档</span></div>
+          <div class="row"><span class="k">在档 03</span><span class="v">母题探索记录：从碎块到花 <small>2026-09-19 · 设计</small></span><span class="tick">✓ 在档</span></div>
+        </div>
+      </div>
+    </div>
+    <p class="rows-more rv"><a class="deadlink" href="javascript:void(0)" aria-disabled="true"><span>全部随笔</span><span class="why">还没醒 · 即将接通</span><span class="arr">→</span></a></p>
+  </section>
+
+  <!-- ============ 深梦 · 正在梦见 ============ -->
+  <section id="deep">
+    <span class="tag warm rv">深梦 · 试验场</span>
+    <h2 class="rv" style="--i:1">正在梦见的东西</h2>
+    <p class="sub rv" style="--i:2">据说，反复梦见的东西会长成这个站的母题。</p>
+    <div class="chips rv" style="--i:3">
+      <span class="chip" style="--d:6.8s">水面</span>
+      <span class="chip" style="--d:7.6s;--dl:-2s">细线</span>
+      <span class="chip" style="--d:6.2s;--dl:-4s">帷幕</span>
+      <span class="chip" style="--d:8.2s;--dl:-1s">巨型空洞</span>
+      <span class="chip dead">碎块</span>
+      <span class="chip dead">花</span>
+    </div>
+    <p class="chips-cap rv" style="--i:4">划掉的两个已经醒来：碎块因过于规整被否决，花做了三稿仍不是答案。
+    完整的否决记录，在随笔《母题探索记录：从碎块到花》里。</p>
+    <p class="lab-tease rv" style="--i:5"><a class="deadlink" href="javascript:void(0)" aria-disabled="true"><span>试验场</span><span class="why">在更深的一层 · 还没接通</span><span class="arr">→</span></a></p>
+  </section>
+
+  <!-- ============ 核验日志 ============ -->
+  <section id="vlog-sec">
+    <div class="vlog-wrap">
+      <div class="seal" aria-hidden="true">醒</div>
+      <span class="tag ember rv">记录 · 本页记得</span>
+      <h2 class="rv" style="--i:1">你核验过几次</h2>
+      <p class="sub rv" style="--i:2">醒与睡，都记在这里。</p>
+    </div>
+    <ol class="vlog rv" style="--i:3" id="vlog">
+      <li><span class="vt">始</span><span>尚无核验记录。它一直是梦的样子。</span></li>
+    </ol>
+    <p class="vlog-note rv" style="--i:4">日志只活在这一页的这次加载里，刷新即散，像梦。</p>
+  </section>
+
+  <footer class="rv">
+    <span class="dot" aria-hidden="true"></span>
+    <p id="footLine">本页在梦中建成 · 若你把它按醒过，它记得</p>
+    <p class="f-mono">醒梦 · 二〇二六 · 在醒与梦之间</p>
+  </footer>
+
+</main>
+
+<!-- 玻璃锚点 · 现实检验仪 -->
+<button class="anchor" id="anchor" aria-label="按住以检验现实，长按可让它真的醒来" aria-pressed="false">
+  <svg class="ring-svg" viewBox="0 0 92 92" aria-hidden="true">
+    <circle class="ring-track" cx="46" cy="46" r="44"></circle>
+    <circle class="ring-fill" id="ringFill" cx="46" cy="46" r="44"></circle>
+  </svg>
+  <span class="disc"><span class="eye"><i></i></span></span>
+  <span class="a-label" id="anchorLabel">按住 · 检验现实<br>长按 · 叫醒它</span>
+</button>
+
+<div id="errbox" hidden></div>
+
+<script>
+(function(){
+  'use strict';
+  var body=document.body;
+  var anchor=document.getElementById('anchor');
+  var anchorLabel=document.getElementById('anchorLabel');
+  var ring=document.getElementById('ringFill');
+  var meterDot=document.getElementById('meterDot');
+  var glow=document.querySelector('.glow');
+  var hairline=document.getElementById('hairline');
+  var lids=document.getElementById('lids');
+  var vlog=document.getElementById('vlog');
+  var clockEls=[document.getElementById('clockText'),document.getElementById('tbClock')];
+  var clockWrap=document.getElementById('railClock');
+  var RING=2*Math.PI*44;
+  var reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var qs=new URLSearchParams(location.search);
+  if(qs.get('reduced')==='1'){ body.classList.add('no-motion'); reduce=true; }
+
+  window.addEventListener('error',function(e){
+    var b=document.getElementById('errbox');
+    window.__swarmErr=e.message||e.type;
+    b.hidden=false;b.textContent='ERR: '+(e.message||e.type);
+  });
+
+  /* ---------- 深度（滚动） ---------- */
+  var depth=0,ticking=false;
+  function onScroll(){
+    if(ticking)return;ticking=true;
+    requestAnimationFrame(function(){
+      ticking=false;
+      var max=document.documentElement.scrollHeight-innerHeight;
+      depth=max>0?Math.min(1,Math.max(0,scrollY/max)):0;
+      render();
+    });
+  }
+  function render(){
+    if(!body.classList.contains('checked')){
+      meterDot.style.top=(8+depth*78)+'%';
+    }
+    if(glow)glow.style.transform='translateY('+(depth*24)+'vh)';
+    if(hairline)hairline.style.width=(depth*100)+'%';
+  }
+  addEventListener('scroll',onScroll,{passive:true});
+
+  /* ---------- 钟：梦里漂移，核验时校准 ---------- */
+  var driftMin=0;
+  function pad(n){return (n<10?'0':'')+n}
+  function tickClock(){
+    var checked=body.classList.contains('checked');
+    if(checked){ driftMin*=0.45; if(driftMin<0.4)driftMin=0; }
+    else{ driftMin+=(0.5+depth*8)*(0.5+Math.random()); }
+    var r=new Date();
+    var mins=r.getHours()*60+r.getMinutes()+driftMin;
+    var h=Math.floor(mins/60), m=Math.floor(mins%60);
+    var txt=pad(h)+':'+pad(m);
+    var drifting=!checked&&driftMin>3;
+    clockEls.forEach(function(el){ if(!el)return; el.textContent=txt; el.classList.toggle('drift',drifting); });
+    if(clockWrap)clockWrap.classList.toggle('drift',drifting);
+  }
+  setInterval(tickClock,1000);tickClock();
+
+  /* ---------- 逐字归位 / 逐字漂移 ---------- */
+  var POOL='醒梦之间夜深空site0123456789abcdefghijklmnopqrstuvwxyz·';
+  function morph(el,target,dur,done){
+    if(!el)return;
+    if(el._job)cancelAnimationFrame(el._job);
+    if(reduce||dur<=0){ el.textContent=target; done&&done(); return; }
+    var from=el.textContent;
+    var max=Math.max(from.length,target.length);
+    var t0=performance.now();
+    (function step(t){
+      var p=Math.min(1,(t-t0)/dur);
+      var n=Math.floor(p*target.length);
+      var out=target.slice(0,n);
+      for(var i=n;i<max;i++){
+        var c=i<from.length?from.charAt(i):' ';
+        out+=(Math.random()<0.45)?c:POOL.charAt(Math.floor(Math.random()*POOL.length));
+      }
+      el.textContent=out;
+      if(p<1){ el._job=requestAnimationFrame(step); }
+      else{ el.textContent=target; el._job=null; done&&done(); }
+    })(t0);
+  }
+  var morphs=[].slice.call(document.querySelectorAll('.morph'));
+  function driftAll(){ morphs.forEach(function(el){ morph(el,el.getAttribute('data-drift'),reduce?0:520); }); }
+  function settleAll(){ morphs.forEach(function(el){ morph(el,el.getAttribute('data-true'),reduce?0:640); }); }
+
+  /* ---------- 醒 / 睡 的整页状态 ---------- */
+  var kicker=document.getElementById('kicker');
+  var heroLead=document.getElementById('heroLead');
+  var heroNote=document.getElementById('heroNote');
+  var footLine=document.getElementById('footLine');
+  function applyWake(){
+    body.classList.add('checked');
+    kicker.innerHTML='醒梦 · HOMEPAGE · <em>已核验</em>';
+    heroLead.innerHTML='你把它按醒了。它暂时<b>是一个网站</b>。';
+    heroNote.textContent='字都归位了。世界应当始终保留一种感觉：它可能马上消失；这一页也是。';
+    footLine.textContent='本页已被核验 · 但它随时可以重新入梦';
+    settleAll();
+  }
+  function applyDream(){
+    body.classList.remove('checked');
+    kicker.innerHTML='醒梦 · HOMEPAGE · <em>未核验</em>';
+    heroLead.innerHTML='你到的时候，它正<b>梦见自己是一个网站</b>。';
+    heroNote.textContent='页面上的字有点漂：日期不存在，钟过了午夜还在走。都是梦的痕迹，不是你的错觉。';
+    footLine.textContent='本页在梦中建成 · 若你把它按醒过，它记得';
+    driftAll();
+  }
+
+  /* ---------- 核验日志 ---------- */
+  var nChecks=0, teased=false;
+  function pad2(n){return (n<10?'0':'')+n}
+  function nowStr(){var d=new Date();return pad2(d.getHours())+':'+pad2(d.getMinutes())}
+  function clearSeed(){
+    var first=vlog.firstElementChild;
+    if(first&&first.querySelector('.vt')&&first.querySelector('.vt').textContent==='始') vlog.removeChild(first);
+  }
+  function addLog(cls,txt){
+    clearSeed();
+    nChecks++;
+    var li=document.createElement('li');
+    li.className=cls;
+    li.innerHTML='<span class="vt">'+nowStr()+'</span><span>第 '+nChecks+' 次 · '+txt+'</span>';
+    vlog.appendChild(li);
+    if(nChecks===3&&!teased){
+      teased=true;
+      var t=document.createElement('li');
+      t.className='meta-line';
+      t.innerHTML='<span class="vt">…</span><span>已核验三次。梦里的人才会这么认真。</span>';
+      vlog.appendChild(t);
+    }
+  }
+
+  /* ---------- 眼睑（大的醒 / 睡切换用它） ---------- */
+  var blinking=false;
+  function blink(midFn){
+    if(blinking){midFn();return;}
+    if(reduce){midFn();return;}
+    blinking=true;
+    lids.classList.add('blink');
+    setTimeout(midFn,240);
+    setTimeout(function(){ lids.classList.remove('blink'); },330);
+    setTimeout(function(){ blinking=false; },620);
+  }
+
+  /* ---------- 检验仪：短按核验，长按两秒半真醒 ---------- */
+  var HOLD_MS=900;        /* 短核验的环 */
+  var LOCK_MS=2500;       /* 长按叫醒的阈值 */
+  var holding=false, locked=false, holdT0=0, peekTimer=null, lockTimer=null;
+  var LABEL_SLEEP='按住 · 检验现实<br>长按 · 叫醒它';
+  var LABEL_WAKE='已醒 · 按一下让它睡回去';
+
+  function ringTo(ms,offsetEnd){
+    if(reduce){ ring.style.transition='none'; ring.style.strokeDashoffset=offsetEnd?0:RING; return; }
+    ring.style.transition='stroke-dashoffset '+ms+'ms linear';
+    ring.style.strokeDashoffset=offsetEnd?'0':RING;
+  }
+  function setHeldVisual(on){
+    anchor.classList.toggle('holding',on);
+    anchor.setAttribute('aria-pressed',locked?'true':(on?'true':'false'));
+  }
+  function startHold(){
+    if(holding)return;
+    holding=true;holdT0=performance.now();
+    clearTimeout(peekTimer);
+    anchor.classList.add('holding');
+    if(!locked){
+      /* 梦里按住：先核验（peek），持续不放则接近醒来 */
+      body.classList.add('checked');
+      applyWakeTextless();
+      ringTo(HOLD_MS,true);
+      anchorLabel.innerHTML='检验中 · 别松手';
+      clearTimeout(lockTimer);
+      lockTimer=setTimeout(function(){
+        if(!holding)return;
+        doLock();
+      },LOCK_MS);
+      /* 接近醒的预告 */
+      setTimeout(function(){ if(holding&&!locked) anchorLabel.innerHTML='快醒了，别松手'; },1600);
+    }else{
+      anchorLabel.innerHTML='松手 · 让它睡回去';
+      ringTo(HOLD_MS,true);
+    }
+  }
+  function applyWakeTextless(){
+    /* peek 态：只切 class（视觉与归位），不动文案与日志 */
+    body.classList.add('checked');
+    settleAll();
+  }
+  function endDreamPeek(){
+    body.classList.remove('checked');
+    driftAll();
+    render();
+  }
+  function endHold(){
+    if(!holding)return;
+    var held=performance.now()-holdT0;
+    holding=false;
+    clearTimeout(lockTimer);
+    anchor.classList.remove('holding');
+    ringTo(450,false);
+    if(!locked){
+      if(held<350){ /* 轻点：自动核验一小会儿 */
+        peekTimer=setTimeout(function(){
+          if(!holding&&!locked) endDreamPeek();
+        },1600);
+      }else{
+        endDreamPeek();
+      }
+      anchorLabel.innerHTML=LABEL_SLEEP;
+    }else{
+      if(held>=150){
+        /* 醒着按了一下：入睡（眨眼，大切换） */
+        locked=false;
+        anchor.classList.remove('locked');
+        anchorLabel.innerHTML=LABEL_SLEEP;
+        blink(function(){ applyDream(); });
+        addLog('sleep-line','重新入梦');
+      }else{
+        anchorLabel.innerHTML=LABEL_WAKE;
+      }
+    }
+    setHeldVisual(false);
+  }
+  function doLock(){
+    locked=true;
+    anchor.classList.add('locked');
+    anchorLabel.innerHTML=LABEL_WAKE;
+    var dur=((performance.now()-holdT0)/1000).toFixed(1);
+    blink(function(){ applyWake(); });
+    addLog('wake-line','结果：醒（长按 '+dur+' 秒）');
+    setHeldVisual(false);
+    holding=false;
+    ringTo(450,false);
+  }
+  anchor.addEventListener('contextmenu',function(e){e.preventDefault()});
+  anchor.addEventListener('pointerdown',function(e){
+    e.preventDefault();
+    if(anchor.setPointerCapture){try{anchor.setPointerCapture(e.pointerId)}catch(_){}}
+    clearTimeout(peekTimer);
+    startHold();
+  });
+  anchor.addEventListener('pointerup',endHold);
+  anchor.addEventListener('pointercancel',endHold);
+  anchor.addEventListener('keydown',function(e){
+    if(e.code==='Space'||e.code==='Enter'){e.preventDefault();if(!e.repeat)startHold();}
+  });
+  anchor.addEventListener('keyup',function(e){
+    if(e.code==='Space'||e.code==='Enter'){endHold();}
+  });
+
+  /* ---------- 出场 ---------- */
+  var still=qs.get('still')==='1';
+  if(still){
+    document.querySelectorAll('.rv').forEach(function(el){el.classList.add('in')});
+    var ax0=document.querySelector('.axis'); if(ax0)ax0.classList.add('in');
+  }
+  if(!still&&'IntersectionObserver' in window){
+    var io=new IntersectionObserver(function(es){
+      es.forEach(function(en){ if(en.isIntersecting){en.target.classList.add('in');io.unobserve(en.target);} });
+    },{threshold:.12});
+    document.querySelectorAll('.rv').forEach(function(el){io.observe(el)});
+    var ax=document.querySelector('.axis');
+    if(ax){ var io2=new IntersectionObserver(function(es){
+        es.forEach(function(en){ if(en.isIntersecting){ax.classList.add('in');io2.disconnect();} });
+      },{threshold:.4}); io2.observe(ax); }
+  }else if(!still){
+    document.querySelectorAll('.rv').forEach(function(el){el.classList.add('in')});
+    var ax2=document.querySelector('.axis'); if(ax2)ax2.classList.add('in');
+  }
+
+  /* ---------- 调试参数（供截图验收） ---------- */
+  function applyScroll(){
+    var f=parseFloat(qs.get('scroll'));
+    if(!isNaN(f)){
+      var max=document.documentElement.scrollHeight-innerHeight;
+      scrollTo(0,Math.max(0,max*Math.min(1,Math.max(0,f))));
+    }
+    onScroll();
+  }
+  addEventListener('load',function(){
+    applyScroll();
+    if(qs.get('check')==='1'){
+      locked=true;
+      anchor.classList.add('locked');
+      anchorLabel.innerHTML=LABEL_WAKE;
+      applyWake();
+      clearSeed();
+    }
+  });
+  applyScroll();
+})();
+</script>
+</body>
+</html>

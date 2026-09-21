@@ -1,0 +1,419 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>方案 D · 字的档案馆</title>
+<style>
+  /* ═══ 概念 ═══
+     最后一层世界由字构成：宣言竖排成碑，立在雾里。
+     地面是账目线（把全站的“账目式列表”语言空间化）；
+     远处有更淡的回声碑——同样的字被距离稀释，且微微走样：
+     回声不忠实，记忆不可靠（有意的梦逻辑，不是文案错误）。
+     醒，全页唯一一枚金色。
+     层三明治：雾 → 回声碑（远） → 回声碑（中） → 地面账目线
+     → 主碑群（前） → 梯与纸鹤（尺度锚点） → 编辑层。 */
+
+  @font-face {
+    font-family: 'Noto Serif SC Web';
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url('https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/files/noto-serif-sc-chinese-simplified-500-normal.woff2') format('woff2');
+  }
+  @font-face {
+    font-family: 'Noto Serif SC Web';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url('https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/files/noto-serif-sc-chinese-simplified-600-normal.woff2') format('woff2');
+  }
+
+  :root {
+    --paper: #f7f8f7;
+    --ink: #242a31;
+    --ink-soft: #545f6a;
+    --ink-faint: #5f6a75;
+    --mist: #dfe8ec;
+    --mist-ink: #4c6a80;
+    --line: #dfe4e7;
+    --gold: #8f7f52;
+    --font-display: 'Noto Serif SC Web', 'Noto Serif SC', 'Palatino Linotype', Georgia, 'Songti SC', SimSun, serif;
+    --font-body: system-ui, -apple-system, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+    --ground: 70vh; /* 地平线 */
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    font-family: var(--font-body);
+    color: var(--ink);
+    background: var(--paper);
+    overflow: hidden;
+  }
+
+  .stage {
+    position: relative;
+    height: 100dvh;
+    overflow: clip;
+    background:
+      linear-gradient(to bottom, #f8f9f8 0%, #f4f6f5 calc(var(--ground) - 14vh), var(--mist) calc(var(--ground) + 2vh), #eef1f0 78%, #e9edeb 100%);
+  }
+
+  /* 地平线：账目线在此收束成一 */
+  .horizon {
+    position: absolute;
+    left: 0; right: 0;
+    top: var(--ground);
+    height: 1px;
+    background: rgba(76, 106, 128, 0.28);
+    z-index: 2;
+  }
+
+  /* 地面：账目线（越近越疏） */
+  .ground-lines {
+    position: absolute;
+    left: 0; right: 0;
+    top: var(--ground);
+    bottom: 0;
+    z-index: 1;
+    pointer-events: none;
+  }
+  .ground-lines svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+  /* 雾团 */
+  .fog {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(2px);
+    z-index: 1;
+    pointer-events: none;
+  }
+  .fog.f1 {
+    width: 46vw; height: 22vh;
+    left: -8vw; top: 46vh;
+    background: radial-gradient(50% 50% at 50% 50%, rgba(223, 232, 236, 0.85), transparent 70%);
+    animation: fog-drift 37s ease-in-out infinite alternate;
+  }
+  .fog.f2 {
+    width: 40vw; height: 20vh;
+    right: -10vw; top: 40vh;
+    background: radial-gradient(50% 50% at 50% 50%, rgba(223, 232, 236, 0.7), transparent 72%);
+    animation: fog-drift 47s ease-in-out infinite alternate-reverse;
+  }
+  @keyframes fog-drift {
+    from { transform: translateX(-16px); }
+    to   { transform: translateX(22px); }
+  }
+
+  /* ── 碑：竖排宣言 ── */
+  .stele {
+    position: absolute;
+    margin: 0;
+    writing-mode: vertical-rl;
+    font-family: var(--font-display);
+    letter-spacing: 0.18em;
+    line-height: 1;
+    color: var(--ink);
+    z-index: 4;
+  }
+  /* 每面碑的轴线：贯穿字列的一根细线 */
+  .stele::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: -7vh;
+    bottom: -9vh;
+    width: 1px;
+    background: rgba(76, 106, 128, 0.16);
+  }
+
+  /* 主碑群（前景，右起；水平间距刻意不等距，仅维持阅读的右起左行） */
+  .s1 { right: 11vw;   bottom: 9vh;  font-size: clamp(2.4rem, 5.4vw, 5rem);   font-weight: 600; }
+  .s2 { right: 22.5vw; bottom: 13vh; font-size: clamp(1.9rem, 4.3vw, 4rem);   font-weight: 600; transform: rotate(0.4deg); }
+  .s3 { right: 31vw;   bottom: 7vh;  font-size: clamp(2.2rem, 5vw, 4.6rem);   font-weight: 600; }
+  .s4 { right: 41.5vw; bottom: 15vh; font-size: clamp(1.7rem, 3.8vw, 3.5rem); font-weight: 600; color: #2e3944; }
+  .s5 { right: 48vw;   bottom: 10vh; font-size: clamp(1.5rem, 3.3vw, 3rem);   font-weight: 500; color: #3a4550; }
+  .s6 { right: 57vw;   bottom: 17vh; font-size: clamp(1.3rem, 2.8vw, 2.5rem); font-weight: 500; color: #46525e; }
+
+  .s4 .wake { color: var(--gold); }
+
+  /* 回声碑（中景与远景：同样的字，被距离稀释） */
+  .echo {
+    z-index: 3;
+    color: var(--mist-ink);
+  }
+  .e1 { right: 8vw;  bottom: 27vh; font-size: clamp(0.95rem, 1.9vw, 1.7rem); opacity: 0.4;  filter: blur(0.6px); }
+  .e2 { right: 26vw; bottom: 31vh; font-size: clamp(0.85rem, 1.7vw, 1.5rem); opacity: 0.32; filter: blur(1px); }
+  .e3 { right: 44vw; bottom: 29vh; font-size: clamp(0.8rem, 1.6vw, 1.4rem);  opacity: 0.26; filter: blur(1.4px); }
+  .e4 { right: 60vw; bottom: 33vh; font-size: clamp(0.75rem, 1.4vw, 1.25rem); opacity: 0.2; filter: blur(1.8px); }
+  .e5 { right: 18vw; bottom: 37vh; font-size: clamp(0.7rem, 1.3vw, 1.15rem); opacity: 0.16; filter: blur(2.2px); }
+
+  /* ── 尺度锚点：梯与纸鹤 ── */
+  .ladder {
+    position: absolute;
+    right: 33.5vw;
+    bottom: 7vh;
+    z-index: 5;
+    pointer-events: none;
+    transform: rotate(-7deg);
+  }
+  .ladder svg { display: block; }
+  .crane {
+    position: absolute;
+    left: 30vw;
+    bottom: 12.5vh;
+    z-index: 5;
+    pointer-events: none;
+    animation: crane-bob 9s ease-in-out infinite alternate;
+  }
+  .crane svg { display: block; }
+  @keyframes crane-bob {
+    from { transform: translateY(0); }
+    to   { transform: translateY(-3px); }
+  }
+
+  /* ── 编辑层 ── */
+  .brand {
+    position: absolute;
+    top: 4.5vh;
+    left: 4vw;
+    z-index: 9;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 1.02rem;
+    letter-spacing: 0.06em;
+    color: var(--ink);
+    text-decoration: none;
+  }
+  .brand .ring {
+    width: 11px; height: 11px;
+    border: 1.5px solid var(--mist-ink);
+    border-radius: 50%;
+    opacity: 0.85;
+  }
+
+  .nav {
+    position: absolute;
+    left: 3.2vw;
+    top: 24vh;
+    z-index: 9;
+    display: flex;
+    flex-direction: column;
+    gap: 2.3rem;
+  }
+  .nav a {
+    position: relative;
+    writing-mode: vertical-rl;
+    letter-spacing: 0.5em;
+    padding: 0.4rem 0.7rem;
+    color: var(--ink-soft);
+    text-decoration: none;
+    font-size: 0.95rem;
+    transition: color 0.18s ease;
+  }
+  .nav a::after {
+    content: '';
+    position: absolute;
+    top: 46%;
+    left: calc(100% + 0.35rem);
+    width: 1.3rem;
+    height: 1px;
+    background: rgba(76, 106, 128, 0.35);
+    transition: width 0.18s ease, background 0.18s ease;
+  }
+  .nav a:hover { color: var(--ink); }
+  .nav a:hover::after { width: 2rem; background: var(--mist-ink); }
+
+  .side-note {
+    position: absolute;
+    right: 4vw;
+    top: 8vh;
+    z-index: 9;
+    writing-mode: vertical-rl;
+    font-size: 0.8rem;
+    letter-spacing: 0.52em;
+    color: var(--ink-faint);
+  }
+
+  /* 最近的随笔：落在账目线上 */
+  .ledger {
+    position: absolute;
+    left: 8vw;
+    bottom: 7vh;
+    z-index: 8;
+    width: 30vw;
+    min-width: 300px;
+  }
+  .ledger h2 {
+    margin: 0 0 0.8rem;
+    font-family: var(--font-body);
+    font-weight: 500;
+    font-size: 0.8rem;
+    letter-spacing: 0.3em;
+    color: var(--ink-faint);
+  }
+  .ledger a {
+    display: grid;
+    grid-template-columns: 6.5em 1fr;
+    gap: 0 1.2rem;
+    align-items: baseline;
+    padding-block: 0.55rem;
+    border-top: 1px solid rgba(76, 106, 128, 0.22);
+    text-decoration: none;
+  }
+  .ledger a:last-of-type { border-bottom: 1px solid rgba(76, 106, 128, 0.22); }
+  .ledger .d {
+    font-size: 0.74rem;
+    color: var(--ink-faint);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.08em;
+  }
+  .ledger .t {
+    font-family: var(--font-display);
+    font-size: 0.98rem;
+    color: var(--ink);
+    transition: color 0.18s ease;
+  }
+  .ledger a:hover .t { color: var(--mist-ink); }
+
+  /* ── 回退 ── */
+  @media (prefers-reduced-motion: reduce) {
+    .fog, .crane { animation: none; }
+  }
+
+  @media (max-height: 700px) {
+    :root { --ground: 66vh; }
+    .s1 { font-size: clamp(2rem, 4.6vw, 4rem); }
+    .ledger { bottom: 5vh; }
+  }
+
+  @media (max-width: 760px) {
+    .s1 { right: 6vw;  bottom: 22vh; font-size: clamp(1.5rem, 7vw, 2.2rem); }
+    .s2 { right: 24vw; bottom: 26vh; font-size: clamp(1.25rem, 5.8vw, 1.8rem); }
+    .s3 { right: 10vw; bottom: 38vh; font-size: clamp(1.15rem, 5.2vw, 1.6rem); }
+    .s4 { right: 30vw; bottom: 42vh; font-size: clamp(1rem, 4.6vw, 1.4rem); }
+    .s5 { right: 12vw; bottom: 52vh; font-size: clamp(0.95rem, 4.2vw, 1.3rem); }
+    .s6 { right: 32vw; bottom: 56vh; font-size: clamp(0.9rem, 3.8vw, 1.2rem); }
+    .e1 { right: 40vw; bottom: 60vh; }
+    .e2, .e3, .e4, .e5, .ladder, .side-note { display: none; }
+    .crane { left: 60vw; bottom: 30vh; }
+    .nav {
+      position: static;
+      margin: 1.8rem 9vw 0;
+      flex-direction: row;
+      gap: 1.8rem;
+    }
+    .nav a { writing-mode: horizontal-tb; letter-spacing: 0.24em; font-size: 0.9rem; }
+    .nav a::after { display: none; }
+    .ledger { position: static; margin: 2.4rem 9vw 7vh; width: auto; }
+    .stage { overflow-y: auto; }
+  }
+</style>
+</head>
+<body>
+<div class="stage">
+
+  <!-- 雾 -->
+  <div class="fog f1" aria-hidden="true"></div>
+  <div class="fog f2" aria-hidden="true"></div>
+
+  <!-- 地面：账目线 -->
+  <div class="ground-lines" aria-hidden="true">
+    <svg viewBox="0 0 1440 270" preserveAspectRatio="none">
+      <g stroke="#8fa3ad" stroke-width="1">
+        <line x1="0" y1="10"  x2="1440" y2="10"  opacity="0.22"/>
+        <line x1="0" y1="22"  x2="1440" y2="22"  opacity="0.22"/>
+        <line x1="0" y1="37"  x2="1440" y2="37"  opacity="0.24"/>
+        <line x1="0" y1="56"  x2="1440" y2="56"  opacity="0.26"/>
+        <line x1="0" y1="80"  x2="1440" y2="80"  opacity="0.28"/>
+        <line x1="0" y1="111" x2="1440" y2="111" opacity="0.3"/>
+        <line x1="0" y1="150" x2="1440" y2="150" opacity="0.32"/>
+        <line x1="0" y1="199" x2="1440" y2="199" opacity="0.34"/>
+        <line x1="0" y1="240" x2="1440" y2="240" opacity="0.36"/>
+      </g>
+    </svg>
+  </div>
+
+  <!-- 地平线 -->
+  <div class="horizon" aria-hidden="true"></div>
+
+  <!-- 回声碑（被距离稀释的同文） -->
+  <p class="stele echo e1" aria-hidden="true">这里不是梦</p>
+  <p class="stele echo e2" aria-hidden="true">也不是现实</p>
+  <p class="stele echo e3" aria-hidden="true">它在醒来之前</p>
+  <p class="stele echo e4" aria-hidden="true">最后一层</p>
+  <p class="stele echo e5" aria-hidden="true">世界与世界之间</p>
+
+  <!-- 主碑群：竖排宣言（右起左行） -->
+  <h1 style="display:contents" aria-label="这里不是梦，也不是现实。它是人在即将醒来时，看见的最后一层世界。">
+    <span class="stele s6" aria-hidden="true">一层世界</span>
+    <span class="stele s5" aria-hidden="true">看见的最后</span>
+    <span class="stele s4" aria-hidden="true">即将<span class="wake">醒</span>来时</span>
+    <span class="stele s3" aria-hidden="true">它是人在</span>
+    <span class="stele s2" aria-hidden="true">也不是现实</span>
+    <span class="stele s1" aria-hidden="true">这里不是梦</span>
+  </h1>
+
+  <!-- 梯：靠在碑上的尺度锚点 -->
+  <div class="ladder" aria-hidden="true">
+    <svg width="26" height="72" viewBox="0 0 26 72">
+      <g stroke="#3d4a54" stroke-width="2" stroke-linecap="round" fill="none" opacity="0.7">
+        <line x1="4" y1="0" x2="9" y2="72"/>
+        <line x1="22" y1="0" x2="17" y2="72"/>
+        <line x1="6.2" y1="12" x2="20.4" y2="12"/>
+        <line x1="7.3" y1="27" x2="19.6" y2="27"/>
+        <line x1="8.3" y1="42" x2="18.8" y2="42"/>
+        <line x1="9.4" y1="57" x2="17.9" y2="57"/>
+      </g>
+    </svg>
+  </div>
+
+  <!-- 纸鹤 -->
+  <div class="crane" aria-hidden="true">
+    <svg width="30" height="22" viewBox="0 0 30 22">
+      <g fill="#8fa3ad" opacity="0.75">
+        <polygon points="2,14 14,4 12,16"/>
+        <polygon points="14,4 28,10 16,14"/>
+        <polygon points="16,14 24,20 12,16" fill="#a9bbc4"/>
+        <polygon points="14,4 11,1 15,2"/>
+      </g>
+    </svg>
+  </div>
+
+  <!-- 站名 -->
+  <a class="brand" href="/"><span class="ring" aria-hidden="true"></span>Traveritas</a>
+
+  <!-- 竖排导航（左缘，与碑群右起呼应） -->
+  <nav class="nav" aria-label="站内入口">
+    <a href="/articles/">随笔</a>
+    <a href="/projects/">项目</a>
+    <a href="/about/">关于</a>
+  </nav>
+
+  <!-- 竖排旁注 -->
+  <p class="side-note" aria-hidden="true">回声比原声　先走样</p>
+
+  <!-- 最近的随笔：落在账目线上 -->
+  <section class="ledger" aria-label="最近的随笔">
+    <h2>最近的随笔</h2>
+    <a href="#">
+      <span class="d">2026.09.12</span>
+      <span class="t">母题探索记录</span>
+    </a>
+    <a href="#">
+      <span class="d">2026.08.30</span>
+      <span class="t">关于“醒梦”的第一份笔记</span>
+    </a>
+    <a href="#">
+      <span class="d">2026.08.11</span>
+      <span class="t">把网站做成一个房间</span>
+    </a>
+  </section>
+</div>
+</body>
+</html>

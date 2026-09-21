@@ -1,0 +1,626 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>主页探索总览 · Home Direction Atlas</title>
+<link rel="preconnect" href="https://fastly.jsdelivr.net">
+<link rel="stylesheet" href="https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5.2.5/500.css">
+<link rel="stylesheet" href="https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5.2.5/600.css">
+<style>
+  :root {
+    --paper: #f4efe7;
+    --ink: #3d4148;
+    --ink-faint: #8a8f96;
+    --line: #ddd5c8;
+    --rose: #a9738a;
+    --gold: #a8842f;
+    --blue: #5b7d99;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: linear-gradient(160deg, #e9edf2 0%, var(--paper) 42%, #efe3dd 100%);
+    color: var(--ink);
+    font-family: 'Noto Serif SC', '思源宋体', serif;
+    font-weight: 500;
+    padding: 0 24px 96px;
+  }
+  .wrap { max-width: 1240px; margin: 0 auto; }
+  header.masthead { padding: 72px 0 8px; }
+  .kicker { font-size: 12px; letter-spacing: 0.35em; color: var(--ink-faint); margin-bottom: 14px; }
+  h1 { font-weight: 600; font-size: clamp(30px, 4.6vw, 46px); letter-spacing: 0.06em; }
+  .masthead .sub { margin-top: 12px; color: var(--ink-faint); font-size: 14px; letter-spacing: 0.08em; }
+  .statebar {
+    margin-top: 26px; padding: 16px 20px;
+    border: 1px solid var(--line); background: rgba(255,255,255,0.5);
+    font-size: 13.5px; line-height: 1.9; letter-spacing: 0.04em;
+  }
+  .statebar b { font-weight: 600; }
+  nav.toc { display: flex; flex-wrap: wrap; gap: 10px 22px; margin: 18px 0 8px; font-size: 13px; }
+  nav.toc a { color: var(--ink); text-decoration: none; border-bottom: 1px solid var(--line); padding-bottom: 2px; }
+  nav.toc a:hover { border-color: var(--rose); color: var(--rose); }
+  section.round { margin-top: 72px; }
+  .round-head { border-top: 1px solid var(--ink); padding-top: 18px; margin-bottom: 8px; }
+  .round-no { font-size: 12px; letter-spacing: 0.3em; color: var(--ink-faint); margin-bottom: 8px; }
+  h2 { font-weight: 600; font-size: 24px; letter-spacing: 0.05em; }
+  .verdict { margin-top: 10px; max-width: 880px; font-size: 13.5px; line-height: 2; color: #5c6169; }
+  h3.gname { margin: 34px 0 14px; font-size: 14px; font-weight: 600; letter-spacing: 0.18em; color: var(--ink-faint); }
+  h3.gname.compact { margin-top: 26px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
+  .grid.compact { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 14px; }
+  .card {
+    display: flex; flex-direction: column; text-decoration: none; color: inherit;
+    background: rgba(255,255,255,0.62); border: 1px solid var(--line);
+    transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease;
+  }
+  .card:hover { transform: translateY(-3px); border-color: #c9bfae; box-shadow: 0 14px 30px -18px rgba(61,65,72,0.35); }
+  .card figure { aspect-ratio: 8 / 5; overflow: hidden; border-bottom: 1px solid var(--line); background: #fff; position: relative; }
+  .card img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .card img.missing { visibility: hidden; }
+  .card figure::after {
+    content: '截图缺失'; position: absolute; inset: 0; display: none;
+    align-items: center; justify-content: center; color: var(--ink-faint); font-size: 12px; letter-spacing: .3em;
+  }
+  .card:has(img.missing) figure::after { display: flex; }
+  .card .meta { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 5px; flex: 1; }
+  .card .row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .card .zh { font-weight: 600; font-size: 15.5px; letter-spacing: 0.05em; }
+  .card .tag { flex: none; font-size: 10.5px; letter-spacing: 0.14em; padding: 2px 7px; border: 1px solid currentColor; border-radius: 999px; opacity: 0.85; }
+  .card .slug { font-size: 10.5px; letter-spacing: 0.12em; color: var(--ink-faint); }
+  .card .desc { font-size: 12.5px; line-height: 1.85; color: #5c6169; }
+  .card.compact .zh { font-size: 13.5px; }
+  .card.compact .desc { display: none; }
+  .card.compact .meta { padding: 10px 12px 11px; gap: 3px; }
+  /* 状态色 */
+  .st-done .tag { color: var(--ink-faint); }
+  .st-dropped .tag { color: var(--ink-faint); border-style: dashed; }
+  .st-line .tag { color: var(--gold); }
+  .st-final .tag { color: var(--rose); }
+  .st-pool .tag { color: var(--blue); }
+  .st-part .tag { color: var(--ink-faint); }
+  .card.st-line { border-color: #d9c48a; background: rgba(255,252,244,0.75); }
+  .card.st-dropped { opacity: 0.62; }
+  footer { margin-top: 96px; border-top: 1px solid var(--line); padding-top: 18px;
+    font-size: 12px; line-height: 2; color: var(--ink-faint); letter-spacing: 0.06em; }
+  footer a { color: inherit; }
+  @media (max-width: 640px) { body { padding: 0 14px 64px; } .grid { grid-template-columns: 1fr 1fr; gap: 12px; } .grid.compact { grid-template-columns: 1fr 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="masthead">
+    <p class="kicker">醒与梦 · 主页重做</p>
+    <h1>主页探索总览</h1>
+    <p class="sub">9 轮探索 · 82 稿 · 2026-09-19 → 09-20 · 点击卡片打开原稿</p>
+    <div class="statebar">
+      <b>当前状态</b>：线上主页仍为 Phase 2 融合方案（醒/梦轴线 × 文字碎片 × 磨砂水晶）。<br>
+      <b>终选池</b>：J✦ 四时巨环 ＋ P4 三稿（悬浪/群浪/天缺）＋ 第 2–6 波 p5 稿（方向大爆炸，尚无比选）＋ 第 6 波组合稿（印潮/长卷·渡/晷园）＋ 第 9 轮 p7 稿（内页叙事反哺：落针/序厅/现实检验/入梦检验；新方向：晓线/睡眠图）。全部稿件已归档于 <a href="archive/2026-09-phase2-4/p3-index.html" target="_blank" rel="noopener">design/archive/2026-09-phase2-4/</a> 与 <a href="mocks/p5-atlas.html" target="_blank" rel="noopener">design/mocks/</a>。
+    </div>
+    <nav class="toc"><a href="#r1">1 静态方向稿</a><a href="#r2">2 Three.js 活体稿</a><a href="#r3">3 P4 并行探索</a><a href="#r4">4 主体母题大爆炸</a><a href="#r5">5 入口机制</a><a href="#r6">6 平面基底 × 3D</a><a href="#r7">7 平面 × artifact × 浮窗</a><a href="#r8">8 盘点 + 组合轮</a><a href="#r9">9 内页叙事反哺主页 ＋ 新方向</a></nav>
+  </header>
+  
+  <section class="round" id="r1">
+    <header class="round-head">
+      <p class="round-no">第 1 轮 · 2026-09-19</p>
+      <h2>Phase 2 · 静态方向稿</h2>
+      <p class="verdict">六稿 + 图标四案全部被否（「过于规整、组成太简单且丑」；花三稿「都不喜欢」）。可保留构件汇入融合方案＝当前线上主页：醒/梦对角轴线、四块衬线文字碎片、竖排导航、磨砂材质、账目式列表。</p>
+    </header>
+    
+      <h3 class="gname">三方向首稿</h3>
+      <div class="grid"><a class="card st-st-done" href="archive/2026-09-phase2-4/p2-a-fragments.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p2-a-fragments.jpg" alt="碎屑与字" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">碎屑与字</span><span class="tag">已否</span></div>
+    <p class="slug">a-fragments</p>
+    <p class="desc">层三明治骨架：四块衬线宣言碎片 + 巨构水晶骑跨醒梦边界</p></div></a>
+<a class="card st-st-done" href="archive/2026-09-phase2-4/p2-b-megastructure.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p2-b-megastructure.jpg" alt="巨构尺度" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">巨构尺度</span><span class="tag">已否</span></div>
+    <p class="slug">b-megastructure</p>
+    <p class="desc">大水晶切出画面上/右缘——「尺度由世界承担」的供体</p></div></a>
+<a class="card st-st-done" href="archive/2026-09-phase2-4/p2-c-threshold.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p2-c-threshold.jpg" alt="醒梦边界" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">醒梦边界</span><span class="tag">已否</span></div>
+    <p class="slug">c-threshold</p>
+    <p class="desc">对角轴线即参数：左上冷雾蓝 → 右下暖灰粉，无硬边界</p></div></a></div>
+
+      <h3 class="gname">花母题三方向（花被否后的对症稿）</h3>
+      <div class="grid"><a class="card st-st-done" href="archive/2026-09-phase2-4/p2-d-giant-lily.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p2-d-giant-lily.jpg" alt="巨花" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">巨花</span><span class="tag">已否</span></div>
+    <p class="slug">d-giant-lily</p>
+    <p class="desc">抽象百合单体巨构</p></div></a>
+<a class="card st-st-done" href="archive/2026-09-phase2-4/p2-e-flower-field.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p2-e-flower-field.jpg" alt="花田" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">花田</span><span class="tag">已否</span></div>
+    <p class="slug">e-flower-field</p>
+    <p class="desc">花铺满地面，不做「一朵花摆在那里」</p></div></a>
+<a class="card st-st-done" href="archive/2026-09-phase2-4/p2-f-flower-geometry.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p2-f-flower-geometry.jpg" alt="花与几何" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">花与几何</span><span class="tag">已否</span></div>
+    <p class="slug">f-flower-geometry</p>
+    <p class="desc">花与几何巨构的组合</p></div></a></div>
+
+      <h3 class="gname">图标</h3>
+      <div class="grid"><a class="card st-st-done" href="archive/2026-09-phase2-4/p2-icons.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p2-icons.jpg" alt="图标四案" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">图标四案</span><span class="tag">已否</span></div>
+    <p class="slug">icons</p>
+    <p class="desc">花母题字标图标；后全站去图标化，不再需要</p></div></a></div>
+  </section>
+
+  <section class="round" id="r2">
+    <header class="round-head">
+      <p class="round-no">第 2 轮 · 2026-09-19</p>
+      <h2>Phase 3 · Three.js 活体稿</h2>
+      <p class="verdict">参考 Kage 场景编排语法转向活体稿：氛围与水面语言达标，确立「单主体 + 局部规则 + 字被真实遮挡」语法；J 巨环深化为 J✦ 四时，成为主线候选。</p>
+    </header>
+    
+      <h3 class="gname">五方向首稿（评审推荐 C 丰富度 / A 稳妥 / E 概念锐度）</h3>
+      <div class="grid"><a class="card st-st-done" href="archive/2026-09-phase2-4/p3-a-still-water.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p3-a-still-water.jpg" alt="A 水面剧场" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">A 水面剧场</span><span class="tag">已否</span></div>
+    <p class="slug">a-still-water</p>
+    <p class="desc">醒在水上、梦在水下的镜像世界，柱列 + 栈道尽头之椅</p></div></a>
+<a class="card st-st-done" href="archive/2026-09-phase2-4/p3-b-curtain.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p3-b-curtain.jpg" alt="B 帷幕之后" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">B 帷幕之后</span><span class="tag">已否</span></div>
+    <p class="slug">b-curtain</p>
+    <p class="desc">三重纱逐层稀释宣言，深处虚掩之门漏暖光（机制供体）</p></div></a>
+<a class="card st-st-done" href="archive/2026-09-phase2-4/p3-c-field.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p3-c-field.jpg" alt="C 花是旷野" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">C 花是旷野</span><span class="tag">已否</span></div>
+    <p class="slug">c-field</p>
+    <p class="desc">花铺满旷野 + 立在花田中的巨门框，门内同田更暖</p></div></a>
+<a class="card st-st-done" href="archive/2026-09-phase2-4/p3-d-archive.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p3-d-archive.jpg" alt="D 字的档案馆" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">D 字的档案馆</span><span class="tag">已否</span></div>
+    <p class="slug">d-archive</p>
+    <p class="desc">宣言竖排成碑、回声碑走样——记忆不可靠（语言供体）</p></div></a>
+<a class="card st-st-done" href="archive/2026-09-phase2-4/p3-e-waking.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p3-e-waking.jpg" alt="E 醒来之前" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">E 醒来之前</span><span class="tag">已否</span></div>
+    <p class="slug">e-waking</p>
+    <p class="desc">正俯瞰一张占满画面的床，褶皱压字、影子方向不一</p></div></a></div>
+
+      <h3 class="gname">水面深化</h3>
+      <div class="grid"><a class="card st-st-done" href="archive/2026-09-phase2-4/p3-f-water-field.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p3-f-water-field.jpg" alt="F 沉水花田" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">F 沉水花田</span><span class="tag">已否</span></div>
+    <p class="slug">f-water-field</p>
+    <p class="desc">SVG 静态合成：水下比水上更盛</p></div></a>
+<a class="card st-st-done" href="archive/2026-09-phase2-4/p3-g-live-field.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p3-g-live-field.jpg" alt="G 沉水花田·活体" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">G 沉水花田·活体</span><span class="tag">已否</span></div>
+    <p class="slug">g-live-field</p>
+    <p class="desc">Three.js 活体稿——「在场感必须活体验证」的分水岭</p></div></a>
+<a class="card st-st-done" href="archive/2026-09-phase2-4/p3-h-terrain-steles.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p3-h-terrain-steles.jpg" alt="H 画笔水面·沉城碑林" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">H 画笔水面·沉城碑林</span><span class="tag">已否</span></div>
+    <p class="slug">h-terrain-steles</p>
+    <p class="desc">等高线色带水面 + 水下沉城，字平面被柱列真实切割</p></div></a>
+<a class="card st-st-done" href="archive/2026-09-phase2-4/p3-i-terraces.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p3-i-terraces.jpg" alt="I 台地字林" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">I 台地字林</span><span class="tag">已否</span></div>
+    <p class="slug">i-terraces</p>
+    <p class="desc">阶梯台地 + 六列竖排字碑，右起左行渐淡</p></div></a></div>
+
+      <h3 class="gname">单主体四方向（用户裁定：氛围到位、要有明确主体）</h3>
+      <div class="grid"><a class="card st-st-line" href="archive/2026-09-phase2-4/p3-j-giant-ring.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p3-j-giant-ring.jpg" alt="J 巨环" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">J 巨环</span><span class="tag">主线候选</span></div>
+    <p class="slug">j-giant-ring</p>
+    <p class="desc">水上断环 + 水下更大更暖的完整环——梦补齐断环</p></div></a>
+<a class="card st-st-done" href="archive/2026-09-phase2-4/p3-k-giant-gate.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p3-k-giant-gate.jpg" alt="K 巨门" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">K 巨门</span><span class="tag">已否</span></div>
+    <p class="slug">k-giant-gate</p>
+    <p class="desc">顶天门框，门洞后是「更深的雾」而非世界</p></div></a>
+<a class="card st-st-done" href="archive/2026-09-phase2-4/p3-l-needle-tower.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p3-l-needle-tower.jpg" alt="L 通天之塔" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">L 通天之塔</span><span class="tag">已否</span></div>
+    <p class="slug">l-needle-tower</p>
+    <p class="desc">六棱针塔顶出画，塔顶悬石是全场景唯一动体</p></div></a>
+<a class="card st-st-done" href="archive/2026-09-phase2-4/p3-m-colossal-stele.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p3-m-colossal-stele.jpg" alt="M 字碑" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">M 字碑</span><span class="tag">已否</span></div>
+    <p class="slug">m-colossal-stele</p>
+    <p class="desc">宣言六列竖排直接刻在倾斜巨碑上＝字碑合一</p></div></a></div>
+
+      <h3 class="gname compact">巨环变体（用户裁定：均不如原版 J）</h3>
+      <div class="grid compact"><a class="card compact st-st-part" href="archive/2026-09-phase2-4/p3-j2-linked-rings.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p3-j2-linked-rings.jpg" alt="J2 环环" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">J2 环环</span><span class="tag">积木/变体</span></div>
+    <p class="slug">j2-linked-rings</p>
+    <p class="desc">受光巨环 + 自发光小环互扣穿过环洞</p></div></a>
+<a class="card compact st-st-part" href="archive/2026-09-phase2-4/p3-j3-ring-axis.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p3-j3-ring-axis.jpg" alt="J3 环与轴" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">J3 环与轴</span><span class="tag">积木/变体</span></div>
+    <p class="slug">j3-ring-axis</p>
+    <p class="desc">巨环穿心六棱轴 + 悬石——浑天仪式无用途秩序</p></div></a>
+<a class="card compact st-st-part" href="archive/2026-09-phase2-4/p3-j4-sunken-ring.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p3-j4-sunken-ring.jpg" alt="J4 沉环" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">J4 沉环</span><span class="tag">积木/变体</span></div>
+    <p class="slug">j4-sunken-ring</p>
+    <p class="desc">重心反转俯视：主角是水下更大更亮的完整暖环</p></div></a></div>
+
+      <h3 class="gname compact">J✦ 配色五版（同一构图，仅色彩与光不同）</h3>
+      <div class="grid compact"><a class="card compact st-st-part" href="archive/2026-09-phase2-4/p3-j-cool.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p3-j-cool.jpg" alt="Jc 冷晨" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">Jc 冷晨</span><span class="tag">积木/变体</span></div>
+    <p class="slug">j-cool</p>
+    <p class="desc">雾鼠尾草 × 暖玫瑰水下环——冷世界唯一的暖在梦里</p></div></a>
+<a class="card compact st-st-part" href="archive/2026-09-phase2-4/p3-j-rose.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p3-j-rose.jpg" alt="Jr 暮玫瑰" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">Jr 暮玫瑰</span><span class="tag">积木/变体</span></div>
+    <p class="slug">j-rose</p>
+    <p class="desc">粉雾 × 绛紫 × 暖玫瑰，最贴醒梦简报本源</p></div></a>
+<a class="card compact st-st-part" href="archive/2026-09-phase2-4/p3-j-gold.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p3-j-gold.jpg" alt="Jg 金晨" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">Jg 金晨</span><span class="tag">积木/变体</span></div>
+    <p class="slug">j-gold</p>
+    <p class="desc">香槟 × 蜂蜜 × 琥珀</p></div></a>
+<a class="card compact st-st-part" href="archive/2026-09-phase2-4/p3-j-night.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p3-j-night.jpg" alt="Jn 夜青" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">Jn 夜青</span><span class="tag">积木/变体</span></div>
+    <p class="slug">j-night</p>
+    <p class="desc">青灰夜 × 淡金灯环，最偏梦侧</p></div></a></div>
+
+      <h3 class="gname">J✦ 四时（终稿候选）</h3>
+      <div class="grid"><a class="card st-st-line" href="archive/2026-09-phase2-4/p3-j-cycle.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p3-j-cycle.jpg" alt="J✦ 四时" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">J✦ 四时</span><span class="tag">主线候选</span></div>
+    <p class="slug">j-cycle</p>
+    <p class="desc">暮玫瑰→冷晨→夜青缓慢循环（约 3.7 分钟/轮），滚动拨快换季；旁注「颜色在换季，环从未动」</p></div></a></div>
+
+      <h3 class="gname compact">元素积木（可叠加进 J✦）</h3>
+      <div class="grid compact"><a class="card compact st-st-part" href="archive/2026-09-phase2-4/p3-jv1-shoal.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p3-jv1-shoal.jpg" alt="V1 游光" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">V1 游光</span><span class="tag">积木/变体</span></div>
+    <p class="slug">jv1-shoal</p>
+    <p class="desc">70 道水下暖色光痕巡游</p></div></a>
+<a class="card compact st-st-part" href="archive/2026-09-phase2-4/p3-jv2-ripples.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p3-jv2-ripples.jpg" alt="V2 涟漪" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">V2 涟漪</span><span class="tag">积木/变体</span></div>
+    <p class="slug">jv2-ripples</p>
+    <p class="desc">随机生灭扩散环 + 环脚呼吸涟漪</p></div></a>
+<a class="card compact st-st-part" href="archive/2026-09-phase2-4/p3-jv3-lanterns.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p3-jv3-lanterns.jpg" alt="V3 浮灯" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">V3 浮灯</span><span class="tag">积木/变体</span></div>
+    <p class="slug">jv3-lanterns</p>
+    <p class="desc">8 盏漂流小灯 + 柔光晕</p></div></a>
+<a class="card compact st-st-part" href="archive/2026-09-phase2-4/p3-jv4-mist.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p3-jv4-mist.jpg" alt="V4 低雾" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">V4 低雾</span><span class="tag">积木/变体</span></div>
+    <p class="slug">jv4-mist</p>
+    <p class="desc">12 团贴水柔雾慢移呼吸</p></div></a>
+<a class="card compact st-st-part" href="archive/2026-09-phase2-4/p3-b1-terraces.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p3-b1-terraces.jpg" alt="B1 远山" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">B1 远山</span><span class="tag">积木/变体</span></div>
+    <p class="slug">b1-terraces</p>
+    <p class="desc">平面位移山脊剪影，正中留空给巨环</p></div></a>
+<a class="card compact st-st-part" href="archive/2026-09-phase2-4/p3-b2-skyring.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p3-b2-skyring.jpg" alt="B2 天环" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">B2 天环</span><span class="tag">积木/变体</span></div>
+    <p class="slug">b2-skyring</p>
+    <p class="desc">跨天空巨弧极缓摆动</p></div></a>
+<a class="card compact st-st-part" href="archive/2026-09-phase2-4/p3-f1-forestele.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p3-f1-forestele.jpg" alt="F1 近碑" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">F1 近碑</span><span class="tag">积木/变体</span></div>
+    <p class="slug">f1-forestele</p>
+    <p class="desc">右下切入的暗色巨碑剪影（画框装置）</p></div></a>
+<a class="card compact st-st-part" href="archive/2026-09-phase2-4/p3-f2-threads.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p3-f2-threads.jpg" alt="F2 垂线" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">F2 垂线</span><span class="tag">积木/变体</span></div>
+    <p class="slug">f2-threads</p>
+    <p class="desc">程序化线场：三层远近缓垂如分钟级慢雨</p></div></a>
+<a class="card compact st-st-part" href="archive/2026-09-phase2-4/p3-s3-arcs.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p3-s3-arcs.jpg" alt="S3 环冢" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">S3 环冢</span><span class="tag">积木/变体</span></div>
+    <p class="slug">s3-arcs</p>
+    <p class="desc">前几世环的弧形残段与主环同族</p></div></a>
+<a class="card compact st-st-part" href="archive/2026-09-phase2-4/p3-s4-columns.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p3-s4-columns.jpg" alt="S4 柱列" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">S4 柱列</span><span class="tag">积木/变体</span></div>
+    <p class="slug">s4-columns</p>
+    <p class="desc">六棱矮柱走进雾里，一根失序一根断矮</p></div></a>
+<a class="card compact st-st-dropped" href="archive/2026-09-phase2-4/p3-s1-fallenbeam.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p3-s1-fallenbeam.jpg" alt="S1 倒梁" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">S1 倒梁</span><span class="tag">已弃</span></div>
+    <p class="slug">s1-fallenbeam</p>
+    <p class="desc">斜倒半浸的巨梁（用户裁定：不好）</p></div></a>
+<a class="card compact st-st-dropped" href="archive/2026-09-phase2-4/p3-s2-isle.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p3-s2-isle.jpg" alt="S2 浮岛" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">S2 浮岛</span><span class="tag">已弃</span></div>
+    <p class="slug">s2-isle</p>
+    <p class="desc">底座小碑 + 碑顶微缩环（用户裁定：不好）</p></div></a></div>
+  </section>
+
+  <section class="round" id="r3">
+    <header class="round-head">
+      <p class="round-no">第 3 轮 · 2026-09-19 深夜</p>
+      <h2>Swarm 第 1 波 · P4 并行探索</h2>
+      <p class="verdict">首开多会话并行（swarm）：悬浪 / 群浪 / 天缺三稿全部通过截图与 judge 验收，与 J✦ 同台待用户终选。</p>
+    </header>
+    
+      <h3 class="gname">三会话三方向</h3>
+      <div class="grid"><a class="card st-st-final" href="archive/2026-09-phase2-4/p4-suspended-wave.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p4-suspended-wave.jpg" alt="悬浪" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">悬浪</span><span class="tag">待终选</span></div>
+    <p class="slug">suspended-wave</p>
+    <p class="desc">一道悬停不落的巨浪——「正在发生的事」被暂停，水下浪影更盛</p></div></a>
+<a class="card st-st-final" href="archive/2026-09-phase2-4/p4-murmuration.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p4-murmuration.jpg" alt="群浪" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">群浪</span><span class="tag">待终选</span></div>
+    <p class="slug">murmuration</p>
+    <p class="desc">3200 只活体聚成环与字又散开——醒时字能成形，入梦散作群</p></div></a>
+<a class="card st-st-final" href="archive/2026-09-phase2-4/p4-absence.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p4-absence.jpg" alt="天缺" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">天缺</span><span class="tag">待终选</span></div>
+    <p class="slug">absence</p>
+    <p class="desc">天上裂开巨型空洞，世界从边缘持续剥落飘向缺口——缺从不扩大也从不愈合</p></div></a></div>
+  </section>
+
+  <section class="round" id="r4">
+    <header class="round-head">
+      <p class="round-no">第 4 轮 · 2026-09-20 凌晨</p>
+      <h2>Swarm 第 2 波 · 主体母题大爆炸</h2>
+      <p class="verdict">八个会话、十四稿：主体母题全面铺开（镜/梯/花/线/影/门/雾/坠/眼……），全部通过截图验收，进入候选池。</p>
+    </header>
+    
+      
+      <div class="grid"><a class="card st-st-pool" href="mocks/p5-mirror.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p5-mirror.jpg" alt="镜渊" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">镜渊</span><span class="tag">候选池</span></div>
+    <p class="slug">mirror</p>
+    <p class="desc">宣言残缺于现实、完整于镜中倒影——「照错了时间的镜子」</p></div></a>
+<a class="card st-st-pool" href="mocks/p5-stairs.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p5-stairs.jpg" alt="融梯" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">融梯</span><span class="tag">候选池</span></div>
+    <p class="slug">stairs</p>
+    <p class="desc">通天巨阶，脚下溶解、前方由雾凝出——每登一级来路少一级</p></div></a>
+<a class="card st-st-pool" href="mocks/p5-bloom.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p5-bloom.jpg" alt="玻璃园" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">玻璃园</span><span class="tag">候选池</span></div>
+    <p class="slug">bloom</p>
+    <p class="desc">巨型玻璃百合永远「正在开」：花心始终合拢＝梦里那部分</p></div></a>
+<a class="card st-st-pool" href="mocks/p5-linescape.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p5-linescape.jpg" alt="线野" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">线野</span><span class="tag">候选池</span></div>
+    <p class="slug">linescape</p>
+    <p class="desc">世界没有面只有线：等高线即大地，线聚处凝成悬空巨环群</p></div></a>
+<a class="card st-st-pool" href="mocks/p5-echo.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p5-echo.jpg" alt="叠影" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">叠影</span><span class="tag">候选池</span></div>
+    <p class="slug">echo</p>
+    <p class="desc">每个巨构旁漂着微错位的「上一次的自己」，页尾重合且比本体更真</p></div></a>
+<a class="card st-st-pool" href="mocks/p5-echo-vault.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p5-echo-vault.jpg" alt="回声穹骨" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">回声穹骨</span><span class="tag">候选池</span></div>
+    <p class="slug">echo-vault</p>
+    <p class="desc">身处七道巨拱穹笼内部，笼外漂着走样的回声残影</p></div></a>
+<a class="card st-st-pool" href="mocks/p5-veil.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p5-veil.jpg" alt="织幔" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">织幔</span><span class="tag">候选池</span></div>
+    <p class="slug">veil</p>
+    <p class="desc">千余根垂线构成可穿过的巨型帷幕，穿越即由冷入暖</p></div></a>
+<a class="card st-st-pool" href="mocks/p5-submerged.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p5-submerged.jpg" alt="沉川" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">沉川</span><span class="tag">候选池</span></div>
+    <p class="slug">submerged</p>
+    <p class="desc">整页沉在水下：水面是头顶发光的天花板，醒来在一步之遥</p></div></a>
+<a class="card st-st-pool" href="mocks/p5-frost.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p5-frost.jpg" alt="呵雾" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">呵雾</span><span class="tag">候选池</span></div>
+    <p class="slug">frost</p>
+    <p class="desc">整页隔着呵气玻璃，指针即呵气——擦开处留痕不重生</p></div></a>
+<a class="card st-st-pool" href="mocks/p5-descent.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p5-descent.jpg" alt="坠" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">坠</span><span class="tag">候选池</span></div>
+    <p class="slug">descent</p>
+    <p class="desc">滚动＝坠落：穿云井而下，井底之光永远差一步</p></div></a>
+<a class="card st-st-pool" href="mocks/p5-eyelid.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p5-eyelid.jpg" alt="阖眼" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">阖眼</span><span class="tag">候选池</span></div>
+    <p class="slug">eyelid</p>
+    <p class="desc">按住直到醒来：睁眼与世界成形是同一刻</p></div></a>
+<a class="card st-st-pool" href="mocks/p5-door.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p5-door.jpg" alt="过门" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">过门</span><span class="tag">候选池</span></div>
+    <p class="slug">door</p>
+    <p class="desc">「门」字巨构，镜头从字中穿过，门里比门外暖</p></div></a>
+<a class="card st-st-pool" href="mocks/p5-shadow.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p5-shadow.jpg" alt="巨影" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">巨影</span><span class="tag">候选池</span></div>
+    <p class="slug">shadow</p>
+    <p class="desc">从未到场者的影子横陈雾原——以缺席在场；影子不服从光</p></div></a>
+<a class="card st-st-pool" href="mocks/p5-fleet.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p5-fleet.jpg" alt="浮眠" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">浮眠</span><span class="tag">候选池</span></div>
+    <p class="slug">fleet</p>
+    <p class="desc">仰躺开场看巨壳底面，滚动＝坐起，巨物群与你一起快醒</p></div></a></div>
+  </section>
+
+  <section class="round" id="r5">
+    <header class="round-head">
+      <p class="round-no">第 5 轮 · 2026-09-20</p>
+      <h2>Swarm 第 3 波 · 入口机制</h2>
+      <p class="verdict">四个会话、七稿：把「怎么进入一个网站」当作主角——转动、压破、横渡、降层、展开、注视门控、点亮。</p>
+    </header>
+    
+      
+      <div class="grid"><a class="card st-st-pool" href="mocks/p5-revolve.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p5-revolve.jpg" alt="旋门" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">旋门</span><span class="tag">候选池</span></div>
+    <p class="slug">revolve</p>
+    <p class="desc">相机立于环形巨殿圆心不动，滚动＝转动整座世界，翼过即换章</p></div></a>
+<a class="card st-st-pool" href="mocks/p5-membrane.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p5-membrane.jpg" alt="天膜" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">天膜</span><span class="tag">候选池</span></div>
+    <p class="slug">membrane</p>
+    <p class="desc">整页隔一层磨砂天膜，滚动加压至裂纹蔓延、破膜穿越</p></div></a>
+<a class="card st-st-pool" href="mocks/p5-ferry.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p5-ferry.jpg" alt="渡" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">渡</span><span class="tag">候选池</span></div>
+    <p class="slug">ferry</p>
+    <p class="desc">相机固定在岸，渡船队列横渡你面前——巨构是正在被搬走的</p></div></a>
+<a class="card st-st-pool" href="mocks/p5-frames.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p5-frames.jpg" alt="重界" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">重界</span><span class="tag">候选池</span></div>
+    <p class="slug">frames</p>
+    <p class="desc">雾原上无尽嵌套的方形巨框，滚动＝向内降层，最内层只有末句</p></div></a>
+<a class="card st-st-pool" href="mocks/p5-unfold.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p5-unfold.jpg" alt="折启" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">折启</span><span class="tag">候选池</span></div>
+    <p class="slug">unfold</p>
+    <p class="desc">世界是一封折起的信，滚动＝它为你展开（展开＝阅读＝醒来）</p></div></a>
+<a class="card st-st-pool" href="mocks/p5-somnambule.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p5-somnambule.jpg" alt="梦游" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">梦游</span><span class="tag">候选池</span></div>
+    <p class="slug">somnambule</p>
+    <p class="desc">不被注视的东西才会移动：注视门控运动，页尾当面归位</p></div></a>
+<a class="card st-st-pool" href="mocks/p5-lantern.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p5-lantern.jpg" alt="巡灯" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">巡灯</span><span class="tag">候选池</span></div>
+    <p class="slug">lantern</p>
+    <p class="desc">灯到之处世界才被点亮；页尾领队灯驻停升起成为常亮站灯</p></div></a></div>
+  </section>
+
+  <section class="round" id="r6">
+    <header class="round-head">
+      <p class="round-no">第 6 轮 · 2026-09-20</p>
+      <h2>Swarm 第 4 波 · 平面基底 × 3D</h2>
+      <p class="verdict">五个会话、五稿：平面设计不再是背景而是世界本身——图纸、活字、标本册、舆图、散页，3D 只是纸上唯一活物。</p>
+    </header>
+    
+      
+      <div class="grid"><a class="card st-st-pool" href="mocks/p5-draft.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p5-draft.jpg" alt="图纸" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">图纸</span><span class="tag">候选池</span></div>
+    <p class="slug">draft</p>
+    <p class="desc">工程总图上三个瓷件自线稿充气立起即入口；入梦后尺寸线测不准、比例 1:∞</p></div></a>
+<a class="card st-st-pool" href="mocks/p5-imprint.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p5-imprint.jpg" alt="压印" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">压印</span><span class="tag">候选池</span></div>
+    <p class="slug">imprint</p>
+    <p class="desc">磨砂活字「梦」压过纸面逐行压印宣言，末段沉入成版＋套金错版</p></div></a>
+<a class="card st-st-pool" href="mocks/p5-herbarium.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p5-herbarium.jpg" alt="押花册" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">押花册</span><span class="tag">候选池</span></div>
+    <p class="slug">herbarium</p>
+    <p class="desc">加载页把整个世界压平成印痕，滚动逐件复浮——平面态与立体态并存</p></div></a>
+<a class="card st-st-pool" href="mocks/p5-atlas.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p5-atlas.jpg" alt="舆图" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">舆图</span><span class="tag">候选池</span></div>
+    <p class="slug">atlas</p>
+    <p class="desc">世界只有被画下来的这一层：向南旅行，玻璃镇纸压住醒、封着梦</p></div></a>
+<a class="card st-st-pool" href="mocks/p5-paperroom.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p5-paperroom.jpg" alt="纸间" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">纸间</span><span class="tag">候选池</span></div>
+    <p class="slug">paperroom</p>
+    <p class="desc">版台上悬浮散页印张堆 + 玻璃纸鹤（登记簿仅记开工，以实稿为准）</p></div></a></div>
+  </section>
+
+  <section class="round" id="r7">
+    <header class="round-head">
+      <p class="round-no">第 7 轮 · 2026-09-20</p>
+      <h2>Swarm 第 5 波 · 平面 × artifact × 浮窗</h2>
+      <p class="verdict">四个会话、四稿：在「网站本身是平面」的前提下，artifact 与浮窗成为入口语言——窗、风、光、放映。</p>
+    </header>
+    
+      
+      <div class="grid"><a class="card st-st-pool" href="mocks/p5-floatwin.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p5-floatwin.jpg" alt="浮窗" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">浮窗</span><span class="tag">候选池</span></div>
+    <p class="slug">floatwin</p>
+    <p class="desc">醒前的房间：可拖拽、可最小化成纸签的玻璃浮窗即入口，artifact 被窗玻璃真实磨砂</p></div></a>
+<a class="card st-st-pool" href="mocks/p5-casement.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p5-casement.jpg" alt="悬窗" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">悬窗</span><span class="tag">候选池</span></div>
+    <p class="slug">casement</p>
+    <p class="desc">雾中三扇有真实铰链的平开窗，巨窗框住纯平面剪纸世界——玻璃后面永远暖一格</p></div></a>
+<a class="card st-st-pool" href="mocks/p5-paperkite.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p5-paperkite.jpg" alt="纸鸢" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">纸鸢</span><span class="tag">候选池</span></div>
+    <p class="slug">paperkite</p>
+    <p class="desc">滚动即风：天空海报上三只真纸鸢，尾段最小一只断线飞向印刷月亮</p></div></a>
+<a class="card st-st-pool" href="mocks/p5-projector.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p5-projector.jpg" alt="幻灯" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">幻灯</span><span class="tag">候选池</span></div>
+    <p class="slug">projector</p>
+    <p class="desc">印好平面设计的墙前一台老幻灯机在放映——梦活在光里，印着的网站活在亮里</p></div></a></div>
+  </section>
+
+  <section class="round" id="r8">
+    <header class="round-head">
+      <p class="round-no">第 8 轮 · 2026-09-20</p>
+      <h2>Swarm 第 6 波 · 盘点 + 组合轮</h2>
+      <p class="verdict">每会话先以一个视角盘点 73 稿的可用设计，再取料组合成完整方案（做出来看、再补再换）。首战三稿不约而同以「平面印刷基底 × J✦ 巨环基因」为主轴——海 / 卷 / 地三种基底解，均完成并截图验收，进入候选池。</p>
+    </header>
+    
+      
+      <div class="grid"><a class="card st-st-pool" href="mocks/p6-inktide.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p6-inktide.jpg" alt="印潮" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">印潮</span><span class="tag">候选池</span></div>
+    <p class="slug">inktide</p>
+    <p class="desc">印刷之海做基底 + J✦ 断环做主体 + 镜渊真反射做局部规则：倒影里断环完整更暖；舆图信标入口、涨潮加载、四时调色</p></div></a>
+<a class="card st-st-pool" href="mocks/p6-handscroll.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p6-handscroll.jpg" alt="长卷·渡" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">长卷·渡</span><span class="tag">候选池</span></div>
+    <p class="slug">handscroll</p>
+    <p class="desc">网站是一幅横移展卷的手卷：装裱=真版式，画心开进真实景深；「绢停水走」双速；小舟渡向卷尾，卷收走世界</p></div></a>
+<a class="card st-st-pool" href="mocks/p6-sundial-garden.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p6-sundial-garden.jpg" alt="晷园" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">晷园</span><span class="tag">候选池</span></div>
+    <p class="slug">sundial-garden</p>
+    <p class="desc">印刷园图做大地，J✦ 巨环改晷针——印的太阳支配真的影子；三只玻璃花罩做入口，夜里印刷层自发光</p></div></a></div>
+  </section>
+
+  <section class="round" id="r9">
+    <header class="round-head">
+      <p class="round-no">第 9 轮 · 2026-09-20</p>
+      <h2>Swarm 第 7 波 · 内页叙事反哺主页 ＋ 新方向</h2>
+      <p class="verdict">内页轮（design/explore/）四个认可叙事被带到主页尺度重新发明——缝 / 展 / 验（同题两解），另有两稿全新方向（晓线阅读系统、一夜睡眠图）。全部完成并截图验收，进入候选池。</p>
+    </header>
+    
+      <h3 class="gname">认可叙事 → 主页（源稿见 design/explore/）</h3>
+      <div class="grid"><a class="card st-st-pool" href="mocks/p7-first-stitch.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p7-first-stitch.jpg" alt="落针" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">落针</span><span class="tag">候选池</span></div>
+    <p class="slug">first-stitch</p>
+    <p class="desc">醒梦缝在主页尺度重发明：醒与梦分立缝线两侧，访客亲手落下第一针</p></div></a>
+<a class="card st-st-pool" href="mocks/p7-vestibule.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p7-vestibule.jpg" alt="序厅" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">序厅</span><span class="tag">候选池</span></div>
+    <p class="slug">vestibule</p>
+    <p class="desc">站点即常设展：主页是序厅——取入场券、看 1:1 馆舍模型、沿地面铜钉线走进各展厅</p></div></a>
+<a class="card st-st-pool" href="mocks/p7-verify.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p7-verify.jpg" alt="现实检验 · 主页版" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">现实检验 · 主页版</span><span class="tag">候选池</span></div>
+    <p class="slug">verify</p>
+    <p class="desc">主页不确定自己醒着还是做梦：按住玻璃锚点核验；按住不放，它会真的醒过来</p></div></a>
+<a class="card st-st-pool" href="mocks/p7-doorcheck.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p7-doorcheck.jpg" alt="入梦检验" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">入梦检验</span><span class="tag">候选池</span></div>
+    <p class="slug">doorcheck</p>
+    <p class="desc">主页是门口，清醒梦的规矩是进门先检验：每句话写两遍（梦面/醒面），按住看它醒来</p></div></a></div>
+
+      <h3 class="gname">全新方向</h3>
+      <div class="grid"><a class="card st-st-pool" href="mocks/p7-dawnline.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p7-dawnline.jpg" alt="晓线" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">晓线</span><span class="tag">候选池</span></div>
+    <p class="slug">dawnline</p>
+    <p class="desc">阅读即破晓：晓线悬在眼前不动，滚动把未读之夜拉过线变成已读之昼；三夜客户端互切，证系统而非单页</p></div></a>
+<a class="card st-st-pool" href="mocks/p7-hypnogram.html" target="_blank" rel="noopener">
+    <figure><img src="index-shots/p7-hypnogram.jpg" alt="一夜 · 睡眠图" loading="lazy" onerror="this.classList.add('missing')"></figure>
+    <div class="meta"><div class="row"><span class="zh">一夜 · 睡眠图</span><span class="tag">候选池</span></div>
+    <p class="slug">hypnogram</p>
+    <p class="desc">主页是一张整夜睡眠分期图：宣言碎片按入睡时刻挂在各睡眠期（N1→REM），走纸校准做加载页</p></div></a></div>
+  </section>
+  <footer>
+    缩略图由无头浏览器按各稿锁态参数截取（1440×900，多数为醒/首屏侧；滚动入梦态请点开原稿体验）。<br>
+    各轮结论与踩坑登记：landingpage_swarm*.md（项目根目录）；探索史：docs/design/homepage-direction.md。<br>内页（随笔/项目/关于/标签/404）探索总览：<a href="explore/index.html" target="_blank" rel="noopener">explore/index.html</a>。本页由 design/.build-index.cjs 生成。
+  </footer>
+</div>
+</body>
+</html>

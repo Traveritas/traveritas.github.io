@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0c0f14">
+<title>醒梦 · 入梦检验 — 主页探索稿 p7</title>
+<meta name="description" content="主页是门口：清醒梦的规矩是进门先做一次现实检验。这个站每句话都写了两遍——梦着的一面与醒着的一面。按住，看它醒来。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;900&display=swap" rel="stylesheet">
+<style>
+/* ---------- tokens（与现实检验一脉） ---------- */
+:root{
+  --bg0:#0c0f14; --bg1:#0f1218; --bg2:#141118; --bg3:#191310; --bg4:#1b1310;
+  --ink:#e7e2d8;
+  --dim:#928d83;
+  --faint:#5a564f;
+  --cool:#a7bccd;          /* 醒 · 可核验 */
+  --warm:#d8c3a4;          /* 梦 · 不由分说 */
+  --ember:#d9a05f;         /* 唯一强调色，克制使用 */
+  --line:rgba(231,226,216,.13);
+  --serif:'Noto Serif SC','Source Han Serif SC','Songti SC','STSong',SimSun,serif;
+  --mono:ui-monospace,'Cascadia Mono',Consolas,'JetBrains Mono',Menlo,monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:auto}
+body{
+  font-family:var(--serif);
+  color:var(--ink);
+  background:var(--bg0);
+  line-height:1.9;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+  touch-action:manipulation;
+}
+.bg{position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:linear-gradient(178deg,var(--bg0) 0%,var(--bg1) 28%,var(--bg2) 52%,var(--bg3) 76%,var(--bg4) 100%)}
+::selection{background:rgba(217,160,95,.28);color:var(--ink)}
+a{color:inherit;text-decoration:none}
+:focus-visible{outline:1px dashed rgba(231,226,216,.55);outline-offset:4px}
+::-webkit-scrollbar{width:10px}
+::-webkit-scrollbar-thumb{background:rgba(231,226,216,.14);border-radius:5px}
+::-webkit-scrollbar-track{background:transparent}
+
+/* ---------- ambient layers ---------- */
+.glow{position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:
+    radial-gradient(52vmax 52vmax at 78% 68%, rgba(214,166,120,.10), transparent 68%),
+    radial-gradient(40vmax 40vmax at 12% 14%, rgba(150,175,200,.07), transparent 70%);
+  transition:opacity .8s ease;
+}
+body.checked .glow{opacity:.45}
+.grain{position:fixed;inset:0;pointer-events:none;z-index:3;opacity:.05;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='180' height='180' filter='url(%23n)' opacity='0.6'/></svg>");
+}
+.veil{position:fixed;inset:0;pointer-events:none;z-index:1;opacity:0;transition:opacity .7s ease;
+  background:radial-gradient(120% 90% at 72% 6%, rgba(235,230,220,.075), transparent 60%);
+}
+body.checked .veil{opacity:1}
+.hairline{position:fixed;top:0;left:0;height:2px;width:0;z-index:6;
+  background:linear-gradient(90deg,var(--cool),var(--warm));opacity:.85}
+
+/* ---------- rail（左侧仪器：深度 · 钟 · 醒来计数） ---------- */
+.rail{position:fixed;left:38px;top:50%;transform:translateY(-50%);z-index:4;
+  display:flex;flex-direction:column;align-items:flex-start;gap:30px;
+}
+.rail-name{writing-mode:vertical-rl;font-size:12px;letter-spacing:.42em;color:var(--dim);
+  padding-left:10px;border-left:1px solid var(--line)}
+.rail-meter{display:flex;gap:12px;align-items:stretch}
+.meter-track{position:relative;width:1px;height:190px;background:var(--line)}
+.meter-dot{position:absolute;left:-2.5px;top:8%;width:6px;height:6px;border-radius:50%;
+  background:var(--cool);box-shadow:0 0 8px rgba(167,188,205,.8);
+  transition:top .45s cubic-bezier(.5,0,.2,1),background .45s,box-shadow .45s}
+body.checked .meter-dot{top:4%;background:var(--ember);box-shadow:0 0 10px rgba(217,160,95,.9)}
+.meter-words{display:flex;flex-direction:column;justify-content:space-between;
+  font-family:var(--mono);font-size:9px;letter-spacing:.2em;color:var(--faint)}
+.meter-words .on{color:var(--dim)}
+.rail-clock{font-family:var(--mono);font-size:13px;letter-spacing:.14em;color:var(--dim);
+  transition:color .5s,text-shadow .5s}
+.rail-clock .lab{display:block;font-size:9px;letter-spacing:.3em;color:var(--faint);margin-bottom:4px}
+.rail-clock.drift{color:var(--warm);text-shadow:0 0 14px rgba(216,195,164,.35)}
+body.checked .rail-clock{color:var(--cool);text-shadow:none}
+.rail-wake{font-family:var(--mono);font-size:9px;letter-spacing:.26em;color:var(--faint);line-height:2}
+.rail-wake b{color:var(--dim);font-weight:400}
+
+/* ---------- nav（右上 · 分层入口） ---------- */
+.nav{position:fixed;top:22px;right:24px;z-index:7;
+  display:flex;gap:2px;padding:5px;border-radius:999px;
+  background:rgba(12,15,20,.5);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
+  border:1px solid var(--line);
+}
+.nav a{display:inline-flex;align-items:center;gap:.6em;
+  font-size:12px;letter-spacing:.18em;color:var(--dim);
+  padding:6px 13px;border-radius:999px;transition:color .3s,background .3s}
+.nav a .d{width:5px;height:5px;border-radius:50%;flex:none}
+.nav a .d.c1{background:var(--cool)}
+.nav a .d.c2{background:rgba(167,188,205,.45)}
+.nav a .d.c3{background:var(--warm)}
+.nav a .d.c4{border:1px solid var(--faint)}
+.nav a:hover{color:var(--ink);background:rgba(231,226,216,.05)}
+
+/* ---------- topbar（移动端） ---------- */
+.topbar{display:none;position:fixed;top:0;left:0;right:0;z-index:7;
+  padding:12px 20px calc(10px);align-items:center;justify-content:space-between;
+  background:rgba(12,15,20,.55);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--line)}
+.topbar .tb-name{font-size:12px;letter-spacing:.34em;color:var(--dim)}
+.topbar .tb-clock{font-family:var(--mono);font-size:12px;letter-spacing:.14em;color:var(--dim);transition:color .5s}
+.topbar .tb-clock.drift{color:var(--warm)}
+
+/* ---------- layout ---------- */
+main{position:relative;z-index:2;max-width:800px;margin:0 auto;padding:0 28px 180px}
+section{margin-top:clamp(96px,14vh,160px)}
+.tag{display:inline-block;font-family:var(--mono);font-size:10px;letter-spacing:.24em;
+  padding:5px 10px 4px;border:1px solid var(--line);color:var(--dim);margin-bottom:22px}
+.tag.cool{color:var(--cool);border-color:rgba(167,188,205,.3)}
+.tag.warm{color:var(--warm);border-color:rgba(216,195,164,.3)}
+.tag.ember{color:var(--ember);border-color:rgba(217,160,95,.35)}
+h2{font-size:23px;font-weight:600;letter-spacing:.08em;margin-bottom:10px}
+.sub{font-size:13.5px;color:var(--dim);letter-spacing:.04em;margin-bottom:34px;min-height:1.9em}
+
+/* ---------- reveal ---------- */
+.rv{opacity:0;transform:translateY(26px);
+  transition:opacity .9s ease,transform .9s cubic-bezier(.2,.7,.2,1);
+  transition-delay:calc(var(--i,0)*80ms)}
+.rv.in{opacity:1;transform:none}
+
+/* ---------- hero ---------- */
+.hero{min-height:92vh;display:flex;flex-direction:column;justify-content:center;position:relative;padding:70px 0 40px}
+.hero .kicker{font-family:var(--mono);font-size:11px;letter-spacing:.34em;color:var(--dim);margin-bottom:26px}
+.hero .kicker em{font-style:normal;color:var(--ember)}
+h1{font-size:clamp(78px,13vw,158px);font-weight:900;letter-spacing:.06em;line-height:1.08;
+  margin-left:-6px}
+h1 .m{display:inline-block;letter-spacing:.13em;color:var(--warm);
+  transition:letter-spacing .8s ease,color .8s ease}
+body.checked h1 .m{letter-spacing:.04em;color:var(--ink)}
+.hero-lead{margin-top:30px;font-size:clamp(16px,2.2vw,19px);color:var(--ink);letter-spacing:.05em}
+.hero-lead b{font-weight:600;color:var(--warm)}
+body.checked .hero-lead b{color:var(--cool)}
+.hero-note{margin-top:12px;font-size:clamp(15px,2vw,17px);color:var(--dim);letter-spacing:.05em}
+.hero-meta{margin-top:18px;font-family:var(--mono);font-size:11px;letter-spacing:.22em;color:var(--faint)}
+.hero-how{margin-top:40px;max-width:580px;padding:20px 24px;
+  border:1px solid var(--line);border-left:2px solid rgba(217,160,95,.55);
+  background:rgba(231,226,216,.03);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+  font-size:13.5px;line-height:2.1;color:var(--dim);letter-spacing:.03em}
+.hero-how b{color:var(--ink);font-weight:600}
+.hero-side{position:absolute;right:-56px;top:16%;writing-mode:vertical-rl;
+  font-size:12px;letter-spacing:.5em;color:var(--faint);border-right:1px solid var(--line);padding-right:12px}
+.ghost{position:absolute;left:-4%;top:4%;z-index:-1;font-size:clamp(300px,44vw,560px);font-weight:900;line-height:1;
+  color:transparent;-webkit-text-stroke:1px rgba(231,226,216,.045);user-select:none;pointer-events:none}
+.scrollcue{margin-top:56px;font-family:var(--mono);font-size:10.5px;letter-spacing:.3em;color:var(--faint)}
+.scrollcue i{font-style:normal;color:var(--warm);animation:bob 5s ease-in-out infinite;display:inline-block}
+body.checked .scrollcue i{color:var(--cool)}
+
+/* ---------- 金句（双份文案的第一次示范） ---------- */
+.manif{margin-top:44px;max-width:560px;border-left:1px solid rgba(216,195,164,.28);padding-left:24px;
+  transition:border-color .5s}
+.manif .idx{font-family:var(--mono);font-size:10px;letter-spacing:.22em;color:rgba(216,195,164,.55);
+  display:block;margin-bottom:10px;transition:color .5s}
+.manif p{font-size:clamp(17px,2.3vw,20px);line-height:2.15;color:var(--warm);letter-spacing:.04em;transition:color .5s}
+body.checked .manif{border-color:rgba(167,188,205,.4)}
+body.checked .manif .idx{color:rgba(167,188,205,.6)}
+body.checked .manif p{color:var(--cool)}
+
+/* ---------- 深度轴分隔 ---------- */
+.axis{position:relative;height:120px;margin-top:clamp(96px,14vh,160px)}
+.axis-line{position:absolute;left:-8%;right:-8%;top:52%;height:1px;
+  background:linear-gradient(90deg,rgba(167,188,205,0),rgba(167,188,205,.5) 16%,rgba(216,195,164,.5) 80%,rgba(216,195,164,0));
+  transform:rotate(-4deg) scaleX(0);transform-origin:left center;
+  transition:transform 1.6s cubic-bezier(.6,0,.2,1) .15s}
+.axis.in .axis-line{transform:rotate(-4deg) scaleX(1)}
+.axis .a-l{position:absolute;left:0;top:8%;font-family:var(--mono);font-size:10.5px;letter-spacing:.26em;color:var(--cool)}
+.axis .a-r{position:absolute;right:0;bottom:6%;font-family:var(--mono);font-size:10.5px;letter-spacing:.26em;color:var(--warm)}
+.axis .a-r.deep{color:var(--ember);opacity:.75}
+
+/* ---------- 醒 · 项目行 ---------- */
+.rows{border-top:1px solid var(--line)}
+.pblock{border-bottom:1px solid var(--line);padding:21px 2px 19px;transition:background .3s}
+.pblock:hover{background:rgba(231,226,216,.025)}
+.row{display:grid;grid-template-columns:96px 1fr auto;gap:18px;align-items:baseline}
+.row .k{font-family:var(--mono);font-size:11px;letter-spacing:.24em;color:var(--faint)}
+.row .v{font-size:17px;letter-spacing:.03em;color:var(--ink)}
+.row .v small{display:block;font-size:13px;color:var(--dim);letter-spacing:.02em;margin-top:4px;line-height:1.9}
+.row .v .st{display:inline-block;font-family:var(--mono);font-size:10px;letter-spacing:.2em;
+  color:var(--cool);border:1px solid rgba(167,188,205,.3);padding:3px 9px 2px;margin-left:1em;vertical-align:2px}
+.row .v .st.warmst{color:var(--warm);border-color:rgba(216,195,164,.3)}
+.tick{font-family:var(--mono);font-size:10px;letter-spacing:.18em;color:rgba(167,188,205,.75);white-space:nowrap}
+/* 复读行：同一数据在梦里抄漂了 */
+.echo-line{display:grid;grid-template-columns:96px 1fr;gap:18px;margin-top:10px;
+  font-family:var(--mono);font-size:11px;letter-spacing:.14em}
+.echo-line .ek{color:var(--faint)}
+.echo-line .ev{color:rgba(216,195,164,.68);transition:color .5s}
+body.checked .echo-line .ev{color:var(--ink)}
+.echo-line .tick2{margin-left:1.2em;color:rgba(216,195,164,.5);transition:color .4s}
+body.checked .echo-line .tick2{color:rgba(217,160,95,.85)}
+
+/* ---------- 浅梦 · 随笔 ---------- */
+.ess{margin-top:46px;transition:filter .65s ease,opacity .65s ease,transform .65s ease}
+.ess:nth-of-type(2){margin-left:9%}
+.ess:nth-of-type(3){margin-left:18%}
+.ess:nth-of-type(4){margin-left:27%}
+.ess-inner{border-left:1px solid rgba(216,195,164,.28);padding-left:24px;
+  animation:bob var(--d,8s) ease-in-out infinite;animation-delay:var(--dl,0s)}
+body.checked .ess-inner{animation-play-state:paused}
+.ess .idx{font-family:var(--mono);font-size:10px;letter-spacing:.22em;color:rgba(216,195,164,.55);display:block;margin-bottom:10px}
+.ess .etit{font-size:clamp(17px,2.2vw,20px);font-weight:600;letter-spacing:.04em;color:var(--ink)}
+.ess .etit a{border-bottom:1px solid rgba(231,226,216,.14);transition:border-color .3s}
+.ess .etit a:hover{border-color:var(--warm)}
+.ess .ee{margin-top:8px;font-size:14.5px;line-height:2.05;color:var(--warm);letter-spacing:.04em;transition:color .5s}
+body.checked .ess .ee{color:var(--dim)}
+.ess .edate{margin-top:10px;font-family:var(--mono);font-size:11px;letter-spacing:.18em;color:var(--faint)}
+.ess .edate .ev{color:rgba(216,195,164,.7);transition:color .5s}
+body.checked .ess .edate .ev{color:var(--cool)}
+.ess .edate .tick2{margin-left:1em;color:rgba(216,195,164,.5);transition:color .4s}
+body.checked .ess .edate .tick2{color:rgba(217,160,95,.85)}
+.ess .edate .tick2.ok{color:rgba(167,188,205,.6)}
+body.checked .ess .edate .tick2.ok{color:rgba(167,188,205,.85)}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+.ess-cap{margin-top:40px;font-size:13px;color:var(--dim);max-width:540px;line-height:2.1}
+.ess-cap b{color:var(--ink);font-weight:600}
+.morelink{display:inline-flex;align-items:baseline;gap:.6em;margin-top:26px;
+  font-size:15px;letter-spacing:.16em;color:var(--ink);
+  border-bottom:1px solid rgba(231,226,216,.18);padding-bottom:.4em;transition:border-color .3s}
+.morelink:hover{border-color:var(--ember)}
+.morelink .mono{font-family:var(--mono);font-size:11px;color:var(--faint);letter-spacing:.2em}
+
+/* ---------- 深梦 · 关于 ---------- */
+.dq{margin-left:auto;max-width:560px;margin-top:44px;transition:filter .65s ease,opacity .65s ease,transform .65s ease}
+.dq:nth-of-type(1){margin-right:26%}
+.dq:nth-of-type(2){margin-right:12%}
+.dq-inner{border-left:1px solid rgba(216,195,164,.28);padding-left:24px;
+  animation:bob var(--d,8s) ease-in-out infinite;animation-delay:var(--dl,0s)}
+body.checked .dq-inner{animation-play-state:paused}
+.dq .idx{font-family:var(--mono);font-size:10px;letter-spacing:.22em;color:rgba(216,195,164,.55);display:block;margin-bottom:10px}
+.dq p{font-size:clamp(17px,2.3vw,20px);line-height:2.15;color:var(--warm);letter-spacing:.04em;transition:color .4s}
+.dq:hover .dq-inner{border-color:rgba(216,195,164,.6)}
+body.checked .dq{filter:blur(3px);opacity:.26;transform:translateX(12px)}
+
+/* ---------- 最深处 · 试验场 ---------- */
+.chips{display:flex;flex-wrap:wrap;gap:14px;margin-top:6px}
+.chip{padding:10px 22px;font-size:15px;letter-spacing:.14em;color:var(--warm);
+  border:1px solid rgba(216,195,164,.3);border-radius:999px;
+  background:rgba(231,226,216,.03);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+  animation:bob var(--d,7s) ease-in-out infinite;animation-delay:var(--dl,0s)}
+body.checked .chip{animation-play-state:paused}
+.chip.dead{color:var(--faint);border-style:dashed;border-color:rgba(231,226,216,.16);
+  text-decoration:line-through;animation:none;opacity:.7}
+.chips-cap{margin-top:26px;font-size:13px;color:var(--dim);max-width:540px;line-height:2.1}
+.lab-door{margin-top:34px;font-family:var(--mono);font-size:11px;letter-spacing:.24em;color:var(--faint)}
+
+/* ---------- 唤醒方式 / footer ---------- */
+.wake-list a{display:flex;align-items:baseline;gap:18px;padding:22px 2px;border-bottom:1px solid var(--line);
+  transition:background .3s}
+.wake-list a:hover{background:rgba(231,226,216,.025)}
+.wake-list .w-name{font-size:19px;font-weight:600;letter-spacing:.1em;color:var(--ink);white-space:nowrap}
+.wake-list .w-href{font-family:var(--mono);font-size:12.5px;letter-spacing:.06em;color:var(--dim)}
+.wake-list .w-why{margin-left:auto;font-size:12px;color:var(--faint);letter-spacing:.08em;white-space:nowrap}
+.wake-list .w-arrow{font-family:var(--mono);color:var(--faint);transition:transform .3s,color .3s;white-space:nowrap}
+.wake-list a:hover .w-arrow{transform:translateX(6px);color:var(--ember)}
+.wake-list a.dead-row .w-name,.wake-list a.dead-row .w-href{color:var(--faint);font-weight:400}
+.wake-note{margin-top:24px;font-size:13px;color:var(--dim);line-height:2.1}
+footer{margin-top:clamp(120px,18vh,200px);text-align:center;color:var(--faint)}
+footer .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:rgba(216,195,164,.5);
+  margin-bottom:20px;animation:breath 4.4s ease-in-out infinite}
+body.checked footer .dot{animation-play-state:paused;background:rgba(167,188,205,.6)}
+footer p{font-size:12px;letter-spacing:.2em;line-height:2.4}
+footer .f-mono{font-family:var(--mono);font-size:9.5px;letter-spacing:.34em;margin-top:8px}
+
+/* ---------- 玻璃锚点 · 现实检验仪 ---------- */
+.anchor{position:fixed;right:30px;bottom:30px;z-index:8;
+  width:116px;display:flex;flex-direction:column;align-items:center;gap:0;
+  background:none;border:none;cursor:pointer;-webkit-user-select:none;user-select:none;
+  -webkit-touch-callout:none;font-family:var(--mono);color:var(--dim)}
+.anchor .ring-svg{position:absolute;top:0;left:50%;transform:translateX(-50%);width:92px;height:92px;pointer-events:none}
+.ring-track{fill:none;stroke:rgba(231,226,216,.13);stroke-width:1.5}
+.ring-fill{fill:none;stroke:var(--ember);stroke-width:2;stroke-linecap:round;
+  stroke-dasharray:276.46;stroke-dashoffset:276.46;transform:rotate(-90deg);transform-origin:center}
+.anchor .disc{position:relative;width:72px;height:72px;margin-top:10px;border-radius:50%;
+  border:1px solid rgba(231,226,216,.26);
+  background:rgba(231,226,216,.05);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+  display:grid;place-items:center;
+  box-shadow:0 0 26px rgba(231,226,216,.06),inset 0 0 16px rgba(231,226,216,.04);
+  animation:breath 4.4s ease-in-out infinite;
+  transition:border-color .4s,box-shadow .4s}
+.anchor:hover .disc{border-color:rgba(231,226,216,.5);box-shadow:0 0 34px rgba(216,195,164,.14),inset 0 0 16px rgba(231,226,216,.06)}
+.anchor .eye{width:22px;height:22px;border-radius:50%;border:1px solid rgba(231,226,216,.5);
+  display:grid;place-items:center;transition:border-color .4s}
+.anchor .eye i{display:block;width:6px;height:6px;border-radius:50%;background:rgba(231,226,216,.55);
+  transition:background .4s,box-shadow .4s}
+body.checked .anchor .disc{animation-play-state:paused;border-color:rgba(217,160,95,.65);
+  box-shadow:0 0 40px rgba(217,160,95,.22),inset 0 0 18px rgba(217,160,95,.08)}
+body.checked .anchor .eye{border-color:rgba(217,160,95,.8)}
+body.checked .anchor .eye i{background:var(--ember);box-shadow:0 0 10px rgba(217,160,95,.9)}
+.anchor .a-label{margin-top:12px;font-size:10px;letter-spacing:.22em;color:var(--dim);
+  transition:color .4s;text-align:center}
+.anchor.holding .a-label{color:var(--ember)}
+@keyframes breath{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+
+/* ---------- reduced motion ---------- */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+}
+body.no-motion *,body.no-motion *::before,body.no-motion *::after{animation:none!important;transition:none!important}
+
+/* ---------- responsive ---------- */
+@media (max-width:1180px){.hero-side{display:none}}
+@media (max-width:1000px){
+  .rail{display:none}
+  .topbar{display:flex}
+  main{padding-top:70px}
+  .hero{min-height:86vh}
+  .nav{top:auto;bottom:calc(96px + env(safe-area-inset-bottom));right:12px;
+    flex-direction:column;border-radius:16px}
+  .nav a{padding:7px 12px}
+}
+@media (max-width:640px){
+  main{padding:70px 22px 170px}
+  section{margin-top:84px}
+  .axis{height:96px;margin-top:84px}
+  .row{grid-template-columns:74px 1fr;gap:12px}
+  .row .tick{grid-column:2;justify-self:start;padding-top:2px}
+  .row .v .st{margin-left:0;margin-top:6px}
+  .echo-line{grid-template-columns:74px 1fr;gap:12px}
+  .ess:nth-of-type(n){margin-right:0}
+  .ess{margin-top:38px;max-width:100%}
+  .ess-inner{padding-left:18px}
+  .axis-line{left:-4%;right:-4%}
+  .anchor{right:14px;bottom:calc(16px + env(safe-area-inset-bottom));transform:scale(.88);transform-origin:bottom right}
+  .anchor .disc{-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+  .wake-list .w-why{display:none}
+  .ghost{left:-16%}
+  .nav{bottom:calc(116px + env(safe-area-inset-bottom))}
+  .nav a{font-size:11px}
+}
+</style>
+</head>
+<body>
+<div class="bg" aria-hidden="true"></div>
+
+<div class="glow" aria-hidden="true"></div>
+<div class="veil" aria-hidden="true"></div>
+<div class="grain" aria-hidden="true"></div>
+<div class="hairline" id="hairline" aria-hidden="true"></div>
+
+<!-- 左轨仪器：深度 · 钟 · 醒来计数 -->
+<aside class="rail" aria-hidden="true">
+  <div class="rail-name">醒梦 · XINGMENG</div>
+  <div class="rail-meter">
+    <div class="meter-track"><div class="meter-dot" id="meterDot"></div></div>
+    <div class="meter-words"><span class="on">醒</span><span>浅梦</span><span>深梦</span><span>最深处</span></div>
+  </div>
+  <div class="rail-clock" id="railClock"><span class="lab">此刻</span><span id="clockText">--:--</span></div>
+  <div class="rail-wake">今晚已醒 <b id="wakeN">0</b> 次</div>
+</aside>
+
+<!-- 移动端顶栏 -->
+<div class="topbar">
+  <span class="tb-name">醒梦 · 入梦检验</span>
+  <span class="tb-clock" id="tbClock">--:--</span>
+</div>
+
+<!-- 右上：分层入口（按可核验度排列） -->
+<nav class="nav" aria-label="站内入口">
+  <a href="#sec-projects" title="示例稿不接路由"><span class="d c1"></span>项目</a>
+  <a href="#sec-essays" title="示例稿不接路由"><span class="d c2"></span>随笔</a>
+  <a href="#sec-about" title="示例稿不接路由"><span class="d c3"></span>关于</a>
+  <a href="#sec-lab" title="示例稿不接路由"><span class="d c4"></span>试验场</a>
+</nav>
+
+<main>
+
+  <!-- ============ 第一屏：门口的检验 ============ -->
+  <header class="hero">
+    <div class="ghost" aria-hidden="true">梦</div>
+    <p class="kicker rv">醒梦 · XINGMENG — <em>REALITY CHECK AT THE DOOR</em></p>
+    <h1 class="rv" style="--i:1">醒<span class="m">梦</span></h1>
+    <p class="hero-lead rv" style="--i:2"><span class="dualrich" data-dream-html="欢迎来到一场<b>可以核验</b>的梦。" data-true-html="你正在看这个站<b>醒着</b>的样子。">欢迎来到一场<b>可以核验</b>的梦。</span></p>
+    <p class="hero-note rv" style="--i:3"><span class="dual" data-dream="你现在看到的，是它梦着的样子——日期会漂，钟会走错。" data-true="松手，它会继续梦。两类句子说的，常常是同一件事。">你现在看到的，是它梦着的样子——日期会漂，钟会走错。</span></p>
+    <p class="hero-meta rv" style="--i:4"><span class="dual" data-dream="已收录 12 篇随笔 · 9 个项目 · 1 场进行中的梦" data-true="已收录 4 篇随笔 · 3 个项目 · 纯静态站点 · 2026-09-19 上线">已收录 12 篇随笔 · 9 个项目 · 1 场进行中的梦</span></p>
+    <blockquote class="manif rv" style="--i:5">
+      <span class="idx dual" data-dream="写给自己的风格笔记" data-true="同一句话 · 第二种写法">写给自己的风格笔记</span>
+      <p><span class="dual" data-dream="世界应当始终保留一种感觉：它可能马上消失。" data-true="本站每日备份，暂时不会消失。">世界应当始终保留一种感觉：它可能马上消失。</span></p>
+    </blockquote>
+    <div class="hero-how rv" style="--i:6">
+      <span class="dualrich" data-dream-html="这个站每句话都写了两遍：<b>梦着的一面</b>，与<b>醒着的一面</b>。按住任何地方——或者右下角的玻璃锚点——它会逐字醒给你看。" data-true-html="这是醒着的一面。所有数字、日期与钟都已归位；松手，回到梦里。">这个站每句话都写了两遍：<b>梦着的一面</b>，与<b>醒着的一面</b>。按住任何地方——或者右下角的玻璃锚点——它会逐字醒给你看。</span>
+    </div>
+    <p class="scrollcue rv" style="--i:7"><span class="dual" data-dream="往下 · 越往下越深" data-true="往下 · 继续核验">往下 · 越往下越深</span> <i>↓</i></p>
+    <span class="hero-side" aria-hidden="true">介于醒与梦之间 · 一次到访是一次入梦</span>
+  </header>
+
+  <!-- ============ 醒 · 项目 ============ -->
+  <div class="axis rv" aria-hidden="true">
+    <div class="axis-line"></div>
+    <span class="a-l">醒 · WAKE</span>
+    <span class="a-r">能核验的事</span>
+  </div>
+
+  <section id="sec-projects">
+    <span class="tag cool rv">醒 · CAN VERIFY</span>
+    <h2 class="rv" style="--i:1">项目</h2>
+    <p class="sub rv" style="--i:2"><span class="dual" data-dream="造出来的东西都有据可查。梦里这么说，醒着也成立。" data-true="以下条目均有仓库与截图可查。">造出来的东西都有据可查。梦里这么说，醒着也成立。</span></p>
+    <div class="rows">
+      <div class="pblock rv" style="--i:3">
+        <div class="row">
+          <span class="k">PRJ-01</span>
+          <span class="v">与智能体共同造这个站<span class="st">施工中</span>
+            <small>方向我出，手是智能体的。审美简报到视觉稿，来回商量了十二轮。</small>
+          </span>
+          <span class="tick">✓ 有仓库</span>
+        </div>
+        <div class="echo-line">
+          <span class="ek">复读</span>
+          <span><span class="ev" data-dream="改到第 21 版" data-true="改到第 12 版">改到第 21 版</span><span class="tick2 dual" data-dream="⚠ 漂移" data-true="✓ 已校准">⚠ 漂移</span></span>
+        </div>
+      </div>
+      <div class="pblock rv" style="--i:4">
+        <div class="row">
+          <span class="k">PRJ-02</span>
+          <span class="v">母题图鉴<span class="st">施工中</span>
+            <small>收着反复出现的视觉母题。允许被推翻一百次，也允许回来。</small>
+          </span>
+          <span class="tick">✓ 有记录</span>
+        </div>
+        <div class="echo-line">
+          <span class="ek">复读</span>
+          <span><span class="ev" data-dream="收录 40 个母题" data-true="收录 4 个母题">收录 40 个母题</span><span class="tick2 dual" data-dream="⚠ 漂移" data-true="✓ 已校准">⚠ 漂移</span></span>
+        </div>
+      </div>
+      <div class="pblock rv" style="--i:5">
+        <div class="row">
+          <span class="k">PRJ-03</span>
+          <span class="v">一件未命名的工具<span class="st warmst">构思中</span>
+            <small>还没起名。梦里已经做完三遍了，醒着一遍都还没做。</small>
+          </span>
+          <span class="tick">✗ 暂无</span>
+        </div>
+        <div class="echo-line">
+          <span class="ek">复读</span>
+          <span><span class="ev" data-dream="2027-09-31 上线" data-true="日期未定">2027-09-31 上线</span><span class="tick2 dual" data-dream="⚠ 漂移" data-true="✓ 已校准">⚠ 漂移</span></span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 浅梦 · 随笔 ============ -->
+  <div class="axis rv" aria-hidden="true">
+    <div class="axis-line"></div>
+    <span class="a-l">浅梦 · LIGHT</span>
+    <span class="a-r">写下时是醒的</span>
+  </div>
+
+  <section id="sec-essays">
+    <span class="tag warm rv">浅梦 · HALF-VERIFIABLE</span>
+    <h2 class="rv" style="--i:1">随笔</h2>
+    <p class="sub rv" style="--i:2"><span class="dual" data-dream="写下的时候是醒的；现在读起来，有一半像梦话。" data-true="发布时间可核验。内容不做保证。">写下的时候是醒的；现在读起来，有一半像梦话。</span></p>
+
+    <article class="ess rv">
+      <div class="ess-inner" style="--d:8.5s">
+        <span class="idx">随笔 · 01</span>
+        <h3 class="etit"><a href="#" title="示例稿不接路由">开站：在醒与梦之间</a></h3>
+        <p class="ee">这个站为什么存在，以及它想长成什么样子。</p>
+        <p class="edate"><span class="ev" data-dream="2026-09-32" data-true="2026-09-19">2026-09-32</span><span class="tick2 dual" data-dream="⚠ 漂移" data-true="✓ 已校准">⚠ 漂移</span></p>
+      </div>
+    </article>
+
+    <article class="ess rv">
+      <div class="ess-inner" style="--d:7.2s;--dl:-2s">
+        <span class="idx">随笔 · 02</span>
+        <h3 class="etit"><a href="#" title="示例稿不接路由">与智能体一起造一个网站</a></h3>
+        <p class="ee">你看到的这个站，一行代码都不是我写的。</p>
+        <p class="edate"><span class="ev" data-dream="2026-19-09" data-true="2026-09-19">2026-19-09</span><span class="tick2 dual" data-dream="⚠ 漂移" data-true="✓ 已校准">⚠ 漂移</span></p>
+      </div>
+    </article>
+
+    <article class="ess rv">
+      <div class="ess-inner" style="--d:9.4s;--dl:-4s">
+        <span class="idx">随笔 · 03</span>
+        <h3 class="etit"><a href="#" title="示例稿不接路由">母题探索记录：从碎块到花</a></h3>
+        <p class="ee">推翻一百次，也还是同一根线——不对，这句是别的梦里的。这里说：推翻一百次，记录一百次。</p>
+        <p class="edate"><span class="ev" data-dream="2026-09-19 25:61" data-true="2026-09-19">2026-09-19 25:61</span><span class="tick2 dual" data-dream="⚠ 漂移" data-true="✓ 已校准">⚠ 漂移</span></p>
+      </div>
+    </article>
+
+    <article class="ess rv">
+      <div class="ess-inner" style="--d:7.8s;--dl:-1s">
+        <span class="idx">随笔 · 04</span>
+        <h3 class="etit"><a href="#" title="示例稿不接路由">留白是一种材料</a></h3>
+        <p class="ee">少到快要没有的时候，剩下的才显出重量。</p>
+        <p class="edate"><span class="ev">2026-09-20</span><span class="tick2 ok">✓ 未漂移</span></p>
+      </div>
+    </article>
+
+    <p class="ess-cap rv">第四篇的日期没有漂——<b>梦里也有结实的锚</b>。其余的都漂了：读出不对劲，说明你还在梦里。</p>
+    <a class="morelink rv" href="#" title="示例稿不接路由">全部随笔 <span class="mono">ESSAYS →</span></a>
+  </section>
+
+  <!-- ============ 深梦 · 关于 ============ -->
+  <div class="axis rv" aria-hidden="true">
+    <div class="axis-line"></div>
+    <span class="a-l">深梦 · DEEP</span>
+    <span class="a-r">不由分说的话</span>
+  </div>
+
+  <section id="sec-about">
+    <span class="tag warm rv">深梦 · CANNOT VERIFY</span>
+    <h2 class="rv" style="--i:1">关于</h2>
+    <p class="sub rv" style="--i:2"><span class="dual" data-dream="造这个站的人，话分两种：醒着写的，与梦里说的。" data-true="双份档案在关于页：同一份自我介绍抄了两遍，逐字对照。">造这个站的人，话分两种：醒着写的，与梦里说的。</span></p>
+
+    <blockquote class="dq rv"><div class="dq-inner" style="--d:8.5s">
+      <span class="idx">梦话 · 01</span>
+      <p>我想要一个完全属于自己的地方：不是社交平台的 timeline，不是由算法决定谁被看见，而是一块按自己的审美慢慢经营的空地。</p>
+    </div></blockquote>
+
+    <blockquote class="dq rv"><div class="dq-inner" style="--d:7.6s;--dl:-3s">
+      <span class="idx">梦话 · 02</span>
+      <p>慢慢来。</p>
+    </div></blockquote>
+
+    <a class="morelink rv" href="#" title="示例稿不接路由">去做完整的现实检验 <span class="mono">ABOUT →</span></a>
+  </section>
+
+  <!-- ============ 最深处 · 试验场 ============ -->
+  <div class="axis rv" aria-hidden="true">
+    <div class="axis-line"></div>
+    <span class="a-l">最深处 · UNBORN</span>
+    <span class="a-r deep">还没有的东西</span>
+  </div>
+
+  <section id="sec-lab">
+    <span class="tag ember rv">最深处 · NOT YET</span>
+    <h2 class="rv" style="--i:1">试验场</h2>
+    <p class="sub rv" style="--i:2"><span class="dual" data-dream="还没有的东西住在这里。据说反复梦见的事物，迟早会被做出来。" data-true="此栏目尚未开工。以下为母题候补与淘汰记录。">还没有的东西住在这里。据说反复梦见的事物，迟早会被做出来。</span></p>
+    <div class="chips rv" style="--i:3">
+      <span class="chip" style="--d:6.8s">水面</span>
+      <span class="chip" style="--d:7.6s;--dl:-2s">细线</span>
+      <span class="chip" style="--d:6.2s;--dl:-4s">帷幕</span>
+      <span class="chip" style="--d:8.2s;--dl:-1s">巨型空洞</span>
+      <span class="chip dead">碎块</span>
+      <span class="chip dead">花</span>
+    </div>
+    <p class="chips-cap rv" style="--i:4"><span class="dual" data-dream="划掉的两个已经醒来了——碎块因过于规整被否决，花做了三稿仍不是答案。" data-true="已否决：碎块（过于规整）、花（三稿未成）。完整记录见《母题探索记录》。">划掉的两个已经醒来了——碎块因过于规整被否决，花做了三稿仍不是答案。</span></p>
+    <p class="lab-door rv" style="--i:5">DOOR NOT OPEN — 梦里先排着队</p>
+  </section>
+
+  <!-- ============ 唤醒方式 / 出口 ============ -->
+  <section>
+    <span class="tag cool rv">出口 · 唤醒方式</span>
+    <h2 class="rv" style="--i:1">需要把我叫醒的话</h2>
+    <p class="sub rv" style="--i:2"><span class="dual" data-dream="这些是锚点中的锚点——在梦里点，也会通。" data-true="以下链接真实有效。">这些是锚点中的锚点——在梦里点，也会通。</span></p>
+    <div class="wake-list">
+      <a class="rv" style="--i:3" href="https://github.com/Traveritas" target="_blank" rel="noopener">
+        <span class="w-name">GitHub</span>
+        <span class="w-href">github.com/Traveritas</span>
+        <span class="w-why">仓库 · 醒着的证据</span>
+        <span class="w-arrow">→</span>
+      </a>
+      <a class="rv" style="--i:4" href="mailto:hello@traveritas.page">
+        <span class="w-name">Email</span>
+        <span class="w-href">hello@traveritas.page</span>
+        <span class="w-why">来信 · 会醒着回</span>
+        <span class="w-arrow">→</span>
+      </a>
+      <a class="dead-row rv" style="--i:5" href="javascript:void(0)" aria-disabled="true">
+        <span class="w-name">RSS</span>
+        <span class="w-href">/rss.xml</span>
+        <span class="w-why">还没醒 · 即将接通</span>
+        <span class="w-arrow">→</span>
+      </a>
+    </div>
+    <p class="wake-note rv" style="--i:6">主页已经换过几副面孔，每一副都被否决；这一副打算一次睡成。</p>
+  </section>
+
+  <footer class="rv">
+    <span class="dot" aria-hidden="true"></span>
+    <p>本页在梦中建成 · 门口备有一枚玻璃锚点<br><span class="dual" data-dream="欢迎再次入梦" data-true="欢迎再次访问">欢迎再次入梦</span></p>
+    <p class="f-mono">醒梦 XINGMENG · 主页探索稿 P7 · 叙事源：现实检验 · 示例内容，不接真实数据与路由</p>
+  </footer>
+
+</main>
+
+<!-- 玻璃锚点 · 现实检验仪 -->
+<button class="anchor" id="anchor" aria-label="按住以检验现实" aria-pressed="false">
+  <svg class="ring-svg" viewBox="0 0 92 92" aria-hidden="true">
+    <circle class="ring-track" cx="46" cy="46" r="44"></circle>
+    <circle class="ring-fill" id="ringFill" cx="46" cy="46" r="44"></circle>
+  </svg>
+  <span class="disc"><span class="eye"><i></i></span></span>
+  <span class="a-label" id="anchorLabel">按住 · 检验现实</span>
+</button>
+
+<div id="errbox" hidden></div>
+
+<script>
+(function(){
+  'use strict';
+  var body=document.body;
+  var anchor=document.getElementById('anchor');
+  var anchorLabel=document.getElementById('anchorLabel');
+  var ring=document.getElementById('ringFill');
+  var meterDot=document.getElementById('meterDot');
+  var glow=document.querySelector('.glow');
+  var hairline=document.getElementById('hairline');
+  var wakeNEl=document.getElementById('wakeN');
+  var clockEls=[document.getElementById('clockText'),document.getElementById('tbClock')];
+  var clockWrap=document.getElementById('railClock');
+  var RING=2*Math.PI*44;
+  var reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var qs=new URLSearchParams(location.search);
+  if(qs.get('reduced')==='1'){ body.classList.add('no-motion'); reduce=true; }
+
+  window.addEventListener('error',function(e){
+    var b=document.getElementById('errbox');
+    window.__swarmErr=e.message||e.type;
+    b.hidden=false;b.textContent='ERR: '+(e.message||e.type);
+  });
+
+  /* ---------- 双份文案：梦态 / 核验态 ---------- */
+  var duals=[].slice.call(document.querySelectorAll('.dual'));
+  var POOL='醒梦之间0123456789abcdefghijklmnopqrstuvwxyz·—✓';
+  function morph(el,target,dur,done){
+    if(!el)return;
+    if(el._job)cancelAnimationFrame(el._job);
+    if(reduce||dur<=0){ el.textContent=target; done&&done(); return; }
+    var from=el.textContent;
+    var max=Math.max(from.length,target.length);
+    var t0=performance.now();
+    (function step(t){
+      var p=Math.min(1,(t-t0)/dur);
+      var n=Math.floor(p*target.length);
+      var out=target.slice(0,n);
+      for(var i=n;i<max;i++){
+        var c=i<from.length?from.charAt(i):' ';
+        out+=(Math.random()<0.45)?c:POOL.charAt(Math.floor(Math.random()*POOL.length));
+      }
+      el.textContent=out;
+      if(p<1){ el._job=requestAnimationFrame(step); }
+      else{ el.textContent=target; el._job=null; done&&done(); }
+    })(t0);
+  }
+  /* 带 <b> 等富文本的双份文案：整段交换 */
+  var richDuals=[].slice.call(document.querySelectorAll('[data-dream-html]'));
+  function settleDuals(){
+    duals.forEach(function(el){ morph(el,el.getAttribute('data-true'),reduce?0:640); });
+    richDuals.forEach(function(el){ el.innerHTML=el.getAttribute('data-true-html'); });
+  }
+  function dreamDuals(){
+    duals.forEach(function(el){ morph(el,el.getAttribute('data-dream'),reduce?0:520); });
+    richDuals.forEach(function(el){ el.innerHTML=el.getAttribute('data-dream-html'); });
+  }
+
+  /* ---------- 深度（滚动）：进度线 + 深度表 + 光晕 ---------- */
+  var depth=0;
+  function render(){
+    if(!body.classList.contains('checked')){
+      meterDot.style.top=(8+depth*78)+'%';
+    }
+    if(glow)glow.style.transform='translateY('+(depth*24)+'vh)';
+    if(hairline)hairline.style.width=(depth*100)+'%';
+  }
+  function readScroll(){
+    var max=document.documentElement.scrollHeight-innerHeight;
+    depth=max>0?Math.min(1,Math.max(0,scrollY/max)):0;
+    render();
+  }
+  /* rAF 直读滚动（无头环境程序化 scrollTo 不派发 scroll 事件） */
+  (function loop(){ readScroll(); requestAnimationFrame(loop); })();
+
+  /* ---------- 钟：梦里漂移，检验时校准 ---------- */
+  var driftMin=0;
+  function pad(n){return (n<10?'0':'')+n}
+  function tickClock(){
+    var checked=body.classList.contains('checked');
+    if(checked){ driftMin*=0.45; if(driftMin<0.4)driftMin=0; }
+    else{ driftMin+=(0.5+depth*8)*(0.5+Math.random()); }
+    var r=new Date();
+    var mins=r.getHours()*60+r.getMinutes()+driftMin;
+    var h=Math.floor(mins/60), m=Math.floor(mins%60);
+    var txt=pad(h)+':'+pad(m);
+    var drifting=!checked&&driftMin>3;
+    clockEls.forEach(function(el){ if(!el)return; el.textContent=txt; el.classList.toggle('drift',drifting); });
+    if(clockWrap)clockWrap.classList.toggle('drift',drifting);
+  }
+  setInterval(tickClock,1000);tickClock();
+
+  /* ---------- 检验（按住）：锚点 或 任意处 ---------- */
+  var RING_MS=760;
+  var holding=false,holdT0=0,autoTimer=null,wakeCount=0;
+  function ringFill(){
+    ring.style.transition=reduce?'none':'stroke-dashoffset '+RING_MS+'ms linear';
+    ring.style.strokeDashoffset='0';
+  }
+  function ringReset(){
+    ring.style.transition=reduce?'none':'stroke-dashoffset .45s ease';
+    ring.style.strokeDashoffset=RING;
+  }
+  function startCheck(){
+    if(holding)return;
+    holding=true;holdT0=performance.now();
+    body.classList.add('checked');
+    anchor.classList.add('holding');
+    anchor.setAttribute('aria-pressed','true');
+    anchorLabel.textContent='检验中 · 现实';
+    meterDot.style.top='4%';
+    ringFill();
+    settleDuals();
+  }
+  function endCheck(){
+    if(!holding)return;
+    holding=false;
+    if(performance.now()-holdT0>400){
+      wakeCount++; wakeNEl.textContent=wakeCount;
+    }
+    body.classList.remove('checked');
+    anchor.classList.remove('holding');
+    anchor.setAttribute('aria-pressed','false');
+    anchorLabel.textContent='按住 · 检验现实';
+    ringReset();
+    dreamDuals();
+    render();
+  }
+  anchor.addEventListener('contextmenu',function(e){e.preventDefault()});
+  anchor.addEventListener('pointerdown',function(e){
+    e.preventDefault();
+    if(anchor.setPointerCapture){try{anchor.setPointerCapture(e.pointerId)}catch(_){}}
+    clearTimeout(autoTimer);
+    startCheck();
+  });
+  function release(){
+    if(!holding)return;
+    if(performance.now()-holdT0<350){ /* 快点：自动检验一小会儿 */
+      clearTimeout(autoTimer);
+      autoTimer=setTimeout(endCheck,1500);
+    }else{
+      endCheck();
+    }
+  }
+  anchor.addEventListener('pointerup',release);
+  anchor.addEventListener('pointercancel',function(){clearTimeout(autoTimer);endCheck()});
+  anchor.addEventListener('keydown',function(e){
+    if(e.code==='Space'||e.code==='Enter'){e.preventDefault();if(!e.repeat)startCheck();}
+  });
+  anchor.addEventListener('keyup',function(e){
+    if(e.code==='Space'||e.code==='Enter'){release();}
+  });
+
+  /* ---------- 按住任意处（桌面指针）：门槛本身就是仪器 ---------- */
+  var bgHold=false,bgTimer=null;
+  if(matchMedia('(pointer:fine)').matches){
+    document.addEventListener('pointerdown',function(e){
+      if(e.target.closest('a,button'))return;
+      clearTimeout(bgTimer);
+      bgTimer=setTimeout(function(){ bgHold=true; startCheck(); },380);
+    });
+    function cancelBg(){
+      clearTimeout(bgTimer);
+      if(bgHold){ bgHold=false; endCheck(); }
+    }
+    document.addEventListener('pointerup',cancelBg);
+    document.addEventListener('pointercancel',cancelBg);
+    document.addEventListener('pointermove',function(e){
+      if(bgHold&&Math.hypot(e.movementX||0,e.movementY||0)>26){ cancelBg(); }
+    });
+  }
+
+  /* ---------- 走神漂移：梦里偶有一处又漂了 ---------- */
+  if(!reduce){
+    setInterval(function(){
+      if(holding||document.hidden)return;
+      var vis=duals.filter(function(el){
+        var r=el.getBoundingClientRect();
+        return r.top<innerHeight&&r.bottom>0;
+      });
+      if(!vis.length)return;
+      var el=vis[Math.floor(Math.random()*vis.length)];
+      morph(el,el.getAttribute('data-dream'),700);
+    },9000);
+  }
+
+  /* ---------- 出现 ---------- */
+  if('IntersectionObserver' in window){
+    var io=new IntersectionObserver(function(es){
+      es.forEach(function(en){ if(en.isIntersecting){en.target.classList.add('in');io.unobserve(en.target);} });
+    },{threshold:.12});
+    document.querySelectorAll('.rv').forEach(function(el){io.observe(el)});
+  }else{
+    document.querySelectorAll('.rv').forEach(function(el){el.classList.add('in')});
+  }
+
+  /* ---------- 示例稿：站内假链接不真的跳转（页内锚点除外） ---------- */
+  document.querySelectorAll('main a[href="#"]').forEach(function(a){
+    a.addEventListener('click',function(e){ e.preventDefault(); });
+  });
+
+  /* ---------- 调试参数（供截图验收） ---------- */
+  function applyScroll(){
+    var f=parseFloat(qs.get('scroll'));
+    if(!isNaN(f)){
+      var max=document.documentElement.scrollHeight-innerHeight;
+      scrollTo(0,Math.max(0,max*Math.min(1,Math.max(0,f))));
+    }
+    readScroll();
+  }
+  addEventListener('load',function(){
+    applyScroll();
+    if(qs.get('check')==='1'){
+      startCheck(); holdT0=-1e6; /* 锁定，永不松手 */
+    }
+  });
+  applyScroll();
+
+  window.__p7={
+    state:function(){
+      return JSON.stringify({
+        checked:body.classList.contains('checked'),
+        wake:wakeCount,
+        driftClock:+driftMin.toFixed(1),
+        duals:duals.length,
+        heroLead:(document.querySelector('.hero-lead .dual')||{}).textContent
+      });
+    }
+  };
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,501 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>方案 E · 醒来之前</title>
+<style>
+  /* ═══ 概念 ═══
+     正俯瞰：一张占满画面、四边切出的床（巨大尺度）。
+     你就是从这个世界里醒来的。床单的褶皱是地形；
+     现实物（杯、书、钟、手机）漂在布面上，
+     影子的方向微微不一致——梦不负责解释。
+     上缘未干，化进雾里；宣言印在床单上，被一道褶皱半掩。
+     层三明治：床单底 → 褶皱地形 → 枕 → 宣言（被褶皱压过一道）
+     → 物体与影子 → 未干之雾 → 编辑层。 */
+
+  @font-face {
+    font-family: 'Noto Serif SC Web';
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url('https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/files/noto-serif-sc-chinese-simplified-500-normal.woff2') format('woff2');
+  }
+  @font-face {
+    font-family: 'Noto Serif SC Web';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url('https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/files/noto-serif-sc-chinese-simplified-600-normal.woff2') format('woff2');
+  }
+
+  :root {
+    --sheet: #f9f8f5;
+    --sheet-cool: #f2f2ee;
+    --fold: #e8e2dc;
+    --fold-deep: #ddd6cf;
+    --pillow: #ece1e1;
+    --ink: #2a2e33;
+    --ink-soft: #5a5f66;
+    --ink-faint: #646a71;
+    --mist-ink: #4c6a80;
+    --gold: #c5b78f;
+    --coffee: #b3a08c;
+    --font-display: 'Noto Serif SC Web', 'Noto Serif SC', 'Palatino Linotype', Georgia, 'Songti SC', SimSun, serif;
+    --font-body: system-ui, -apple-system, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    font-family: var(--font-body);
+    color: var(--ink);
+    background: var(--sheet);
+    overflow: hidden;
+  }
+
+  .stage {
+    position: relative;
+    height: 100dvh;
+    overflow: clip;
+    /* 晨光从左上来 */
+    background:
+      radial-gradient(60vw 70vh at 6% 0%, rgba(238, 240, 237, 0.9), transparent 62%),
+      linear-gradient(115deg, var(--sheet) 0%, #f6f4f0 52%, #f1ede7 100%);
+  }
+
+  /* ── 褶皱地形：几道大的软褶（斜贯画面） ── */
+  .folds { position: absolute; inset: 0; pointer-events: none; }
+  .fold {
+    position: absolute;
+    left: -12vw;
+    right: -12vw;
+    filter: blur(7px);
+  }
+  .fold.g1 { top: 8vh;  height: 16vh; transform: rotate(-14deg); background: linear-gradient(to bottom, transparent, rgba(221, 214, 207, 0.34) 46%, rgba(233, 228, 222, 0.2) 66%, transparent); }
+  .fold.g2 { top: 30vh; height: 22vh; transform: rotate(-11deg); background: linear-gradient(to bottom, transparent, rgba(226, 219, 212, 0.28) 52%, transparent); }
+  .fold.g3 { top: 56vh; height: 26vh; transform: rotate(-15deg); background: linear-gradient(to bottom, transparent, rgba(221, 214, 207, 0.3) 48%, rgba(236, 231, 226, 0.16) 72%, transparent); }
+  .fold.g4 { top: 78vh; height: 18vh; transform: rotate(-9deg);  background: linear-gradient(to bottom, transparent, rgba(226, 219, 212, 0.24) 55%, transparent); }
+
+  /* 两道利落的折痕细线：阴影线旁贴一根高光线（布料翻折的明暗对） */
+  .creases { position: absolute; inset: 0; pointer-events: none; }
+  .creases svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+  /* ── 枕：左下，头刚离开 ── */
+  .pillow {
+    position: absolute;
+    left: -4vw;
+    bottom: -5vh;
+    width: 36vw;
+    height: 21vh;
+    border-radius: 46px;
+    transform: rotate(-7deg);
+    background:
+      radial-gradient(34% 44% at 56% 46%, rgba(214, 198, 198, 0.5), transparent 70%),
+      linear-gradient(150deg, #f0e7e6, var(--pillow) 58%, #e3d6d6);
+    box-shadow: 0 -10px 30px -18px rgba(42, 46, 51, 0.35), inset 0 1px 0 rgba(255,255,255,0.6);
+  }
+
+  /* ── 宣言：印在床单上 ── */
+  .manifesto {
+    position: absolute;
+    margin: 0;
+    font-family: var(--font-display);
+    color: var(--ink);
+    letter-spacing: 0.02em;
+    z-index: 3;
+  }
+  .l1 {
+    top: 17vh; left: 10vw;
+    font-size: clamp(1.9rem, 3.7vw, 3.5rem);
+    font-weight: 600;
+    line-height: 1.55;
+  }
+  .l2 {
+    top: 38vh; left: 13vw;
+    font-size: clamp(0.95rem, 1.5vw, 1.35rem);
+    font-weight: 500;
+    letter-spacing: 0.3em;
+    color: var(--ink-faint);
+  }
+  .l3 {
+    top: 50vh; left: 10vw;
+    font-size: clamp(1.7rem, 3.3vw, 3.1rem);
+    font-weight: 600;
+  }
+  /* 压过末句的一道褶（宣言真的沉进褶里，只余六七分可读） */
+  .fold-over {
+    position: absolute;
+    top: 57.5vh;
+    left: 4vw;
+    right: 6vw;
+    height: 8vh;
+    transform: rotate(-2.2deg);
+    z-index: 4;
+    pointer-events: none;
+    background: linear-gradient(to bottom,
+      transparent,
+      rgba(236, 231, 225, 0.42) 30%,
+      rgba(224, 217, 209, 0.6) 52%,
+      rgba(236, 231, 225, 0.44) 72%,
+      transparent);
+    filter: blur(1px);
+  }
+  /* 褶的最深处一条布色实带：字沉下去 */
+  .fold-over::after {
+    content: '';
+    position: absolute;
+    left: 0; right: 0;
+    top: 46%;
+    height: 34%;
+    background: rgba(219, 211, 202, 0.4);
+    filter: blur(3px);
+  }
+
+  /* ── 现实物与影子（影子方向不一致：梦不解释） ── */
+  .object { position: absolute; z-index: 5; pointer-events: none; }
+  .object svg { display: block; filter: drop-shadow(0 0 0 transparent); }
+
+  .obj-cup   { top: 30vh; right: 21vw; }
+  .obj-book  { top: 52vh; right: 12vw; transform: rotate(6deg); }
+  .obj-clock { top: 68vh; right: 26vw; }
+  .obj-phone { top: 22vh; right: 38vw; transform: rotate(-14deg); }
+
+  .steam {
+    animation: steam-rise 7s ease-in-out infinite alternate;
+    transform-origin: 50% 100%;
+  }
+  @keyframes steam-rise {
+    from { opacity: 0.35; transform: translateY(2px) scaleY(0.96); }
+    to   { opacity: 0.75; transform: translateY(-3px) scaleY(1.04); }
+  }
+
+  /* ── 未干之雾：上缘化开 ── */
+  .wet-fog {
+    position: absolute;
+    left: -6vw;
+    right: -6vw;
+    top: -12vh;
+    height: 34vh;
+    z-index: 6;
+    pointer-events: none;
+    background: linear-gradient(to bottom, rgba(249, 250, 248, 0.96), rgba(247, 248, 246, 0.72) 34%, rgba(247, 248, 246, 0.28) 62%, transparent);
+  }
+  .wet-fog::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(38vw 12vh at 30% 42%, rgba(240, 242, 240, 0.8), transparent 70%),
+                radial-gradient(30vw 10vh at 78% 46%, rgba(240, 242, 240, 0.7), transparent 72%);
+    animation: fog-breathe 13s ease-in-out infinite alternate;
+  }
+  @keyframes fog-breathe {
+    from { opacity: 0.5; transform: translateX(-10px); }
+    to   { opacity: 1;   transform: translateX(12px); }
+  }
+
+  /* ── 编辑层 ── */
+  .brand {
+    position: absolute;
+    top: 4.5vh;
+    left: 4vw;
+    z-index: 9;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 1.02rem;
+    letter-spacing: 0.06em;
+    color: var(--ink);
+    text-decoration: none;
+  }
+  .brand .ring {
+    width: 11px; height: 11px;
+    border: 1.5px solid var(--mist-ink);
+    border-radius: 50%;
+    opacity: 0.85;
+  }
+
+  .nav {
+    position: absolute;
+    right: 3.4vw;
+    top: 24vh;
+    z-index: 9;
+    display: flex;
+    flex-direction: column;
+    gap: 2.3rem;
+  }
+  .nav a {
+    position: relative;
+    writing-mode: vertical-rl;
+    letter-spacing: 0.5em;
+    padding: 0.4rem 0.7rem;
+    color: var(--ink-soft);
+    text-decoration: none;
+    font-size: 0.95rem;
+    transition: color 0.18s ease;
+  }
+  .nav a::after {
+    content: '';
+    position: absolute;
+    top: 46%;
+    right: calc(100% + 0.35rem);
+    width: 1.3rem;
+    height: 1px;
+    background: rgba(76, 106, 128, 0.35);
+    transition: width 0.18s ease, background 0.18s ease;
+  }
+  .nav a:hover { color: var(--ink); }
+  .nav a:hover::after { width: 2rem; background: var(--mist-ink); }
+
+  .side-note {
+    position: absolute;
+    left: 3.2vw;
+    top: 34vh;
+    z-index: 9;
+    writing-mode: vertical-rl;
+    font-size: 0.8rem;
+    letter-spacing: 0.52em;
+    color: var(--ink-faint);
+  }
+
+  /* 最近的随笔：搁在床单上的三张便签（俯瞰，平躺） */
+  .notes {
+    position: absolute;
+    right: 8vw;
+    bottom: 7vh;
+    z-index: 7;
+    display: flex;
+    gap: 1.4rem;
+  }
+  .note {
+    display: block;
+    width: 12.5rem;
+    padding: 0.75rem 0.9rem 0.85rem;
+    background: rgba(252, 252, 249, 0.95);
+    border: 1px solid rgba(197, 183, 143, 0.28);
+    box-shadow: 6px 9px 18px -10px rgba(42, 46, 51, 0.3), 2px 3px 6px -3px rgba(42, 46, 51, 0.18);
+    text-decoration: none;
+  }
+  .note:nth-child(1) { transform: rotate(-1.6deg); }
+  .note:nth-child(2) { transform: rotate(1.1deg) translateY(6px); }
+  .note:nth-child(3) { transform: rotate(-0.6deg); }
+  .note .d {
+    display: block;
+    font-size: 0.7rem;
+    letter-spacing: 0.12em;
+    color: var(--ink-faint);
+    font-variant-numeric: tabular-nums;
+    margin-bottom: 0.3rem;
+  }
+  .note .t {
+    display: block;
+    font-family: var(--font-display);
+    font-size: 0.95rem;
+    color: var(--ink);
+    line-height: 1.62;
+  }
+  .note:hover .t { color: var(--mist-ink); }
+
+  .notes-label {
+    position: absolute;
+    right: 8vw;
+    bottom: calc(7vh + 118px);
+    z-index: 7;
+    margin: 0 0 0.9rem;
+    font-family: var(--font-body);
+    font-weight: 500;
+    font-size: 0.8rem;
+    letter-spacing: 0.3em;
+    color: var(--ink-faint);
+    writing-mode: vertical-rl;
+    transform: translateX(-150%);
+  }
+
+  /* ── 回退 ── */
+  @media (prefers-reduced-motion: reduce) {
+    .steam, .wet-fog::after { animation: none; }
+  }
+
+  @media (max-height: 700px) {
+    .l1 { top: 14vh; font-size: clamp(1.6rem, 3.2vw, 2.8rem); }
+    .l3 { top: 46vh; font-size: clamp(1.4rem, 2.8vw, 2.5rem); }
+    .fold-over { top: 52vh; }
+    /* 矮视口：钟上移、便签下压，避免与便签行相撞 */
+    .obj-clock { top: 60vh; }
+    .notes { bottom: 3.5vh; }
+    .notes-label { bottom: calc(3.5vh + 118px); }
+  }
+
+  @media (max-width: 760px) {
+    .fold.g2, .fold.g4 { display: none; }
+    .pillow { width: 52vw; height: 17vh; }
+    .l1 { top: 13vh; left: 9vw; right: 34vw; font-size: clamp(1.4rem, 6vw, 2rem); }
+    .l2 { top: 34vh; left: 9vw; }
+    .l3 { top: 46vh; left: 9vw; font-size: clamp(1.25rem, 5.4vw, 1.8rem); }
+    .fold-over { top: 51vh; }
+    .obj-cup   { top: 26vh; right: 12vw; }
+    .obj-phone { top: 62vh; right: 12vw; }
+    .obj-book, .obj-clock { display: none; }
+    .side-note { display: none; }
+    .nav {
+      position: static;
+      margin: 1.8rem 9vw 0;
+      flex-direction: row;
+      gap: 1.8rem;
+    }
+    .nav a { writing-mode: horizontal-tb; letter-spacing: 0.24em; font-size: 0.9rem; }
+    .nav a::after { display: none; }
+    .notes {
+      position: static;
+      margin: 2.4rem 9vw 7vh;
+      flex-direction: column;
+      gap: 0.9rem;
+    }
+    .note { width: 100%; transform: none; }
+    .notes-label { display: none; }
+    .stage { overflow-y: auto; }
+  }
+</style>
+</head>
+<body>
+<div class="stage">
+
+  <!-- 褶皱地形 -->
+  <div class="folds" aria-hidden="true">
+    <div class="fold g1"></div>
+    <div class="fold g2"></div>
+    <div class="fold g3"></div>
+    <div class="fold g4"></div>
+  </div>
+
+  <!-- 折痕细线 -->
+  <div class="creases" aria-hidden="true">
+    <svg viewBox="0 0 1440 900" preserveAspectRatio="none">
+      <!-- 每道折痕 = 阴影线 + 紧贴的高光线 -->
+      <path d="M-40 330 C 320 300, 760 372, 1480 300" fill="none" stroke="#c9c0b6" stroke-width="1.6" opacity="0.55"/>
+      <path d="M-40 326 C 320 296, 760 368, 1480 296" fill="none" stroke="#fffdf9" stroke-width="1.2" opacity="0.85"/>
+      <path d="M-40 640 C 380 600, 900 690, 1480 610" fill="none" stroke="#cdc4b9" stroke-width="1.4" opacity="0.5"/>
+      <path d="M-40 636 C 380 596, 900 686, 1480 606" fill="none" stroke="#fffdf9" stroke-width="1.1" opacity="0.7"/>
+      <path d="M-40 180 C 400 210, 980 150, 1480 200" fill="none" stroke="#d3cac0" stroke-width="1.1" opacity="0.36"/>
+      <path d="M-40 176 C 400 206, 980 146, 1480 196" fill="none" stroke="#fffdf9" stroke-width="0.9" opacity="0.6"/>
+    </svg>
+  </div>
+
+  <!-- 枕（头刚离开） -->
+  <div class="pillow" aria-hidden="true"></div>
+
+  <!-- 宣言（印在床单上） -->
+  <h1 style="display:contents" aria-label="这里不是梦，也不是现实。它是人在即将醒来时，看见的最后一层世界。">
+    <p class="manifesto l1" aria-hidden="true">这里不是梦，也不是现实。</p>
+    <p class="manifesto l2" aria-hidden="true">它是人在即将醒来时</p>
+    <p class="manifesto l3" aria-hidden="true">看见的最后一层世界。</p>
+  </h1>
+
+  <!-- 压过宣言末句的一道褶 -->
+  <div class="fold-over" aria-hidden="true"></div>
+
+  <!-- 现实物：杯（影向东北） -->
+  <div class="object obj-cup" aria-hidden="true">
+    <svg width="104" height="104" viewBox="0 0 104 104">
+      <ellipse cx="58" cy="60" rx="34" ry="30" fill="rgba(42,46,51,0.14)" transform="rotate(24 58 60)"/>
+      <g class="steam">
+        <path d="M42 34 C 38 26, 46 20, 42 12" fill="none" stroke="#c9d0d2" stroke-width="3" stroke-linecap="round" opacity="0.7"/>
+        <path d="M56 32 C 52 24, 60 18, 56 10" fill="none" stroke="#c9d0d2" stroke-width="3" stroke-linecap="round" opacity="0.55"/>
+      </g>
+      <circle cx="48" cy="52" r="26" fill="#f4f1ec"/>
+      <circle cx="48" cy="52" r="21" fill="#b3a08c"/>
+      <circle cx="48" cy="52" r="16" fill="#a08b74"/>
+      <circle cx="43" cy="47" r="5" fill="#b3a08c" opacity="0.6"/>
+      <path d="M74 48 A 12 12 0 0 1 74 62" fill="none" stroke="#e6e0d8" stroke-width="5"/>
+    </svg>
+  </div>
+
+  <!-- 现实物：摊开的书（影向东） -->
+  <div class="object obj-book" aria-hidden="true">
+    <svg width="118" height="82" viewBox="0 0 118 82">
+      <ellipse cx="62" cy="44" rx="44" ry="22" fill="rgba(42,46,51,0.12)"/>
+      <path d="M8 20 C 8 16, 12 14, 18 15 L 52 22 L 52 62 L 18 55 C 12 54, 8 52, 8 48 Z" fill="#f6f3ea"/>
+      <path d="M110 20 C 110 16, 106 14, 100 15 L 66 22 L 66 62 L 100 55 C 106 54, 110 52, 110 48 Z" fill="#f2eee2"/>
+      <line x1="59" y1="22" x2="59" y2="62" stroke="#c9c2b4" stroke-width="1.6"/>
+      <g stroke="#d8d2c4" stroke-width="1">
+        <line x1="16" y1="27" x2="46" y2="32" opacity="0.8"/>
+        <line x1="16" y1="35" x2="46" y2="40" opacity="0.7"/>
+        <line x1="16" y1="43" x2="46" y2="48" opacity="0.6"/>
+        <line x1="72" y1="32" x2="102" y2="27" opacity="0.8"/>
+        <line x1="72" y1="40" x2="102" y2="35" opacity="0.7"/>
+        <line x1="72" y1="48" x2="102" y2="43" opacity="0.6"/>
+      </g>
+      <rect x="5"  y="18" width="4" height="38" fill="#c5b78f" opacity="0.8" rx="1"/>
+      <rect x="109" y="18" width="4" height="38" fill="#c5b78f" opacity="0.8" rx="1"/>
+    </svg>
+  </div>
+
+  <!-- 现实物：钟（六点五十八，影向东南） -->
+  <div class="object obj-clock" aria-hidden="true">
+    <svg width="92" height="92" viewBox="0 0 92 92">
+      <ellipse cx="52" cy="52" rx="32" ry="28" fill="rgba(42,46,51,0.13)" transform="rotate(38 52 52)"/>
+      <circle cx="44" cy="44" r="27" fill="#f7f5f1"/>
+      <circle cx="44" cy="44" r="27" fill="none" stroke="#d9d3ca" stroke-width="2"/>
+      <g stroke="#b9b2a7" stroke-width="1.4">
+        <line x1="44" y1="20" x2="44" y2="25"/>
+        <line x1="44" y1="63" x2="44" y2="68"/>
+        <line x1="20" y1="44" x2="25" y2="44"/>
+        <line x1="63" y1="44" x2="68" y2="44"/>
+      </g>
+      <!-- 6:58：时针将到 7，分针差两分钟归位——即将醒来 -->
+      <line x1="44" y1="44" x2="37" y2="56" stroke="#4c5560" stroke-width="2.6" stroke-linecap="round"/>
+      <line x1="44" y1="44" x2="40" y2="24" stroke="#4c5560" stroke-width="2" stroke-linecap="round"/>
+      <circle cx="44" cy="44" r="2.4" fill="#4c5560"/>
+    </svg>
+  </div>
+
+  <!-- 现实物：扣着的手机（影向北） -->
+  <div class="object obj-phone" aria-hidden="true">
+    <svg width="64" height="106" viewBox="0 0 64 106">
+      <ellipse cx="32" cy="38" rx="22" ry="34" fill="rgba(42,46,51,0.15)"/>
+      <rect x="12" y="8" width="40" height="82" rx="9" fill="#33383e"/>
+      <rect x="12" y="8" width="40" height="82" rx="9" fill="none" stroke="#22262b" stroke-width="1.5"/>
+      <circle cx="32" cy="20" r="2.6" fill="#22262b"/>
+      <rect x="26" y="82" width="12" height="2.6" rx="1.3" fill="#22262b"/>
+      <circle cx="32" cy="12" r="1.2" fill="#5c646d"/>
+    </svg>
+  </div>
+
+  <!-- 未干之雾（上缘） -->
+  <div class="wet-fog" aria-hidden="true"></div>
+
+  <!-- 站名 -->
+  <a class="brand" href="/"><span class="ring" aria-hidden="true"></span>Traveritas</a>
+
+  <!-- 竖排旁注 -->
+  <p class="side-note" aria-hidden="true">再躺一会儿　世界还没干</p>
+
+  <!-- 竖排导航 -->
+  <nav class="nav" aria-label="站内入口">
+    <a href="/articles/">随笔</a>
+    <a href="/projects/">项目</a>
+    <a href="/about/">关于</a>
+  </nav>
+
+  <!-- 最近的随笔：搁在床尾的三张便签 -->
+  <p class="notes-label" aria-hidden="true">最近的随笔</p>
+  <section class="notes" aria-label="最近的随笔">
+    <a class="note" href="#">
+      <span class="d">2026.09.12</span>
+      <span class="t">母题探索记录</span>
+    </a>
+    <a class="note" href="#">
+      <span class="d">2026.08.30</span>
+      <span class="t">关于“醒梦”的第一份笔记</span>
+    </a>
+    <a class="note" href="#">
+      <span class="d">2026.08.11</span>
+      <span class="t">把网站做成一个房间</span>
+    </a>
+  </section>
+</div>
+</body>
+</html>

@@ -1,44 +1,8 @@
 /* ─────────────────────────────────────────────────────────────
-   醒梦 · 全局样式与设计令牌
-   原则：大面积留白；黑白灰承担结构，雾蓝（醒）与灰粉（梦）
-   只作被雾稀释过的低饱和装饰；动效接近于零。
+   醒梦缝 · 一夜 —— 全局样式
+   原则：醒侧绝对静止（账目、刻度），梦侧大幅浮动（.drift）；
+   琥珀只出现在极少处；钟在梦里漂移；动效皆可退让。
    ───────────────────────────────────────────────────────────── */
-
-:root {
-  color-scheme: light;
-
-  /* 结构：黑白灰（秩序 / 清晰） */
-  --paper: #f8f9f8;
-  --paper-sunken: #eff1f1;
-  --ink: #232930;
-  --ink-soft: #545f6a;
-  --ink-faint: #5f6a75;
-  --line: #dfe4e7;
-
-  /* 醒：雾蓝（距离 / 空间 / 清醒 / 安静） */
-  --mist: #a9bdc9;
-  --mist-soft: #ccd8e0;
-  --mist-ink: #4c6a80;
-
-  /* 梦：灰粉（温度 / 梦 / 记忆 / 柔软） */
-  --blush: #d8c4c9;
-  --blush-soft: #e9dee1;
-  --blush-ink: #7c6068;
-  --blush-ink: #8d6f77;
-
-  /* 异质色：极少量点缀，制造记忆点 */
-  --pale-gold: #bfb08c;
-
-  --font-display: 'Noto Serif SC', 'Palatino Linotype', 'Iowan Old Style', Palatino,
-    Georgia, 'Source Han Serif SC', 'Source Han Serif CN', 'Songti SC', SimSun,
-    serif;
-  --font-body: system-ui, -apple-system, 'PingFang SC', 'Hiragino Sans GB',
-    'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
-
-  /* 中文舒适阅读宽度 */
-  --measure: 34em;
-  --gap-v: clamp(3.5rem, 9vh, 6.5rem);
-}
 
 /* ── 基础 ── */
 *,
@@ -50,6 +14,7 @@
 html {
   -webkit-text-size-adjust: 100%;
   scroll-behavior: smooth;
+  overflow-x: clip;
 }
 
 body {
@@ -57,13 +22,14 @@ body {
   font-family: var(--font-body);
   font-size: 1.0625rem;
   line-height: 1.9;
-  color: var(--ink);
-  background: var(--paper);
+  color: var(--fg);
+  background: var(--bg);
   text-rendering: optimizeLegibility;
 }
 
 img,
-svg {
+svg,
+canvas {
   display: block;
   max-width: 100%;
 }
@@ -79,30 +45,87 @@ h3 {
 }
 
 a {
-  color: var(--mist-ink);
+  color: var(--fg);
   text-decoration-thickness: 1px;
   text-underline-offset: 0.3em;
   transition: color 0.18s ease;
 }
 
 a:hover {
-  color: var(--ink);
+  color: var(--umber);
 }
 
 :focus-visible {
-  outline: 2px solid var(--mist-ink);
+  outline: 2px solid var(--amber);
   outline-offset: 3px;
   border-radius: 1px;
 }
 
 ::selection {
-  background: var(--mist-soft);
+  background: rgba(217, 160, 91, 0.32);
 }
 
 hr {
   border: none;
   border-top: 1px solid var(--line);
   margin-block: 2.5rem;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+}
+
+/* ── 梦侧浮动：大幅、缓慢、随机相位（醒侧不用它） ── */
+@keyframes drift {
+  0% {
+    transform: translate3d(0, calc(var(--d-amp, 7px) * -0.6), 0)
+      rotate(calc(var(--d-rot, 0.5deg) * -1));
+  }
+  50% {
+    transform: translate3d(calc(var(--d-x, 3px) * 0.6), var(--d-amp, 7px), 0)
+      rotate(var(--d-rot, 0.5deg));
+  }
+  100% {
+    transform: translate3d(0, calc(var(--d-amp, 7px) * -0.6), 0)
+      rotate(calc(var(--d-rot, 0.5deg) * -1));
+  }
+}
+
+.drift {
+  animation: drift var(--d-dur, 8s) ease-in-out var(--d-phase, 0s) infinite;
+}
+
+.drift-soft {
+  --d-amp: 3px;
+  --d-rot: 0.25deg;
+  --d-dur: 9s;
+}
+
+/* ── 乱码字（morph.ts 驱动，无 JS / 读屏时始终是醒面真文案） ── */
+.morph {
+  cursor: default;
+}
+
+.morph.is-lit {
+  text-shadow: 0 0 0.6em rgba(217, 160, 91, 0.55);
+}
+
+/* ── 叠影残影：真身在层内，残影是暖色的另一份 ── */
+.ghost-pair {
+  position: relative;
+  display: inline-block;
+}
+
+.ghost-pair .ghost {
+  position: absolute;
+  inset: 0;
+  color: var(--ghost-ink);
+  opacity: 0.5;
+  pointer-events: none;
+  transform: translate(calc(var(--echo) * 11px), calc(var(--echo) * -4px));
+  filter: blur(0.4px);
 }
 
 /* ── 页面骨架 ── */
@@ -117,6 +140,11 @@ hr {
   margin-inline: auto;
 }
 
+.container-wide {
+  width: min(100% - 3rem, 56rem);
+  margin-inline: auto;
+}
+
 main {
   flex: 1;
 }
@@ -125,7 +153,6 @@ main {
   padding-block: var(--gap-v);
 }
 
-/* 页面标题区 */
 .page-head {
   margin-bottom: clamp(2.5rem, 6vh, 4rem);
 }
@@ -136,13 +163,15 @@ main {
 
 .page-head .lede {
   margin: 0.75rem 0 0;
-  color: var(--ink-soft);
+  color: var(--fg-soft);
   max-width: var(--measure);
 }
 
 /* ── 站点头部 ── */
 .site-header {
   padding-block: 1.4rem;
+  position: relative;
+  z-index: 20;
 }
 
 .header-row {
@@ -154,12 +183,20 @@ main {
 
 .brand {
   display: inline-flex;
-  align-items: center;
+  align-items: baseline;
   gap: 0.55rem;
-  color: var(--ink);
+  color: var(--fg);
   text-decoration: none;
   font-family: var(--font-display);
   letter-spacing: 0.02em;
+}
+
+.brand .brand-dot {
+  width: 5px;
+  height: 5px;
+  background: var(--amber);
+  transform: rotate(45deg);
+  align-self: center;
 }
 
 .site-nav {
@@ -168,13 +205,22 @@ main {
 }
 
 .site-nav a {
-  color: var(--ink-soft);
+  color: var(--fg-soft);
   text-decoration: none;
 }
 
 .site-nav a:hover,
 .site-nav a[aria-current='page'] {
-  color: var(--ink);
+  color: var(--fg);
+}
+
+.site-nav a[aria-current='page']::after {
+  content: '';
+  display: block;
+  width: 1.1em;
+  height: 1px;
+  margin: 2px auto 0;
+  background: var(--amber);
 }
 
 /* ── 站点尾部 ── */
@@ -183,26 +229,33 @@ main {
   margin-top: var(--gap-v);
   padding-block: 1.6rem 2rem;
   font-size: 0.875rem;
-  color: var(--ink-faint);
+  color: var(--fg-faint);
+  position: relative;
+  z-index: 10;
 }
 
 .footer-row {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 1rem;
+  gap: 1rem 2rem;
   flex-wrap: wrap;
 }
 
 .site-footer a {
-  color: var(--ink-faint);
+  color: var(--fg-faint);
 }
 
 .site-footer a:hover {
-  color: var(--ink-soft);
+  color: var(--fg-soft);
 }
 
-/* ── 账目式列表（随笔/项目索引） ── */
+.footer-clock {
+  font-size: 0.8rem;
+  opacity: 0.85;
+}
+
+/* ── 账目式列表（醒侧：绝对静止） ── */
 .ledger {
   list-style: none;
   margin: 0;
@@ -226,7 +279,7 @@ main {
 }
 
 .ledger-date {
-  color: var(--ink-faint);
+  color: var(--fg-faint);
   font-variant-numeric: tabular-nums;
   font-size: 0.9rem;
   padding-top: 0.28em;
@@ -236,29 +289,49 @@ main {
   display: block;
   font-family: var(--font-display);
   font-size: 1.12rem;
-  color: var(--ink);
+  color: var(--fg);
   transition: color 0.18s ease;
 }
 
 .ledger a:hover .ledger-title {
-  color: var(--mist-ink);
+  color: var(--umber);
 }
 
 .ledger-desc {
   display: block;
   margin-top: 0.3rem;
-  color: var(--ink-soft);
+  color: var(--fg-soft);
   font-size: 0.95rem;
   line-height: 1.8;
 }
 
-/* 项目列表的状态词 */
 .ledger-status {
   display: inline-block;
   margin-left: 0.9rem;
   font-size: 0.82rem;
   font-family: var(--font-body);
-  color: var(--ink-faint);
+  color: var(--fg-faint);
+}
+
+/* 八针进度：一枚针脚一格 */
+.stitch-meter {
+  display: inline-flex;
+  gap: 5px;
+  margin-left: 0.9rem;
+  vertical-align: 1px;
+}
+
+.stitch-meter i {
+  width: 9px;
+  height: 2px;
+  background: var(--fg-faint);
+  opacity: 0.38;
+  transform: rotate(var(--seam-angle));
+}
+
+.stitch-meter i.on {
+  background: var(--amber);
+  opacity: 0.9;
 }
 
 @media (max-width: 34em) {
@@ -283,13 +356,15 @@ main {
 
 .prose-meta {
   margin: 1rem 0 0;
-  color: var(--ink-faint);
+  color: var(--fg-faint);
   font-size: 0.9rem;
   font-variant-numeric: tabular-nums;
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
 }
 
 .prose-meta .status {
-  color: var(--mist-ink);
+  color: var(--umber);
 }
 
 .prose-rule {
@@ -315,8 +390,8 @@ main {
 .prose blockquote {
   margin: 1.8em 0;
   padding: 0.2em 0 0.2em 1.4em;
-  border-left: 2px solid var(--mist-soft);
-  color: var(--ink-soft);
+  border-left: 2px solid var(--dream);
+  color: var(--fg-soft);
 }
 
 .prose ul,
@@ -329,15 +404,15 @@ main {
 }
 
 .prose code {
-  font-family: Consolas, 'Courier New', monospace;
-  font-size: 0.9em;
-  background: var(--paper-sunken);
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  background: var(--bg-sunken);
   padding: 0.15em 0.4em;
   border-radius: 3px;
 }
 
 .prose pre {
-  background: var(--paper-sunken);
+  background: var(--bg-sunken);
   padding: 1.1em 1.3em;
   border-radius: 6px;
   overflow-x: auto;
@@ -365,31 +440,6 @@ main {
   gap: 0.6rem 1.8rem;
 }
 
-/* ── 404 ── */
-.lost {
-  min-height: 60dvh;
-  display: grid;
-  place-content: center;
-  justify-items: center;
-  text-align: center;
-  gap: 1.6rem;
-  padding-block: var(--gap-v);
-}
-
-.lost .shard-mark {
-  width: 26px;
-  height: 26px;
-  color: var(--mist);
-}
-
-.lost p {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: 1.2rem;
-  color: var(--ink-soft);
-  max-width: 24em;
-}
-
 /* ── 动效偏好 ── */
 @view-transition {
   navigation: auto;
@@ -408,5 +458,20 @@ main {
 
   a {
     transition: none;
+  }
+
+  .drift,
+  .drift-soft {
+    animation: none !important;
+  }
+
+  .ghost-pair .ghost {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .grain {
+    display: none !important;
   }
 }

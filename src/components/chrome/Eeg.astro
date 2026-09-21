@@ -1,0 +1,83 @@
+---
+/* 缝线上的脑电纹理（var1 移植，全站常驻）：
+   fixed 视口层，波轴心恒为视口 50vh——与全局缝线同轴锁定，
+   滚动零滞后。波形不挂任何状态：自有恒定的缓慢波动。 */
+---
+
+<svg class="eeg" id="site-eeg" aria-hidden="true">
+  <g>
+    <path class="eeg-main" />
+  </g>
+</svg>
+
+<script>
+  const svg = document.getElementById('site-eeg');
+  if (svg) {
+    const g = svg.querySelector('g');
+    const main = svg.querySelector<SVGPathElement>('.eeg-main');
+    const TAU = Math.PI * 2;
+    // 自有的缓慢波动：两层正弦叠出的呼吸感，参数恒定
+    const AMP = 3.6;
+    const FREQ = 0.5;
+    const SPD = 2.6;
+    const draw = (ph: number) => {
+      const W = innerWidth;
+      const H = innerHeight;
+      const cy = H * 0.5; // 与 fixed 缝线同轴
+      const half = Math.sqrt(W * W + H * H) / 2 + 60;
+      let d = '';
+      let first = true;
+      for (let x = -half; x <= half; x += 26) {
+        const u = x / 600;
+        const y = Math.sin(u * FREQ * TAU + ph * SPD) * AMP + Math.sin(u * FREQ * 2.7 + ph * 1.3) * AMP * 0.4;
+        d += (first ? 'M' : 'L') + (W / 2 + x).toFixed(1) + ' ' + (cy + y).toFixed(1);
+        first = false;
+      }
+      main?.setAttribute('d', d);
+      g?.setAttribute('transform', `rotate(14 ${W / 2} ${cy})`);
+    };
+    // 立即画一帧（不等 rAF），再用 rAF 驱动流动；
+    // rAF 被节流/停转的环境里由低频定时器兜底补帧
+    let lastDraw = 0;
+    const tickDraw = (ph: number) => {
+      lastDraw = performance.now();
+      draw(ph);
+    };
+    tickDraw(0);
+    if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      let last = 0;
+      (function loop(ts: number) {
+        requestAnimationFrame(loop);
+        if (ts - last < 33) return; // 30fps 足够
+        last = ts;
+        if (!document.hidden) tickDraw(ts / 1000);
+      })(0);
+      setInterval(() => {
+        if (!document.hidden && performance.now() - lastDraw > 500) {
+          tickDraw(performance.now() / 1000);
+        }
+      }, 400);
+    }
+  }
+</script>
+
+<style>
+  .eeg {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 2;
+    pointer-events: none;
+    overflow: visible;
+  }
+
+  .eeg .eeg-main {
+    stroke: var(--umber);
+    stroke-width: 1.2;
+    fill: none;
+    opacity: 0.62;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+</style>

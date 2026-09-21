@@ -1,0 +1,701 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>方案 F·织幔（活体）</title>
+<style>
+  /* ═══ 概念 ═══（Phase 5 · 会话 F · 织幔 veil）
+     巨构没有实体——只有千余根垂挂的细线。线不是幕上的装饰，线本身就是那道幕：
+     一道可以穿过的巨型帷幕。滚动 = 从醒侧（冷雾蓝）穿过线幕，进入暖侧（奶油玫瑰）。
+     局部规则：①幕没有墙，线只是挂着；风以一道行波扫过线场，线整体荡开再静下来
+     ②线幕在 x≈2.2 处天然分缕（线更疏），暖光从分缕处漏进来
+     ③近处看线是乱的，退远/正对时线场泛起摩尔纹干涉——「似乎有规则，只是无法理解」
+     母题：细线 + 帷幕（首次作主体）。宣言两行在幕后，被线真实切割（穿插式遮挡）。
+     参考语法：three.js lines 场 / 雾中滑行镜头（atmospheric flythrough），
+     醒/梦对角轴线继承自 Phase 2 C。测试：?auto（无头截图定时器驱动）。 */
+
+  @font-face {
+    font-family: 'Noto Serif SC Web';
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url('https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/files/noto-serif-sc-chinese-simplified-500-normal.woff2') format('woff2');
+  }
+  @font-face {
+    font-family: 'Noto Serif SC Web';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url('https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/files/noto-serif-sc-chinese-simplified-600-normal.woff2') format('woff2');
+  }
+
+  :root {
+    --ink: #3a383c;
+    --ink-soft: #63626a;
+    --ink-faint: #71737c;
+    --mist-ink: #6d7684;
+    --font-display: 'Noto Serif SC Web', 'Noto Serif SC', 'Palatino Linotype', Georgia, 'Songti SC', SimSun, serif;
+    --font-body: system-ui, -apple-system, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: var(--font-body); color: var(--ink); background: #e7e8ec; }
+
+  .stage {
+    position: fixed;
+    inset: 0;
+    overflow: clip;
+    /* 醒/梦对角轴线：左上冷雾蓝 → 右下暖玫瑰灰（WebGL 失败时的退路也是构图） */
+    background: linear-gradient(133deg, #eaecf0 0%, #e3e4e9 42%, #ece0da 100%);
+  }
+  .scroll-length { height: 260vh; }
+  canvas#gl { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+  .vignette {
+    position: absolute; inset: 0; z-index: 2; pointer-events: none;
+    background: radial-gradient(130% 95% at 50% 42%, transparent 58%, rgba(80, 76, 86, 0.13) 100%);
+  }
+
+  .rise { opacity: 0; transform: translateY(10px); animation: rise-in 1.3s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+  .rise.d1 { animation-delay: 0.15s; }
+  .rise.d2 { animation-delay: 0.45s; }
+  @keyframes rise-in { to { opacity: 1; transform: translateY(0); } }
+
+  .manifesto {
+    position: absolute;
+    left: 8vw;
+    top: 10vh;
+    z-index: 10;
+    margin: 0;
+    font-family: var(--font-display);
+    line-height: 1.6;
+    color: var(--ink);
+    text-shadow: 0 2px 26px rgba(248, 244, 238, 0.9), 0 0 8px rgba(248, 244, 238, 0.7);
+    will-change: opacity, transform;
+  }
+  .manifesto .l1 { display: block; font-size: clamp(1.35rem, 2.8vw, 2.6rem); font-weight: 500; letter-spacing: 0.04em; }
+
+  .scroll-hint {
+    position: absolute; left: 50%; bottom: 5.5vh; z-index: 10;
+    transform: translateX(-50%);
+    font-size: 0.72rem; letter-spacing: 0.42em; text-indent: 0.42em;
+    color: var(--ink-faint);
+    text-shadow: 0 1px 14px rgba(248, 244, 238, 0.9);
+    will-change: opacity;
+  }
+  .scroll-hint::after {
+    content: ''; position: absolute; left: 50%; bottom: -1.5rem; width: 1px; height: 1.1rem;
+    background: linear-gradient(to bottom, rgba(109, 118, 132, 0.55), transparent);
+  }
+
+  .brand {
+    position: absolute; top: 4.5vh; left: 4vw; z-index: 10;
+    display: inline-flex; align-items: center; gap: 0.6rem;
+    font-family: var(--font-display); font-weight: 500; font-size: 1.02rem;
+    letter-spacing: 0.06em; color: var(--ink); text-decoration: none;
+    text-shadow: 0 1px 18px rgba(248, 244, 238, 0.9);
+  }
+  .brand .ring { width: 11px; height: 11px; border: 1.5px solid var(--mist-ink); border-radius: 50%; opacity: 0.85; }
+
+  .nav {
+    position: absolute; right: 3.4vw; top: 24vh; z-index: 10;
+    display: flex; flex-direction: column; gap: 2.3rem;
+  }
+  .nav a {
+    position: relative; writing-mode: vertical-rl; letter-spacing: 0.5em;
+    padding: 0.4rem 0.7rem; color: var(--ink-soft); text-decoration: none;
+    font-size: 0.95rem; transition: color 0.18s ease;
+    text-shadow: 0 1px 16px rgba(248, 244, 238, 0.9);
+  }
+  .nav a::after {
+    content: ''; position: absolute; top: 46%; right: calc(100% + 0.35rem);
+    width: 1.3rem; height: 1px; background: rgba(109, 118, 132, 0.45);
+    transition: width 0.18s ease, background 0.18s ease;
+  }
+  .nav a:hover { color: var(--ink); }
+  .nav a:hover::after { width: 2rem; background: var(--mist-ink); }
+
+  .side-note {
+    position: absolute; left: 3.2vw; top: 13vh; z-index: 10;
+    writing-mode: vertical-rl; font-size: 0.8rem; letter-spacing: 0.52em;
+    color: var(--ink-faint);
+    text-shadow: 0 0 10px rgba(248, 244, 238, 0.95), 0 0 4px rgba(248, 244, 238, 0.9);
+  }
+
+  /* 随笔账目：在滚动终点（暖侧）浮出，给滚动一个目的地 */
+  .floating-ledger {
+    position: relative; z-index: 10;
+    margin: 0 0 9vh; padding-top: 4vh;
+    left: 0; right: 0;
+  }
+  .floating-ledger .ledger-inner { margin: 0 auto; width: min(46rem, 78vw); }
+  .floating-ledger h2 {
+    margin: 0 0 1rem; font-weight: 500; font-size: 0.82rem;
+    letter-spacing: 0.3em; color: var(--ink-faint);
+    text-shadow: 0 1px 14px rgba(250, 242, 234, 0.9);
+  }
+  .slips { display: flex; gap: 1.2rem 1.8rem; align-items: flex-start; }
+  .slip {
+    position: relative; display: block; padding: 0.85rem 1rem 0.95rem;
+    background: rgba(252, 249, 244, 0.9); border: 1px solid rgba(255, 255, 255, 0.62);
+    box-shadow: 5px 4px 10px -6px rgba(96, 82, 82, 0.3);
+    text-decoration: none; overflow: clip;
+  }
+  .slip::after {
+    content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 38%;
+    background: linear-gradient(to bottom, transparent, rgba(206, 168, 152, 0.24));
+  }
+  .slip:nth-child(1) { width: 13rem; transform: rotate(-1.2deg); }
+  .slip:nth-child(2) { width: 15.5rem; transform: rotate(0.7deg) translateY(10px); }
+  .slip:nth-child(3) { width: 12.5rem; transform: rotate(-0.5deg) translateY(3px); }
+  .slip .d { display: block; font-size: 0.72rem; letter-spacing: 0.12em; color: var(--ink-faint); font-variant-numeric: tabular-nums; margin-bottom: 0.35rem; }
+  .slip .t { display: block; font-family: var(--font-display); font-size: 0.98rem; color: var(--ink); line-height: 1.55; }
+  .slip:hover .t { color: var(--mist-ink); }
+
+  .stage.no3d canvas#gl { display: none; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .rise { animation: none; opacity: 1; transform: none; }
+  }
+  @media (max-width: 760px) {
+    .side-note { display: none; }
+    .scroll-length { height: 170vh; }
+    .nav {
+      position: fixed; top: 4.6vh; right: 5vw;
+      flex-direction: row; gap: 1.4rem;
+    }
+    .nav a { writing-mode: horizontal-tb; letter-spacing: 0.24em; font-size: 0.9rem; }
+    .nav a::after { display: none; }
+    .manifesto { top: 13vh; }
+    .floating-ledger .ledger-inner { width: auto; margin: 0 9vw; }
+    .slips { flex-direction: column; gap: 0.9rem; }
+    .slip { width: 100% !important; transform: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="stage" id="stage">
+  <canvas id="gl" aria-hidden="true"></canvas>
+  <div class="vignette" aria-hidden="true"></div>
+
+  <h1 class="manifesto rise" id="manifesto" aria-label="这里不是梦，也不是现实。它是人在即将醒来时，看见的最后一层世界。">
+    <span class="l1">这里不是梦，也不是现实。</span>
+  </h1>
+
+  <p class="scroll-hint" id="scrollHint" aria-hidden="true">向下滚动　穿过织幔</p>
+
+  <a class="brand rise d1" href="/"><span class="ring" aria-hidden="true"></span>Traveritas</a>
+  <p class="side-note rise d2" aria-hidden="true">幕没有墙　线只是挂着</p>
+
+  <nav class="nav rise d2" aria-label="站内入口">
+    <a href="/articles/">随笔</a>
+    <a href="/projects/">项目</a>
+    <a href="/about/">关于</a>
+  </nav>
+</div>
+<div class="scroll-length" aria-hidden="true"></div>
+
+<section class="floating-ledger" aria-label="最近的随笔">
+  <div class="ledger-inner">
+    <h2>最近的随笔</h2>
+    <div class="slips">
+      <a class="slip" href="#"><span class="d">2026.09.12</span><span class="t">母题探索记录</span></a>
+      <a class="slip" href="#"><span class="d">2026.08.30</span><span class="t">关于“醒梦”的第一份笔记</span></a>
+      <a class="slip" href="#"><span class="d">2026.08.11</span><span class="t">把网站做成一个房间</span></a>
+    </div>
+  </div>
+</section>
+
+<script src="vendor/three.min.js"></script>
+<script>
+/* ═══ 织幔 ═══ 巨构没有实体，只有千余根挂着的线。
+   线场 = 一道可穿过的巨型帷幕（三个深度带，x 抖动非均匀分布，
+   x≈2.2 天然分缕）；行波扫过线场（vertex shader 内完成，零 CPU）；
+   滚动 = 镜头穿过线幕：雾由冷雾蓝转暖玫瑰，宣言两行在幕后被线切割。 */
+(function () {
+  if (!window.THREE) return;
+  var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var isMobile = window.matchMedia && window.matchMedia('(max-width: 760px)').matches;
+
+  var seed = 20260920;
+  function rnd() { seed = (seed * 1664525 + 1013904223) % 4294967296; return seed / 4294967296; }
+  function range(a, b) { return a + rnd() * (b - a); }
+
+  var canvas = document.getElementById('gl');
+  var renderer;
+  try { renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: false }); }
+  catch (e) { document.getElementById('stage').classList.add('no3d'); return; }
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+
+  var scene = new THREE.Scene();
+  var FOG_WAKE = new THREE.Color(0xe4e6ea);
+  var FOG_DREAM = new THREE.Color(0xf2e3da);
+  scene.background = FOG_WAKE.clone();
+  scene.fog = new THREE.Fog(scene.background.clone(), 5, 46);
+
+  var camera = new THREE.PerspectiveCamera(44, 1, 0.1, 120);
+
+  var hemi = new THREE.HemisphereLight(0xf2ede4, 0xb9bcc4, 0.95);
+  scene.add(hemi);
+  var sun = new THREE.DirectionalLight(0xffe8d2, 0.5);
+  sun.position.set(-4, 9, 5);
+  scene.add(sun);
+  var fill = new THREE.DirectionalLight(0xe4dbe2, 0.24);
+  fill.position.set(6, 4, -6);
+  scene.add(fill);
+
+  /* ── 地面：连续域扭曲 fbm 色场（构造上无量化，杜绝马赛克） ── */
+  var groundUniforms = {
+    uTime: { value: 0 },
+    uDream: { value: 0 },
+    uFogColor: { value: scene.fog.color },
+    uFogNear: { value: 5.0 },
+    uFogFar: { value: 46.0 },
+    uA: { value: new THREE.Color(0xe9e6e1) }, uB: { value: new THREE.Color(0xded9d3) },
+    uC: { value: new THREE.Color(0xccC5be) }, uD: { value: new THREE.Color(0xb2aaa4) },
+    uDA: { value: new THREE.Color(0xece2da) }, uDB: { value: new THREE.Color(0xe2d4ca) },
+    uDC: { value: new THREE.Color(0xd2beb2) }, uDD: { value: new THREE.Color(0xb49a8e) }
+  };
+  var NOISE_GLSL = [
+    'float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }',
+    'float noise(vec2 p) {',
+    '  vec2 i = floor(p), f = fract(p);',
+    '  float a = hash(i), b = hash(i + vec2(1.0, 0.0)), c = hash(i + vec2(0.0, 1.0)), d = hash(i + vec2(1.0, 1.0));',
+    '  vec2 u = f * f * (3.0 - 2.0 * f);',
+    '  return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);',
+    '}',
+    'float fbm(vec2 p) {',
+    '  float v = 0.0, a = 0.5;',
+    '  for (int i = 0; i < 4; i++) { v += a * noise(p); p *= 2.03; a *= 0.5; }',
+    '  return v;',
+    '}'
+  ].join('\n');
+  var groundMat = new THREE.ShaderMaterial({
+    uniforms: groundUniforms,
+    vertexShader: [
+      'varying vec3 vWorld;',
+      'void main() {',
+      '  vec4 w = modelMatrix * vec4(position, 1.0);',
+      '  vWorld = w.xyz;',
+      '  gl_Position = projectionMatrix * viewMatrix * w;',
+      '}'
+    ].join('\n'),
+    fragmentShader: [
+      'uniform float uTime; uniform float uDream;',
+      'uniform vec3 uFogColor; uniform float uFogNear; uniform float uFogFar;',
+      'uniform vec3 uA; uniform vec3 uB; uniform vec3 uC; uniform vec3 uD;',
+      'uniform vec3 uDA; uniform vec3 uDB; uniform vec3 uDC; uniform vec3 uDD;',
+      'varying vec3 vWorld;',
+      NOISE_GLSL,
+      'vec3 grad(float t, vec3 A, vec3 B, vec3 C, vec3 D) {',
+      '  vec3 c = mix(A, B, smoothstep(0.0, 0.36, t));',
+      '  c = mix(c, C, smoothstep(0.36, 0.64, t));',
+      '  c = mix(c, D, smoothstep(0.64, 1.0, t));',
+      '  return c;',
+      '}',
+      'void main() {',
+      '  vec2 p = vWorld.xz * 0.055;',
+      '  vec2 w1 = vec2(fbm(p + vec2(0.0, 3.7)), fbm(p + vec2(5.2, 0.0)));',
+      '  vec2 w2 = vec2(fbm(p * 1.9 + w1 * 1.4 + vec2(1.7, 9.2)),',
+      '                 fbm(p * 1.9 + w1 * 1.4 + vec2(8.3, 2.8)));',
+      '  float h = fbm(p * 2.1 + w2 * 1.1 + vec2(uTime * 0.004, -uTime * 0.003));',
+      '  h = h * 0.74 + 0.26 * fbm(p * 0.4);',
+      '  float dist = length(vWorld - cameraPosition);',
+      '  float fogF = smoothstep(uFogNear, uFogFar, dist);',
+      '  vec3 col = grad(h,',
+      '    mix(uA, uDA, uDream), mix(uB, uDB, uDream),',
+      '    mix(uC, uDC, uDream), mix(uD, uDD, uDream));',
+      '  col *= 0.965 + 0.07 * fbm(vec2(vWorld.x * 0.3, vWorld.z * 1.2) + w1 * 0.8);',
+      '  col = mix(col, uFogColor, fogF);',
+      '  gl_FragColor = vec4(col, 1.0);',
+      '}'
+    ].join('\n')
+  });
+  var ground = new THREE.Mesh(new THREE.PlaneGeometry(180, 180, 56, 56), groundMat);
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.z = -30;
+  scene.add(ground);
+
+  /* ── 线幕：LineSegments，全部动态在 vertex shader 内 ── */
+  var PART_X = 2.2;
+  function buildThreads(o) {
+    var K = 9; /* 每根线 9 点 8 段 */
+    var segCount = o.count * (K - 1);
+    var posArr = new Float32Array(segCount * 2 * 3);
+    var datArr = new Float32Array(segCount * 2 * 4); /* phase, amp, warm, t */
+    var bandArr = new Float32Array(segCount * 2);
+    var vi = 0; /* 顶点索引：posArr 按 ×3、datArr 按 ×4、bandArr 按 ×1 */
+    for (var i = 0; i < o.count; i++) {
+      var x = -o.xSpan / 2 + o.xSpan * (i / o.count) + (rnd() - 0.5) * o.xJitter;
+      /* 分缕：把落在分缕带里的线推开，形成天然的疏缕 */
+      if (o.partGap) {
+        var dxp = x - o.partX;
+        if (Math.abs(dxp) < o.partGap) x = o.partX + (dxp >= 0 ? 1 : -1) * (o.partGap + rnd() * o.partPush);
+      }
+      var band = i % 3;
+      var z = o.zBands[band] + (rnd() - 0.5) * o.zJitter;
+      var tall = rnd() < o.tallProb;
+      var yTop = tall ? o.topA[0] + rnd() * (o.topA[1] - o.topA[0]) : o.topB[0] + rnd() * (o.topB[1] - o.topB[0]);
+      var yBot = o.bot[0] + rnd() * (o.bot[1] - o.bot[0]);
+      var len = yTop - yBot;
+      var amp = (0.09 + len * 0.045 * (0.5 + rnd())) * o.ampScale;
+      var phase = rnd() * Math.PI * 2;
+      var warm = rnd() < o.warmProb ? 0.7 + rnd() * 0.3 : 0;
+      var bandA = o.bandA[band] * (0.82 + rnd() * 0.36);
+      for (var j = 0; j < K - 1; j++) {
+        var t0 = j / (K - 1), t1 = (j + 1) / (K - 1);
+        var y0 = yTop - len * t0, y1 = yTop - len * t1;
+        var z0 = z + Math.sin(t0 * 3.1 + phase) * 0.05;
+        var z1 = z + Math.sin(t1 * 3.1 + phase) * 0.05;
+        var p3 = vi * 3, d4 = vi * 4;
+        posArr[p3] = x; posArr[p3 + 1] = y0; posArr[p3 + 2] = z0;
+        datArr[d4] = phase; datArr[d4 + 1] = amp; datArr[d4 + 2] = warm; datArr[d4 + 3] = t0;
+        bandArr[vi] = bandA; vi++;
+        p3 = vi * 3; d4 = vi * 4;
+        posArr[p3] = x; posArr[p3 + 1] = y1; posArr[p3 + 2] = z1;
+        datArr[d4] = phase; datArr[d4 + 1] = amp; datArr[d4 + 2] = warm; datArr[d4 + 3] = t1;
+        bandArr[vi] = bandA; vi++;
+      }
+    }
+    var g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(posArr, 3));
+    g.setAttribute('aData', new THREE.BufferAttribute(datArr, 4));
+    g.setAttribute('aBand', new THREE.BufferAttribute(bandArr, 1));
+    return g;
+  }
+  /* 动态 uniform 全体线场共享（同一对象引用，一次更新全体生效） */
+  var sharedLineU = {
+    uTime: { value: 0 },
+    uWaveX: { value: -30 },
+    uFogColor: { value: scene.fog.color },
+    uFogNear: { value: 5.0 },
+    uFogFar: { value: 46.0 }
+  };
+  function makeLineMat(colors) {
+    var u = {};
+    for (var k in sharedLineU) u[k] = sharedLineU[k];
+    u.uColCool = { value: new THREE.Color(colors.cool) };
+    u.uColWarm = { value: new THREE.Color(colors.warm) };
+    u.uColHot = { value: new THREE.Color(colors.hot) };
+    return new THREE.ShaderMaterial({
+      uniforms: u,
+      transparent: true,
+      depthWrite: false,
+      vertexShader: [
+        'attribute vec4 aData;   /* phase, amp, warm, t(0顶→1底) */',
+        'attribute float aBand;',
+        'uniform float uTime; uniform float uWaveX;',
+        'uniform float uFogNear; uniform float uFogFar;',
+        'varying float vWarm; varying float vFogF; varying float vGlow; varying float vBand;',
+        'void main() {',
+        '  vec3 p = position;',
+        '  float t = aData.w;',
+        '  /* 行波包络：一道宽高斯沿 x 行进，线在波峰处荡开 */',
+        '  float d = position.x - uWaveX;',
+        '  float wave = exp(-d * d * 0.018);',
+        '  float amp = aData.y * (0.3 + 0.95 * wave) * (0.12 + 0.88 * t * t);',
+        '  float ph = aData.x;',
+        '  p.x += sin(uTime * 0.9 + ph + position.x * 0.22) * amp;',
+        '  p.x += 0.45 * sin(uTime * 2.1 + ph * 1.9) * amp * t;',
+        '  p.z += sin(uTime * 0.47 + ph * 1.7 + position.z * 0.8) * amp * 0.55;',
+        '  p.y += sin(uTime * 0.6 + ph * 2.0) * amp * 0.1;',
+        '  vec4 mv = modelViewMatrix * vec4(p, 1.0);',
+        '  float dist = -mv.z;',
+        '  vFogF = smoothstep(uFogNear, uFogFar, dist);',
+        '  vWarm = aData.z;',
+        '  vGlow = wave * (0.35 + 0.65 * t);',
+        '  vBand = aBand;',
+        '  gl_Position = projectionMatrix * mv;',
+        '}'
+      ].join('\n'),
+      fragmentShader: [
+        'uniform vec3 uFogColor; uniform vec3 uColCool; uniform vec3 uColWarm; uniform vec3 uColHot;',
+        'varying float vWarm; varying float vFogF; varying float vGlow; varying float vBand;',
+        'void main() {',
+        '  vec3 col = mix(uColCool, uColWarm, vWarm);',
+        '  col += uColHot * vGlow * (0.10 + 0.30 * vWarm);',
+        '  col = mix(col, uFogColor, vFogF * 0.85);',
+        '  float a = mix(0.52, 0.95, vWarm) * vBand * (1.0 - vFogF * 0.5);',
+        '  gl_FragColor = vec4(col, a);',
+        '}'
+      ].join('\n')
+    });
+  }
+  /* 主线幕：三深度带，x≈2.2 天然分缕 */
+  var BAND_Z = [-1.15, 0, 1.15];
+  var threads = new THREE.LineSegments(
+    buildThreads({
+      count: isMobile ? 880 : 1500, xSpan: 34, xJitter: 0.36,
+      partX: PART_X, partGap: 1.15, partPush: 1.7,
+      zBands: BAND_Z, zJitter: 0.5, tallProb: 0.72,
+      topA: [8.5, 16], topB: [4.6, 8.2], bot: [0.06, 0.48],
+      ampScale: 1, warmProb: 0.09, bandA: [0.88, 1.0, 0.7]
+    }),
+    makeLineMat({ cool: 0x8b92a2, warm: 0xd9a884, hot: 0xe8c4a2 })
+  );
+  threads.renderOrder = 6;
+  scene.add(threads);
+  /* 暖侧远线场：幕的那侧仍有线，只是暖了、疏了（接近时隔着幕隐约可见） */
+  var farThreads = new THREE.LineSegments(
+    buildThreads({
+      count: isMobile ? 260 : 440, xSpan: 40, xJitter: 0.5,
+      partX: 0, partGap: 0, partPush: 0,
+      zBands: [-19.5, -17.2, -14.8], zJitter: 0.9, tallProb: 0.6,
+      topA: [5.5, 11.5], topB: [3.2, 6], bot: [0.15, 1.3],
+      ampScale: 0.7, warmProb: 0.38, bandA: [0.5, 0.62, 0.4]
+    }),
+    makeLineMat({ cool: 0xb2a094, warm: 0xd9a074, hot: 0xe8c0a0 })
+  );
+  farThreads.renderOrder = 5;
+  scene.add(farThreads);
+
+  /* ── 光：分缕处的暖光柱 + 远处梦侧的整体辉光（additive 面片，无后处理） ── */
+  function radialTex(inner, outer) {
+    var c = document.createElement('canvas'); c.width = c.height = 256;
+    var x = c.getContext('2d');
+    var g = x.createRadialGradient(128, 128, 8, 128, 128, 128);
+    g.addColorStop(0, inner); g.addColorStop(1, outer);
+    x.fillStyle = g; x.fillRect(0, 0, 256, 256);
+    return new THREE.CanvasTexture(c);
+  }
+  var glowTex = radialTex('rgba(246,210,178,0.8)', 'rgba(246,210,178,0)');
+  var bandTex = radialTex('rgba(250,224,192,0.9)', 'rgba(250,224,192,0)');
+  var partGlow = new THREE.Mesh(
+    new THREE.PlaneGeometry(3.4, 14),
+    new THREE.MeshBasicMaterial({ map: bandTex, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false })
+  );
+  partGlow.position.set(PART_X, 5.2, -3.2);
+  partGlow.renderOrder = 2;
+  scene.add(partGlow);
+  var farGlow = new THREE.Mesh(
+    new THREE.PlaneGeometry(20, 14),
+    new THREE.MeshBasicMaterial({ map: glowTex, transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false })
+  );
+  farGlow.position.set(1.2, 3.4, -24);
+  farGlow.renderOrder = 2;
+  scene.add(farGlow);
+
+  /* 幕脚的软接触影 */
+  var shadowTex = radialTex('rgba(70,66,76,0.30)', 'rgba(70,66,76,0)');
+  var contact = new THREE.Mesh(
+    new THREE.PlaneGeometry(40, 8),
+    new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, opacity: 0.5, depthWrite: false })
+  );
+  contact.rotation.x = -Math.PI / 2;
+  contact.position.set(0, 0.015, 0);
+  contact.renderOrder = 1;
+  scene.add(contact);
+
+  /* ── 场景内字平面：在幕后，被线真实切割 ── */
+  function makeTextPlane(text, vertical, colorInk, worldW) {
+    var cvs = document.createElement('canvas');
+    var ctx = cvs.getContext('2d');
+    var ratio = vertical ? [512, 2048] : [2048, 512];
+    cvs.width = ratio[0]; cvs.height = ratio[1];
+    var tex = new THREE.CanvasTexture(cvs);
+    tex.anisotropy = 4;
+    function draw() {
+      var fontSize = vertical ? 168 : 148;
+      ctx.clearRect(0, 0, cvs.width, cvs.height);
+      ctx.fillStyle = colorInk;
+      ctx.font = '600 ' + fontSize + 'px "Noto Serif SC Web", "Songti SC", serif';
+      ctx.textBaseline = 'middle';
+      ctx.textAlign = 'center';
+      if (vertical) {
+        var x = cvs.width / 2;
+        var step = fontSize * 1.12;
+        var startY = cvs.height / 2 - (text.length - 1) * step / 2;
+        for (var i = 0; i < text.length; i++) ctx.fillText(text[i], x, startY + i * step);
+      } else {
+        ctx.fillText(text, cvs.width / 2, cvs.height / 2);
+      }
+      tex.needsUpdate = true;
+    }
+    draw();
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(draw);
+    var mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, side: THREE.DoubleSide });
+    var h = worldW * (ratio[1] / ratio[0]);
+    var mesh = new THREE.Mesh(new THREE.PlaneGeometry(worldW, h), mat);
+    mesh.renderOrder = 4;
+    scene.add(mesh);
+    return mesh;
+  }
+  var tp1 = makeTextPlane('它是人在即将醒来时', true, 'rgba(58,51,44,0.88)', 1.55);
+  tp1.position.set(-7.8, 2.7, -8.2);
+  tp1.rotation.y = 0.34;
+  var tp2 = makeTextPlane('看见的最后一层世界', false, 'rgba(88,62,52,0.66)', 9);
+  tp2.position.set(0.8, 6.4, -16);
+
+  /* ── 尺度锚点：醒侧近处的细碑 + 暖侧远处的细碑 ── */
+  var steleTones = [0xdad8da, 0xc9c7cb, 0xbcb9be];
+  [[6.4, 5.2, 0.16, 0.85], [7.5, 4.4, 0.11, 0.55], [-7.8, 6.0, 0.2, 1.5], [5.2, 3.2, 0.09, 0.4]]
+  .forEach(function (s, i) {
+    var stele = new THREE.Mesh(
+      new THREE.BoxGeometry(s[2], s[3], s[2] * 0.6),
+      new THREE.MeshStandardMaterial({ color: steleTones[i % 3], roughness: 0.92 })
+    );
+    stele.position.set(s[0], s[3] / 2, s[1]);
+    stele.rotation.y = rnd() * Math.PI;
+    scene.add(stele);
+  });
+  [[-6.5, -13, 0.14, 1.4], [7.8, -15, 0.2, 2.1], [-1.5, -17.5, 0.1, 0.9]]
+  .forEach(function (s, i) {
+    var stele = new THREE.Mesh(
+      new THREE.BoxGeometry(s[2], s[3], s[2] * 0.6),
+      new THREE.MeshStandardMaterial({ color: 0xd8c9bd, roughness: 0.92 })
+    );
+    stele.position.set(s[0], s[3] / 2, s[1]);
+    stele.rotation.y = rnd() * Math.PI;
+    scene.add(stele);
+  });
+
+  /* ── 尘屑：醒侧冷屑 + 暖侧暖屑 ── */
+  function makeMotes(n, box, color, size, opacity, renderOrder) {
+    var g = new THREE.BufferGeometry();
+    var arr = new Float32Array(n * 3);
+    for (var i = 0; i < n; i++) {
+      arr[i * 3] = range(box[0], box[1]);
+      arr[i * 3 + 1] = range(box[2], box[3]);
+      arr[i * 3 + 2] = range(box[4], box[5]);
+    }
+    g.setAttribute('position', new THREE.BufferAttribute(arr, 3));
+    var m = new THREE.PointsMaterial({ color: color, size: size, transparent: true, opacity: opacity, sizeAttenuation: true, depthWrite: false });
+    var pts = new THREE.Points(g, m);
+    pts.renderOrder = renderOrder;
+    scene.add(pts);
+    return pts;
+  }
+  var motesCool = makeMotes(isMobile ? 70 : 120, [-15, 15, 0.3, 6.5, -10, 9], 0xb9bcc6, 0.045, 0.5, 7);
+  var motesWarm = makeMotes(isMobile ? 50 : 90, [-14, 14, 0.4, 8, -24, -2], 0xe0b896, 0.05, 0.42, 7);
+
+  /* ── 镜头与滚动 ── */
+  var pointer = { x: 0, y: 0 };
+  var scrollP = 0;
+  var camPos = { x: 0, y: 1.6, z: 9.5 };
+  var look = { x: 0, y: 2.0, z: -8 };
+
+  function readScroll() {
+    var max = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+    scrollP = Math.min(1, Math.max(0, window.scrollY / max || 0));
+  }
+
+  var elManifesto = document.getElementById('manifesto');
+  var elHint = document.getElementById('scrollHint');
+  /* .rise 的 fill-mode:forwards 会永远覆盖内联 opacity——动画结束后摘掉 class，
+     之后滚动淡出才能生效 */
+  setTimeout(function () {
+    if (elManifesto) { elManifesto.classList.remove('rise'); elManifesto.style.opacity = '0.98'; }
+  }, 1600);
+
+  var SUN_WAKE = new THREE.Color(0xffe8d2), SUN_DREAM = new THREE.Color(0xffd9b8);
+  function smooth(a, b, x) { var t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); }
+
+  function renderOnce(t) {
+    var e = scrollP;
+    camPos.z = 9.5 - 18.2 * e;
+    camPos.x = 0.7 * Math.sin(e * 2.6);
+    camPos.y = 1.6 + 0.95 * e;
+    /* 回望段（e 0.78→0.94）：视线从行进前方缓缓转向身后的织幔——
+       从梦的那侧回望，幕还是那道幕，世界已经换色 */
+    var turnT = smooth(0.78, 0.94, e);
+    look.x = 0.3 * turnT;
+    look.y = (2.0 + 1.15 * e) * (1 - turnT) + 3.4 * turnT;
+    look.z = -8 * (1 - turnT);
+    camera.position.set(
+      camPos.x + pointer.x * 0.3,
+      camPos.y + pointer.y * -0.1,
+      camPos.z
+    );
+    camera.lookAt(look.x, look.y, look.z);
+
+    /* 越过线幕（e≈0.53）后世界转暖 */
+    var warmF = smooth(0.34, 0.72, e);
+    scene.fog.color.copy(FOG_WAKE).lerp(FOG_DREAM, warmF);
+    scene.background.copy(scene.fog.color);
+    scene.fog.near = 5 - 1.6 * warmF;
+    scene.fog.far = 46 - 9 * warmF;
+    sharedLineU.uFogNear.value = scene.fog.near;
+    sharedLineU.uFogFar.value = scene.fog.far;
+    groundUniforms.uDream.value = warmF;
+    hemi.intensity = 0.95 + 0.15 * warmF;
+    sun.color.copy(SUN_WAKE).lerp(SUN_DREAM, warmF);
+    farGlow.material.opacity = 0.14 + 0.14 * warmF;
+
+    if (elManifesto) {
+      var f = 1 - smooth(0.5, 0.68, e);
+      elManifesto.style.opacity = (f * 0.98).toFixed(3);
+      elManifesto.style.transform = 'translateY(' + ((1 - f) * -14).toFixed(1) + 'px)';
+    }
+    if (elHint) elHint.style.opacity = (1 - smooth(0.02, 0.09, e)).toFixed(3);
+    tp1.material.opacity = 1 - smooth(0.4, 0.58, e);
+    tp2.material.opacity = (0.55 + 0.35 * warmF) * (1 - smooth(0.84, 0.93, e));
+
+    if (typeof t === 'number') {
+      sharedLineU.uTime.value = t;
+      sharedLineU.uWaveX.value = -30 + ((t * 1.15) % 78);
+      groundUniforms.uTime.value = t;
+      partGlow.material.opacity = (0.3 + 0.12 * Math.sin(t * 0.23)) * (1 - smooth(0.6, 0.7, e));
+      farGlow.material.opacity = 0.14 + 0.14 * warmF + 0.04 * Math.sin(t * 0.17);
+      var mc = motesCool.geometry.attributes.position.array;
+      for (var i2 = 0; i2 < mc.length; i2 += 3) {
+        mc[i2] += 0.0035 * Math.sin(t * 0.4 + i2);
+        mc[i2 + 1] += 0.0022 * Math.sin(t * 0.3 + i2 * 0.7);
+      }
+      motesCool.geometry.attributes.position.needsUpdate = true;
+      var mw = motesWarm.geometry.attributes.position.array;
+      for (var i3 = 0; i3 < mw.length; i3 += 3) {
+        mw[i3] += 0.0028 * Math.sin(t * 0.33 + i3 * 0.5);
+        mw[i3 + 1] += 0.0028 * Math.cos(t * 0.27 + i3 * 0.3);
+      }
+      motesWarm.geometry.attributes.position.needsUpdate = true;
+    }
+    renderer.render(scene, camera);
+  }
+
+  function onResize() {
+    var w = window.innerWidth, h = window.innerHeight;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+    renderOnce();
+  }
+
+  var lastT = 0, running = false, rafId = null;
+  var stillMode = location.search.indexOf('still') >= 0; /* 静帧模式：无头截图用 */
+  function loop(now) {
+    requestAnimationFrame(loop);
+    if (now - lastT < 33) return;
+    lastT = now;
+    readScroll();          /* 每帧兜底：无头环境 scrollTo 不派发 scroll 事件 */
+    renderOnce(now / 1000);
+  }
+  function start() { if (running || reduceMotion || stillMode) return; running = true; lastT = performance.now(); rafId = requestAnimationFrame(loop); }
+  function stop() { running = false; if (rafId !== null) cancelAnimationFrame(rafId); rafId = null; }
+  document.addEventListener('visibilitychange', function () { if (document.hidden) stop(); else start(); });
+
+  /* 测试钩子：静帧模式下手动渲染任意滚动位（不影响正常路径） */
+  window.__renderOnce = function (t) { readScroll(); renderOnce(t === undefined ? 1.5 : t); };
+
+  /* ?auto：rAF 被无头渲染器节流时用定时器驱动（正常路径不受影响） */
+  if (location.search.indexOf('auto') >= 0 && !reduceMotion && !stillMode) {
+    setInterval(function () { if (!document.hidden) loop(performance.now()); }, 34);
+  }
+
+  if (!reduceMotion && !stillMode) {
+    start();
+    window.addEventListener('pointermove', function (e) {
+      pointer.x = (e.clientX / window.innerWidth - 0.5) * 2;
+      pointer.y = (e.clientY / window.innerHeight - 0.5) * 2;
+    }, { passive: true });
+  }
+  window.addEventListener('scroll', function () { readScroll(); if (reduceMotion || stillMode) renderOnce(); }, { passive: true });
+  window.addEventListener('resize', onResize);
+
+  onResize();
+  readScroll();
+  renderOnce();
+})();
+</script>
+</body>
+</html>

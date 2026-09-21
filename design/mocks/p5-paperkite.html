@@ -1,0 +1,1177 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>纸鸢 Paperkite · 醒梦主页探索 P5-T</title>
+<style>
+  @font-face{
+    font-family:'Source Han Serif SC';
+    font-style:normal;font-weight:500;font-display:swap;
+    src:url('https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/files/noto-serif-sc-chinese-simplified-500-normal.woff2') format('woff2');
+  }
+  @font-face{
+    font-family:'Source Han Serif SC';
+    font-style:normal;font-weight:600;font-display:swap;
+    src:url('https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/files/noto-serif-sc-chinese-simplified-600-normal.woff2') format('woff2');
+  }
+  :root{
+    /* 由 JS 按滚动在三段色板（晨纸/暮玫瑰/夜青）间插值 */
+    --sky1:#F5F0E7; --sky2:#EFE5D6;
+    --ink:#3A4552; --ink-soft:#6E7A85;
+    --gold:#8A6839; --blush:#C08E88;
+    --moon:#E4D8BC; --moon-ring:#D9C9A4;
+    --night-k:0; --paper-glass:rgba(248,244,236,.6);
+    --star-k:0; --hairline:rgba(58,69,82,.34);
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{background:#EFEBE1}
+  body{
+    font-family:'Source Han Serif SC','Noto Serif SC','STSong','SimSun',serif;
+    color:var(--ink); background:transparent;
+    overflow-x:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+  body.kite-hover{cursor:pointer}
+  #scrollspace{height:760vh}
+
+  /* ---------- z0 天空底（环境，不随内容滚动） ---------- */
+  #sky{position:fixed;inset:0;z-index:0;pointer-events:none;
+    background:linear-gradient(178deg,var(--sky1) 0%,var(--sky2) 100%)}
+  #sky .dither{position:absolute;inset:0;opacity:.55;mix-blend-mode:multiply}
+
+  /* ---------- z1 海报印刷层（固定层，由 JS 按滚动平移=等价文档流） ---------- */
+  #poster{position:fixed;inset:0;z-index:1;pointer-events:none;will-change:transform}
+  #scrollspace{height:760vh}
+  #poster .pr{position:absolute;will-change:transform}
+  .vtype{writing-mode:vertical-rl;text-orientation:upright;font-weight:600;color:var(--ink)}
+
+  #hero{left:11vw;top:7vh;display:flex;gap:3.2vw;align-items:flex-start}
+  #hero .title{font-size:clamp(64px,15vh,148px);line-height:1.04;letter-spacing:.16em}
+  #hero .latin{writing-mode:vertical-rl;font-size:11px;letter-spacing:.42em;color:var(--ink-soft);margin-top:1.2vh}
+  #hero .lede{margin-top:2.6vh;font-size:13px;letter-spacing:.30em;color:var(--ink-soft)}
+  #hero .rule{width:1px;height:17vh;background:var(--hairline);margin:2.2vh auto 0}
+  #hero .seal{margin-top:2.4vh;width:34px;height:34px;border:1px solid var(--gold);
+    color:var(--gold);font-size:17px;font-weight:600;display:flex;align-items:center;justify-content:center;
+    letter-spacing:0;border-radius:2px;opacity:.85}
+
+  .mani{font-size:clamp(20px,3.4vh,34px);letter-spacing:.30em;line-height:2.05;opacity:0;transform:translateY(14px)}
+  .mani.on{opacity:1;transform:none;transition:opacity 1.1s ease,transform 1.1s ease}
+  .mani small{display:block;margin-top:1.8vh;writing-mode:horizontal-tb;font-size:10px;letter-spacing:.34em;color:var(--ink-soft);font-weight:500}
+  #s1{left:26vw;top:158vh}
+  #s2{left:56vw;top:318vh}
+  #s3{left:30vw;top:462vh}
+  #s4{left:63vw;top:656vh;color:var(--gold)}
+  #s4 .gold{transition:opacity 1.2s ease}
+
+  #moonpr{left:57vw;top:596vh;width:44vh;height:44vh;opacity:0}
+  #moonpr.on{opacity:1;transition:opacity 1.4s ease}
+  #moonpr .disc{position:absolute;inset:0;border-radius:50%;
+    background:radial-gradient(circle at 38% 34%, var(--moon) 58%, var(--moon-ring) 100%);
+    box-shadow:0 0 0 1px var(--hairline)}
+  #moonpr .crat{position:absolute;border-radius:50%;background:var(--moon-ring);opacity:.55}
+
+  /* 星芒（夜段才显） */
+  .star{position:absolute;color:var(--ink);opacity:calc(var(--star-k) * .8)}
+  .star svg{display:block}
+  .star.tw{animation:tw 5.2s ease-in-out infinite}
+  @keyframes tw{0%,100%{opacity:calc(var(--star-k)*.8)}50%{opacity:calc(var(--star-k)*.28)}}
+
+  /* 云纹印章（印刷，随风微漂） */
+  .cloud{color:var(--ink);opacity:.13}
+  .cloud svg{display:block;width:100%;height:100%}
+
+  /* 回声纸鸢：印在海报上的小风筝剪影（平面） */
+  .echo{color:var(--ink);opacity:.14}
+
+  /* 旗幡 */
+  .flag{transform-origin:50% 0;color:var(--ink);opacity:.5}
+
+  /* 右缘高度刻度（固定字已移至左下，不冲突） */
+  #alt{right:2.4vw;top:0;bottom:0;width:34px}
+  #alt .tick{position:absolute;right:0;width:14px;height:1px;background:var(--hairline)}
+  #alt .lab{position:absolute;right:20px;transform:translateY(-50%);font-size:9px;letter-spacing:.28em;color:var(--ink-soft);white-space:nowrap}
+
+  /* 页脚账目 */
+  #fin{left:11vw;right:11vw;top:716vh;pointer-events:none}
+  #fin .ledger{display:flex;gap:34px;font-size:12px;letter-spacing:.22em;color:var(--ink-soft);align-items:baseline}
+  #fin .ledger b{font-weight:600;color:var(--ink)}
+  #fin .back{margin-top:3.4vh;pointer-events:auto;display:inline-block;
+    font-size:12.5px;letter-spacing:.34em;color:var(--gold);text-decoration:none;
+    border-bottom:1px solid transparent;padding-bottom:4px;cursor:pointer}
+  #fin .back:hover,#fin .back:focus-visible{border-bottom-color:var(--gold);outline:none}
+  #fin .colo{margin-top:5vh;font-size:10px;letter-spacing:.30em;color:var(--ink-soft);opacity:.75}
+
+  /* ---------- z2 线与尾练（SVG，画布之下） ---------- */
+  #lines{position:fixed;inset:0;z-index:2;pointer-events:none;width:100vw;height:100vh}
+  #lines .str{fill:none;stroke:var(--ink);stroke-opacity:.5;stroke-width:1}
+  #lines .bow{fill:var(--ink);fill-opacity:.55;stroke:var(--ink);stroke-width:.8}
+  #lines .lant{pointer-events:none}
+
+  /* ---------- z3 纸鸢（透明画布） ---------- */
+  #stage{position:fixed;inset:0;z-index:3;width:100vw;height:100vh;display:block;pointer-events:none}
+
+  /* ---------- z4 风签（线轴=入口浮窗） ---------- */
+  #tags{position:fixed;inset:0;z-index:4;pointer-events:none}
+  .tag{position:absolute;left:0;top:0;pointer-events:auto;cursor:pointer;
+    display:flex;align-items:stretch;gap:11px;text-decoration:none;
+    background:var(--paper-glass);border:1px solid var(--hairline);border-radius:2px;
+    padding:11px 13px;backdrop-filter:blur(10px) saturate(1.08);-webkit-backdrop-filter:blur(10px) saturate(1.08);
+    box-shadow:0 10px 26px rgba(58,69,82,.14), inset 0 0 0 1px rgba(255,255,255,.25);
+    opacity:0;transform:translate(-200px,-200px)}
+  .tag.up{opacity:1}
+  .tag .vt{writing-mode:vertical-rl;text-orientation:upright;font-weight:600;font-size:15px;
+    letter-spacing:.30em;color:var(--ink)}
+  .tag .meta{display:flex;flex-direction:column;justify-content:flex-end;gap:8px;padding-bottom:2px}
+  .tag .cnt{font-size:10px;letter-spacing:.30em;color:var(--ink-soft);white-space:nowrap}
+  .tag .go{font-size:10px;letter-spacing:.30em;color:var(--gold);white-space:nowrap}
+  .tag .spool{width:1px;background:var(--hairline);align-self:stretch;position:relative}
+  .tag .spool i{position:absolute;left:-2px;width:5px;height:5px;border-radius:50%;background:var(--gold);opacity:.8;top:8px}
+  .tag:hover,.tag:focus-visible{background:rgba(250,246,238,.78);box-shadow:0 14px 30px rgba(58,69,82,.16);outline:none}
+  .tag:hover .go,.tag:focus-visible .go{text-decoration:underline;text-underline-offset:3px}
+
+  /* ---------- z5 固定画框 UI ---------- */
+  #brand{position:fixed;left:26px;top:24px;z-index:5;font-weight:600;font-size:15px;
+    letter-spacing:.34em;color:var(--ink)}
+  #brand small{display:block;margin-top:6px;font-weight:500;font-size:9px;letter-spacing:.32em;color:var(--ink-soft)}
+  #corner{position:fixed;left:26px;bottom:20px;z-index:5;font-size:10px;letter-spacing:.30em;
+    color:var(--ink-soft);text-align:left}
+  #hint{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:5;
+    font-size:11px;letter-spacing:.42em;color:var(--ink-soft);transition:opacity .8s ease}
+
+  /* 相风罗盘 */
+  #dial{position:fixed;right:24px;bottom:22px;z-index:5;width:96px;user-select:none}
+  #dial .card{background:var(--paper-glass);border:1px solid var(--hairline);border-radius:3px;
+    padding:9px 9px 8px;backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);
+    box-shadow:0 10px 26px rgba(58,69,82,.10);text-align:center}
+  #dial svg{display:block;margin:0 auto}
+  #dial .needle{transform-origin:32px 32px}
+  #dial .wlab{margin-top:6px;font-size:10.5px;letter-spacing:.20em;color:var(--ink);white-space:nowrap}
+  #dial .wsub{margin-top:2px;font-size:8px;letter-spacing:.14em;color:var(--ink-soft);white-space:nowrap}
+  #dial .corner-lab{margin-top:5px;font-size:8.5px;letter-spacing:.5em;text-indent:.5em;color:var(--ink-soft);opacity:.8}
+
+  /* ---------- z6 加载页 ---------- */
+  #veil{position:fixed;inset:0;z-index:6;background:#181D24;opacity:.92;pointer-events:none;
+    transition:opacity .9s ease}
+  #loader{position:fixed;inset:0;z-index:7;display:flex;flex-direction:column;
+    align-items:center;justify-content:flex-end;padding-bottom:11vh;pointer-events:none;
+    opacity:1;transition:opacity .55s ease}
+  #loader.done{opacity:0}
+  #ld-title{position:absolute;top:9vh;left:50%;transform:translateX(-50%);
+    font-weight:600;font-size:19px;letter-spacing:.62em;text-indent:.62em;color:var(--gold)}
+  #ld-sub{position:absolute;top:calc(9vh + 34px);left:50%;transform:translateX(-50%);
+    font-size:9px;letter-spacing:.4em;color:var(--gold);opacity:.7}
+  #ld-row{display:flex;flex-direction:column;align-items:center;gap:12px}
+  #ld-barwrap{width:min(300px,64vw);height:1px;background:rgba(138,104,57,.4);position:relative;overflow:hidden}
+  #ld-bar{position:absolute;inset:0;background:var(--gold);transform-origin:0 50%;transform:scaleX(0)}
+  #ld-status{font-size:11.5px;letter-spacing:.34em;color:var(--gold);min-height:1.3em}
+  #ld-pct{font-size:10px;letter-spacing:.28em;color:var(--gold);opacity:.75;font-variant-numeric:tabular-nums}
+  #ld-skip{margin-top:8px;font-size:10.5px;letter-spacing:.3em;color:var(--gold);opacity:.9}
+  body.ldone #loader{display:none}
+
+  /* ---------- 通用 ---------- */
+  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
+    clip:rect(0 0 0 0);white-space:nowrap;border:0}
+  .fadein{opacity:0;transform:translateY(10px)}
+  .fadein.on{opacity:1;transform:none;transition:opacity 1s ease,transform 1s ease}
+
+  /* reduced-motion：全部 CSS 动画/过渡关停 */
+  body.rm *,body.rm *::before,body.rm *::after{animation:none!important;transition:none!important}
+  body.still .mani,body.still #moonpr,body.still .fadein{transition:none!important}
+
+  /* 移动端 */
+  @media (max-width:760px){
+    #hero{left:8vw;top:7.5vh;gap:5vw}
+    #hero .title{font-size:clamp(56px,9.5vh,92px)}
+    .mani{font-size:clamp(17px,2.4vh,22px);letter-spacing:.24em;line-height:2}
+    .mani{max-width:80vw}
+    #s1{left:8vw;top:150vh}
+    #s2{left:auto;right:7vw;top:338vh;max-width:74vw}
+    #s3{left:12vw;top:458vh}
+    #s4{left:auto;right:9vw;top:648vh;max-width:70vw}
+    #moonpr{left:44vw;top:590vh;width:34vh;height:34vh}
+    #dial{right:14px;bottom:16px;transform:scale(.86);transform-origin:100% 100%}
+    #brand{left:16px;top:16px}
+    #corner{display:none}
+    #alt{display:none}
+    .tag{padding:8px 10px}
+    .tag .vt{font-size:13px}
+  }
+</style>
+</head>
+<body>
+<h1 class="sr-only">纸鸢——醒梦主页探索：滚动即是风</h1>
+<nav class="sr-only" aria-label="站内导航">
+  <a href="#st-essays" data-goto="1">随笔</a>
+  <a href="#st-works" data-goto="2">项目</a>
+  <a href="#st-about" data-goto="3">关于</a>
+</nav>
+
+<div id="sky"><div class="dither"></div></div>
+<div id="scrollspace"></div>
+
+<div id="poster">
+  <!-- 开场 -->
+  <div class="pr fadein" id="hero">
+    <div>
+      <div class="vtype title">纸鸢</div>
+      <div class="lede">风起时，字在天上。</div>
+      <div class="rule"></div>
+      <div class="seal">记</div>
+    </div>
+    <div class="latin">PAPER KITES · OVER THE LAST LAYER OF THE WORLD</div>
+  </div>
+
+  <!-- 宣言四句（竖排，分驻沿途） -->
+  <div class="pr mani" id="s1"><span>这里不是梦，也不是现实。</span><small>其一</small></div>
+  <div class="pr mani" id="s2"><span>它是人在即将醒来时，看见的最后一层世界。</span><small>其二</small></div>
+  <div class="pr mani" id="s3"><span>世界应当始终保留一种感觉：</span><small>其三</small></div>
+  <div class="pr mani" id="s4"><span class="gold" id="s4gold">它可能马上消失。</span><small>其四</small></div>
+
+  <!-- 印在纸上的平面月（与真的纸鸢同框：月是印的，鸢是真的） -->
+  <div class="pr" id="moonpr">
+    <div class="disc"></div>
+    <div class="crat" style="left:24%;top:30%;width:11%;height:11%"></div>
+    <div class="crat" style="left:58%;top:20%;width:7%;height:7%"></div>
+    <div class="crat" style="left:44%;top:58%;width:14%;height:14%"></div>
+    <div class="crat" style="left:70%;top:52%;width:6%;height:6%"></div>
+  </div>
+
+  <div class="pr" id="alt" aria-hidden="true"></div>
+  <div class="pr" id="deco" aria-hidden="true"></div>
+  <div class="pr" id="fin">
+    <div class="ledger">
+      <span><b>随笔</b> · 3 篇</span><span><b>项目</b> · 2 件</span><span><b>关于</b> · 1 页</span>
+    </div>
+    <a class="back" id="backTop" href="#top" role="button">回到目次 ↑</a>
+    <div class="colo">记 · 纸鸢 —— 滚动即是风。风筝断线处，世界正醒。<span style="display:inline-flex;width:22px;height:22px;border:1px solid var(--gold);color:var(--gold);align-items:center;justify-content:center;font-size:12px;margin-left:10px;vertical-align:-5px;border-radius:2px">终</span></div>
+  </div>
+</div>
+
+<svg id="lines" aria-hidden="true"></svg>
+<canvas id="stage" aria-hidden="true"></canvas>
+
+<div id="tags">
+  <a class="tag" id="tag1" href="#st-essays" data-goto="1" aria-label="进入：随笔，共三篇">
+    <span class="vt">随笔</span><span class="spool"><i></i></span>
+    <span class="meta"><span class="cnt">3 篇</span><span class="go">入</span></span>
+  </a>
+  <a class="tag" id="tag2" href="#st-works" data-goto="2" aria-label="进入：项目，共两件">
+    <span class="vt">项目</span><span class="spool"><i></i></span>
+    <span class="meta"><span class="cnt">2 件</span><span class="go">入</span></span>
+  </a>
+  <a class="tag" id="tag3" href="#st-about" data-goto="3" aria-label="进入：关于">
+    <span class="vt">关于</span><span class="spool"><i></i></span>
+    <span class="meta"><span class="cnt">1 页</span><span class="go">入</span></span>
+  </a>
+</div>
+
+<div id="brand">记<small>PAPER KITE</small></div>
+<div id="corner">滚动即是风<br>SCROLL IS THE WIND</div>
+<div id="hint">向下 · 起风</div>
+
+<div id="dial" aria-hidden="true">
+  <div class="card">
+    <svg width="64" height="64" viewBox="0 0 64 64">
+      <circle cx="32" cy="32" r="29" fill="none" stroke="currentColor" stroke-opacity=".28" stroke-width="1"/>
+      <g stroke="currentColor" stroke-opacity=".4" stroke-width="1">
+        <line x1="32" y1="3" x2="32" y2="9"/><line x1="32" y1="55" x2="32" y2="61"/>
+        <line x1="3" y1="32" x2="9" y2="32"/><line x1="55" y1="32" x2="61" y2="32"/>
+      </g>
+      <g class="needle" id="needle">
+        <line x1="32" y1="32" x2="32" y2="8" stroke="#8A6839" stroke-width="1.4"/>
+        <line x1="32" y1="32" x2="32" y2="46" stroke="currentColor" stroke-opacity=".35" stroke-width="1"/>
+      </g>
+      <circle cx="32" cy="32" r="2.2" fill="#8A6839"/>
+    </svg>
+    <div class="wlab" id="wlab">东风 · 微风</div>
+    <div class="wsub" id="wsub">BEAUFORT 3</div>
+    <div class="corner-lab">相风</div>
+  </div>
+</div>
+
+<div id="veil"></div>
+<div id="loader" aria-hidden="true">
+  <div id="ld-title">纸鸢</div>
+  <div id="ld-sub">PAPER KITE</div>
+  <div id="ld-row">
+    <div id="ld-barwrap"><div id="ld-bar"></div></div>
+    <div id="ld-status">铺开天空</div>
+    <div id="ld-pct">0%</div>
+    <div id="ld-skip">点击任意处跳过</div>
+  </div>
+</div>
+
+<script src="vendor/three.min.js"></script>
+<script>
+(function(){
+'use strict';
+
+/* ============ 错误钩子（最先挂） ============ */
+window.__swarmErr = [];
+window.onerror = function(m,s,l,c){ __swarmErr.push('onerror: '+m+' @'+(s||'')+':'+l); };
+(function(ce){ console.error = function(){ try{__swarmErr.push('console.error: '+[].join.call(arguments,' '));}catch(e){} ce.apply(console,arguments); }; })(console.error);
+
+/* ============ 参数 ============ */
+var Q = (function(){
+  var o = {}, re = /[?&]([^=&]+)(?:=([^&]*))?/g, m;
+  while ((m = re.exec(location.search))) o[m[1]] = (m[2] === undefined) ? '' : m[2];
+  return o;
+})();
+var AUTO  = Q.auto !== undefined;
+var FAST  = Q.fast !== undefined;
+var STILL = Q.still !== undefined;
+var RM    = Q.rm !== undefined || STILL;
+var NOWEBGL = Q.nw !== undefined;
+var PIN   = (Q.pin !== undefined && Q.pin !== '') ? Math.min(1, Math.max(0, parseFloat(Q.pin) || 0)) : null;
+var LOADP = (Q.load !== undefined && Q.load !== '') ? Math.min(1, Math.max(0, parseFloat(Q.load) || 0)) : null;
+var HOVERF = (Q.hover !== undefined && Q.hover !== '') ? parseInt(Q.hover, 10) || 0 : 0;
+var ZOOM = (Q.zoom !== undefined && Q.zoom !== '') ? (parseFloat(Q.zoom) || 1) : 1;
+var CAMZ = 10/ZOOM;
+var FLAT = Q.flat !== undefined;   /* 诊断：印纹不裁形，整张糊满 */
+
+/* ============ 工具 ============ */
+function clamp(v,a,b){ return v<a?a:(v>b?b:v); }
+function lerp(a,b,k){ return a+(b-a)*k; }
+function smooth(a,b,x){ x=clamp((x-a)/(b-a),0,1); return x*x*(3-2*x); }
+function mulberry32(s){ return function(){ s|=0; s=(s+0x6D2B79F5)|0; var t=Math.imul(s^(s>>>15),1|s); t=(t+Math.imul(t^(t>>>7),61|t))^t; return ((t^(t>>>14))>>>0)/4294967296; }; }
+var R1 = mulberry32(20260920);
+function h2r(h){ h=h.replace('#',''); return [parseInt(h.substr(0,2),16)/255, parseInt(h.substr(2,2),16)/255, parseInt(h.substr(4,2),16)/255]; }
+function mixHex(a,b,k){
+  var c1=h2r(a), c2=h2r(b);
+  function hx(v){ v=Math.round(clamp(v,0,1)*255).toString(16); return v.length<2?'0'+v:v; }
+  return '#'+hx(lerp(c1[0],c2[0],k))+hx(lerp(c1[1],c2[1],k))+hx(lerp(c1[2],c2[2],k));
+}
+
+/* ============ 三段色板：晨纸 → 暮玫瑰 → 夜青 ============ */
+var PAL = [
+  { sky1:'#F5F0E7', sky2:'#EFE5D6', ink:'#3A4552', soft:'#6E7A85', gold:'#8A6839', moon:'#E6D9BA', mr:'#D8C69E', hair:'rgba(58,69,82,.34)', glass:'rgba(248,244,236,.6)' },
+  { sky1:'#EDD9CE', sky2:'#E5C2B9', ink:'#403A44', soft:'#6E5D64', gold:'#96693B', moon:'#ECD9AE', mr:'#DCC091', hair:'rgba(64,58,68,.38)', glass:'rgba(250,242,236,.6)' },
+  { sky1:'#2C3542', sky2:'#3E4A58', ink:'#D9D4C6', soft:'#A2A8AD', gold:'#D9B36C', moon:'#F0DCA6', mr:'#E2C488', hair:'rgba(217,212,198,.30)', glass:'rgba(48,56,68,.55)' }
+];
+function palAt(p){
+  var a,b,k;
+  if (p < 0.52){ a=PAL[0]; b=PAL[1]; k=smooth(0.14,0.52,p); }
+  else        { a=PAL[1]; b=PAL[2]; k=smooth(0.52,0.94,p); }
+  var o={};
+  o.sky1=mixHex(a.sky1,b.sky1,k); o.sky2=mixHex(a.sky2,b.sky2,k);
+  o.ink=mixHex(a.ink,b.ink,k);    o.soft=mixHex(a.soft,b.soft,k);
+  o.gold=mixHex(a.gold,b.gold,k); o.moon=mixHex(a.moon,b.moon,k); o.mr=mixHex(a.mr,b.mr,k);
+  o.hair=k<0.5?a.hair:b.hair;     o.glass=k<0.5?a.glass:b.glass;
+  o.nightK = smooth(0.52,0.94,p);
+  return o;
+}
+
+/* ============ 沙燕形制：路径数据（THREE.Shape 与 SVG 共用） ============
+   单位盒：x ∈ [-0.5W, 0.5W]，y ∈ [0,1]（0=尾梢，1=头顶）。
+   每条曲线 = [cp1x,cp1y,cp2x,cp2y,x,y]，从头顶中点出发顺时针走右半，镜像得左半。 */
+var HEADY=0.985;
+function swallowPath(fat){
+  var W = fat ? 1.30 : 1.04;
+  var P;
+  if (!fat){
+    P = [
+      [ 0.032,1.000, 0.062,0.988, 0.070,0.942],   /* 头中(最高) → 小尖眉 → 额侧 */
+      [ 0.240,0.815, 0.440,0.685, 0.520,0.580],   /* 膀兜前缘 → 翼尖 */
+      [ 0.340,0.410, 0.150,0.330, 0.072,0.300],   /* 后缘深凹收腰 */
+      [ 0.086,0.245, 0.094,0.205, 0.088,0.170],   /* 柱身 → 髀 */
+      [ 0.118,0.090, 0.112,0.015, 0.098,0.000],   /* 剪刀尾外弧 → 尾尖 */
+      [ 0.050,0.058, 0.020,0.098, 0.014,0.148],   /* 尾内弧 */
+      [ 0.006,0.188, 0.000,0.192, 0.000,0.192]    /* 燕尾中央凹口 */
+    ];
+    } else {
+    P = [
+      [ 0.050,0.996, 0.092,0.972, 0.082,0.922],
+      [ 0.300,0.795, 0.545,0.665, 0.650,0.565],
+      [ 0.420,0.380, 0.185,0.305, 0.088,0.280],
+      [ 0.106,0.220, 0.116,0.180, 0.108,0.145],
+      [ 0.148,0.078, 0.140,0.012, 0.126,0.000],
+      [ 0.064,0.052, 0.027,0.092, 0.018,0.142],
+      [ 0.008,0.182, 0.000,0.186, 0.000,0.186]
+    ];
+  }
+  function shapeAndSvg(){
+    /* 纯 JS 采样整条轮廓（含镜像），几何与 SVG 严格同源 */
+    var pts=[[0,HEADY]], i, s, k;
+    function cub(p0,p1,p2,p3,t){
+      var u=1-t;
+      return [u*u*u*p0[0]+3*u*u*t*p1[0]+3*u*t*t*p2[0]+t*t*t*p3[0],
+              u*u*u*p0[1]+3*u*u*t*p1[1]+3*u*t*t*p2[1]+t*t*t*p3[1]];
+    }
+    var cur=[0,HEADY], PER=24;
+    for(i=0;i<P.length;i++){
+      s=P[i];
+      for(k=1;k<=PER;k++) pts.push(cub(cur,[s[0]*W,s[1]],[s[2]*W,s[3]],[s[4]*W,s[5]],k/PER));
+      cur=[s[4]*W,s[5]];
+    }
+    for(i=P.length-1;i>=0;i--){
+      s=P[i];
+      var end=(i>0)?[-P[i-1][4]*W, P[i-1][5]]:[0,HEADY];
+      for(k=1;k<=PER;k++) pts.push(cub(cur,[-s[2]*W,s[3]],[-s[0]*W,s[1]],end,k/PER));
+      cur=end;
+    }
+    var sh=new THREE.Shape();
+    sh.setFromPoints(pts.map(function(p){ return new THREE.Vector2(p[0],p[1]); }));
+    function fy(y){ return ((1-y)*100).toFixed(1); }
+    function fx(x){ return ((x*W)*100).toFixed(1); }
+    var d='M '+fx(0)+' '+fy(HEADY);
+    for(i=0;i<P.length;i++){ s=P[i]; d+=' C '+fx(s[0])+' '+fy(s[1])+' '+fx(s[2])+' '+fy(s[3])+' '+fx(s[4])+' '+fy(s[5]); }
+    for(i=P.length-1;i>=0;i--){ s=P[i]; var px=(i>0)?-P[i-1][4]:0, py=(i>0)?P[i-1][5]:HEADY;
+      d+=' C '+fx(-s[2])+' '+fy(s[3])+' '+fx(-s[0])+' '+fy(s[1])+' '+fx(px)+' '+fy(py); }
+    d+=' Z';
+    return { shape:sh, svg:d, w:W, h:1 };
+  }
+  return shapeAndSvg();
+}
+function diamondPath(){
+  var W=0.80,H=1.06;
+  var sh=new THREE.Shape();
+  sh.moveTo(0,H); sh.lineTo(W*0.5,H*0.5); sh.lineTo(0,0); sh.lineTo(-W*0.5,H*0.5); sh.closePath();
+  function fx(x){ return (x*100).toFixed(1); } function fy(y){ return ((H-y)*100).toFixed(1); }
+  var d='M '+fx(0)+' '+fy(H)+' L '+fx(W*0.5)+' '+fy(H*0.5)+' L '+fx(0)+' '+fy(0)+' L '+fx(-W*0.5)+' '+fy(H*0.5)+' Z';
+  return { shape:sh, svg:d, w:W, h:H };
+}
+
+/* ============ 风筝印纹（CanvasTexture） ============ */
+/* 画布映射（与几何 UV 一致）：px = S/2 + xShape*K*S；py = S/2 + (h/2 - yShape)*K*S
+   对应 uv = (0.5 + x'*K, 0.5 + y'*K)，x'/y' 为居中后几何坐标，flipY 已计入 */
+var UVK=0.86;
+function canvasMapper(pp,S){
+  return function(x,y){ return [ S/2 + x*UVK*S, S/2 + (pp.h/2 - y)*UVK*S ]; };
+}
+function paintPaper(ctx,w,h,tint){
+  ctx.fillStyle=tint; ctx.fillRect(0,0,w,h);
+  var rr=mulberry32(7), i;
+  for(i=0;i<900;i++){
+    ctx.fillStyle='rgba(58,69,82,'+(0.018+rr()*0.02)+')';
+    ctx.fillRect(rr()*w, rr()*h, 1.2, 1.2);
+  }
+}
+function drawSwallowFace(fat, kind){
+  var S=512, c=document.createElement('canvas'); c.width=c.height=S;
+  var x=c.getContext('2d');
+  var ink = kind==='blush' ? '#5A4A50' : '#3A4552';
+  var blush = kind==='blush' ? '#C58583' : '#C08E88';
+  var gold = '#8A6839';
+  /* 先取形：形外保持全透明 */
+  var pp=swallowPath(fat), M=canvasMapper(pp,S);
+  var p=new Path2D();
+  var pts=pp.shape.getPoints(64), i, pt, xy;
+  for(i=0;i<pts.length;i++){ pt=pts[i]; xy=M(pt.x,pt.y); if(i===0)p.moveTo(xy[0],xy[1]); else p.lineTo(xy[0],xy[1]); }
+  p.closePath();
+  x.save();
+  if (!FLAT) x.clip(p);
+  paintPaper(x,S,S, kind==='blush' ? '#F6E7E0' : '#F8F4EB');
+  var W=pp.w;
+  /* 中脊与膀条（「大」字骨架的印痕）——全部形制坐标 */
+  x.strokeStyle=ink; x.globalAlpha=.5; x.lineWidth=3;
+  x.beginPath(); var a1=M(0,0.90), a2=M(0,0.16); x.moveTo(a1[0],a1[1]); x.lineTo(a2[0],a2[1]); x.stroke();
+  x.beginPath(); var b1=M(-0.44*W,0.635), b2=M(0,0.80), b3=M(0.44*W,0.635);
+  x.moveTo(b1[0],b1[1]); x.quadraticCurveTo(b2[0],b2[1],b3[0],b3[1]); x.stroke();
+  x.beginPath(); var c1=M(-0.20*W,0.78), c2=M(0,0.885), c3=M(0.20*W,0.78);
+  x.moveTo(c1[0],c1[1]); x.quadraticCurveTo(c2[0],c2[1],c3[0],c3[1]); x.stroke();
+  /* 蛙眼：翼上一对环（加大加重，远看可读） */
+  [[-0.25*W,0.55],[0.25*W,0.55]].forEach(function(e){
+    var ex=M(e[0],e[1]);
+    x.globalAlpha=.9; x.strokeStyle=ink; x.lineWidth=6;
+    x.beginPath(); x.arc(ex[0],ex[1],S*0.075,0,7); x.stroke();
+    x.strokeStyle=blush; x.lineWidth=9;
+    x.beginPath(); x.arc(ex[0],ex[1],S*0.044,0,7); x.stroke();
+    x.fillStyle=ink; x.beginPath(); x.arc(ex[0],ex[1],S*0.016,0,7); x.fill();
+  });
+  /* 云纹（翼中两朵螺旋） */
+  function swirl(sx,sy,r,rot){
+    var ce=M(sx,sy);
+    x.strokeStyle=ink; x.globalAlpha=.5; x.lineWidth=3;
+    x.beginPath();
+    for(var a=0;a<Math.PI*3.4;a+=0.12){
+      var rr=r*(a/(Math.PI*3.4));
+      var px=ce[0]+Math.cos(a+rot)*rr, py=ce[1]+Math.sin(a+rot)*rr*0.8;
+      if(a===0)x.moveTo(px,py); else x.lineTo(px,py);
+    }
+    x.stroke();
+  }
+  swirl(-0.16*W,0.42,30,0.6); swirl(0.16*W,0.42,30,2.2);
+  /* 团寿（髀部） */
+  x.globalAlpha=.85; x.strokeStyle=gold; x.lineWidth=3.4;
+  var hy=M(0,0.21);
+  x.beginPath(); x.arc(hy[0],hy[1],S*0.038,0,7); x.stroke();
+  x.beginPath(); x.arc(hy[0],hy[1],S*0.020,0,7); x.stroke();
+  /* 眉梢晕染 */
+  x.globalAlpha=.34; x.fillStyle=blush;
+  var be=M(0,0.895);
+  x.beginPath(); x.ellipse(be[0],be[1],S*0.11,S*0.05,0,0,7); x.fill();
+  /* 肥燕加牡丹团花 */
+  if (fat){
+    var ro=M(0,0.21);
+    x.globalAlpha=.75;
+    for(i=0;i<8;i++){
+      var an=i/8*Math.PI*2;
+      x.strokeStyle=(i%2?blush:ink); x.lineWidth=3;
+      x.beginPath(); x.ellipse(ro[0]+Math.cos(an)*S*0.050, ro[1]+Math.sin(an)*S*0.050, S*0.028,S*0.013, an, 0, 7); x.stroke();
+    }
+    x.globalAlpha=.85; x.strokeStyle=ink; x.lineWidth=2.6;
+    x.beginPath(); x.arc(ro[0],ro[1],S*0.021,0,7); x.stroke();
+  }
+  /* 尾梢条纹 */
+  x.globalAlpha=.5; x.strokeStyle=blush; x.lineWidth=5;
+  [[-1],[1]].forEach(function(s){
+    var t1=M(s[0]*0.085*W,0.04), t2=M(s[0]*0.045*W,0.12);
+    x.beginPath(); x.moveTo(t1[0],t1[1]); x.lineTo(t2[0],t2[1]); x.stroke();
+  });
+  x.restore();
+  /* 描边（纸缘） */
+  x.save(); x.strokeStyle=ink; x.globalAlpha=.9; x.lineWidth=4.5; x.stroke(p); x.restore();
+  return c;
+}
+function drawDiamondFace(){
+  var S=512, c=document.createElement('canvas'); c.width=c.height=S;
+  var x=c.getContext('2d');
+  var ink='#3A4552', gold='#8A6839';
+  var pp=diamondPath(), M=canvasMapper(pp,S);
+  var p=new Path2D();
+  var pts=pp.shape.getPoints(2), i, pt, xy;
+  for(i=0;i<pts.length;i++){ pt=pts[i]; xy=M(pt.x,pt.y); if(i===0)p.moveTo(xy[0],xy[1]); else p.lineTo(xy[0],xy[1]); }
+  p.closePath();
+  x.save();
+  if (!FLAT) x.clip(p);
+  paintPaper(x,S,S,'#F7F2E7');
+  /* 脊条（形制坐标） */
+  x.globalAlpha=.55; x.strokeStyle=ink; x.lineWidth=4;
+  var d1=M(0,1.0), d2=M(0,0.06); x.beginPath(); x.moveTo(d1[0],d1[1]); x.lineTo(d2[0],d2[1]); x.stroke();
+  var d3=M(-0.36,0.53), d4=M(0.36,0.53); x.beginPath(); x.moveTo(d3[0],d3[1]); x.lineTo(d4[0],d4[1]); x.stroke();
+  /* 内框（内缩菱形） */
+  x.globalAlpha=.7; x.lineWidth=2.4;
+  [[0,0.89],[0.26,0.53],[0,0.17],[-0.26,0.53]].forEach(function(e,ei){
+    var q=M(e[0],e[1]); if(ei===0)x.moveTo(q[0],q[1]); else x.lineTo(q[0],q[1]);
+  });
+  x.closePath(); x.stroke();
+  /* 四角团寿 */
+  [[0,0.90],[0.30,0.53],[0,0.16],[-0.30,0.53]].forEach(function(e){
+    var q=M(e[0],e[1]);
+    x.globalAlpha=.85; x.strokeStyle=gold; x.lineWidth=2.6;
+    x.beginPath(); x.arc(q[0],q[1],S*0.030,0,7); x.stroke();
+    x.beginPath(); x.arc(q[0],q[1],S*0.014,0,7); x.stroke();
+  });
+  /* 中腰云纹 */
+  x.globalAlpha=.4; x.strokeStyle=ink; x.lineWidth=2.6;
+  var ce=M(0,0.53);
+  x.beginPath();
+  for(var a=0;a<Math.PI*3.2;a+=0.12){
+    var rr=S*0.055*(a/(Math.PI*3.2));
+    var px=ce[0]+Math.cos(a)*rr, py=ce[1]+Math.sin(a)*rr;
+    if(a===0)x.moveTo(px,py); else x.lineTo(px,py);
+  }
+  x.stroke();
+  x.restore();
+  x.save(); x.strokeStyle=ink; x.globalAlpha=.9; x.lineWidth=5; x.stroke(p); x.restore();
+  return c;
+}
+
+/* ============ 印刷装饰：星芒 / 云纹 / 回声鸢 / 刻度（JS 生成） ============ */
+var decoEl = document.getElementById('deco');
+function starSVG(){ return '<svg width="11" height="11" viewBox="0 0 11 11"><path d="M5.5 0 L6.4 4.6 L11 5.5 L6.4 6.4 L5.5 11 L4.6 6.4 L0 5.5 L4.6 4.6 Z" fill="currentColor"/></svg>'; }
+function cloudSVG(){ /* 如意云纹 */
+  return '<svg viewBox="0 0 120 56" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">'
+    +'<path d="M8 40 C2 40 2 30 10 30 C10 20 24 18 28 26 C34 16 50 18 50 28 C60 24 68 32 62 40 Z" transform="translate(6,6)"/>'
+    +'<path d="M70 46 C86 46 96 40 104 30" stroke-opacity=".6"/>'
+    +'</svg>';
+}
+function flagSVG(){ return '<svg width="54" height="72" viewBox="0 0 54 72" fill="none">'
+    +'<line x1="4" y1="0" x2="4" y2="72" stroke="currentColor" stroke-width="1.4" stroke-opacity=".7"/>'
+    +'<path d="M5 6 L50 12 L5 22 Z" fill="currentColor" fill-opacity=".8"/>'
+    +'</svg>'; }
+(function buildDeco(){
+  var i, h, html='';
+  /* 星芒：夜段散布（避开尾声固定字区，尾声另置安全星点） */
+  for(i=0;i<30;i++){
+    var sy=380+R1()*205, sx=4+R1()*90;
+    html+='<div class="star'+(R1()>0.55?' tw':'')+'" style="left:'+sx.toFixed(1)+'vw;top:'+sy.toFixed(1)+'vh;animation-delay:'+(R1()*5).toFixed(1)+'s">'+starSVG()+'</div>';
+  }
+  [[24,632],[70,700],[48,742],[15,712],[30,612],[86,650]].forEach(function(s){
+    html+='<div class="star'+(R1()>0.5?' tw':'')+'" style="left:'+s[0]+'vw;top:'+s[1]+'vh;animation-delay:'+(R1()*5).toFixed(1)+'s">'+starSVG()+'</div>';
+  });
+  /* 云纹 */
+  var clouds=[[10,96,190],[74,180,150],[16,262,230],[80,388,170],[8,472,210],[68,548,150],[24,610,190]];
+  clouds.forEach(function(cl){
+    html+='<div class="cloud pr" data-cloud="'+cl[2]+'" style="left:'+cl[0]+'vw;top:'+cl[1]+'vh;width:'+cl[2]+'px;height:'+(cl[2]*0.47)+'px">'+cloudSVG()+'</div>';
+  });
+  /* 回声纸鸢（印在海报上的剪影） */
+  var pp=swallowPath(false).svg, pf=swallowPath(true).svg, pd=diamondPath().svg;
+  var echoes=[[13,205,92,12],[83,372,110,-9],[9,540,86,7],[86,452,70,-14],[12,662,96,-6]];
+  echoes.forEach(function(e,ei){
+    var d= ei===2? pd : (ei===1? pf : pp);
+    html+='<div class="echo pr" style="left:'+e[0]+'vw;top:'+e[1]+'vh;width:'+e[2]+'px;transform:rotate('+e[3]+'deg)">'
+        +'<svg viewBox="-8 -6 116 116" style="overflow:visible"><path d="'+d+'" fill="currentColor" fill-rule="evenodd"/></svg></div>';
+  });
+  /* 旗幡两杆 */
+  html+='<div class="flag pr" id="flagA" style="left:57vw;top:8vh">'+flagSVG()+'</div>';
+  html+='<div class="flag pr" id="flagB" style="left:5vw;top:430vh">'+flagSVG()+'</div>';
+  /* 印在纸上的弦月（开场加载第二步「印上月亮」的可见兑现） */
+  html+='<div class="fadein pr" id="cres" style="left:12vw;top:56vh;width:60px;color:var(--ink)">'
+      +'<svg viewBox="0 0 64 64" fill="none"><path d="M38 8 A24 24 0 1 0 38 56 A28 28 0 0 1 38 8 Z" fill="currentColor" fill-opacity=".26"/></svg></div>';
+  decoEl.innerHTML=html;
+  /* 高度刻度 */
+  var alt=document.getElementById('alt'), ah='';
+  for(i=1;i<=14;i++){
+    ah+='<div class="tick" style="top:'+(i*50)+'vh"></div>';
+    if(i%2===0) ah+='<div class="lab" style="top:'+(i*50)+'vh">'+(i*50)+'</div>';
+  }
+  alt.innerHTML=ah;
+})();
+
+/* ============ Three 场景：纸鸢是唯一活物 ============ */
+var canvas=document.getElementById('stage');
+var renderer=null, scene=null, camera=null;
+var worldPerPx=1, VH=innerHeight||900, VW=innerWidth||1440;
+var kites=[];
+var KITE_DEFS=[
+  { id:1, kind:'slim',  face:'ink',   size:1.58, dx:68, dy:40,  tag:'tag1', lantern:.9,  ph:0.0  },
+  { id:2, kind:'fat',   face:'blush', size:2.00, dx:25, dy:305, tag:'tag2', lantern:.8,  ph:2.1  },
+  { id:3, kind:'diam',  face:'gold',  size:1.42, dx:67, dy:487, tag:'tag3', lantern:.7,  ph:4.2  },
+  { id:4, kind:'slim',  face:'ink',   size:0.98, dx:40, dy:640, tag:null,  lantern:.95, ph:5.3  }
+];
+function kiteMaterial(faceCanvas){
+  var tex=new THREE.CanvasTexture(faceCanvas);
+  tex.anisotropy=2;
+  return new THREE.ShaderMaterial({
+    uniforms:{ uMap:{value:tex}, uNight:{value:0}, uHover:{value:0}, uFade:{value:1} },
+    vertexShader:[
+      'varying vec2 vUv; varying vec3 vN; varying vec3 vV;',
+      'void main(){',
+      '  vUv=uv;',
+      '  vN=normalize(normalMatrix*normal);',
+      '  vec4 mv=modelViewMatrix*vec4(position,1.0);',
+      '  vV=normalize(-mv.xyz);',
+      '  gl_Position=projectionMatrix*mv;',
+      '}'
+    ].join('\n'),
+    fragmentShader:[
+      'uniform sampler2D uMap; uniform float uNight,uHover,uFade;',
+      'varying vec2 vUv; varying vec3 vN; varying vec3 vV;',
+      'void main(){',
+      '  vec4 tex=texture2D(uMap,vUv);',
+      '  float ff = gl_FrontFacing ? 1.0 : 0.34;',           /* 纸背透印 */
+      '  vec3 N = normalize(vN) * (gl_FrontFacing ? 1.0 : -1.0);',
+      '  vec3 L = normalize(vec3(-0.32,0.62,0.72));',
+      '  float dif = 0.82 + 0.30*max(dot(N,L),0.0);',
+      '  vec3 col = tex.rgb * dif * ff;',
+      '  col = mix(col, col*vec3(0.80,0.85,1.02), uNight*0.48);', /* 夜色里纸变冷 */
+      '  col += uHover * vec3(0.10,0.075,0.035);',
+      '  gl_FragColor = vec4(col, tex.a * uFade);',
+      '}'
+    ].join('\n'),
+    transparent:true, depthWrite:false, side:THREE.DoubleSide
+  });
+}
+function buildKites(){
+  KITE_DEFS.forEach(function(def,di){
+    var pp = def.kind==='diam' ? diamondPath() : swallowPath(def.kind==='fat');
+    var geo = new THREE.ShapeGeometry(pp.shape, 24);
+    /* UV 对齐印纹画布映射（见 canvasMapper 注记） */
+    var pos=geo.attributes.position, uv=geo.attributes.uv, i;
+    for(i=0;i<pos.count;i++){
+      uv.setXY(i, 0.5 + pos.getX(i)*UVK, 0.5 + (pos.getY(i)-pp.h/2)*UVK);
+      /* 起拱：翼面向观者微鼓 */
+      var nx=pos.getX(i)/pp.w, ny=pos.getY(i)/pp.h;
+      pos.setZ(i, Math.pow(Math.abs(nx)*2,2)*0.10*(0.35+0.65*clamp(ny,0,1)));
+    }
+    uv.needsUpdate=true;
+    geo.translate(0,-pp.h/2,0);   /* 原点移到形心 */
+    geo.computeVertexNormals();
+    var fc = def.kind==='diam' ? drawDiamondFace() : drawSwallowFace(def.kind==='fat', def.face);
+    var mesh=new THREE.Mesh(geo, kiteMaterial(fc));
+    mesh.scale.setScalar(def.size);
+    mesh.renderOrder=10+di;
+    scene.add(mesh);
+    var k={ def:def, mesh:mesh, pp:pp, hover:0, hoverT:0,
+            byLocal:0.36-pp.h/2, tyLocal:0.05-pp.h/2,
+            tail:[], lant:null, rel:0, launchE:1 };
+    var TN=9;
+    for(i=0;i<TN;i++){
+      var g=document.createElementNS(NS,'path');
+      g.setAttribute('class','bow');
+      g.setAttribute('d','M -5 0 L 0 -3.4 L 5 0 L 0 3.4 Z M -3.2 0 L 3.2 0');
+      linesG.appendChild(g);
+      k.tail.push({ x:0,y:0, init:false, el:g });
+    }
+    k.lant=document.createElementNS(NS,'circle');
+    k.lant.setAttribute('r','30');
+    k.lant.setAttribute('fill','url(#lantgrad)');
+    k.lant.style.opacity='0';
+    linesG.appendChild(k.lant);
+    kites.push(k);
+  });
+}
+
+/* ============ SVG 线层 ============ */
+var linesSVG=document.getElementById('lines');
+var NS='http://www.w3.org/2000/svg';
+var linesG=document.createElementNS(NS,'g'); linesSVG.appendChild(linesG);
+var defs=document.createElementNS(NS,'defs');
+defs.innerHTML='<radialGradient id="lantgrad"><stop offset="0%" stop-color="#F2C27E" stop-opacity=".55"/>'
+  +'<stop offset="55%" stop-color="#E8AE62" stop-opacity=".18"/><stop offset="100%" stop-color="#E8AE62" stop-opacity="0"/></radialGradient>';
+linesSVG.appendChild(defs);
+var strPaths=[], bowEls=[];
+KITE_DEFS.forEach(function(def,di){
+  if(!def.tag) { strPaths.push(null); }
+  else {
+    var p=document.createElementNS(NS,'path'); p.setAttribute('class','str'); linesG.appendChild(p);
+    strPaths.push(p);
+  }
+});
+function bowGroup(){ /* 已并入 buildKites；保留空实现兼容 */
+  return null;
+}
+
+/* ============ 站点/坐标 ============ */
+var TAGS = [document.getElementById('tag1'), document.getElementById('tag2'), document.getElementById('tag3')];
+function vh2px(v){ return v/100*VH; }
+function docToScreen(dyVh){ return vh2px(dyVh) - scrollY(); }
+function scrollY(){ return (PIN!==null) ? PIN*(document.documentElement.scrollHeight-VH) : (window.pageYOffset||document.documentElement.scrollTop||0); }
+
+/* ============ 风 ============ */
+var wind={ th:-38, spd:2.6, name:'东风', bft:3 };
+var windThS=-38, windSpdS=2.6;
+function windAt(p,t){
+  var th = -38 + 92*smooth(0,0.9,p) + 7*Math.sin(t*0.05);
+  var base = 2.6 - 2.0*smooth(0.55,0.96,p);
+  var breathe = 0.55*Math.sin(t*0.09+1.3);
+  var gust = Math.pow(Math.max(0, Math.sin(t*0.23)*Math.sin(t*0.071)),3) * 1.5
+           * smooth(0.04,0.22,p) * (1-smooth(0.82,0.96,p));
+  var spd = clamp(base + breathe + gust, 0, 4.2);
+  return { th:th, spd:spd };
+}
+var DIRS=['东','东南','南','西南','西','西北','北','东北'];
+var BFT=['无风','软风','轻风','微风','和风','劲风'];
+function windName(th){
+  var a=((th%360)+360)%360;
+  var i=Math.round(a/45)%8;
+  return DIRS[i]+'风';
+}
+var dialNeedle=document.getElementById('needle'), wlab=document.getElementById('wlab'), wsub=document.getElementById('wsub');
+var wlabLast='';
+function updateDial(w, lp){
+  var na = (lp>=1) ? w.th : lerp(-90, w.th, smooth(0.52,0.66,lp)); /* 加载：起风时指针自静摆起 */
+  dialNeedle.style.transform='rotate('+na.toFixed(1)+'deg)';
+  var bft=Math.min(5,Math.round(w.spd));
+  var lab = (lp<0.52)?'静':((w.spd<0.35&&lp>=1)?'风定':windName(w.th)+' · '+BFT[bft]);
+  if(lab!==wlabLast){ wlab.textContent=lab; wsub.textContent = (lp<0.52)?'CALM':(w.spd<0.35?'CALM':'BEAUFORT '+bft); wlabLast=lab; }
+}
+
+/* ============ 调色/入场状态 ============ */
+var rootStyle=document.documentElement.style;
+var maniEls=[document.getElementById('s1'),document.getElementById('s2'),document.getElementById('s3'),document.getElementById('s4')];
+var moonEl=document.getElementById('moonpr');
+var s4gold=document.getElementById('s4gold');
+var hintEl=document.getElementById('hint');
+var veilEl=document.getElementById('veil');
+var loaderEl=document.getElementById('loader');
+var ldBar=document.getElementById('ld-bar'), ldStatus=document.getElementById('ld-status'), ldPct=document.getElementById('ld-pct');
+var flagA=document.getElementById('flagA'), flagB=document.getElementById('flagB');
+var cloudEls=[];
+function collectClouds(){ cloudEls=[].slice.call(document.querySelectorAll('[data-cloud]')); }
+collectClouds();
+
+var MANI_ON=[0.10,0.30,0.44,0.70]; /* 各句随滚动显影的位置 */
+var posterEl=document.getElementById('poster');
+
+function applyPal(pal){
+  rootStyle.setProperty('--sky1',pal.sky1); rootStyle.setProperty('--sky2',pal.sky2);
+  rootStyle.setProperty('--ink',pal.ink);   rootStyle.setProperty('--ink-soft',pal.soft);
+  rootStyle.setProperty('--gold',pal.gold); rootStyle.setProperty('--moon',pal.moon);
+  rootStyle.setProperty('--moon-ring',pal.mr);
+  rootStyle.setProperty('--hairline',pal.hair);
+  rootStyle.setProperty('--paper-glass',pal.glass);
+  rootStyle.setProperty('--star-k', pal.nightK.toFixed(3));
+  rootStyle.setProperty('--night-k', pal.nightK.toFixed(3));
+}
+
+/* ============ 主合成 ============ */
+var pointer={x:0,y:0}, pointerS={x:0,y:0};
+function project(wx,wy){
+  return { x: (wx/worldPerPx) + VW/2, y: VH/2 - (wy/worldPerPx) };
+}
+function compose(p, lp, t){
+  if ((window.innerWidth&&window.innerWidth!==VW)||(window.innerHeight&&window.innerHeight!==VH)) onResize(); /* 尺寸看门狗 */
+  var pal=palAt(p);
+  /* 海报层平移（等价文档流滚动；pin/still 下同样确定） */
+  posterEl.style.transform='translate3d(0,'+(-scrollY()).toFixed(1)+'px,0)';
+  applyPal(pal);
+  var w = windAt(p,t);
+  /* 风的平滑（静帧直接落位） */
+  var kf = STILL?1:0.06;
+  windThS += (w.th - windThS)*kf;
+  windSpdS += (w.spd - windSpdS)*kf;
+  wind.th=windThS; wind.spd=windSpdS;
+  updateDial(wind, lp);
+
+  /* 印刷宣言显影 */
+  maniEls.forEach(function(el,i){
+    var on = lp>=1 && p>MANI_ON[i]-0.045;
+    el.classList.toggle('on', !!on);
+  });
+  moonEl.classList.toggle('on', p>0.52);
+  var heroEl=document.getElementById('hero'), cresEl=document.getElementById('cres');
+  if (heroEl) heroEl.classList.toggle('on', lp>0.13);
+  if (cresEl) cresEl.classList.toggle('on', lp>0.22);
+
+  /* 末句金 */
+  s4gold.style.opacity = String(lerp(0.55,1,smooth(0.84,0.93,p)));
+  /* 提示 */
+  hintEl.style.opacity = (scrollYRaw()>30 || p>0.02) ? '0' : '';
+
+  /* 旗幡摆动 = 风 */
+  var fl = Math.sin(t*1.7+wind.th*0.05)*4 + wind.spd*2.2;
+  if(flagA) flagA.style.transform='rotate('+(-fl*0.5)+'deg)';
+  if(flagB) flagB.style.transform='rotate('+(fl*0.4)+'deg)';
+  /* 云纹横漂 = 风（印刷层也听同一阵风） */
+  var drift = Math.cos(wind.th*Math.PI/180)*wind.spd;
+  cloudEls.forEach(function(el){
+    var f=parseFloat(el.getAttribute('data-cloud'))/220;
+    el.style.transform='translateX('+(drift*9*f).toFixed(1)+'px)';
+  });
+
+  /* 加载页 */
+  applyLoad(lp, t);
+
+  /* 风签位置（doc 锚点 → 屏幕）——先落位，线的锚点随后读取 */
+  TAGS.forEach(function(tag,i){
+    var k=kites[i];
+    if (!k) { tag.style.transform='translate(-300px,-300px)'; return; }
+    var tx=vw(k.def.dx) + (i===1?1:-1)*Math.min(150,VW*0.11);
+    var ty=docToScreen(k.def.dy) + vh(24);
+    tag.style.transform='translate('+tx.toFixed(0)+'px,'+ty.toFixed(0)+'px)';
+    tag.classList.toggle('up', lp>=0.9);
+  });
+
+  /* 纸鸢 */
+  var thR=wind.th*Math.PI/180;
+  var wvx=Math.cos(thR), wvy=Math.sin(thR);
+  var hovF = HOVERF;
+  kites.forEach(function(k){
+    var d=k.def;
+    var sx = vw(d.dx), sy = docToScreen(d.dy);
+    var sc = k.def.size;
+    /* 风 → 漂移 */
+    var wob=Math.sin(t*0.6+d.ph)*0.5+Math.sin(t*0.23+d.ph*2.1)*0.5;
+    var spdN=clamp(wind.spd/4,0,1);
+    var ox = wvx*wind.spd*15*(0.7+0.6*wob*0.5);
+    var oy = wvy*wind.spd*7 - wind.spd*9 + Math.sin(t*0.8+d.ph)*13*(0.4+spdN);
+    var fl2 = Math.sin(t*2.3+d.ph*3)*2.5*spdN;
+    /* hover */
+    var hovT = (hovF===d.id)?1:((hovF===0)?k.hoverT:k.hoverT);
+    var hov=k.hover;
+    k.hover += ((hovT)-k.hover)*(STILL?1:0.10);
+    hov=k.hover;
+    oy += hov*16;  /* 被注视 → 点头低一低 */
+    oy += (1-k.launchE)*vh(46);   /* 加载放飞：自画外下方升入 */
+    /* 尾段断线 */
+    var rel = smooth(0.868,0.965,p);
+    k.rel=rel;
+    var relx = rel*rel*(90+60*Math.sin(d.ph))* (wvx>=0?1:-0.4);
+    var rely = -rel*rel*330;
+    var fade = 1 - smooth(0.5,1,rel)*0.88;
+    /* 屏内钳制：风漂不把纸鸢推出画外 */
+    var hw = k.pp.w*sc*0.5/worldPerPx;
+    var kx = clamp(sx+ox+fl2+relx, hw+6, VW-hw-6);
+    k.mesh.position.set( px2w(kx), py2w(sy+oy+rely), 0 );
+    k.mesh.scale.setScalar(sc*(1-0.30*rel));
+    k.mesh.rotation.z = clamp(-Math.sin(thR)*wind.spd*0.05,-0.4,0.4) + Math.sin(t*0.7+d.ph)*0.05*(0.4+spdN);
+    k.mesh.rotation.y = k.mesh.rotation.z*0.55 + hov*-0.15;
+    k.mesh.rotation.x = Math.sin(t*0.5+d.ph*1.7)*0.045*(0.4+spdN) + hov*0.10;
+    k.mesh.material.uniforms.uNight.value = pal.nightK;
+    k.mesh.material.uniforms.uHover.value = hov*0.9;
+    k.mesh.material.uniforms.uFade.value = fade;
+
+    /* 衔点（bride 点）与尾根（局部锚点 × 尺寸，随姿态旋转） */
+    var m=new THREE.Matrix4().makeRotationFromEuler(k.mesh.rotation);
+    var v=new THREE.Vector3(0,k.byLocal*d.size,0.02).applyMatrix4(m).add(k.mesh.position);
+    var brid=project(v.x,v.y);
+    var v2=new THREE.Vector3(0,k.tyLocal*d.size,0).applyMatrix4(m).add(k.mesh.position);
+    var root=project(v2.x,v2.y);
+
+    /* 线：签 → 衔点（签已在本帧落位，rect 即时） */
+    if (k.def.tag){
+      var tagEl=document.getElementById(k.def.tag);
+      var r=tagEl.getBoundingClientRect();
+      var tx=r.left+r.width*0.5, ty=r.top+7;
+      var midx=(tx+brid.x)/2 + Math.sin(thR)*10;
+      var sag=(30-20*spdN)*(1-hov*0.5)*(1-rel);
+      var path='M '+tx.toFixed(1)+' '+ty.toFixed(1)
+        +' Q '+midx.toFixed(1)+' '+((ty+brid.y)/2+sag).toFixed(1)+' '+brid.x.toFixed(1)+' '+brid.y.toFixed(1);
+      var sp=strPaths[d.id-1];
+      if(sp){ sp.setAttribute('d',path); sp.style.strokeOpacity=String(0.5-0.14*pal.nightK); sp.style.opacity=String(1-rel); }
+    }
+
+    /* 尾练：链式跟随 */
+    var TN=k.tail.length, sway=(0.4+spdN);
+    for(var i=0;i<TN;i++){
+      var b=k.tail[i];
+      var tx2, ty2;
+      if (i===0){ tx2=root.x; ty2=root.y+4; }
+      else {
+        var prev=k.tail[i-1];
+        tx2=prev.x + wvx*wind.spd*4.4 + Math.sin(t*2.1+i*0.7+d.ph)*2.6*sway;
+        ty2=prev.y + 15.5 - wind.spd*2.2 + Math.cos(t*1.7+i*0.55)*1.8*sway;
+      }
+      if (STILL||RM){
+        /* 静态：沿固定弯曲摆放 */
+        var fr=i/(TN-1);
+        tx2=root.x + wvx*wind.spd*22*fr + Math.sin(fr*5+d.ph)*6;
+        ty2=root.y + 4 + fr*(140-40*spdN);
+      }
+      if(!b.init){ b.x=tx2; b.y=ty2; b.init=true; }
+      var f=STILL?1:0.30;
+      b.x+=(tx2-b.x)*f; b.y+=(ty2-b.y)*f;
+      var el=b.el, sc2=1-fr*0.55;
+      el.setAttribute('transform','translate('+b.x.toFixed(1)+','+b.y.toFixed(1)+') scale('+sc2.toFixed(2)+') rotate('+(Math.sin(t*1.3+i)*14*sway).toFixed(1)+')');
+      el.style.opacity=String((0.55-0.3*pal.nightK)*fade);
+    }
+
+    /* 夜灯 */
+    if (k.lant){
+      var lo=pal.nightK*(0.55+0.45*spdN)*(0.8+0.4*hov)*fade*(d.lantern||0.8);
+      k.lant.setAttribute('cx',brid.x.toFixed(1));
+      k.lant.setAttribute('cy',brid.y.toFixed(1));
+      k.lant.style.opacity=lo.toFixed(3);
+    }
+  });
+}
+function scrollYRaw(){ return window.pageYOffset||document.documentElement.scrollTop||0; }
+function vh(v){ return v/100*VH; }
+function vw(v){ return v/100*VW; }
+function px2w(px){ return (px-VW/2)*worldPerPx; }
+function py2w(py){ return (VH/2-py)*worldPerPx; }  /* 屏幕 y 向下，世界 y 向上 */
+
+/* ============ 加载时间线 ============ */
+var LOAD_STEPS=[
+  [0.00,0.14,'铺开天空'],[0.14,0.34,'印上月亮'],[0.34,0.52,'落云影'],
+  [0.52,0.66,'起风'],[0.66,1.00,'放鸢']
+];
+var loadDone=false;
+function applyLoad(lp,t){
+  ldBar.style.transform='scaleX('+lp.toFixed(3)+')';
+  ldPct.textContent=Math.round(lp*100)+'%';
+  for(var i=0;i<LOAD_STEPS.length;i++){
+    if(lp>=LOAD_STEPS[i][0]&&lp<LOAD_STEPS[i][1]){ ldStatus.textContent=LOAD_STEPS[i][2]; break; }
+    if(lp>=1) ldStatus.textContent='风起';
+  }
+  veilEl.style.opacity=String(clamp(0.94-smooth(0,0.78,lp)*0.94,0,0.94));
+  /* 放鸢：自画外下方入位（compose 内按 launchE 叠加位移） */
+  kites.forEach(function(k,i){
+    var k0=0.66+i*0.075, k1=k0+0.10;
+    k.launchE = smooth(k0,k1,lp);
+  });
+  if(lp>=1&&!loadDone){ finishLoad(); }
+}
+function finishLoad(){
+  loadDone=true;
+  loaderEl.classList.add('done');
+  document.body.classList.add('ldone');
+  veilEl.style.opacity='0';
+}
+
+/* ============ 交互 ============ */
+function stationY(i){ return vh(KITE_DEFS[i].dy) - vh(34); }
+function gotoKite(i){
+  window.scrollTo({ top: Math.max(0,stationY(i)), behavior: RM?'auto':'smooth' });
+}
+TAGS.forEach(function(tag,i){
+  tag.addEventListener('click',function(e){ e.preventDefault(); gotoKite(i); });
+  tag.addEventListener('focus',function(){ if(kites[i]) kites[i].hoverT=1; });
+  tag.addEventListener('blur',function(){ if(kites[i]) kites[i].hoverT=0; });
+});
+[].forEach.call(document.querySelectorAll('[data-goto]'),function(el){
+  if(el.classList.contains('tag')) return;
+  el.addEventListener('click',function(e){ e.preventDefault(); gotoKite(parseInt(el.getAttribute('data-goto'),10)-1); });
+});
+document.getElementById('backTop').addEventListener('click',function(e){
+  e.preventDefault(); window.scrollTo({top:0,behavior:RM?'auto':'smooth'});
+});
+window.addEventListener('pointermove',function(e){
+  pointer.x=(e.clientX/VW-0.5)*2; pointer.y=(e.clientY/VH-0.5)*2;
+  if(!loadDone){ return; }
+  var hov=0;
+  kites.forEach(function(k){
+    var sc=project(k.mesh.position.x,k.mesh.position.y);
+    var rr=vh(9)*(k.def.size/1.6);
+    if(Math.hypot(e.clientX-sc.x, e.clientY-sc.y)<rr && k.def.tag && k.rel<0.4) hov=k.def.id;
+  });
+  if(HOVERF) hov=HOVERF;
+  kites.forEach(function(k){ if(k.def.tag) k.hoverT = (k.def.id===hov)?1:0; });
+  document.body.classList.toggle('kite-hover', hov>0);
+},{passive:true});
+window.addEventListener('pointerdown',function(){ if(!loadDone && LOADP===null) loadP=1; },{passive:true});
+window.addEventListener('keydown',function(){ if(!loadDone && LOADP===null) loadP=1; });
+
+/* ============ 尺寸 ============ */
+function onResize(){
+  var w=window.innerWidth||1440, h=window.innerHeight||900;
+  if(w<100||h<100) return;
+  VW=w; VH=h;
+  if(renderer){
+    renderer.setSize(w,h);   /* 含 style 更新 */
+    camera.aspect=w/h;
+    camera.fov = (w/h<0.75)?56:42;
+    camera.updateProjectionMatrix();
+    worldPerPx = 2*CAMZ*Math.tan(camera.fov*Math.PI/360)/h;
+  }
+}
+window.addEventListener('resize',function(){ onResize(); if(STILL){ compose(curP(),loadP,12); if(renderer)renderer.render(scene,camera);} });
+window.__mockResize=onResize;
+
+/* ============ 主循环 ============ */
+var lastT=0, running=false, rafId=null, autoT0=performance.now();
+var loadP = LOADP!==null ? LOADP : 0;
+var pTarget=0;
+function curP(){
+  if (PIN!==null) return PIN;
+  if (AUTO){ return pTarget; }
+  var max=document.documentElement.scrollHeight-VH;
+  return max>0? clamp(scrollYRaw()/max,0,1) : 0;
+}
+function loop(now){
+  if(running) rafId=requestAnimationFrame(loop);
+  if(now-lastT<33) return;
+  var dt=Math.min(0.1,(now-lastT)/1000); lastT=now;
+  var t=now/1000;
+  if (LOADP!==null) loadP=LOADP;
+  else if(!loadDone){ loadP+=dt/(FAST?0.9:2.7); if(loadP>=1)loadP=1; }
+  if (PIN!==null){ pTarget=PIN; }
+  else if (AUTO){
+    var T=FAST?18:52;
+    var ph=((now-autoT0)/1000/T)%1;
+    pTarget=0.5-0.5*Math.cos(ph*Math.PI*2);
+    if(loadDone) window.scrollTo(0,pTarget*(document.documentElement.scrollHeight-VH));
+  }
+  pointerS.x+=(pointer.x-pointerS.x)*0.06;
+  pointerS.y+=(pointer.y-pointerS.y)*0.06;
+  if(camera){
+    camera.position.x=pointerS.x*0.4;
+    camera.position.y=-pointerS.y*0.3;
+    camera.lookAt(0,0,0);
+  }
+  compose(curP(), loadP, RM?12.3:t);
+  if(renderer) renderer.render(scene,camera);
+}
+function renderOnce(){
+  if(!renderer||!scene) return;
+  compose(curP(),loadP,12.3);
+  renderer.render(scene,camera);
+}
+
+document.addEventListener('visibilitychange',function(){
+  if(document.hidden){ running=false; if(rafId!==null)cancelAnimationFrame(rafId); rafId=null; }
+  else startLoop();
+});
+function startLoop(){
+  if(running||STILL) return;
+  running=true; lastT=performance.now()-40;
+  rafId=requestAnimationFrame(loop);
+  if(AUTO&&!startLoop.__auto){
+    startLoop.__auto=true;
+    setInterval(function(){ if(!document.hidden) loop(performance.now()); },33);
+  }
+}
+
+/* ============ 启动 ============ */
+if (!window.THREE || NOWEBGL){
+  document.body.classList.add('no-webgl');
+  canvas.style.display='none';
+  linesSVG.style.display='none';
+  finishLoad();
+  loadP=1; loadDone=true;
+  if (STILL){ compose(PIN!==null?PIN:0, 1, 12.3); }
+  startLoop();          /* 平面稿也走 compose（宣言显影/罗盘/云漂） */
+} else {
+  renderer=new THREE.WebGLRenderer({canvas:canvas,alpha:true,antialias:true});
+  renderer.setClearColor(0x000000,0);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.5));
+  scene=new THREE.Scene();
+  camera=new THREE.PerspectiveCamera(42,VW/VH,0.1,60);
+  camera.position.set(0,0,CAMZ);
+  buildKites();
+  onResize();
+  if(RM) document.body.classList.add('rm');
+  if(STILL) document.body.classList.add('still');
+  var initP=PIN!==null?PIN:0;
+  var initLoad=LOADP!==null?LOADP:((STILL||PIN!==null||RM)?1:0);
+  loadP=initLoad;
+  if (STILL){
+    if (initLoad>=1){ loadDone=true; finishLoad(); }
+    compose(initP,loadP,12.3);
+    renderer.render(scene,camera);
+    window.__renderOnce=function(p,lp){
+      loadP=(lp!==undefined)?lp:1;
+      compose(p!==undefined?p:initP,loadP,12.3);
+      renderer.render(scene,camera);
+      return canvas.toDataURL('image/png');
+    };
+  } else {
+    startLoop();
+  }
+}
+/* STILL 下加载页完成态（仅在未锁加载进度时） */
+if (STILL && renderer && LOADP===null){ loadDone=true; finishLoad(); }
+
+/* ============ 无头验证 ============ */
+window.__mockSnap=function(pOverride,lpOverride){
+  if(window.innerWidth<50||window.innerHeight<50) onResize();
+  var p=(pOverride!==undefined)?pOverride:curP();
+  loadP=(lpOverride!==undefined)?lpOverride:1;
+  if(loadP>=1) finishLoad();
+  compose(p,loadP,12.3);
+  if(renderer) renderer.render(scene,camera);
+  return renderer?canvas.toDataURL('image/png'):'';
+};
+window.__pk={ kites:kites, wind:wind, compose:compose, scrollY:scrollYRaw };
+
+/* 无头诊断：错误外显到 html 属性，--dump-dom 可 grep */
+setTimeout(function(){
+  var vEl=document.createElement('div');
+  vEl.style.cssText='position:fixed;left:4px;bottom:2px;z-index:99;font:9px monospace;color:#888;opacity:.75';
+  vEl.textContent='build 20260920-F';
+  document.body.appendChild(vEl);
+  if (window.__swarmErr && __swarmErr.length){
+    document.documentElement.setAttribute('data-err', String(__swarmErr.join(' | ')).slice(0,400));
+  }
+  document.documentElement.setAttribute('data-ok','1');
+  document.documentElement.setAttribute('data-env', VW+'x'+VH+' wpp:'+worldPerPx.toFixed(5)+' fov:'+(camera?camera.fov:'-'));
+  document.documentElement.setAttribute('data-state','p:'+curP().toFixed(3)+' lp:'+loadP.toFixed(3)+' done:'+loadDone);
+  try{
+    if (kites[0] && kites[0].mesh){
+      var gpos=kites[0].mesh.geometry.attributes.position;
+      var buv=kites[0].mesh.geometry.attributes.uv;
+      var bx=[1e9,-1e9,1e9,-1e9,1e9,-1e9,1e9,-1e9];
+      for (var gi=0;gi<gpos.count;gi++){
+        bx[0]=Math.min(bx[0],gpos.getX(gi)); bx[1]=Math.max(bx[1],gpos.getX(gi));
+        bx[2]=Math.min(bx[2],gpos.getY(gi)); bx[3]=Math.max(bx[3],gpos.getY(gi));
+        bx[4]=Math.min(bx[4],buv.getX(gi)); bx[5]=Math.max(bx[5],buv.getX(gi));
+        bx[6]=Math.min(bx[6],buv.getY(gi)); bx[7]=Math.max(bx[7],buv.getY(gi));
+      }
+      document.documentElement.setAttribute('data-bbox', bx.map(function(v){return v.toFixed(3)}).join(',')+' np:'+gpos.count+' w:'+kites[0].pp.w);
+    }
+    document.documentElement.setAttribute('data-dbg', JSON.stringify({
+      VW:VW, VH:VH, wpp:worldPerPx, sx:vw(68), th:wind.th, spd:wind.spd,
+      px:kites[0].mesh.position.x, py:kites[0].mesh.position.y, launch:kites[0].launchE
+    }));
+    kites.forEach(function(k,i){
+      var v=k.mesh.position;
+      document.documentElement.setAttribute('data-k'+(i+1),
+        (v.x/worldPerPx+VW/2).toFixed(0)+','+(VH/2-v.y/worldPerPx).toFixed(0)+',rel:'+k.rel.toFixed(2));
+    });
+    var t1=document.getElementById('tag1').getBoundingClientRect();
+    document.documentElement.setAttribute('data-tag1', (t1.left+t1.width/2).toFixed(0)+','+t1.top.toFixed(0));
+    try{
+      var s2=document.getElementById('s2');
+      var cs=getComputedStyle(s2), r2=s2.getBoundingClientRect();
+      document.documentElement.setAttribute('data-s2', 'l:'+cs.left+' r:'+cs.right+' mw:'+cs.maxWidth+' rect:'+r2.left.toFixed(0)+','+r2.right.toFixed(0));
+    }catch(e){}
+  }catch(e){}
+},900);
+
+})();
+</script>
+</body>
+</html>

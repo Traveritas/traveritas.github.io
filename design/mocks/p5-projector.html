@@ -1,0 +1,1189 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>幻灯 · 醒梦 —— 主页探索稿 U（projector）</title>
+<meta name="description" content="主页探索稿 U：网站本身是一面印好平面设计的墙，一台黄铜幻灯机把梦放映在墙上。宣言四句是四格胶片，站内三入口是三枚玻璃幻灯片。光越亮，放映越淡，字越清楚。">
+<link rel="preconnect" href="https://fastly.jsdelivr.net" crossorigin>
+<link rel="stylesheet" href="https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5.0.5/500.css">
+<link rel="stylesheet" href="https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5.0.5/600.css">
+<style>
+/* ================= 基底：暮色放映室 ================= */
+:root{
+  --serif:'Noto Serif SC','Songti SC','SimSun',serif;
+  --gold:#C9A05C; --gold-hi:#E8CC96; --ink:#5B4C44;
+  --paper:#F2E6D9; --rose:#C79BA0;
+  --veil:#171015;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scrollbar-width:none}
+html::-webkit-scrollbar{display:none}
+body{
+  font-family:var(--serif);
+  background:#171015;
+  color:var(--ink);
+  overflow-x:hidden;
+  -webkit-font-smoothing:antialiased;
+  color-scheme:dark;
+}
+#space{height:520vh}
+#stage{position:fixed;inset:0;overflow:hidden}
+canvas{display:block;position:absolute;inset:0}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* ================= 加载页：点灯 ================= */
+#veil{
+  position:absolute;inset:0;background:var(--veil);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3.2vh;
+  z-index:40;cursor:pointer;user-select:none;
+}
+#veil .t{
+  writing-mode:vertical-rl;letter-spacing:.9em;font-weight:600;
+  font-size:clamp(30px,4.6vh,44px);color:#E8D5BE;text-indent:.9em;
+  text-shadow:0 0 22px rgba(232,203,150,.25);
+}
+#veil .s{font-size:13px;letter-spacing:.42em;color:rgba(232,213,190,.55);text-indent:.42em}
+#veil .fil{width:120px;height:1px;background:rgba(201,160,92,.22);position:relative;overflow:hidden}
+#veil .fil i{position:absolute;inset:0;transform-origin:left;background:linear-gradient(90deg,rgba(201,160,92,.1),var(--gold));transform:scaleX(var(--p,0))}
+#veil .hint{position:absolute;bottom:7vh;font-size:12px;letter-spacing:.5em;color:rgba(232,213,190,.42);text-indent:.5em;animation:br 2.8s ease-in-out infinite}
+@keyframes br{0%,100%{opacity:.42}50%{opacity:.85}}
+#veil.gone{display:none}
+
+/* ================= HUD（装饰性平面 UI） ================= */
+#hud{position:absolute;inset:0;pointer-events:none;z-index:20;opacity:0;transition:opacity .9s ease}
+#hud.on{opacity:1}
+body.still #hud,body.rm #hud{transition:none}
+#counter{
+  position:absolute;top:3.4vh;left:50%;transform:translateX(-50%);
+  display:flex;flex-direction:column;align-items:center;gap:7px;
+  color:rgba(238,222,200,.62);font-size:12px;letter-spacing:.34em;text-indent:.34em;
+}
+#counter .dots{display:flex;gap:9px}
+#counter .dot{width:5px;height:5px;border-radius:50%;border:1px solid rgba(201,160,92,.5);transition:background .4s,box-shadow .4s}
+#counter .dot.act{background:var(--gold-hi);border-color:var(--gold-hi);box-shadow:0 0 9px rgba(232,204,150,.8)}
+body.still #counter .dot,body.rm #counter .dot{transition:none}
+#hint{
+  position:absolute;bottom:3.6vh;left:50%;transform:translateX(-50%);
+  font-size:12px;letter-spacing:.46em;text-indent:.46em;color:rgba(238,222,200,.5);
+  animation:br 3.4s ease-in-out infinite;
+}
+#note{
+  position:absolute;right:3vw;bottom:3.4vh;font-size:12px;letter-spacing:.2em;
+  color:rgba(232,204,150,.78);opacity:0;transition:opacity .5s;max-width:34vw;text-align:right;
+}
+#note.on{opacity:1}
+body.still #note,body.rm #note{transition:none}
+#replay{
+  position:absolute;left:3vw;bottom:3.2vh;pointer-events:auto;cursor:pointer;
+  font-size:12px;letter-spacing:.3em;color:rgba(201,160,92,.85);text-decoration:none;
+  border-bottom:1px solid rgba(201,160,92,.4);padding-bottom:3px;opacity:0;visibility:hidden;transition:opacity .6s;
+}
+#replay.on{opacity:1;visibility:visible}
+body.still #replay,body.rm #replay{transition:none}
+#replay:hover{color:var(--gold-hi)}
+#endline{
+  position:absolute;left:50%;top:55%;transform:translate(-50%,-50%);text-align:center;
+  opacity:0;z-index:18;pointer-events:none;width:90vw;
+}
+#endline .m{
+  font-weight:600;font-size:clamp(20px,3.2vh,30px);letter-spacing:.24em;text-indent:.24em;
+  color:var(--gold);text-shadow:0 0 26px rgba(201,160,92,.28);
+}
+#endline .s{margin-top:1.6vh;font-size:12px;letter-spacing:.4em;text-indent:.4em;color:rgba(201,160,92,.55)}
+
+/* ================= 入口：三枚玻璃幻灯片（浮窗卡） ================= */
+#rack{position:fixed;right:3.2vw;bottom:9vh;display:flex;flex-direction:column;gap:2.6vh;z-index:30}
+.slide-card{
+  display:block;width:158px;text-decoration:none;
+  border-radius:11px;padding:9px 9px 8px;
+  background:linear-gradient(160deg,#774f38 0%,#593c2b 58%,#4a3123 100%);
+  box-shadow:0 14px 34px rgba(8,4,6,.5),0 2px 6px rgba(8,4,6,.4),inset 0 1px 0 rgba(255,226,190,.16);
+  border:1px solid rgba(255,224,185,.14);
+  transform:translate3d(var(--px,0),var(--py,0),0) rotate(var(--rot,0deg));
+  opacity:0;
+  transition:box-shadow .35s ease,filter .35s ease;
+  pointer-events:none;
+}
+/* 入场用一次性 animation（避免 transition 与逐帧 --px/--py 视差打架） */
+#rack.on .slide-card{opacity:1;pointer-events:auto;animation:cardin .8s cubic-bezier(.2,.7,.2,1) backwards}
+#rack.on .slide-card:nth-child(2){animation-delay:.12s}
+#rack.on .slide-card:nth-child(3){animation-delay:.24s}
+@keyframes cardin{from{opacity:0;transform:translate3d(var(--px,0),calc(var(--py,0) + 26px),0) rotate(var(--rot,0deg))}}
+body.still #rack.on .slide-card,body.rm #rack.on .slide-card{animation:none}
+.slide-card .win{
+  position:relative;aspect-ratio:4/3;border-radius:5px;overflow:hidden;
+  background:rgba(248,240,228,.26);
+  -webkit-backdrop-filter:blur(9px) saturate(1.15);backdrop-filter:blur(9px) saturate(1.15);
+  border:1px solid rgba(255,240,218,.3);
+  box-shadow:inset 0 0 18px rgba(255,226,180,.1);
+  display:flex;align-items:center;justify-content:center;
+  transition:background .35s,box-shadow .35s;
+}
+.slide-card .win::after{ /* 玻璃斜光 */
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(115deg,transparent 30%,rgba(255,244,224,.14) 42%,transparent 55%);
+  pointer-events:none;
+}
+.slide-card svg{width:44%;height:44%;opacity:.92;filter:drop-shadow(0 0 6px rgba(255,232,190,.35))}
+.slide-card .cap{
+  display:flex;align-items:baseline;justify-content:space-between;
+  padding:7px 3px 1px;color:#F3E4CE;
+}
+.slide-card .cap b{font-weight:600;font-size:15px;letter-spacing:.28em}
+.slide-card .cap i{font-style:normal;font-size:10.5px;letter-spacing:.18em;color:rgba(243,228,206,.6)}
+.slide-card:hover,.slide-card:focus-visible{
+  filter:brightness(1.12);
+  box-shadow:0 22px 44px rgba(8,4,6,.55),0 0 0 1px rgba(232,204,150,.35),0 0 24px rgba(232,204,150,.12);
+  outline:none;
+}
+.slide-card:hover .win,.slide-card:focus-visible .win{
+  background:rgba(250,243,231,.38);
+  box-shadow:inset 0 0 22px rgba(255,230,180,.22),0 0 14px rgba(255,228,180,.18);
+}
+.slide-card:focus-visible{transform:translate3d(var(--px,0),calc(var(--py,0) - 6px),0) rotate(var(--rot,0deg))!important}
+
+/* ================= 纯平面回退（WebGL 失败） ================= */
+#flat{display:none;position:fixed;inset:0;background:
+  radial-gradient(120% 90% at 72% 30%,#241a20 0%,#170f14 62%,#100a0e 100%);
+  z-index:5;align-items:center;justify-content:center}
+body.flat #flat{display:flex}
+body.flat #stage,body.flat #veil{display:none}
+#flat .wall{
+  position:relative;width:min(88vw,1060px);aspect-ratio:15/8.4;border:2px solid rgba(148,124,108,.5);
+  outline:1px solid rgba(148,124,108,.25);outline-offset:7px;
+  background:linear-gradient(180deg,#4a3b39 0%,#413335 100%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2.6vh;
+  padding:6vh 4vw;
+}
+#flat .wall::before{content:'醒梦 · 放映室';position:absolute;top:3.4vh;left:4vw;font-size:14px;letter-spacing:.34em;color:rgba(238,222,200,.55)}
+#flat .wall::after{content:'光越亮，放映越淡，字越清楚。';position:absolute;bottom:3.4vh;right:4vw;font-size:11px;letter-spacing:.3em;color:rgba(238,222,200,.35)}
+#flat .l{font-weight:600;color:#F0DEC2;font-size:clamp(19px,3.4vw,32px);letter-spacing:.22em;text-indent:.22em;text-shadow:0 0 22px rgba(255,224,170,.25)}
+#flat .l.g{color:var(--gold)}
+
+/* ================= 移动端 ================= */
+@media (max-width:640px){
+  #space{height:460vh}
+  #counter{left:4vw;right:auto;top:2.6vh;transform:none;align-items:flex-start}
+  #hint{bottom:18vh}
+  #rack{right:auto;left:50%;bottom:3.2vh;transform:translateX(-50%);width:max-content;justify-content:center;align-items:flex-end;flex-direction:row;gap:8px}
+  .slide-card{width:26vw;max-width:106px;padding:6px 6px 5px}
+  .slide-card .cap b{font-size:12px;letter-spacing:.14em}
+  .slide-card .cap i{display:none}
+  .slide-card svg{width:38%;height:38%}
+  #note{right:auto;left:4vw;bottom:16vh;max-width:60vw;text-align:left}
+  #replay{bottom:15vh}
+  #endline{top:48%}
+}
+</style>
+</head>
+<body>
+<h1 class="sr-only">这里不是梦，也不是现实。它是人在即将醒来时，看见的最后一层世界。它可能马上消失。</h1>
+<div id="space"></div>
+
+<div id="stage">
+  <canvas id="gl" aria-hidden="true"></canvas>
+
+  <div id="endline" aria-hidden="true">
+    <div class="m">它可能马上消失。</div>
+    <div class="s">放映结束 · 入口仍在晨光里</div>
+  </div>
+
+  <div id="hud">
+    <div id="counter">
+      <span id="ctext">放映 · 第一格</span>
+      <span class="dots"><span class="dot act"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span></span>
+    </div>
+    <div id="hint">滚动 · 放映继续</div>
+    <div id="note" role="status"></div>
+    <a id="replay" href="#top">↺ 重放</a>
+  </div>
+
+  <div id="veil">
+    <div class="t">幻灯</div>
+    <div class="s">昨夜之梦 · 放映于此</div>
+    <div class="fil"><i></i></div>
+    <div class="hint">轻触任意处 · 点亮</div>
+  </div>
+</div>
+
+<nav id="rack" aria-label="站内入口">
+  <a class="slide-card" style="--rot:-2.2deg" href="#essay" data-key="essay" data-frame="4" aria-label="进入 随笔，共三篇">
+    <span class="win">
+      <svg viewBox="0 0 100 100" fill="none" stroke="rgba(255,242,224,.95)" stroke-width="3.4" stroke-linecap="round" aria-hidden="true">
+        <g>
+          <path d="M50 52 C45 33 46.5 18 50 9 C53.5 18 55 33 50 52 Z"/>
+          <path d="M50 52 C45 33 46.5 18 50 9 C53.5 18 55 33 50 52 Z" transform="rotate(72 50 50)"/>
+          <path d="M50 52 C45 33 46.5 18 50 9 C53.5 18 55 33 50 52 Z" transform="rotate(144 50 50)"/>
+          <path d="M50 52 C45 33 46.5 18 50 9 C53.5 18 55 33 50 52 Z" transform="rotate(216 50 50)"/>
+          <path d="M50 52 C45 33 46.5 18 50 9 C53.5 18 55 33 50 52 Z" transform="rotate(288 50 50)"/>
+        </g>
+        <circle cx="50" cy="50" r="4.5"/>
+      </svg>
+    </span>
+    <span class="cap"><b>随笔</b><i>三篇</i></span>
+  </a>
+  <a class="slide-card" style="--rot:1.4deg" href="#projects" data-key="projects" data-frame="5" aria-label="进入 项目，共两件">
+    <span class="win">
+      <svg viewBox="0 0 100 100" fill="none" stroke="rgba(255,242,224,.95)" stroke-width="3.4" stroke-linecap="round" aria-hidden="true">
+        <circle cx="50" cy="50" r="31"/>
+        <circle cx="50" cy="50" r="17" stroke-dasharray="4 7"/>
+        <circle cx="81" cy="50" r="4.6" fill="rgba(255,242,224,.95)" stroke="none"/>
+      </svg>
+    </span>
+    <span class="cap"><b>项目</b><i>二件</i></span>
+  </a>
+  <a class="slide-card" style="--rot:4.2deg" href="#about" data-key="about" data-frame="6" aria-label="进入 关于，一页">
+    <span class="win">
+      <svg viewBox="0 0 100 100" fill="none" stroke="rgba(255,242,224,.95)" stroke-width="3.4" stroke-linecap="round" aria-hidden="true">
+        <path d="M27 82 V22 H73 V82"/>
+        <rect x="36" y="32" width="28" height="42"/>
+        <circle cx="50" cy="12" r="3.4"/>
+      </svg>
+    </span>
+    <span class="cap"><b>关于</b><i>一页</i></span>
+  </a>
+</nav>
+
+<div id="flat" aria-hidden="true">
+  <div class="wall">
+    <div class="l">这里不是梦，</div>
+    <div class="l">也不是现实。</div>
+    <div class="l">它是人在即将醒来时，看见的最后一层世界。</div>
+    <div class="l g">它可能马上消失。</div>
+  </div>
+</div>
+
+<script src="vendor/three.min.js"></script>
+<script src="vendor/anime.min.js"></script>
+<script>
+'use strict';
+/* =============================================================
+   幻灯（projector）—— 主页探索稿 U
+   网站=一面印好平面设计的墙；唯一 3D artifact=黄铜幻灯机；
+   光锥+尘埃=唯一体积；入口=三枚玻璃幻灯片浮窗卡。
+   局部规则：放映的内容只活在光里（投影是加色，晨光把它洗没），
+            墨印的内容只活在亮里（光越亮，墙上的印刷越清楚）。
+   ============================================================= */
+(function(){
+var W=innerWidth,H=innerHeight;
+var q={};(function(s){s.replace(/[?&]([^=&]+)(?:=([^&]*))?/g,function(m,k,v){q[k]=v===undefined?'':v;});})(location.search);
+var IS_STILL = q.still==='1';
+var PIN = q.pin!==undefined ? Math.max(0,Math.min(1,parseFloat(q.pin)||0)) : null;
+var AUTO = q.auto!==undefined;
+var FAST = q.fast!==undefined;
+var FORCE_RM = q.rm!==undefined;
+var INTRO_LOCK = q.intro!==undefined ? Math.max(0,Math.min(1,parseFloat(q.intro)||0)) : null;
+var CARD_LOCK = q.card!==undefined ? Math.max(0,Math.min(2,parseInt(q.card,10)||0)) : null;
+var FAILGL = q.failgl==='1';
+var CACHE = q.v||'';
+
+/* ---------- 错误钩子 ---------- */
+window.__swarmErr=null;
+function errHook(e){ window.__swarmErr=String(e&&e.message||e); try{console.error(e);}catch(_){} }
+window.addEventListener('error',function(ev){errHook(ev.error||ev.message);});
+(function(){var oe=console.error;console.error=function(){try{window.__swarmErr=Array.prototype.map.call(arguments,String).join(' ');}catch(_){} oe.apply(console,arguments);};})();
+
+var RM = FORCE_RM || (window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches);
+if(RM) document.body.classList.add('rm');
+if(IS_STILL) document.body.classList.add('still');
+history.scrollRestoration='manual'; scrollTo(0,0);
+
+/* ---------- 调色 ---------- */
+var C={
+  bgNight:0x161015, bgDawn:0xEFDBC9,
+  wallDim:0x6d5a53, wallLit:0xffffff,
+  floorDim:0x211920, floorLit:0xE9D5C2,
+  beam:0xFFDCAC, beamRose:0xF6C4B4,
+  halo:0xFFD9A4, dawnPatch:0xFFE3CD,
+  brass:0x8a6a3e, brassHi:0xC7A468, enamel:0x2e3a3d,
+  glass:0xF2ECE2, ember:0xFFB367
+};
+var NIGHT_INK=[0.36,0.30,0.27]; // 暗态下墙纸的乘色
+
+/* ---------- 画布纹理绘制 ---------- */
+function mkCanvas(w,h){var c=document.createElement('canvas');c.width=w;c.height=h;return c;}
+function font(w,s){return w+' '+s+'px "Noto Serif SC","Songti SC","SimSun",serif';}
+var painters=[]; // 字体就绪后重绘
+
+// —— 墙纸（晨光亮度绘制；暗态靠材质乘色变暗）——
+var wallCv=mkCanvas(2048,1152), wallTex=null;
+painters.push(function paintWall(){
+  var c=wallCv.getContext('2d'),Wc=2048,Hc=1152;
+  c.clearRect(0,0,Wc,Hc);
+  var g=c.createLinearGradient(0,0,0,Hc);
+  g.addColorStop(0,'#F5EADB');g.addColorStop(.62,'#F1E3D2');g.addColorStop(1,'#E9D6C4');
+  c.fillStyle=g;c.fillRect(0,0,Wc,Hc);
+  // 纸纹
+  for(var i=0;i<2600;i++){c.fillStyle='rgba(120,96,80,'+(Math.random()*0.045)+')';c.fillRect(Math.random()*Wc,Math.random()*Hc,1.4,1.4);}
+  // 巨字水印「梦」（在放映区左侧，光下透出）
+  c.save();c.translate(360,560);
+  c.font=font(600,560);c.textAlign='center';c.textBaseline='middle';
+  c.strokeStyle='rgba(107,90,80,.10)';c.lineWidth=3;c.strokeText('梦',0,0);
+  c.restore();
+  // 双线印框
+  c.strokeStyle='rgba(91,76,68,.6)';c.lineWidth=3;c.strokeRect(30,30,Wc-60,Hc-60);
+  c.strokeStyle='rgba(91,76,68,.28)';c.lineWidth=1.4;c.strokeRect(48,48,Wc-96,Hc-96);
+  // 角饰
+  function fleuron(x,y,sx,sy){
+    c.save();c.translate(x,y);c.scale(sx,sy);
+    c.strokeStyle='rgba(122,98,84,.55)';c.lineWidth=2.2;
+    c.beginPath();c.arc(46,46,13,0,Math.PI*2);c.stroke();
+    c.beginPath();c.arc(46,46,4,0,Math.PI*2);c.fillStyle='rgba(122,98,84,.55)';c.fill();
+    c.beginPath();c.moveTo(30,46);c.lineTo(8,46);c.moveTo(46,30);c.lineTo(46,8);c.stroke();
+    c.restore();
+  }
+  fleuron(70,70,1,1);fleuron(Wc-70,70,-1,1);fleuron(70,Hc-70,1,-1);fleuron(Wc-70,Hc-70,-1,-1);
+  // 套准十字
+  c.strokeStyle='rgba(91,76,68,.3)';c.lineWidth=1.4;
+  [[176,576],[1024,86],[1024,1066]].forEach(function(p){
+    c.beginPath();c.moveTo(p[0]-12,p[1]);c.lineTo(p[0]+12,p[1]);c.moveTo(p[0],p[1]-12);c.lineTo(p[0],p[1]+12);c.stroke();
+  });
+  // 左上字标（避开花饰角）
+  c.fillStyle='rgba(87,74,66,.9)';c.font=font(600,52);c.textAlign='left';c.textBaseline='alphabetic';
+  c.fillText('醒梦',128,172);
+  c.fillStyle='rgba(87,74,66,.55)';c.font=font(500,24);
+  c.fillText('个人网站 · 放映室',130,212);
+  // 右上竖排注记
+  c.save();c.fillStyle='rgba(87,74,66,.6)';c.font=font(500,27);
+  var vt='昨夜之梦放映于此';for(var k=0;k<vt.length;k++){c.fillText(vt[k],Wc-120,110+k*38);}
+  c.restore();
+  // 右侧竖排·局部规则
+  c.save();c.fillStyle='rgba(160,116,96,.72)';c.font=font(500,26);
+  var vr='光越亮放映越淡字越清楚';for(var k2=0;k2<vr.length;k2++){c.fillText(vr[k2],Wc-206,420+k2*38);}
+  c.strokeStyle='rgba(160,116,96,.4)';c.lineWidth=1;
+  c.beginPath();c.moveTo(Wc-232,400);c.lineTo(Wc-232,420+vr.length*38-10);c.stroke();
+  c.restore();
+  // 左下账目线
+  c.strokeStyle='rgba(91,76,68,.20)';c.lineWidth=1.2;
+  for(var r=0;r<6;r++){var y=700+r*44,x0=120+(r%3)*26;
+    c.beginPath();c.moveTo(x0,y);c.lineTo(x0+300-(r%4)*38,y);c.stroke();
+    c.fillStyle='rgba(91,76,68,.34)';c.font=font(500,17);
+    c.fillText(['一','二','三','四','五','六'][r],x0-34,y+6);
+  }
+  // 底部胶片齿孔行
+  var sy=Hc-92;
+  c.strokeStyle='rgba(91,76,68,.34)';c.lineWidth=1.6;
+  for(var s=0;s<40;s++){var sx=64+s*48.6;c.strokeRect(sx,sy,20,15);}
+  c.fillStyle='rgba(91,76,68,.5)';c.font=font(500,22);
+  var lab=['其一','其二','其三','其四'];
+  for(var f=0;f<4;f++){c.fillText(lab[f],330+f*420,sy-16);}
+  // 朱印
+  c.save();c.translate(Wc-268,Hc-170);c.rotate(0.05);
+  c.fillStyle='rgba(166,73,61,.82)';c.fillRect(-34,-34,68,68);
+  c.fillStyle='rgba(248,236,220,.94)';c.font=font(600,30);c.textAlign='center';c.textBaseline='middle';
+  c.fillText('醒',0,-16);c.fillText('梦',0,18);
+  c.restore();
+  if(wallTex)wallTex.needsUpdate=true;
+});
+
+// —— 胶片格（放映内容：暖光字，透明底，加色投到墙上）——
+var FW=960,FH=600;
+function frameCanvas(){return mkCanvas(FW,FH);}
+function paintFrameBase(c){
+  c.clearRect(0,0,FW,FH);
+  c.strokeStyle='rgba(255,238,212,.4)';c.lineWidth=2;
+  var r=18;
+  c.beginPath();
+  c.moveTo(26+r,20);c.lineTo(FW-26-r,20);c.arcTo(FW-26,20,FW-26,20+r,r);
+  c.lineTo(FW-26,FH-20-r);c.arcTo(FW-26,FH-20,FW-26-r,FH-20,r);
+  c.lineTo(26+r,FH-20);c.arcTo(26,FH-20,26,FH-20-r,r);
+  c.lineTo(26,20+r);c.arcTo(26,20,26+r,20,r);
+  c.stroke();
+  // 角标
+  c.strokeStyle='rgba(255,238,212,.55)';c.lineWidth=3;
+  [[38,38,1,1],[FW-38,38,-1,1],[38,FH-38,1,-1],[FW-38,FH-38,-1,-1]].forEach(function(p){
+    c.beginPath();c.moveTo(p[0]+16*p[2],p[1]);c.lineTo(p[0],p[1]);c.lineTo(p[0],p[1]+16*p[3]);c.stroke();
+  });
+}
+function declText(c,lines,y0,size,lh){
+  c.fillStyle='#FFF2DC';c.font=font(600,size);c.textAlign='center';c.textBaseline='middle';
+  c.shadowColor='rgba(255,214,150,.5)';c.shadowBlur=26;
+  for(var i=0;i<lines.length;i++)c.fillText(lines[i],FW/2,y0+i*lh);
+  c.shadowBlur=0;
+}
+function frameNo(c,no){
+  c.fillStyle='rgba(255,238,212,.5)';c.font=font(500,26);c.textAlign='right';
+  c.fillText(no,FW-58,FH-52);
+}
+var frameCvs=[]; // 0..3 宣言格，4..6 入口预览格
+(function(){
+  var defs=[
+    {lines:['这里不是梦，'],y:300,size:118,no:'其一'},
+    {lines:['也不是现实。'],y:300,size:118,no:'其二'},
+    {lines:['它是人在即将醒来时，','看见的最后一层世界。'],y:238,size:82,no:'其三'},
+    {lines:['它可能马上消失。'],y:292,size:90,no:'其四'}
+  ];
+  defs.forEach(function(d){
+    var cv=frameCanvas(),c=cv.getContext('2d');
+    painters.push(function(){
+      paintFrameBase(c);declText(c,d.lines,d.y,d.size,d.size*1.34);frameNo(c,d.no);
+      if(frameCvs[0])frameCvs.forEach(function(f){f.needsUpdate=true;});
+    });
+    painters[painters.length-1]();
+    frameCvs.push(cv);
+  });
+  // 入口预览格（大画格+标签）
+  var ent=[
+    {key:'essay',label:'随笔 · 三篇'},
+    {key:'projects',label:'项目 · 二件'},
+    {key:'about',label:'关于 · 一页'}
+  ];
+  ent.forEach(function(e){
+    var cv=frameCanvas(),c=cv.getContext('2d');
+    painters.push(function(){
+      paintFrameBase(c);
+      c.save();c.translate(FW/2,252);c.scale(2.2,2.2);
+      c.strokeStyle='rgba(255,240,216,.92)';c.lineWidth=3.1;c.lineCap='round';c.fillStyle='rgba(255,240,216,.92)';
+      drawGlyph(c,e.key);
+      c.restore();
+      c.shadowColor='rgba(255,214,150,.5)';c.shadowBlur=22;
+      c.fillStyle='#FFF2DC';c.font=font(600,58);c.textAlign='center';
+      c.fillText(e.label,FW/2,FH-96);
+      c.shadowBlur=0;
+      if(frameCvs[0])frameCvs.forEach(function(f){f.needsUpdate=true;});
+    });
+    painters[painters.length-1]();
+    frameCvs.push(cv);
+  });
+})();
+function drawGlyph(c,key){
+  c.beginPath();
+  if(key==='essay'){
+    for(var i=0;i<5;i++){
+      c.save();c.rotate(i*Math.PI*2/5);
+      c.moveTo(0,2);c.bezierCurveTo(-5,-16,-3.5,-30,0,-40);c.bezierCurveTo(3.5,-30,5,-16,0,2);
+      c.stroke();c.restore();
+    }
+    c.beginPath();c.arc(0,0,4.5,0,Math.PI*2);c.fill();
+  }else if(key==='projects'){
+    c.arc(0,0,30,0,Math.PI*2);c.stroke();
+    c.setLineDash([4,7]);c.beginPath();c.arc(0,0,16,0,Math.PI*2);c.stroke();c.setLineDash([]);
+    c.beginPath();c.arc(29,0,4.6,0,Math.PI*2);c.fill();
+  }else{
+    c.moveTo(-24,34);c.lineTo(-24,-30);c.lineTo(24,-30);c.lineTo(24,34);c.stroke();
+    c.strokeRect(-13,-20,26,42);
+    c.beginPath();c.moveTo(-24,-30);c.lineTo(-35,-37);c.moveTo(24,-30);c.lineTo(35,-37);c.stroke();
+    c.beginPath();c.arc(0,-39,3.2,0,Math.PI*2);c.fill();
+  }
+}
+
+// —— 柔光点（尘埃）——
+var dustCv=mkCanvas(64,64);
+(function(){var c=dustCv.getContext('2d');
+  var g=c.createRadialGradient(32,32,0,32,32,30);
+  g.addColorStop(0,'rgba(255,236,200,1)');g.addColorStop(.4,'rgba(255,228,180,.5)');g.addColorStop(1,'rgba(255,228,180,0)');
+  c.fillStyle=g;c.fillRect(0,0,64,64);
+})();
+
+/* ---------- Three 场景 ---------- */
+var renderer,scene,camera,glOK=true;
+var wall,floor,projGroup,lensWorld,gateBasis,gateC0;
+var projMat,beamMats=[],beamGeoO,beamGeoI,halo,haloMat,dawnPatch,dawnMat,dustMat,dustGeo,gateSlide,lensGlow;
+var camBase={x:0,y:0.4,z:12.2};
+var QUADC={x:0.62,y:0.48},QUADW=7.2,QUADH=4.5;
+var GATE_HX=0.225,GATE_HY=0.16,GATE_D=0.62; // 片门半宽/半高/距镜头——决定投影画幅
+var portrait=false,baseLens=new THREE.Vector3(-3.2,-0.85,6.5),quadCenter=new THREE.Vector3(QUADC.x,QUADC.y,0);
+var WALLW=15,WALLH=8.4375;
+var mixV=0,pendingFrame=-1,shownFrame=0,hoverFrame=null,curShownDots=-1,devT=1;
+var state={p:0,pT:0,introT:0,t:3.7,swayX:0,swayY:0,tarSx:0,tarSy:0};
+
+try{
+  if(FAILGL)throw new Error('failgl');
+  renderer=new THREE.WebGLRenderer({canvas:document.getElementById('gl'),antialias:true,alpha:false,powerPreference:'high-performance'});
+}catch(e){
+  glOK=false;document.body.classList.add('flat');
+  var ve=document.getElementById('veil');if(ve)ve.classList.add('gone');
+}
+if(glOK){
+  renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.5));
+  renderer.setSize(W,H);
+
+  scene=new THREE.Scene();
+  camera=new THREE.PerspectiveCamera(42,W/H,0.1,120);
+
+  wallTex=new THREE.CanvasTexture(wallCv);
+  wallTex.anisotropy=4;
+  var frameTexs=frameCvs.map(function(cv){var t=new THREE.CanvasTexture(cv);t.generateMipmaps=false;t.minFilter=THREE.LinearFilter;return t;});
+
+  // 墙（网站本身）——印好的平面设计
+  wall=new THREE.Mesh(new THREE.PlaneGeometry(WALLW,WALLH),
+    new THREE.MeshBasicMaterial({map:wallTex}));
+  wall.material.color.setRGB(NIGHT_INK[0],NIGHT_INK[1],NIGHT_INK[2]);
+  scene.add(wall);
+
+  // 地面（承托机器的暗地）
+  var floorCv=mkCanvas(512,512);
+  (function(){var c=floorCv.getContext('2d');
+    c.fillStyle='#2a2126';c.fillRect(0,0,512,512);
+    var g=c.createRadialGradient(150,240,10,150,240,300);
+    g.addColorStop(0,'rgba(255,190,120,.20)');g.addColorStop(1,'rgba(255,190,120,0)');
+    c.fillStyle=g;c.fillRect(0,0,512,512);
+  })();
+  var floorTex=new THREE.CanvasTexture(floorCv);
+  floor=new THREE.Mesh(new THREE.PlaneGeometry(60,40),new THREE.MeshBasicMaterial({map:floorTex}));
+  floor.rotation.x=-Math.PI/2;floor.position.y=-WALLH/2-0.02;
+  scene.add(floor);
+  painters.push(function(){floorTex.needsUpdate=true;});
+
+  /* ----- 幻灯机（程序化） ----- */
+  projGroup=new THREE.Group();
+  var mBrass=new THREE.MeshStandardMaterial({color:C.brass,metalness:0.65,roughness:0.38});
+  var mBrassHi=new THREE.MeshStandardMaterial({color:C.brassHi,metalness:0.7,roughness:0.3});
+  var mEnamel=new THREE.MeshStandardMaterial({color:0x3a484c,metalness:0.22,roughness:0.5,emissive:0x0c1214,emissiveIntensity:1});
+  var mDark=new THREE.MeshStandardMaterial({color:0x272e32,metalness:0.3,roughness:0.5});
+  // 机身
+  var body=new THREE.Mesh(new THREE.BoxGeometry(1.5,1.16,2.1),mEnamel);body.position.y=0.14;projGroup.add(body);
+  var bodyTop=new THREE.Mesh(new THREE.BoxGeometry(1.16,0.5,1.3),mEnamel);bodyTop.position.set(0,0.9,-0.25);projGroup.add(bodyTop);
+  // 前脸黄铜镶边（夜里读出轮廓）
+  var trimL=new THREE.Mesh(new THREE.BoxGeometry(0.05,1.22,0.05),mBrassHi);trimL.position.set(-0.755,0.14,1.06);projGroup.add(trimL);
+  var trimR=trimL.clone();trimR.position.x=0.755;projGroup.add(trimR);
+  var trimB=new THREE.Mesh(new THREE.BoxGeometry(1.56,0.05,0.05),mBrassHi);trimB.position.set(0,-0.45,1.06);projGroup.add(trimB);
+  // 顶部散热鳍
+  for(var fi=0;fi<4;fi++){var fin=new THREE.Mesh(new THREE.BoxGeometry(1.3,0.16,0.07),mDark);fin.position.set(0,1.22,-0.62+fi*0.24);projGroup.add(fin);}
+  // 底座
+  var plinth=new THREE.Mesh(new THREE.BoxGeometry(1.86,0.22,2.42),mDark);plinth.position.y=-0.62;projGroup.add(plinth);
+  // 片门（顶部黄铜框）
+  var gateFrame=new THREE.Mesh(new THREE.BoxGeometry(0.66,0.44,0.1),mBrass);gateFrame.position.set(0,0.92,0.52);projGroup.add(gateFrame);
+  var gateHole=new THREE.Mesh(new THREE.PlaneGeometry(0.5,0.31),new THREE.MeshBasicMaterial({color:0x0d0a0c}));
+  gateHole.position.set(0,0.92,0.578);projGroup.add(gateHole);
+  // 待装玻璃片（两枚斜靠机身）
+  var mGlass=new THREE.MeshStandardMaterial({color:C.glass,transparent:true,opacity:0.32,roughness:0.16,metalness:0,emissive:0x2a2118,emissiveIntensity:0.5});
+  [[-0.86,0.42,-0.5,-0.5],[0.88,0.4,-0.2,0.62]].forEach(function(pp){
+    var pl=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.38,0.018),mGlass);
+    pl.position.set(pp[0],pp[1],pp[2]);pl.rotation.z=pp[3];projGroup.add(pl);
+  });
+  // 镜筒
+  var barrel=new THREE.Mesh(new THREE.CylinderGeometry(0.30,0.36,0.7,28),mBrass);
+  barrel.rotation.x=Math.PI/2;barrel.position.set(0,0.2,1.32);projGroup.add(barrel);
+  var ring1=new THREE.Mesh(new THREE.TorusGeometry(0.315,0.035,10,36),mBrassHi);
+  ring1.position.set(0,0.2,1.6);projGroup.add(ring1);
+  var hood=new THREE.Mesh(new THREE.CylinderGeometry(0.34,0.30,0.2,28),mDark);
+  hood.rotation.x=Math.PI/2;hood.position.set(0,0.2,1.74);projGroup.add(hood);
+  // 镜头玻璃
+  var lensMat=new THREE.ShaderMaterial({
+    transparent:true,depthWrite:false,
+    uniforms:{uGlow:{value:0}},
+    vertexShader:'varying vec2 vU;void main(){vU=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
+    fragmentShader:[
+      'varying vec2 vU;uniform float uGlow;',
+      'void main(){',
+      ' float d=length(vU-0.5)*2.0;',
+      ' float rim=smoothstep(0.62,1.0,d);',
+      ' float hot=exp(-min(d*d*6.0,60.0));',
+      ' vec3 col=mix(vec3(0.16,0.13,0.12),vec3(1.0,0.86,0.62),hot*(0.35+0.65*uGlow));',
+      ' col+=vec3(1.0,0.9,0.7)*uGlow*hot*0.8;',
+      ' float a=0.82-rim*0.45;',
+      ' gl_FragColor=vec4(col,a);}'
+    ].join('\n')
+  });
+  var lens=new THREE.Mesh(new THREE.CircleGeometry(0.27,28),lensMat);
+  lens.position.set(0,0.2,1.845);projGroup.add(lens);
+  // 备用灯指示（ember pilot）
+  var pilot=new THREE.Mesh(new THREE.SphereGeometry(0.055,12,12),
+    new THREE.MeshBasicMaterial({color:C.ember}));
+  pilot.position.set(0.62,0.62,-0.9);projGroup.add(pilot);
+  // 待装片（片门里那枚，落下动画用）
+  gateSlide=new THREE.Mesh(new THREE.BoxGeometry(0.56,0.36,0.02),mBrassHi);
+  gateSlide.position.set(0,2.4,0.52);projGroup.add(gateSlide);
+  var slideWin=new THREE.Mesh(new THREE.PlaneGeometry(0.48,0.3),new THREE.MeshBasicMaterial({
+    map:frameTexs[0],transparent:true,opacity:0.9}));
+  slideWin.position.z=0.013;gateSlide.add(slideWin);
+
+  scene.add(projGroup);
+
+  // 镜头辉光 sprite
+  var glowTex=new THREE.CanvasTexture(dustCv);
+  lensGlow=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex,color:0xFFD9A0,transparent:true,opacity:0.85,depthWrite:false,blending:THREE.AdditiveBlending}));
+  lensGlow.scale.set(1.4,1.4,1);
+  projGroup.add(lensGlow);lensGlow.position.set(0,0.2,1.9);
+
+  // 机器旁小灯（照亮机身自身的暖点）
+  var pl2=new THREE.PointLight(0xFFB367,0.0,7);pl2.position.set(0.3,0.7,1.2);projGroup.add(pl2);
+  projGroup.userData.pl=pl2;
+  // 房间补光（夜态给机器一层可读性；放在机器朝相机的一侧）
+  var fill=new THREE.PointLight(0xFFE4C4,0.55,16);fill.position.set(-1.4,1.5,5.9);scene.add(fill);
+  scene.userData.fill=fill;
+
+  /* ----- 投影平面（片元级真投影映射） ----- */
+  projMat=new THREE.ShaderMaterial({
+    transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,
+    uniforms:{
+      uTexA:{value:frameTexs[0]},uTexB:{value:frameTexs[0]},uMix:{value:0},
+      uLens:{value:new THREE.Vector3()},uGC:{value:new THREE.Vector3()},
+      uGR:{value:new THREE.Vector3()},uGU:{value:new THREE.Vector3()},uGF:{value:new THREE.Vector3()},
+      uGH:{value:new THREE.Vector2(GATE_HX,GATE_HY)},
+      uInt:{value:0},uWob:{value:0},uDev:{value:0},uTime:{value:0},
+      uTint:{value:new THREE.Color(C.beam)}
+    },
+    vertexShader:'varying vec3 vW;void main(){vec4 w=modelMatrix*vec4(position,1.);vW=w.xyz;gl_Position=projectionMatrix*viewMatrix*w;}',
+    fragmentShader:[
+      'varying vec3 vW;',
+      'uniform sampler2D uTexA,uTexB;uniform float uMix;',
+      'uniform vec3 uLens,uGC,uGR,uGU,uGF;uniform vec2 uGH;',
+      'uniform float uInt,uWob,uDev,uTime;uniform vec3 uTint;',
+      'float rrect(vec2 p,vec2 b,float r){vec2 q=abs(p)-b+r;return length(max(q,0.0))+min(max(q.x,q.y),0.0)-r;}',
+      'void main(){',
+      '  vec3 dir=vW-uLens;float L=length(dir);dir/=max(L,1e-4);',
+      '  float dn=dot(dir,uGF);',
+      '  float t=dot(uGC-uLens,uGF)/max(dn,1e-4);',
+      '  vec3 p=uLens+dir*t;',
+      '  vec3 lp=p-uGC;',
+      '  vec2 uv=vec2(dot(lp,uGR)/uGH.x*0.5+0.5,dot(lp,uGU)/uGH.y*0.5+0.5);',
+      '  uv.x+=sin(uv.y*7.0+uTime*1.7)*0.007*uWob+sin(uv.y*17.0-uTime*2.3)*0.0025*uWob;',
+      '  uv.y+=cos(uv.x*6.0-uTime*1.3)*0.005*uWob;',
+      '  float ca=0.0015+0.005*uWob+0.012*(1.0-uDev);',
+      '  vec4 a1=texture2D(uTexA,uv),b1=texture2D(uTexB,uv);',
+      '  vec4 aR=texture2D(uTexA,uv+vec2(ca,0.0)),bR=texture2D(uTexB,uv+vec2(ca,0.0));',
+      '  vec4 aB=texture2D(uTexA,uv-vec2(ca,0.0)),bB=texture2D(uTexB,uv-vec2(ca,0.0));',
+      '  vec3 col=vec3(mix(aR.r,bR.r,uMix),mix(a1.g,b1.g,uMix),mix(aB.b,bB.b,uMix));',
+      '  float alpha=mix(a1.a,b1.a,uMix);',
+      '  vec2 pc=uv-0.5;',
+      '  float sd=rrect(pc,vec2(0.5),0.10);',
+      '  float edge=1.0-smoothstep(-0.055,0.004,sd);',
+      '  float bloom=(1.0-uDev);',
+      '  col+=uTint*bloom*0.55*exp(-min(dot(pc,pc)*14.0,60.0));',
+      '  gl_FragColor=vec4(col*uTint,edge*uInt*alpha);',
+      '}'
+    ].join('\n')
+  });
+  var projPlane=new THREE.Mesh(new THREE.PlaneGeometry(13,9),projMat);
+  projPlane.position.set(QUADC.x,QUADC.y,0.02);
+  projPlane.renderOrder=20;projPlane.frustumCulled=false;
+  scene.add(projPlane);
+
+  /* ----- 光锥（双壳加色） ----- */
+  beamGeoO=mkBeamGeo();beamGeoI=mkBeamGeo();
+  function mkBeamGeo(){
+    var g=new THREE.BufferGeometry();
+    var pos=new Float32Array(4*6*3),at=new Float32Array(4*6),uvA=new Float32Array(4*6*2);
+    for(var s=0;s<4;s++){
+      var o=s*6;
+      // 顶点序：lensL,lensR,wallR / lensL,wallR,wallL —— aT 0=镜端 1=墙端
+      at[o]=0;at[o+1]=0;at[o+2]=1;at[o+3]=0;at[o+4]=1;at[o+5]=1;
+      // uv.x=长度向(0镜→1墙) uv.y=宽度向(两侧软边)
+      var uvs=[[0,0],[0,1],[1,1],[0,0],[1,1],[1,0]];
+      for(var vv=0;vv<6;vv++){uvA[(o+vv)*2]=uvs[vv][0];uvA[(o+vv)*2+1]=uvs[vv][1];}
+    }
+    g.setAttribute('position',new THREE.BufferAttribute(pos,3));
+    g.setAttribute('aT',new THREE.BufferAttribute(at,1));
+    g.setAttribute('uv',new THREE.BufferAttribute(uvA,2));
+    return g;
+  }
+  function mkBeamMat(alpha){
+    var m=new THREE.ShaderMaterial({
+      transparent:true,depthWrite:false,depthTest:true,side:THREE.DoubleSide,
+      blending:THREE.AdditiveBlending,
+      uniforms:{uA:{value:alpha},uCol:{value:new THREE.Color(C.beam)},uInt:{value:0}},
+      vertexShader:[
+        'attribute float aT;varying float vT;varying vec2 vU;',
+        'void main(){vT=aT;vU=uv;gl_Position=projectionMatrix*viewMatrix*vec4(position,1.);}'
+      ].join('\n'),
+      fragmentShader:[
+        'varying float vT;varying vec2 vU;uniform float uA,uInt;uniform vec3 uCol;',
+        'void main(){',
+        ' float lon=mix(0.8,0.16,vT);',
+        ' float lat=0.35+0.65*sin(3.14159*vU.y);',
+        ' float a=uA*lon*lat*uInt;',
+        ' gl_FragColor=vec4(uCol,a);}'
+      ].join('\n')
+    });
+    return m;
+  }
+  beamMats=[mkBeamMat(0.07),mkBeamMat(0.11)];
+  var beamOuter=new THREE.Mesh(beamGeoO,beamMats[0]);beamOuter.renderOrder=21;beamOuter.frustumCulled=false;scene.add(beamOuter);
+  var beamInner=new THREE.Mesh(beamGeoI,beamMats[1]);beamInner.renderOrder=22;beamInner.frustumCulled=false;scene.add(beamInner);
+
+  /* ----- 墙上光晕（溢光，顺便照亮印刷） ----- */
+  function mkHalo(size,alpha){
+    var m=new THREE.ShaderMaterial({
+      transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,
+      uniforms:{uA:{value:alpha},uCol:{value:new THREE.Color(C.halo)}},
+      vertexShader:'varying vec2 vU;void main(){vU=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
+      fragmentShader:[
+        'varying vec2 vU;uniform float uA;uniform vec3 uCol;',
+        'void main(){float d=length(vU-0.5)*2.0;',
+        ' float a=pow(max(0.0,1.0-d),2.3)*uA;',
+        ' gl_FragColor=vec4(uCol,a);}'
+      ].join('\n')
+    });
+    var mesh=new THREE.Mesh(new THREE.PlaneGeometry(size,size*0.72),m);
+    mesh.position.z=0.035;mesh.renderOrder=19;mesh.frustumCulled=false;
+    scene.add(mesh);return mesh;
+  }
+  halo=mkHalo(12.5,0.3);haloMat=halo.material;
+  dawnPatch=mkHalo(8.5,0.0);dawnMat=dawnPatch.material;
+  dawnMat.uniforms.uCol.value=new THREE.Color(C.dawnPatch);
+
+  /* ----- 尘埃 ----- */
+  var DUSTN=230;
+  dustGeo=new THREE.BufferGeometry();
+  var dpos=new Float32Array(DUSTN*3),dseed=new Float32Array(DUSTN);
+  for(var di=0;di<DUSTN;di++){dseed[di]=Math.random()*100;}
+  dustGeo.setAttribute('position',new THREE.BufferAttribute(dpos,3));
+  dustGeo.setAttribute('aSeed',new THREE.BufferAttribute(dseed,1));
+  dustMat=new THREE.ShaderMaterial({
+    transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,
+    uniforms:{uMap:{value:new THREE.CanvasTexture(dustCv)},uA:{value:0},uTime:{value:0},uPx:{value:H*0.5}},
+    vertexShader:[
+      'attribute float aSeed;varying float vA;uniform float uTime,uPx;',
+      'void main(){',
+      ' vec4 mv=modelViewMatrix*vec4(position,1.0);',
+      ' float pulse=0.4+0.6*sin(uTime*(0.5+fract(aSeed)*0.7)+aSeed);',
+      ' vA=pulse;',
+      ' gl_PointSize=clamp(uPx*(0.02+fract(aSeed*7.0)*0.035)/max(-mv.z,1.0),1.0,7.0);',
+      ' gl_Position=projectionMatrix*mv;',
+      '}'
+    ].join('\n'),
+    fragmentShader:[
+      'varying float vA;uniform sampler2D uMap;uniform float uA;',
+      'void main(){vec4 t=texture2D(uMap,gl_PointCoord);',
+      ' float a=t.a*vA*uA;',
+      ' gl_FragColor=vec4(vec3(1.0,0.9,0.72),a);}'
+    ].join('\n')
+  });
+  var dust=new THREE.Points(dustGeo,dustMat);dust.renderOrder=23;dust.frustumCulled=false;
+  scene.add(dust);
+
+  /* ----- 灯光（照亮机器；晨光用） ----- */
+  var hemi=new THREE.HemisphereLight(0x8a7480,0x241a1e,0.42);scene.add(hemi);
+  var dir=new THREE.DirectionalLight(0xFFD7BE,0.0);dir.position.set(6,7,5);scene.add(dir);
+  scene.userData.hemi=hemi;scene.userData.dir=dir;
+
+  layout();
+}
+
+/* ---------- 布局（含竖屏） ---------- */
+function layout(){
+  if(!glOK)return;
+  portrait=(W/H)<0.9;
+  if(!portrait){
+    camera.aspect=W/H;camera.fov=42;camera.updateProjectionMatrix();
+    camera.position.set(0,0.4,12.2);
+    QUADW=7.2;QUADH=4.5;
+    quadCenter.set(0.62,0.48,0);
+    baseLens.set(-3.2,-0.85,6.5);
+  }else{
+    camera.aspect=W/H;camera.fov=46;camera.updateProjectionMatrix();
+    camera.position.set(0,0.8,13.6);
+    var viewW=2*13.6*Math.tan(23*Math.PI/360)*camera.aspect;
+    QUADW=Math.min(4.8,viewW*0.92);QUADH=QUADW*0.62;
+    quadCenter.set(0,1.25,0);
+    baseLens.set(0,quadCenter.y-QUADH/2-1.9,5.6);
+  }
+  camBase.x=camera.position.x;camBase.y=camera.position.y;camBase.z=camera.position.z;
+  camera.lookAt(0,0.45,0);
+  projGroup.position.copy(baseLens);
+  projGroup.lookAt(quadCenter);
+  projGroup.updateMatrixWorld(true);
+  // 镜头世界位置 & 片门基（局部 +Z 前向）
+  lensWorld=new THREE.Vector3(0,0.2,1.845).applyMatrix4(projGroup.matrixWorld);
+  var fwd=new THREE.Vector3(0,0,1).applyQuaternion(projGroup.quaternion).normalize();
+  var up0=Math.abs(fwd.y)>0.94?new THREE.Vector3(1,0,0):new THREE.Vector3(0,1,0);
+  var R=new THREE.Vector3().crossVectors(fwd,up0).normalize();
+  var U=new THREE.Vector3().crossVectors(R,fwd).normalize();
+  gateBasis={f:fwd,r:R,u:U};
+  gateC0=lensWorld.clone().add(fwd.clone().multiplyScalar(GATE_D));
+  if(projMat){
+    projMat.uniforms.uLens.value.copy(lensWorld);
+    projMat.uniforms.uGC.value.copy(gateC0);
+    projMat.uniforms.uGR.value.copy(R);projMat.uniforms.uGU.value.copy(U);projMat.uniforms.uGF.value.copy(fwd);
+    projMat.uniforms.uGH.value.set(GATE_HX,GATE_HY);
+  }
+  if(halo)halo.position.set(quadCenter.x,quadCenter.y-0.3,0.035);
+  if(dawnPatch)dawnPatch.position.set(quadCenter.x+3.6,quadCenter.y+0.4,0.04);
+  if(dustMat)dustMat.uniforms.uPx.value=H*0.5/Math.tan(camera.fov*0.5*Math.PI/180);
+  dustBases=null; // 重建
+}
+
+/* ---------- 尘埃体（静态于房间，随布局重建） ---------- */
+var dustBases=null;
+function buildDust(){
+  if(!glOK)return;
+  var ghw=GATE_HX,ghh=GATE_HY;
+  var cs=[[gateC0.clone().add(gateBasis.r.clone().multiplyScalar(-ghw)).add(gateBasis.u.clone().multiplyScalar(ghh))],
+          [gateC0.clone().add(gateBasis.r.clone().multiplyScalar(ghw)).add(gateBasis.u.clone().multiplyScalar(ghh))],
+          [gateC0.clone().add(gateBasis.r.clone().multiplyScalar(ghw)).add(gateBasis.u.clone().multiplyScalar(-ghh))],
+          [gateC0.clone().add(gateBasis.r.clone().multiplyScalar(-ghw)).add(gateBasis.u.clone().multiplyScalar(-ghh))]];
+  var corners=[];
+  cs.forEach(function(g){
+    var d=g[0].clone().sub(lensWorld).normalize();
+    var t=(0-lensWorld.z)/d.z;
+    corners.push(lensWorld.clone().add(d.multiplyScalar(t)));
+  });
+  var pos=dustGeo.attributes.position.array,n=pos.length/3;
+  for(var i=0;i<n;i++){
+    var s=0.08+Math.random()*0.86;
+    var u=Math.random(),v=Math.random();
+    var p=new THREE.Vector3(0,0,0);
+    p.add(corners[0].clone().multiplyScalar((1-u)*(1-v)*s));
+    p.add(corners[1].clone().multiplyScalar(u*(1-v)*s));
+    p.add(corners[2].clone().multiplyScalar(u*v*s));
+    p.add(corners[3].clone().multiplyScalar((1-u)*v*s));
+    p.x+=(Math.random()-0.5)*0.5;p.y+=(Math.random()-0.5)*0.4;p.z+=(Math.random()-0.5)*0.3;
+    pos[i*3]=p.x;pos[i*3+1]=p.y;pos[i*3+2]=p.z;
+  }
+  dustGeo.attributes.position.needsUpdate=true;
+  dustBases=true;
+}
+
+/* ---------- 光锥几何更新 ---------- */
+var _beamCentroid=null;
+function updateBeam(k){
+  if(!glOK||!beamGeoO)return;
+  var signs=[[-1,1],[1,1],[1,-1],[-1,-1]];
+  var ghw=GATE_HX*k,ghh=GATE_HY*k;
+  var wallPts=[];
+  for(var i=0;i<4;i++){
+    var g=gateC0.clone()
+      .add(gateBasis.r.clone().multiplyScalar(ghw*signs[i][0]))
+      .add(gateBasis.u.clone().multiplyScalar(ghh*signs[i][1]));
+    var d=g.sub(lensWorld).normalize();
+    var t=(0-lensWorld.z)/d.z;
+    wallPts.push(lensWorld.clone().add(d.multiplyScalar(t)));
+  }
+  var cen=wallPts[0].clone().add(wallPts[2]).multiplyScalar(0.5);
+  [beamGeoO,beamGeoI].forEach(function(geo,gi){
+    var sc=gi===0?1:0.6;
+    var arr=geo.attributes.position.array;
+    for(var s=0;s<4;s++){
+      var s2=(s+1)%4;
+      var l1=gateC0.clone()
+        .add(gateBasis.r.clone().multiplyScalar(ghw*sc*signs[s][0]))
+        .add(gateBasis.u.clone().multiplyScalar(ghh*sc*signs[s][1]));
+      l1.sub(lensWorld).multiplyScalar(0.14).add(lensWorld);
+      var l2=gateC0.clone()
+        .add(gateBasis.r.clone().multiplyScalar(ghw*sc*signs[s2][0]))
+        .add(gateBasis.u.clone().multiplyScalar(ghh*sc*signs[s2][1]));
+      l2.sub(lensWorld).multiplyScalar(0.14).add(lensWorld);
+      var w1=cen.clone().lerp(wallPts[s],sc);
+      var w2=cen.clone().lerp(wallPts[s2],sc);
+      var o=s*18;
+      arr[o]=l1.x;arr[o+1]=l1.y;arr[o+2]=l1.z;
+      arr[o+3]=l2.x;arr[o+4]=l2.y;arr[o+5]=l2.z;
+      arr[o+6]=w2.x;arr[o+7]=w2.y;arr[o+8]=w2.z;
+      arr[o+9]=l1.x;arr[o+10]=l1.y;arr[o+11]=l1.z;
+      arr[o+12]=w2.x;arr[o+13]=w2.y;arr[o+14]=w2.z;
+      arr[o+15]=w1.x;arr[o+16]=w1.y;arr[o+17]=w1.z;
+    }
+    geo.attributes.position.needsUpdate=true;
+  });
+}
+
+/* ---------- 换片（交叉溶解 + 片门走片） ---------- */
+function setFrame(idx,instant){
+  idx=Math.max(0,Math.min(6,idx|0));
+  if(instant){
+    projMat.uniforms.uTexA.value=frameTexs[idx];projMat.uniforms.uTexB.value=frameTexs[idx];
+    projMat.uniforms.uMix.value=0;shownFrame=idx;mixV=0;pendingFrame=-1;return;
+  }
+  if(idx===shownFrame||pendingFrame===idx)return;
+  projMat.uniforms.uTexB.value=frameTexs[idx];
+  pendingFrame=idx;
+  if(mixV===0)mixV=0.0001;
+}
+
+/* ---------- DOM 引用 ---------- */
+var el={
+  hud:document.getElementById('hud'),veil:document.getElementById('veil'),
+  ctext:document.getElementById('ctext'),dots:document.querySelectorAll('#counter .dot'),
+  hint:document.getElementById('hint'),note:document.getElementById('note'),
+  replay:document.getElementById('replay'),endline:document.getElementById('endline'),
+  rack:document.getElementById('rack'),fil:document.querySelector('#veil .fil i')
+};
+var FRAME_NAMES=['第一格','第二格','第三格','第四格'];
+var NOTE_TXT={essay:'已装片 · 随笔（演示稿：正式版将跳转）',projects:'已装片 · 项目（演示稿：正式版将跳转）',about:'已装片 · 关于（演示稿：正式版将跳转）'};
+var curShownFrame=-1;
+
+/* ---------- 入口卡（浮窗） ---------- */
+function bindCards(){
+  var cards=document.querySelectorAll('.slide-card');
+  cards.forEach(function(card,i){
+    var fid=4+i,key=card.getAttribute('data-key');
+    function hover(){if(!AUTO&&state.introT>0.95)hoverFrame=fid;}
+    function unhover(){if(!AUTO&&state.introT>0.95)hoverFrame=null;}
+    card.addEventListener('mouseenter',hover);
+    card.addEventListener('mouseleave',unhover);
+    card.addEventListener('focus',hover);
+    card.addEventListener('blur',unhover);
+    card.addEventListener('click',function(ev){
+      ev.preventDefault();
+      if(state.introT<0.95){skipIntro();return;}
+      el.note.textContent=NOTE_TXT[key];el.note.classList.add('on');
+      hoverFrame=fid;setFrame(fid);devT=0;
+      setTimeout(function(){el.note.classList.remove('on');},2600);
+    });
+  });
+  if(CARD_LOCK!==null){
+    hoverFrame=4+CARD_LOCK;
+    setFrame(4+CARD_LOCK,true);
+    cards[CARD_LOCK].style.filter='brightness(1.14)';
+    cards[CARD_LOCK].style.boxShadow='0 0 0 1px rgba(232,204,150,.4),0 14px 34px rgba(8,4,6,.5)';
+    el.note.textContent=NOTE_TXT[['essay','projects','about'][CARD_LOCK]];el.note.classList.add('on');
+  }
+}
+el.replay.addEventListener('click',function(ev){ev.preventDefault();scrollTo({top:0,behavior:RM?'auto':'smooth'});});
+
+/* ---------- 加载页（点灯） ---------- */
+var introDur=RM?0.001:(FAST?1.7:4.6);
+var introDone=false,skipped=false;
+function hideVeil(instant){
+  if(instant||RM||IS_STILL||!window.anime){el.veil.classList.add('gone');return;}
+  anime({targets:el.veil,opacity:0,duration:380,easing:'easeOutQuad',
+    complete:function(){el.veil.classList.add('gone');el.veil.style.opacity='';}});
+}
+function finalizeIntro(instant){
+  introDone=true;
+  hideVeil(instant);
+  el.hud.classList.add('on');el.rack.classList.add('on');
+}
+function skipIntro(){
+  if(skipped)return;skipped=true;
+  state.introT=1;
+  finalizeIntro(true);
+  setFrame(0,true);
+}
+if(IS_STILL&&INTRO_LOCK===null){finalizeIntro(true);}
+function veilSeq(x){ // 点灯闪烁曲线
+  if(x<0.26)return 0;
+  if(x<0.30)return (x-0.26)/0.04*0.75;
+  if(x<0.335)return 0.75-(x-0.30)/0.035*0.5;
+  if(x<0.36)return 0.25+(x-0.335)/0.025*0.7;
+  if(x<0.395)return 0.95-(x-0.36)/0.035*0.5;
+  if(x<0.46)return 0.45+(x-0.395)/0.065*0.55;
+  return 1;
+}
+function bindVeilSkip(){
+  ['pointerdown','keydown','wheel','touchstart'].forEach(function(ev){
+    window.addEventListener(ev,function onIntr(){
+      if(!introDone)skipIntro();
+    },{passive:true});
+  });
+}
+bindVeilSkip();
+
+/* ---------- auto 巡航 ---------- */
+var tourDur=FAST?12:34,tourT=0,tourHold=0;
+function autoP(dt){
+  tourT+=dt;
+  var tt=tourT/tourDur;
+  if(tt>=1){tt=1;tourHold+=dt;if(tourHold>2.2){tourT=0;tourHold=0;return 0;}}
+  var e=tt<0.04?tt/0.04*0.04:tt; // 轻微起步
+  return Math.min(1,e);
+}
+
+/* ---------- 主合成（纯函数：p,introT,time → 世界） ---------- */
+var tmpC1=null,tmpC2=null;
+function smooth(a,b,x){x=Math.max(0,Math.min(1,(x-a)/(b-a)));return x*x*(3-2*x);}
+function bumpF(x,c,w){var d=(x-c)/w;return Math.exp(-Math.min(d*d,60));}
+function compose(p,introT,t){
+  if(!glOK)return;
+  var rmFix=RM||IS_STILL;
+  var dawn=smooth(0.60,0.96,p);
+  var lightR=0.30+dawn*0.70;
+  // 墙纸/地/背景
+  if(!tmpC1){tmpC1=new THREE.Color();tmpC2=new THREE.Color();}
+  tmpC1.setRGB(NIGHT_INK[0],NIGHT_INK[1],NIGHT_INK[2]).lerp(tmpC2.setHex(C.wallLit),lightR);
+  wall.material.color.copy(tmpC1);
+  tmpC1.setHex(C.bgNight).lerp(tmpC2.setHex(C.bgDawn),dawn);
+  renderer.setClearColor(tmpC1,1);
+  tmpC1.setHex(C.floorDim).lerp(tmpC2.setHex(C.floorLit),dawn);
+  floor.material.color.copy(tmpC1);
+  scene.userData.hemi.intensity=0.28+dawn*0.75;
+  scene.userData.dir.intensity=dawn*0.85;
+
+  // intro 各相位
+  var strike=veilSeq(introT);
+  var unfold=smooth(0.45,0.72,introT);
+  var develop=devT<1?(1-devT):smooth(0.62,0.88,introT);
+
+  // 光强：闪烁 + 晨光洗没 + intro
+  var flick=1;
+  if(!rmFix){
+    flick=1+0.05*Math.sin(t*13.0)+0.03*Math.sin(t*29.0+1.7);
+    flick-=0.14*bumpF((t%7.3),5.9,0.55);
+  }
+  var beamBase=(1-dawn*0.97)*strike*unfold;
+  var projI=(1-smooth(0.78,0.945,p))*strike*unfold;
+
+  // dream 漂移（中段最盛）
+  var wob=smooth(0.22,0.5,p)*(1-smooth(0.62,0.85,p))*1.15;
+  var tint=tmpC1.setHex(C.beam).lerp(tmpC2.setHex(C.beamRose),smooth(0.2,0.6,p));
+
+  // 机器浮动
+  var bobX=rmFix?0:Math.sin(t*0.34+1.0)*0.045;
+  var bobY=rmFix?0:Math.sin(t*0.55)*0.055;
+  projGroup.position.set(baseLens.x+bobX,baseLens.y+bobY,baseLens.z);
+  projGroup.rotation.z=rmFix?0:Math.sin(t*0.4)*0.008;
+  projGroup.updateMatrixWorld(true);
+  lensWorld.set(0,0.2,1.845).applyMatrix4(projGroup.matrixWorld);
+  projMat.uniforms.uLens.value.copy(lensWorld);
+  projMat.uniforms.uGC.value.copy(lensWorld).addScaledVector(gateBasis.f,GATE_D);
+
+  // 片门里的待装片（intro 落下）
+  var drop=smooth(0.55,0.72,introT);
+  gateSlide.position.y=2.4-(2.4-0.92)*drop;
+  // 换片走片动画
+  if(pendingFrame>=0){
+    mixV=Math.min(1,mixV+0.055);
+    projMat.uniforms.uMix.value=mixV;
+    gateSlide.position.x=(1-Math.abs(mixV*2-1))*0.5;
+    if(mixV>=1){
+      projMat.uniforms.uTexA.value=frameTexs[pendingFrame];
+      projMat.uniforms.uMix.value=0;shownFrame=pendingFrame;pendingFrame=-1;
+      gateSlide.position.x=0;
+    }
+  }
+
+  // 投影 uniforms
+  projMat.uniforms.uInt.value=projI*1.06;
+  projMat.uniforms.uWob.value=wob;
+  projMat.uniforms.uDev.value=develop;
+  projMat.uniforms.uTime.value=rmFix?0:t;
+  projMat.uniforms.uTint.value.copy(tint);
+
+  // 光晕
+  haloMat.uniforms.uA.value=0.30*beamBase;
+  haloMat.uniforms.uCol.value.copy(tint);
+  dawnMat.uniforms.uA.value=dawn*0.15;
+  // 光锥
+  updateBeam(0.25+0.75*unfold);
+  beamMats[0].uniforms.uInt.value=beamBase;
+  beamMats[1].uniforms.uInt.value=beamBase;
+  beamMats[0].uniforms.uCol.value.copy(tint);
+  beamMats[1].uniforms.uCol.value.copy(tint);
+  // 尘埃
+  dustMat.uniforms.uA.value=0.5*beamBase*smooth(0.5,0.75,introT);
+  dustMat.uniforms.uTime.value=rmFix?0:t;
+  // 镜头辉光 & pilot
+  lensMat.uniforms.uGlow.value=strike*unfold*(1-dawn*0.9);
+  lensGlow.material.opacity=0.85*strike*unfold*(1-dawn*0.92);
+  projGroup.userData.pl.intensity=1.4*strike*unfold*(1-dawn*0.85)+0.4;
+  scene.userData.fill.intensity=0.5+strike*0.2-dawn*0.22;
+  // 相机微视差
+  var sw=(RM||IS_STILL)?0:1;
+  state.swayX+=(state.tarSx*0.35*sw-state.swayX)*0.06;
+  state.swayY+=(state.tarSy*0.22*sw-state.swayY)*0.06;
+  camera.position.set(camBase.x+state.swayX,camBase.y+state.swayY*(portrait?0.6:1),camBase.z);
+  camera.lookAt(0,0.45,0);
+
+  // DOM 状态
+  var fi=p<0.13?0:p<0.27?1:p<0.47?2:3;
+  var targetF=hoverFrame!==null?hoverFrame:fi;
+  if(introT>0.95&&pendingFrame<0&&targetF!==shownFrame)setFrame(targetF);
+  if(fi!==curShownDots){
+    curShownDots=fi;
+    el.ctext.textContent='放映 · '+FRAME_NAMES[fi];
+    el.dots.forEach(function(d,i){d.classList.toggle('act',i===fi);});
+  }
+  var ho=Math.max(0,1-p*14)*(introT>0.95?1:0);
+  el.hint.style.opacity=String(ho);
+  if(ho<=0.01)el.hint.style.animation='none';
+  el.endline.style.opacity=String(smooth(0.88,0.965,p));
+  el.replay.classList.toggle('on',p>0.9);
+  // 卡片视差
+  var px=(-state.swayX*10).toFixed(2)+'px',py=(-state.swayY*7).toFixed(2)+'px';
+  el.rack.style.setProperty('--px',px);
+  el.rack.style.setProperty('--py',py);
+}
+
+/* ---------- 渲染循环 ---------- */
+var lastT=0,started=false;
+function tick(){
+  // 尺寸看门狗
+  if(innerWidth!==W||innerHeight!==H){
+    W=innerWidth;H=innerHeight;
+    if(W>100&&H>100&&glOK){renderer.setSize(W,H);layout();}
+  }
+  var now=performance.now();
+  var dt=Math.min(0.1,(now-lastT)/1000);lastT=now;
+  if(!IS_STILL)state.t+=dt*(FAST?1:1);
+  if(devT<1)devT=Math.min(1,devT+0.045);
+
+  // intro 推进
+  if(!introDone&&!IS_STILL){
+    state.introT=Math.min(1,state.introT+dt/introDur);
+    if(el.fil)el.fil.style.setProperty('--p',state.introT.toFixed(3));
+    var vo=state.introT<0.48?1-smooth(0.28,0.48,state.introT):0;
+    el.veil.style.opacity=String(vo);
+    if(state.introT>=1){
+      finalizeIntro(false);
+      setFrame(0);
+    }
+  }
+  if(IS_STILL){
+    state.introT=INTRO_LOCK!==null?INTRO_LOCK:1;
+    if(INTRO_LOCK!==null){
+      if(el.fil)el.fil.style.setProperty('--p',INTRO_LOCK.toFixed(3));
+      el.veil.style.opacity=String(INTRO_LOCK<0.48?1-smooth(0.28,0.48,INTRO_LOCK):0);
+    }
+    if((INTRO_LOCK===null||INTRO_LOCK>=0.5)&&!introDone)finalizeIntro(true);
+    if(INTRO_LOCK!==null&&INTRO_LOCK<0.5){el.veil.classList.remove('gone');el.hud.classList.remove('on');el.rack.classList.remove('on');}
+  }
+  // 滚动
+  if(AUTO&&!IS_STILL){
+    if(introDone||state.introT>0.98){state.pT=autoP(dt);}
+  }else if(!IS_STILL){
+    if(PIN!==null){state.pT=PIN;}
+    else{
+      var dh=document.documentElement.scrollHeight-innerHeight;
+      state.pT=dh>0?Math.max(0,Math.min(1,scrollY/dh)):0;
+    }
+  }else{
+    state.pT=PIN!==null?PIN:0;
+  }
+  if(RM||IS_STILL)state.p=state.pT;
+  else state.p+=(state.pT-state.p)*0.12;
+
+  if(glOK){
+    compose(state.p,state.introT,state.t);
+    renderer.render(scene,camera);
+  }
+}
+if(glOK){
+  bindCards();
+  if(!dustBases)buildDust();
+  paintAllFrames();
+  compose(state.p,state.introT,state.t);
+  renderer.render(scene,camera);
+}
+function paintAllFrames(){painters.forEach(function(f){try{f();}catch(e){errHook(e);}});}
+paintAllFrames();
+if(document.fonts&&document.fonts.ready){document.fonts.ready.then(function(){paintAllFrames();if(glOK){renderer.render(scene,camera);}});}
+setInterval(tick,33);
+
+/* ---------- 指针视差 ---------- */
+if(!RM&&!IS_STILL){
+  window.addEventListener('pointermove',function(ev){
+    state.tarSx=(ev.clientX/innerWidth-0.5)*2;
+    state.tarSy=-(ev.clientY/innerHeight-0.5)*2;
+  },{passive:true});
+}
+
+/* ---------- 无头钩子 ---------- */
+window.__renderOnce=function(p,introT,frame){
+  if(!glOK)return 'flat';
+  if(frame!==undefined){hoverFrame=Math.max(0,Math.min(6,frame|0));setFrame(hoverFrame,true);}
+  state.p=Math.max(0,Math.min(1,p||0));
+  state.introT=introT===undefined?1:Math.max(0,Math.min(1,introT));
+  if(state.introT>=1)finalizeIntro(true);
+  compose(state.p,state.introT,state.t);
+  renderer.render(scene,camera);
+  return 'ok';
+};
+window.__mockSnap=function(){
+  if(!glOK)return 'data:,';
+  if(W<100||H<100){W=innerWidth;H=innerHeight;if(W>100){renderer.setSize(W,H);layout();}}
+  compose(state.p,state.introT,state.t);
+  renderer.render(scene,camera);
+  try{return renderer.domElement.toDataURL('image/png');}catch(e){return 'data:,';}
+};
+window.__peek=function(){
+  return {p:state.p,introT:state.introT,frame:curShownFrame,mix:mixV,gl:glOK,
+    dev:projMat?projMat.uniforms.uDev.value:-1,int:projMat?projMat.uniforms.uInt.value:-1,
+    wob:projMat?projMat.uniforms.uWob.value:-1};
+};
+})();
+</script>
+</body>
+</html>

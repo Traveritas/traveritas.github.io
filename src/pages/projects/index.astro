@@ -8,13 +8,21 @@ const projects = (await getCollection('projects', (p) => !p.data.draft))
 
 const fmt = (d: Date) =>
   `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
+
+const pinsOf = (status: string) => ({ 构想中: 2, 进行中: 5, 已完成: 8 })[status] ?? 3;
 ---
 
-<BaseLayout title="项目 — Traveritas" description="Traveritas 的项目与造物">
+<BaseLayout
+  title="项目 — Traveritas"
+  description="Traveritas 的项目与造物"
+  rail={{ mode: 'station', station: '项目 · 深眠', en: 'PROJECTS N3' }}
+>
   <div class="container page-body">
     <header class="page-head">
       <h1>项目</h1>
-      <p class="lede">正在做、做过、以及还只存在于念头里的东西。</p>
+      <p class="lede" data-morph data-true="正在做、做过、以及还只存在于念头里的东西。" data-dream="正在做、做过、以及还只存在于梦念里的东西。">
+        正在做、做过、以及还只存在于念头里的东西。
+      </p>
     </header>
 
     <ul class="ledger">
@@ -27,6 +35,11 @@ const fmt = (d: Date) =>
                 <span class="ledger-title">
                   {p.title}
                   <span class="ledger-status">{p.status}</span>
+                  <span class="stitch-meter" title={`第 ${pinsOf(p.status)} 针 / 八针`}>
+                    {Array.from({ length: 8 }).map((_, i) => (
+                      <i class:list={{ on: i < pinsOf(p.status) }} />
+                    ))}
+                  </span>
                 </span>
                 {p.description && <span class="ledger-desc">{p.description}</span>}
               </span>
@@ -35,5 +48,16 @@ const fmt = (d: Date) =>
         ))
       }
     </ul>
+
+    <p class="meter-note mono">八针进度：一针一格，缝满即完成</p>
   </div>
 </BaseLayout>
+
+<style>
+  .meter-note {
+    margin-top: 1.6rem;
+    font-size: 0.6rem;
+    letter-spacing: 0.22em;
+    color: var(--fg-faint);
+  }
+</style>

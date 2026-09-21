@@ -1,0 +1,1194 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>押花册 · 醒梦</title>
+<link rel="preconnect" href="https://fastly.jsdelivr.net" crossorigin>
+<link rel="stylesheet" href="https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5.0.5/500.css">
+<link rel="stylesheet" href="https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5.0.5/600.css">
+<style>
+  :root{
+    --ink:#3a4550;
+    --ink-faint:#6a737c;
+    --gold:#a4762c;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:auto}
+  body{
+    background:#c7d2da;
+    font-family:"Noto Serif SC","Songti SC","SimSun",serif;
+    color:var(--ink);
+    overflow-x:hidden;
+  }
+  /* WebGL 失败回退：静态印页 */
+  #fallback{
+    position:fixed;inset:0;z-index:0;display:none;
+    background:linear-gradient(150deg,#cdd7de 0%,#d8d3d2 48%,#e4d5cb 100%);
+  }
+  body.no-gl #fallback{display:block}
+  #fallback .inner{
+    position:absolute;left:8vw;top:16vh;max-width:30em;
+  }
+  #fallback h2{font-size:clamp(26px,4.4vw,44px);font-weight:600;letter-spacing:.06em;line-height:1.5}
+  #fallback p{margin-top:1.4em;font-size:14px;letter-spacing:.2em;color:var(--ink-faint);line-height:2.2}
+  #fallback nav{margin-top:2.6em;display:flex;gap:2.4em}
+  #fallback nav a{color:var(--ink);font-size:14px;letter-spacing:.3em;text-decoration:none;border-bottom:1px solid rgba(58,69,80,.35);padding-bottom:.4em}
+
+  canvas#gl{position:fixed;inset:0;width:100%;height:100%;z-index:1;display:block}
+  #scrollspace{height:640vh;position:relative;z-index:0;pointer-events:none}
+
+  .ui{position:fixed;z-index:10}
+  #brand{
+    top:4.6vh;left:4.2vw;
+    writing-mode:vertical-rl;letter-spacing:.44em;
+    font-size:17px;font-weight:600;color:var(--ink);
+    opacity:0;transition:opacity 1.4s ease;
+  }
+  body.ready #brand{opacity:1}
+  #brand small{
+    display:block;margin-top:14px;
+    font-size:10.5px;font-weight:500;letter-spacing:.34em;
+    color:var(--ink-faint);
+  }
+  #pagenote{
+    left:4.2vw;bottom:5vh;
+    font-size:12px;letter-spacing:.4em;
+    color:var(--ink-faint);
+    opacity:0;transition:opacity 1.2s ease;
+  }
+  body.ready #pagenote{opacity:.92}
+  #hint{
+    left:50%;bottom:4.6vh;transform:translateX(-50%);
+    font-size:11.5px;letter-spacing:.42em;color:var(--ink-faint);
+    white-space:nowrap;
+    opacity:0;transition:opacity 1.4s ease;
+  }
+  #hint::after{
+    content:"";display:block;margin:10px auto 0;
+    width:1px;height:34px;background:currentColor;opacity:.5;
+  }
+  body.ready.hintable #hint{opacity:.9}
+  #press{
+    left:50%;bottom:9vh;transform:translateX(-50%);
+    font-size:12.5px;letter-spacing:.5em;color:var(--ink);
+    white-space:nowrap;opacity:.9;
+    transition:opacity .8s ease;
+  }
+  #press.off{opacity:0}
+  /* 印痕交互卡 */
+  #card{
+    left:4.2vw;bottom:calc(5vh + 44px);
+    max-width:16em;
+    padding:14px 18px 12px;
+    border-left:1px solid rgba(58,69,80,.4);
+    background:linear-gradient(90deg,rgba(244,240,232,.82),rgba(244,240,232,0));
+    opacity:0;transform:translateY(8px);
+    transition:opacity .45s ease,transform .45s cubic-bezier(.22,.9,.3,1);
+    pointer-events:none;
+  }
+  #card.on{opacity:1;transform:translateY(0)}
+  #card h3{font-size:15px;font-weight:600;letter-spacing:.22em}
+  #card h3 em{font-style:normal;color:var(--gold)}
+  #card p{margin-top:6px;font-size:11px;letter-spacing:.26em;color:var(--ink-faint)}
+  #toindex{
+    right:4.2vw;top:5vh;
+    writing-mode:vertical-rl;text-decoration:none;
+    font-size:11.5px;letter-spacing:.4em;color:var(--ink-faint);
+    border-right:1px solid rgba(58,69,80,.35);
+    padding-right:12px;
+    opacity:0;transform:translateY(-10px);
+    transition:opacity .9s ease,transform .9s cubic-bezier(.22,.9,.3,1),color .4s ease;
+    pointer-events:none;
+  }
+  #toindex.on{opacity:1;transform:translateY(0);pointer-events:auto}
+  #toindex:hover{color:var(--ink)}
+  html{scrollbar-width:none}
+  ::-webkit-scrollbar{display:none}
+
+  #vignette{
+    inset:0;z-index:5;pointer-events:none;
+    background:
+      linear-gradient(to bottom, rgba(70,62,66,.07), rgba(70,62,66,0) 22%),
+      radial-gradient(ellipse 132% 106% at 50% 44%, rgba(0,0,0,0) 58%, rgba(56,48,48,.17) 100%);
+  }
+  .sr-only{
+    position:absolute;width:1px;height:1px;overflow:hidden;
+    clip:rect(0 0 0 0);white-space:nowrap;
+  }
+  @media (max-width:760px){
+    #brand{top:3.4vh;left:5.4vw;font-size:15px}
+    #pagenote{left:5.4vw;bottom:4.2vh;font-size:11px}
+    #hint{bottom:4vh;font-size:10.5px}
+    #press{bottom:12vh;font-size:11px}
+    #card{left:5.4vw;bottom:calc(4.2vh + 40px);max-width:13em}
+    #toindex{right:5.4vw;top:3.4vh;font-size:10.5px}
+  }
+</style>
+</head>
+<body>
+<div id="fallback">
+  <div class="inner">
+    <h2>这里不是梦，也不是现实。<br>它是人在即将醒来时，看见的最后一层世界。</h2>
+    <p>醒梦标本册 —— 世界被压平在纸页之间，向下滚动，把它逐件解压。</p>
+    <nav>
+      <a href="#/articles">随笔</a><a href="#/projects">项目</a><a href="#/about">关于</a>
+    </nav>
+  </div>
+</div>
+<canvas id="gl"></canvas>
+<div id="scrollspace"></div>
+
+<h1 class="sr-only">这里不是梦，也不是现实。它是人在即将醒来时，看见的最后一层世界。世界应当始终保留一种感觉：它可能马上消失。</h1>
+<nav class="sr-only" aria-label="站内导航">
+  <a href="#/articles">随笔</a><a href="#/projects">项目</a><a href="#/about">关于</a>
+</nav>
+
+<div class="ui" id="brand">押花册<small>醒梦标本 · 卷一</small></div>
+<div class="ui" id="pagenote" aria-hidden="true">封面 · 目次</div>
+<div class="ui" id="hint" aria-hidden="true">向下滚动 —— 解压</div>
+<div class="ui" id="press" aria-hidden="true">正在压平世界 · 0%</div>
+<div class="ui" id="card" aria-hidden="true"><h3></h3><p></p></div>
+<a class="ui" id="toindex" href="#top">回到目次</a>
+<div class="ui" id="vignette"></div>
+
+<script src="vendor/three.min.js"></script>
+<script>
+(function(){
+"use strict";
+window.__swarmErr = null;
+function fail(e){
+  window.__swarmErr = (e && (e.stack||e.message)) || String(e);
+  document.body.classList.add('no-gl');
+  document.title = 'ERR';
+}
+window.addEventListener('error', function(ev){ fail(ev.error || ev.message); });
+(function(){
+  var ce = console.error;
+  console.error = function(){
+    try{ window.__swarmErr = Array.prototype.join.call(arguments,' ').slice(0,600); }catch(_e){}
+    return ce.apply(console, arguments);
+  };
+})();
+
+try{
+
+window.__HERB_VER = 5;
+
+/* ================= 参数解析（裸旗标兼容） ================= */
+var Q = {};
+location.search.replace(/[?&]([^=&]+)(?:=([^&]*))?/g, function(m,k,v){ Q[k]=(v===undefined)?'':v; return ''; });
+var AUTO  = ('auto'  in Q);
+var FAST  = ('fast'  in Q) ? 6 : 1;
+var PIN   = ('pin'   in Q) ? Math.min(1, Math.max(0, parseFloat(Q.pin))) : null;
+var STILL = ('still' in Q);
+var RM    = ('rm'    in Q) || (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+var INTRO_AT = ('intro' in Q) ? Math.min(0.999, Math.max(0, parseFloat(Q.intro))) : null;
+
+/* ================= 基础 ================= */
+var canvas = document.getElementById('gl');
+var renderer;
+try{
+  renderer = new THREE.WebGLRenderer({canvas:canvas, antialias:true, powerPreference:'high-performance'});
+}catch(e){ fail(e); return; }
+var DPR = Math.min(window.devicePixelRatio || 1, 1.5);
+renderer.setPixelRatio(DPR);
+renderer.setSize(Math.max(1,innerWidth), Math.max(1,innerHeight));
+
+var scene  = new THREE.Scene();
+var camera = new THREE.PerspectiveCamera(42, Math.max(0.2,innerWidth/Math.max(1,innerHeight)), 0.1, 400);
+scene.fog = new THREE.FogExp2(0xc7d2da, 0.030);
+
+/* ================= 调色板（醒=冷雾蓝灰 → 梦=暖玫瑰灰） ================= */
+function h2r(h){ return new THREE.Color(h); }
+var PAL = {
+  voidc: [h2r('#c7d2da'), h2r('#e2cabd')],
+  tint:  [h2r('#ffffff'), h2r('#f7e6d4')],
+  dust:  [h2r('#ffffff'), h2r('#f4ddc4')],
+  frost: [h2r('#dfe6ea'), h2r('#edd9cb')],
+  warm:  h2r('#e2b48a'),
+  gold:  h2r('#c79a4a')
+};
+var _bg=new THREE.Color(), _tint=new THREE.Color(), _dust=new THREE.Color(),
+    _frost=new THREE.Color(), _white=new THREE.Color('#ffffff');
+function lerpPal(pair, t, out){ return out.copy(pair[0]).lerp(pair[1], t); }
+function ss(a,b,x){ return THREE.MathUtils.smoothstep(x,a,b); }
+function easeIO(x){ return x<0.5 ? 4*x*x*x : 1-Math.pow(-2*x+2,3)/2; }
+
+/* ================= 手写雾 ================= */
+var FOG_D = 0.030;
+var fogUniforms=[];
+var NOISE2 = [
+  'float n2(vec2 p){',
+  '  vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);',
+  '  float a=fract(sin(dot(i,vec2(127.1,311.7)))*43758.5453);',
+  '  float b=fract(sin(dot(i+vec2(1.,0.),vec2(127.1,311.7)))*43758.5453);',
+  '  float c=fract(sin(dot(i+vec2(0.,1.),vec2(127.1,311.7)))*43758.5453);',
+  '  float d=fract(sin(dot(i+vec2(1.,1.),vec2(127.1,311.7)))*43758.5453);',
+  '  return mix(mix(a,b,f.x),mix(c,d,f.x),f.y);',
+  '}'
+].join('\n');
+var FOGFN = 'float fogF(float d){ return 1.0 - exp(-d*d*uFogD*uFogD); }';
+
+/* ================= 印页（CanvasTexture 印刷平面） ================= */
+var SHEET_W = 22, SHEET_H = 14, SHEET_T = 0.09;
+var CANW = 2048, CANH = 2048, USEH = 1303;      // 内容画在 1303 行内，POT 画布走 mipmap
+var FONT = '"Noto Serif SC","Songti SC","SimSun",serif';
+function px2wx(px){ return px/CANW*SHEET_W - SHEET_W/2; }
+function px2wz(py){ return py/USEH*SHEET_H - SHEET_H/2; }
+
+function grain(ctx, n, dark){
+  for(var i=0;i<n;i++){
+    var a = (dark?0.02:0.05)*Math.random();
+    ctx.fillStyle = 'rgba('+(dark?'58,69,80':'255,255,255')+','+a.toFixed(3)+')';
+    ctx.fillRect(Math.random()*CANW, Math.random()*USEH, 1+Math.random()*2, 1+Math.random()*2);
+  }
+}
+function regMark(ctx, x, y){
+  ctx.strokeStyle='rgba(58,69,80,.34)'; ctx.lineWidth=1.6;
+  ctx.beginPath(); ctx.moveTo(x-16,y); ctx.lineTo(x+16,y); ctx.moveTo(x,y-16); ctx.lineTo(x,y+16); ctx.stroke();
+  ctx.beginPath(); ctx.arc(x,y,7,0,Math.PI*2); ctx.stroke();
+}
+function furnit(ctx, pageName){
+  ctx.strokeStyle='rgba(58,69,80,.22)'; ctx.lineWidth=2;
+  ctx.strokeRect(64, 64, CANW-128, USEH-128);
+  regMark(ctx, 118, 118); regMark(ctx, CANW-118, 118);
+  regMark(ctx, 118, USEH-118); regMark(ctx, CANW-118, USEH-118);
+  ctx.fillStyle='rgba(58,69,80,.6)';
+  ctx.font='500 26px '+FONT; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(pageName, CANW-260, USEH-128);
+  ctx.textAlign='left';
+}
+function vertText(ctx, txt, x, y, px, spacing, col, w){
+  ctx.save();
+  ctx.fillStyle=col; ctx.font=(w||500)+' '+px+'px '+FONT;
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  var ty=y;
+  for(var i=0;i<txt.length;i++){ ctx.fillText(txt[i], x, ty); ty += px*spacing; }
+  ctx.restore();
+}
+function hText(ctx, txt, x, y, px, col, w, spacing, align){
+  ctx.save();
+  ctx.fillStyle=col; ctx.font=(w||500)+' '+px+'px '+FONT;
+  ctx.textAlign=align||'left'; ctx.textBaseline='alphabetic';
+  if(spacing){
+    var ls=px*spacing, xx=x;
+    for(var i=0;i<txt.length;i++){ ctx.fillText(txt[i], xx, y); xx += ctx.measureText(txt[i]).width + ls; }
+  } else ctx.fillText(txt, x, y);
+  ctx.restore();
+}
+
+/* —— 印痕：压平的百合 —— */
+function drawLilyStain(ctx, cx, cy, S, rnd){
+  ctx.save(); ctx.translate(cx,cy); ctx.rotate((rnd()-0.5)*0.16); ctx.scale(S,S);
+  // 茎
+  ctx.strokeStyle='rgba(163,138,116,.6)'; ctx.lineWidth=7; ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(6,30); ctx.quadraticCurveTo(-60,190,-215,315); ctx.stroke();
+  ctx.lineWidth=4;
+  ctx.beginPath(); ctx.moveTo(-10,120); ctx.quadraticCurveTo(-95,150,-150,120); ctx.stroke();
+  // 外轮六瓣
+  for(var k=0;k<6;k++){
+    var ang=k*Math.PI/3 + (rnd()-0.5)*0.24;
+    var len=300*(0.86+rnd()*0.26), w=112*(0.82+rnd()*0.34);
+    ctx.save(); ctx.rotate(ang);
+    ctx.beginPath(); ctx.moveTo(0,0);
+    ctx.bezierCurveTo(-w*0.55,-len*0.32, -w*0.6,-len*0.78, 0,-len);
+    ctx.bezierCurveTo( w*0.6,-len*0.78,  w*0.55,-len*0.32, 0,0);
+    ctx.fillStyle='rgba(216,182,174,.9)'; ctx.fill();
+    ctx.strokeStyle='rgba(196,156,148,.45)'; ctx.lineWidth=3; ctx.stroke();
+    ctx.restore();
+  }
+  // 内轮三瓣
+  for(k=0;k<3;k++){
+    ang=k*Math.PI*2/3 + Math.PI/3 + (rnd()-0.5)*0.2;
+    len=185*(0.9+rnd()*0.2), w=74*(0.85+rnd()*0.3);
+    ctx.save(); ctx.rotate(ang);
+    ctx.beginPath(); ctx.moveTo(0,0);
+    ctx.bezierCurveTo(-w*0.55,-len*0.34, -w*0.6,-len*0.8, 0,-len);
+    ctx.bezierCurveTo( w*0.6,-len*0.8,  w*0.55,-len*0.34, 0,0);
+    ctx.fillStyle='rgba(232,208,200,.92)'; ctx.fill();
+    ctx.restore();
+  }
+  // 芯与金粉
+  var g=ctx.createRadialGradient(0,0,4,0,0,52);
+  g.addColorStop(0,'rgba(186,142,132,.75)'); g.addColorStop(1,'rgba(186,142,132,0)');
+  ctx.fillStyle=g; ctx.beginPath(); ctx.arc(0,0,52,0,Math.PI*2); ctx.fill();
+  for(k=0;k<7;k++){
+    var a2=k*Math.PI*2/7+rnd()*0.4, r=58+rnd()*30;
+    ctx.fillStyle='rgba(185,138,62,'+(0.55+rnd()*0.35)+')';
+    ctx.beginPath(); ctx.arc(Math.cos(a2)*r, Math.sin(a2)*r, 3.5+rnd()*3, 0, Math.PI*2); ctx.fill();
+  }
+  ctx.restore();
+}
+/* —— 印痕：押碎的环 —— */
+function drawRingStain(ctx, cx, cy){
+  ctx.save(); ctx.translate(cx,cy); ctx.rotate(-0.12);
+  ctx.strokeStyle='rgba(150,170,186,.85)'; ctx.lineWidth=6; ctx.lineCap='round';
+  ctx.beginPath(); ctx.arc(0,0,92, 0.3, 2.6); ctx.stroke();
+  ctx.beginPath(); ctx.arc(0,0,92, 2.9, 5.3); ctx.stroke();
+  ctx.strokeStyle='rgba(150,170,186,.5)'; ctx.lineWidth=3;
+  ctx.beginPath(); ctx.arc(0,0,64, 3.6, 5.9); ctx.stroke();
+  ctx.beginPath(); ctx.arc(0,0,64, 0.2, 2.3); ctx.stroke();
+  ctx.strokeStyle='rgba(150,170,186,.4)'; ctx.lineWidth=4;
+  ctx.beginPath(); ctx.arc(9,-7,78, 4.4, 5.0); ctx.stroke();
+  ctx.restore();
+}
+/* —— 印痕：玻片 —— */
+function drawSlideStain(ctx, cx, cy){
+  ctx.save(); ctx.translate(cx,cy); ctx.rotate(0.05);
+  ctx.fillStyle='rgba(255,255,255,.4)';
+  ctx.fillRect(-85,-27,170,54);
+  ctx.strokeStyle='rgba(148,162,176,.85)'; ctx.lineWidth=3.5;
+  ctx.strokeRect(-85,-27,170,54);
+  ctx.lineWidth=1.8; ctx.strokeStyle='rgba(148,162,176,.55)';
+  ctx.beginPath(); ctx.moveTo(-30,-27); ctx.lineTo(-30,27); ctx.stroke();
+  ctx.strokeStyle='rgba(148,162,176,.3)';
+  ctx.beginPath(); ctx.moveTo(48,-18); ctx.lineTo(70,14); ctx.stroke();
+  ctx.restore();
+}
+function hairline(ctx, x1,y1,x2,y2, a){
+  ctx.strokeStyle='rgba(58,69,80,'+a+')'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+}
+
+/* 四张印页内容 */
+var R1 = (function(){ var s=7, r=function(){ s=(s*16807)%2147483647; return s/2147483647; }; return r; })();
+var sheetCanvases = {};
+function drawSheet1(ctx){
+  ctx.clearRect(0,0,CANW,USEH);
+  grain(ctx, 2400, true); grain(ctx, 1100, false);
+  furnit(ctx, '页 · 一');
+  vertText(ctx, '醒梦标本册 · 卷一', 128, 190, 26, 1.9, 'rgba(58,69,80,.62)');
+  hText(ctx, 'HERBARIUM · NO.01', 1950, 128, 22, 'rgba(58,69,80,.5)', 500, 0.14, 'right');
+  // 宣言
+  hText(ctx, '这里不是梦，', 140, 500, 132, '#3a4550', 600, 0.05);
+  hText(ctx, '也不是现实。', 356, 636, 74, 'rgba(58,69,80,.85)', 500, 0.08);
+  hText(ctx, '它是人在即将醒来时，', 140, 812, 62, 'rgba(58,69,80,.9)', 500, 0.06);
+  hText(ctx, '看见的最后一层世界。', 306, 900, 62, 'rgba(58,69,80,.9)', 500, 0.06);
+  // 目次注记 + 末页引线（右下）
+  hText(ctx, '压痕即入口 —— 触碰，下潜', 1240, 1128, 30, 'rgba(58,69,80,.55)', 500, 0.1);
+  hText(ctx, '余一句，压在末页', 1240, 1202, 34, 'rgba(58,69,80,.6)', 500, 0.12);
+  hairline(ctx, 1680, 1170, 1680, USEH-64, 0.4);
+  ctx.fillStyle='rgba(58,69,80,.5)';
+  ctx.beginPath(); ctx.moveTo(1680, USEH-70); ctx.lineTo(1672, USEH-92); ctx.lineTo(1688, USEH-92); ctx.closePath(); ctx.fill();
+  // 印痕组
+  drawLilyStain(ctx, 1330, 500, 1, R1);
+  hText(ctx, '百合 · 押于某夜', 1170, 896, 32, 'rgba(58,69,80,.78)', 600, 0.14);
+  hText(ctx, 'LILIUM NOCTE — 存随笔三篇', 1170, 940, 22, 'rgba(58,69,80,.5)', 500, 0.1);
+  hairline(ctx, 1170, 906, 1560, 906, 0.3);
+  drawRingStain(ctx, 450, 1075);
+  hText(ctx, '环 · 押于某次转身', 310, 1176, 26, 'rgba(58,69,80,.7)', 500, 0.12);
+  hText(ctx, '存项目二件', 310, 1214, 21, 'rgba(58,69,80,.5)', 500, 0.1);
+  drawSlideStain(ctx, 985, 1005);
+  hText(ctx, '玻片 · 押于自述一页', 870, 1096, 27, 'rgba(58,69,80,.7)', 500, 0.12);
+  hText(ctx, '存关于一页', 870, 1136, 22, 'rgba(58,69,80,.5)', 500, 0.1);
+}
+function drawSheet2(ctx){
+  ctx.clearRect(0,0,CANW,USEH);
+  grain(ctx, 2000, true);
+  furnit(ctx, '页 · 二');
+  hText(ctx, '项目 · 存二件', 140, 220, 44, 'rgba(58,69,80,.75)', 600, 0.2);
+  hText(ctx, 'PROJECTS — PRESSED AS COVERS', 140, 274, 22, 'rgba(58,69,80,.45)', 500, 0.12);
+  function cover(x,y,w,h,col,title,micro){
+    ctx.fillStyle=col; ctx.fillRect(x,y,w,h);
+    ctx.strokeStyle='rgba(58,69,80,.3)'; ctx.lineWidth=2;
+    ctx.strokeRect(x+16,y+16,w-32,h-32);
+    hText(ctx, title, x+40, y+h-56, 36, 'rgba(58,69,80,.85)', 600, 0.1);
+    hText(ctx, micro, x+40, y+h-24, 20, 'rgba(58,69,80,.5)', 500, 0.1);
+  }
+  cover(300, 430, 560, 400, 'rgba(178,196,208,.55)', '醒梦 · 视觉母题', 'MMXXVI · WIP');
+  cover(1000, 540, 560, 400, 'rgba(214,190,182,.55)', '个人网站', 'THIS SITE · LIVE');
+  hairline(ctx, 300, 1080, 1560, 1080, 0.22);
+  hText(ctx, '封面也被压平了 —— 打开时才立起来', 300, 1140, 28, 'rgba(58,69,80,.5)', 500, 0.1);
+  // 脱压痕：环从这里离页
+  ctx.save(); ctx.globalAlpha=0.4; drawRingStain(ctx, 128, 1040); ctx.restore();
+}
+function drawSheet3(ctx){
+  ctx.clearRect(0,0,CANW,USEH);
+  grain(ctx, 2000, true);
+  furnit(ctx, '页 · 三');
+  hText(ctx, '关于 · 存一页', 140, 220, 44, 'rgba(58,69,80,.75)', 600, 0.2);
+  hText(ctx, 'ABOUT — ONE PAGE, PRESSED', 140, 274, 22, 'rgba(58,69,80,.45)', 500, 0.12);
+  // 一笔侧影
+  ctx.strokeStyle='rgba(58,69,80,.6)'; ctx.lineWidth=4; ctx.lineCap='round'; ctx.lineJoin='round';
+  ctx.beginPath();
+  ctx.moveTo(880, 1010);
+  ctx.bezierCurveTo(880, 880, 900, 780, 980, 700);
+  ctx.bezierCurveTo(1000, 560, 1090, 470, 1200, 470);
+  ctx.bezierCurveTo(1300, 470, 1360, 540, 1350, 640);
+  ctx.bezierCurveTo(1344, 700, 1310, 730, 1316, 770);
+  ctx.bezierCurveTo(1320, 800, 1290, 812, 1268, 810);
+  ctx.bezierCurveTo(1260, 900, 1200, 960, 1120, 980);
+  ctx.bezierCurveTo(1160, 1050, 1240, 1080, 1330, 1080);
+  ctx.stroke();
+  hairline(ctx, 300, 1180, 1748, 1180, 0.25);
+  var lines=['生于某次春分','醒着，偶尔','收集安静的东西'];
+  for(var i=0;i<3;i++) hText(ctx, lines[i], 300+i*490, 1150, 30, 'rgba(58,69,80,.6)', 500, 0.14);
+  // 脱压痕：玻片从这里离页
+  ctx.save(); ctx.globalAlpha=0.35; drawSlideStain(ctx, 336, 986); ctx.restore();
+}
+function drawSheet4(ctx){
+  ctx.clearRect(0,0,CANW,USEH);
+  grain(ctx, 1600, true);
+  furnit(ctx, '页 · 肆 · 末');
+  ctx.save();
+  ctx.textAlign='center';
+  ctx.fillStyle='#a4762c'; ctx.font='600 96px '+FONT;
+  var ls=10, txt='它可能马上消失。', w=0, i;
+  for(i=0;i<txt.length;i++) w+=ctx.measureText(txt[i]).width+ls;
+  var xx=(CANW-w)/2;
+  ctx.textAlign='left';
+  for(i=0;i<txt.length;i++){ ctx.fillText(txt[i], xx, 660); xx+=ctx.measureText(txt[i]).width+ls; }
+  ctx.restore();
+  hText(ctx, '压于最后的夜', 1024, 748, 26, 'rgba(58,69,80,.4)', 500, 0.3, 'center');
+  ctx.save();
+  ctx.translate(1500, 900); ctx.rotate(-0.03);
+  ctx.strokeStyle='rgba(164,118,44,.8)'; ctx.lineWidth=4;
+  ctx.strokeRect(-64,-64,128,128);
+  ctx.fillStyle='rgba(164,118,44,.85)'; ctx.font='600 62px '+FONT;
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText('终', 0, 4);
+  ctx.restore();
+}
+
+/* 印页 mesh：顶面印刷 / 侧面纸边 / 底面暖光 */
+var sideCols = ['#ece6da','#e9e0d2','#e5dcc9','#e0d5c0'];
+var glowK    = [0.3, 0.62, 0.75, 1.0];
+var sheetXZ  = [[0,0],[3.5,0.3],[7,-0.2],[10.5,0.45]];
+var sheets = [];
+function makeSheet(i, drawer){
+  var cv = document.createElement('canvas'); cv.width=CANW; cv.height=CANH;
+  var ctx = cv.getContext('2d');
+  drawer(ctx);
+  sheetCanvases[i] = {cv:cv, draw:drawer};
+  var tex = new THREE.CanvasTexture(cv);
+  tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.repeat.set(1, USEH/CANH);
+  tex.offset.set(0, 1 - USEH/CANH);
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  var printMat = new THREE.MeshBasicMaterial({map:tex, transparent:true, opacity:(i===0?0:1)});
+  printMat.fog = true;
+  var paperMat = new THREE.MeshBasicMaterial({color:'#f3efe7'});
+  paperMat.fog = true;
+  var sideMat = new THREE.MeshBasicMaterial({color:sideCols[i]});
+  sideMat.fog = true;
+  var glowUni = {
+    uCol:{value:new THREE.Color('#f2cfae')},
+    uK:{value:glowK[i]}, uTime:{value:0}, uFogD:{value:FOG_D},
+    uFogCol:{value:new THREE.Color()}
+  };
+  fogUniforms.push(glowUni.uFogD);
+  var glowMat = new THREE.ShaderMaterial({
+    uniforms:glowUni, transparent:true, depthWrite:false,
+    vertexShader:[
+      'varying vec2 vUv; varying float vD;',
+      'void main(){ vUv=uv;',
+      '  vec4 mv = modelViewMatrix*vec4(position,1.0); vD=-mv.z;',
+      '  gl_Position = projectionMatrix*mv; }'
+    ].join('\n'),
+    fragmentShader:[
+      'uniform vec3 uCol, uFogCol; uniform float uK,uTime,uFogD;',
+      'varying vec2 vUv; varying float vD;',
+      FOGFN,
+      'void main(){',
+      '  float r = distance(vUv, vec2(0.5));',
+      '  float rad = 1.0 - smoothstep(0.1, 0.68, r);',
+      '  float a = uK * (0.3 + 0.7*rad) * (0.82 + 0.18*sin(uTime*0.5 + float('+i+')*1.7));',
+      '  float f = fogF(vD);',
+      '  vec3 col = mix(uCol, uFogCol, f);',
+      '  gl_FragColor = vec4(col, a*(1.0-f*0.85));',
+      '}'
+    ].join('\n')
+  });
+  var mats=[sideMat, sideMat, paperMat, glowMat, sideMat, sideMat];
+  var mesh = new THREE.Mesh(new THREE.BoxGeometry(SHEET_W, SHEET_T, SHEET_H), mats);
+  mesh.position.set(sheetXZ[i][0], -i*5.2, sheetXZ[i][1]);
+  mesh.renderOrder = 0;
+  scene.add(mesh);
+  // 印纹平面：略高于纸面，压制时才显影
+  var printMesh = new THREE.Mesh(new THREE.PlaneGeometry(SHEET_W, SHEET_H), printMat);
+  printMesh.rotation.x = -Math.PI/2;
+  printMesh.position.set(sheetXZ[i][0], -i*5.2 + SHEET_T/2 + 0.004, sheetXZ[i][1]);
+  printMesh.renderOrder = 1;
+  scene.add(printMesh);
+  var s = {mesh:mesh, printMesh:printMesh, printMat:printMat, paperMat:paperMat, glowUni:glowUni, i:i};
+  sheets.push(s);
+  return s;
+}
+makeSheet(0, drawSheet1);
+makeSheet(1, drawSheet2);
+makeSheet(2, drawSheet3);
+makeSheet(3, drawSheet4);
+
+var textRedraws = [];
+function redrawAll(){
+  for(var i=0;i<4;i++){
+    var sc = sheetCanvases[i];
+    sc.cv.getContext('2d').clearRect(0,0,CANW,CANH);
+    sc.draw(sc.cv.getContext('2d'));
+    sheets[i].printMat.map.needsUpdate = true;
+  }
+}
+textRedraws.push(redrawAll);
+
+/* ================= 磨砂玻璃 shader（共享） ================= */
+function frostMat(op, base){
+  var uni = {
+    uCol:{value:new THREE.Color(base||'#dfe6ea')},
+    uBase:{value:new THREE.Color(base||'#dfe6ea')},
+    uGlowCol:{value:new THREE.Color('#f6e3d0')},
+    uFogCol:{value:new THREE.Color()}, uFogD:{value:FOG_D},
+    uOp:{value:op}, uGlow:{value:0}, uOpMul:{value:1}, uFresK:{value:0.4},
+    uLight:{value:new THREE.Vector3(0.5,0.72,0.48)}
+  };
+  fogUniforms.push(uni.uFogD);
+  var mat = new THREE.ShaderMaterial({
+    uniforms:uni, transparent:true, depthWrite:false,
+    vertexShader:[
+      'varying vec3 vN, vW; varying vec2 vUv; varying float vD;',
+      'void main(){',
+      '  vUv=uv;',
+      '  vec4 wp = modelMatrix*vec4(position,1.0); vW=wp.xyz;',
+      '  vN = normalize(mat3(modelMatrix)*normal);',
+      '  vec4 mv = viewMatrix*wp; vD=-mv.z;',
+      '  gl_Position = projectionMatrix*mv;',
+      '}'
+    ].join('\n'),
+    fragmentShader:[
+      'uniform vec3 uCol,uGlowCol,uFogCol,uLight;',
+      'uniform float uOp,uGlow,uOpMul,uFresK,uFogD;',
+      'varying vec3 vN, vW; varying vec2 vUv; varying float vD;',
+      NOISE2, FOGFN,
+      'void main(){',
+      '  vec3 N=normalize(vN);',
+      '  vec3 V=normalize(cameraPosition - vW);',
+      '  vec3 L=normalize(uLight);',
+      '  float dL = dot(N,L)*0.5+0.5;',
+      '  dL = pow(dL, 1.6);',
+      '  float gr = n2(vW.xy*2.3 + vW.zx*1.7) - 0.5;',
+      '  vec3 col = uCol*(0.6 + 0.52*dL)*(1.0+gr*0.16);',
+      '  float bl = pow(clamp(dot(V,-L),0.0,1.0), 2.2);',
+      '  col += uGlowCol * bl * 0.5;',
+      '  float fres = pow(1.0-abs(dot(N,V)), 2.3);',
+      '  col += uGlowCol * fres * uFresK;',
+      '  col = mix(col, uGlowCol, uGlow*0.45);',
+      '  float f = fogF(vD);',
+      '  col = mix(col, uFogCol, f);',
+      '  float a = uOp*uOpMul*(1.0 - f*0.88);',
+      '  gl_FragColor = vec4(col, a);',
+      '}'
+    ].join('\n')
+  });
+  mat.frostUni = uni;
+  return mat;
+}
+
+/* ================= 百合（随笔） ================= */
+function petalGeo(L, W, cup, th0, th1, reflex){
+  var SEG=18, geo=new THREE.PlaneGeometry(1,1,4,SEG);
+  var pos=geo.attributes.position;
+  var spine=[], ths=[];
+  for(var i=0;i<=SEG;i++){
+    var v=i/SEG;
+    var th = th0 + (th1-th0)*(v*v*(3-2*v)) + reflex*ss(0.68,1,v);
+    ths.push(th);
+  }
+  var step=L/SEG, cx2=0, cy2=0, cz2=0;
+  for(i=0;i<=SEG;i++){
+    spine.push([cx2,cy2,cz2]);
+    var tm=(ths[i]+(i<SEG?ths[i+1]:ths[i]))/2;
+    cx2 += Math.sin(tm)*step*0.06;
+    cy2 += Math.cos(tm)*step;
+    cz2 += Math.sin(tm)*step;
+  }
+  function wProf(v){
+    return (0.3+0.7*Math.sin(Math.PI*Math.min(1,0.16+0.84*v)))*(1-0.9*ss(0.85,1,v));
+  }
+  for(var vi=0;vi<=SEG;vi++){
+    var v2=vi/SEG, w=W*wProf(v2);
+    for(var ui=0;ui<=4;ui++){
+      var u=ui/4-0.5;
+      var idx=vi*5+ui;
+      pos.setX(idx, u*w);
+      pos.setY(idx, spine[vi][1]);
+      pos.setZ(idx, spine[vi][2] + cup*w*w*0.85*(1-v2*0.35) + u*w*v2*0.18);
+    }
+  }
+  geo.computeVertexNormals();
+  return geo;
+}
+var lily = {grp:new THREE.Group(), petals:[], mats:[]};
+(function(){
+  var g=lily.grp;
+  var pg=new THREE.Group(); g.add(pg); lily.petalsGrp=pg;
+  var defs=[];
+  for(var k=0;k<6;k++) defs.push({L:2.55*(0.86+R1()*0.28), W:0.74*(0.84+R1()*0.32),
+    th1:1.30+(R1()-0.5)*0.3, reflex:0.36+R1()*0.16, yaw:k*Math.PI/3+(R1()-0.5)*0.16,
+    cup:0.3+R1()*0.2, inner:false, col:'#e8d5d0'});
+  for(k=0;k<3;k++) defs.push({L:1.58*(0.9+R1()*0.2), W:0.5*(0.85+R1()*0.3),
+    th1:0.92+(R1()-0.5)*0.14, reflex:0.1, yaw:k*Math.PI*2/3+Math.PI/3+(R1()-0.5)*0.14,
+    cup:0.24+R1()*0.14, inner:true, col:'#efe0da'});
+  for(k=0;k<defs.length;k++){
+    var d=defs[k];
+    var mat=frostMat(d.inner?0.9:0.86, d.col);
+    lily.mats.push(mat);
+    var mesh=new THREE.Mesh(petalGeo(d.L,d.W,d.cup,0.1,d.th1,d.reflex), mat);
+    mesh.renderOrder=6;
+    var pg2=new THREE.Group(); pg2.rotation.y=d.yaw; pg2.add(mesh); pg.add(pg2);
+    lily.petals.push(pg2);
+  }
+  // 金蕊
+  var goldMat=new THREE.MeshBasicMaterial({color:0xc79a4a}); goldMat.fog=true;
+  var filGeo=new THREE.PlaneGeometry(0.03,0.78,1,6);
+  (function(){
+    var pos=filGeo.attributes.position;
+    for(var i2=0;i2<pos.count;i2++){
+      var y=pos.getY(i2)+0.39;
+      pos.setX(i2, pos.getX(i2)+Math.pow(y/0.78,2)*0.3);
+      pos.setY(i2,y);
+    }
+    filGeo.computeVertexNormals();
+  })();
+  for(k=0;k<6;k++){
+    var fg=new THREE.Group();
+    var fm=new THREE.Mesh(filGeo, new THREE.MeshBasicMaterial({color:0xc79a4a,side:THREE.DoubleSide}));
+    fm.material.fog=true; fm.renderOrder=6;
+    var an=new THREE.Mesh(new THREE.BoxGeometry(0.05,0.16,0.035), goldMat);
+    an.position.set(0.3,0.82,0); an.rotation.z=-0.5; an.renderOrder=6;
+    fg.add(fm); fg.add(an);
+    fg.rotation.y=k*Math.PI/3+0.26; fg.rotation.x=-0.62;
+    fg.position.y=0.42;
+    pg.add(fg);
+  }
+  var pistil=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.065,0.5,8),
+    new THREE.MeshBasicMaterial({color:0xe6d9bf}));
+  pistil.material.fog=true; pistil.position.y=0.28; pistil.renderOrder=6;
+  pg.add(pistil);
+  g.position.set(3.28, 0.06, -1.63);
+  scene.add(g);
+  // 地面软影
+  var shCv=document.createElement('canvas'); shCv.width=shCv.height=128;
+  var sctx=shCv.getContext('2d');
+  var sg=sctx.createRadialGradient(64,64,4,64,64,62);
+  sg.addColorStop(0,'rgba(60,52,54,.5)'); sg.addColorStop(1,'rgba(60,52,54,0)');
+  sctx.fillStyle=sg; sctx.fillRect(0,0,128,128);
+  var shTex=new THREE.CanvasTexture(shCv);
+  lily.shadow=new THREE.Mesh(new THREE.PlaneGeometry(3.6,3.6),
+    new THREE.MeshBasicMaterial({map:shTex,transparent:true,opacity:0,depthWrite:false}));
+  lily.shadow.material.fog=true;
+  lily.shadow.rotation.x=-Math.PI/2;
+  lily.shadow.position.set(3.28, 0.055, -1.63);
+  lily.shadow.renderOrder=2;
+  scene.add(lily.shadow);
+})();
+
+/* ================= 环（项目） ================= */
+var ring = {grp:new THREE.Group()};
+(function(){
+  var mat=frostMat(0.72,'#b9c6cf');
+  ring.mat=mat;
+  var m=new THREE.Mesh(new THREE.TorusGeometry(1.5,0.16,20,88), mat);
+  m.renderOrder=7;
+  ring.grp.add(m);
+  ring.grp.position.set(-6.17, -5.11, 4.55);
+  scene.add(ring.grp);
+})();
+
+/* ================= 玻片（关于） ================= */
+var slide = {grp:new THREE.Group()};
+(function(){
+  var mat=frostMat(0.5,'#cfd8da');
+  slide.mat=mat;
+  var m=new THREE.Mesh(new THREE.BoxGeometry(1.5,0.06,3.3), mat);
+  m.renderOrder=7;
+  slide.grp.add(m);
+  // 玻片里压着的一小片暖光（关于这页的体温）
+  var gcv=document.createElement('canvas'); gcv.width=gcv.height=128;
+  var g4=gcv.getContext('2d');
+  var gg=g4.createRadialGradient(64,64,2,64,64,60);
+  gg.addColorStop(0,'rgba(244,205,158,.95)'); gg.addColorStop(0.55,'rgba(240,190,140,.5)'); gg.addColorStop(1,'rgba(240,190,140,0)');
+  g4.fillStyle=gg; g4.fillRect(0,0,128,128);
+  var gtex=new THREE.CanvasTexture(gcv);
+  var glow=new THREE.Mesh(new THREE.PlaneGeometry(1.05,2.3),
+    new THREE.MeshBasicMaterial({map:gtex,transparent:true,opacity:0.85,depthWrite:false}));
+  glow.material.fog=false;
+  glow.rotation.x=-Math.PI/2; glow.position.y=-0.02; glow.renderOrder=6;
+  slide.grp.add(glow);
+  var lbl=document.createElement('canvas'); lbl.width=256; lbl.height=64;
+  var c2=lbl.getContext('2d');
+  c2.fillStyle='rgba(243,239,231,.9)'; c2.fillRect(0,0,256,64);
+  c2.fillStyle='rgba(58,69,80,.85)'; c2.font='500 30px '+FONT;
+  c2.textAlign='center'; c2.textBaseline='middle';
+  c2.fillText('自述 · 压成一片', 128, 30);
+  c2.font='500 13px '+FONT;
+  c2.fillText('A B O U T', 128, 50);
+  c2.strokeStyle='rgba(58,69,80,.4)'; c2.strokeRect(6,6,244,52);
+  var tex=new THREE.CanvasTexture(lbl);
+  tex.minFilter=THREE.LinearFilter; tex.generateMipmaps=false;
+  var lm=new THREE.MeshBasicMaterial({map:tex,transparent:true,opacity:0.95,side:THREE.FrontSide});
+  lm.fog=true;
+  var lmesh=new THREE.Mesh(new THREE.PlaneGeometry(1.3,0.32), lm);
+  lmesh.rotation.x=0.62; lmesh.position.set(0,0.05,0.55); lmesh.renderOrder=8;
+  slide.grp.add(lmesh);
+  slide.mat.frostUni.uFresK.value=1.0;
+  slide.grp.position.set(-0.42, -10.33, 3.80);
+  scene.add(slide.grp);
+})();
+
+/* ================= 压板（加载页主角） ================= */
+var lid = (function(){
+  var mat=frostMat(0.0,'#dfe6ea');
+  mat.frostUni.uOp.value=0.4;
+  var m=new THREE.Mesh(new THREE.BoxGeometry(SHEET_W+3.5, 0.22, SHEET_H+3.5), mat);
+  m.position.set(1.5, 10.5, 0.2);
+  m.renderOrder=10;
+  m.visible=true;
+  scene.add(m);
+  return m;
+})();
+/* 压合时的三声轻响（印痕位置的暖光 ping） */
+var pings=[];
+(function(){
+  var cv=document.createElement('canvas'); cv.width=cv.height=128;
+  var c3=cv.getContext('2d');
+  var g3=c3.createRadialGradient(64,64,2,64,64,62);
+  g3.addColorStop(0,'rgba(240,205,160,.9)'); g3.addColorStop(1,'rgba(240,205,160,0)');
+  c3.fillStyle=g3; c3.fillRect(0,0,128,128);
+  var tex=new THREE.CanvasTexture(cv);
+  var pts=[[3.28,-1.63],[-6.17,4.55],[-0.42,3.80]];
+  for(var i=0;i<3;i++){
+    var m=new THREE.Mesh(new THREE.PlaneGeometry(4,4),
+      new THREE.MeshBasicMaterial({map:tex,transparent:true,opacity:0,depthWrite:false}));
+    m.material.fog=false;
+    m.rotation.x=-Math.PI/2;
+    m.position.set(pts[i][0],0.07,pts[i][1]);
+    m.renderOrder=3;
+    scene.add(m);
+    pings.push(m);
+  }
+})();
+
+/* ================= 金丝书签（夹在末页里：挂于页三底面，悬在末夹层） ================= */
+var ribbon=(function(){
+  var piv=new THREE.Group();
+  piv.position.set(14.0, -10.42, 2.5);
+  var mat=new THREE.MeshBasicMaterial({color:0xbd9145,transparent:true,opacity:0.92,side:THREE.DoubleSide});
+  mat.fog=true;
+  var m=new THREE.Mesh(new THREE.PlaneGeometry(0.18,3.6), mat);
+  m.position.y=-1.8;
+  m.renderOrder=4;
+  piv.add(m);
+  scene.add(piv);
+  return piv;
+})();
+
+/* ================= 浮尘 ================= */
+var DUST_N=230;
+var dustGeo=new THREE.BufferGeometry();
+(function(){
+  var pos=new Float32Array(DUST_N*3), seed=new Float32Array(DUST_N);
+  for(var i=0;i<DUST_N;i++){
+    pos[i*3]  =-11+Math.random()*24;
+    pos[i*3+1]= 6.5-Math.random()*23;
+    pos[i*3+2]=-7+Math.random()*15;
+    seed[i]=Math.random()*100;
+  }
+  dustGeo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  dustGeo.setAttribute('aSeed',new THREE.BufferAttribute(seed,1));
+})();
+var dustUni={uTime:{value:0},uPR:{value:DPR},uCol:{value:new THREE.Color()},uOp:{value:0.5}};
+var dust=new THREE.Points(dustGeo,new THREE.ShaderMaterial({
+  uniforms:dustUni,transparent:true,depthWrite:false,
+  vertexShader:[
+    'attribute float aSeed; uniform float uTime,uPR;',
+    'varying float vA;',
+    'void main(){',
+    '  vec3 p=position;',
+    '  p.y += sin(uTime*0.07+aSeed*1.3)*0.5;',
+    '  p.x += sin(uTime*0.05+aSeed*2.1)*0.4;',
+    '  vec4 mv=modelViewMatrix*vec4(p,1.0);',
+    '  float dist=max(1.5,-mv.z);',
+    '  gl_PointSize=min(120.0/dist,4.5)*uPR;',
+    '  vA=smoothstep(2.2,5.0,-mv.z)*(0.5+0.5*sin(uTime*0.6+aSeed*3.7));',
+    '  gl_Position=projectionMatrix*mv;',
+    '}'
+  ].join('\n'),
+  fragmentShader:[
+    'uniform vec3 uCol; uniform float uOp;',
+    'varying float vA;',
+    'void main(){',
+    '  float d=length(gl_PointCoord-0.5);',
+    '  float a=smoothstep(0.5,0.14,d)*vA*uOp;',
+    '  if(a<0.01) discard;',
+    '  gl_FragColor=vec4(uCol,a);',
+    '}'
+  ].join('\n')
+}));
+dust.renderOrder=9;
+scene.add(dust);
+
+/* ================= 相机路径（scrollP 纯函数；标本恒悬于印痕正上方的xz） ================= */
+var NARROW=false, DISTMUL=1;
+var KEYS=[
+  {p:0.00, pos:[ 0.5,13.8,12.6], look:[ 0.3, 0.0, 1.1]},
+  {p:0.26, pos:[ 2.2,10.6,10.4], look:[ 3.1, 1.9,-1.3]},
+  {p:0.44, pos:[16.8, 2.6, 9.6], look:[-1.0,-3.0,-1.0]},
+  {p:0.58, pos:[12.5,-2.6, 6.6], look:[ 0.0,-3.1, 1.5]},
+  {p:0.70, pos:[-1.5,-2.85, 9.2], look:[-6.2,-3.0, 4.2]},
+  {p:0.78, pos:[-9.6,-4.8, 6.6], look:[-4.5,-6.4, 4.6]},
+  {p:0.86, pos:[-0.2,-8.8,11.6], look:[-0.35,-7.7, 3.4]},
+  {p:0.93, pos:[-5.8,-12.6, 4.8],look:[ 2.0,-14.4, 0.0]},
+  {p:1.00, pos:[ 4.0,-11.8, 7.8],look:[10.1,-15.4, 0.2]}
+];
+var CAM={pos:new THREE.Vector3(),look:new THREE.Vector3()};
+var _p1=new THREE.Vector3(),_p2=new THREE.Vector3(),_l1=new THREE.Vector3(),_l2=new THREE.Vector3();
+function updateCamera(p, t){
+  var a=KEYS[0], b=KEYS[KEYS.length-1], u=0;
+  for(var i=0;i<KEYS.length-1;i++){
+    if(p>=KEYS[i].p && p<=KEYS[i+1].p){
+      a=KEYS[i]; b=KEYS[i+1];
+      u=(p-a.p)/Math.max(0.0001,b.p-a.p);
+      break;
+    }
+  }
+  if(p<KEYS[0].p){ a=b=KEYS[0]; u=0; }
+  if(p>KEYS[KEYS.length-1].p){ a=b=KEYS[KEYS.length-1]; u=0; }
+  var e=u*u*(3-2*u);
+  _p1.fromArray(a.pos); _p2.fromArray(b.pos);
+  _l1.fromArray(a.look); _l2.fromArray(b.look);
+  CAM.pos.copy(_p1).lerp(_p2,e);
+  CAM.look.copy(_l1).lerp(_l2,e);
+  // 窄屏：Act I 拉远至完整取景整页（不切字），深处回落 1.6
+  if(DISTMUL!==1){
+    var K = p<0.46 ? 1.6 + 0.72*(1-ss(0.26,0.46,p)) : 1.6;
+    CAM.pos.sub(CAM.look).multiplyScalar(K).add(CAM.look);
+  }
+  // 活体微息（静帧 t=0 时自然归零）
+  CAM.pos.x += Math.sin(t*0.21)*0.07;
+  CAM.pos.y += Math.sin(t*0.17+2.0)*0.05;
+  CAM.look.x += Math.sin(t*0.13+1.0)*0.05;
+  camera.position.copy(CAM.pos);
+  camera.lookAt(CAM.look);
+}
+
+/* ================= 交互：印痕 hover / 点击下潜 ================= */
+var ENTRIES=[
+  {id:'lily', name:'百合 <em>·</em> 随笔', sub:'存三篇 —— 点击印痕下潜', p:0.26,
+   stain:[3.28,-1.63], hitR:3.3},
+  {id:'ring', name:'环 <em>·</em> 项目', sub:'存二件 —— 点击印痕下潜', p:0.70,
+   stain:[-6.17,4.55], hitR:1.9},
+  {id:'slide', name:'玻片 <em>·</em> 关于', sub:'存一页 —— 点击印痕下潜', p:0.86,
+   stain:[-0.42,3.80], hitR:1.9}
+];
+var hitMeshes=[], artHits=[];
+ENTRIES.forEach(function(E,i){
+  var h=new THREE.Mesh(new THREE.CircleGeometry(E.hitR,20),
+    new THREE.MeshBasicMaterial({transparent:true,opacity:0,depthWrite:false}));
+  h.rotation.x=-Math.PI/2;
+  h.position.set(E.stain[0],0.12,E.stain[1]);
+  h.userData.entry=i;
+  scene.add(h); hitMeshes.push(h);
+  var h2=new THREE.Mesh(new THREE.SphereGeometry(Math.max(1.1,E.hitR*0.8),10,8),
+    new THREE.MeshBasicMaterial({transparent:true,opacity:0,depthWrite:false}));
+  h2.userData.entry=i;
+  scene.add(h2); hitMeshes.push(h2); artHits.push(h2);
+});
+var raycaster=new THREE.Raycaster(), pointer=new THREE.Vector2(-9,-9), pointerOn=false;
+var hoverIdx=-1, hoverK=[0,0,0];
+var cardEl=document.getElementById('card');
+var cardShown=-1;
+function setCard(i){
+  if(cardShown===i) return;
+  cardShown=i;
+  if(i<0){ cardEl.classList.remove('on'); return; }
+  cardEl.querySelector('h3').innerHTML=ENTRIES[i].name;
+  cardEl.querySelector('p').textContent=ENTRIES[i].sub;
+  cardEl.classList.add('on');
+}
+function doRaycast(){
+  if(!pointerOn||!introDone) return;
+  raycaster.setFromCamera(pointer,camera);
+  var hits=raycaster.intersectObjects(hitMeshes,false);
+  var idx=-1;
+  if(hits.length) idx=hits[0].object.userData.entry;
+  if(idx!==hoverIdx){ hoverIdx=idx; setCard(idx); canvas.style.cursor=idx>=0?'pointer':''; }
+}
+canvas.addEventListener('pointermove',function(ev){
+  pointer.x=(ev.clientX/innerWidth)*2-1;
+  pointer.y=-(ev.clientY/innerHeight)*2+1;
+  pointerOn=true;
+  doRaycast();
+});
+canvas.addEventListener('pointerleave',function(){ pointerOn=false; hoverIdx=-1; setCard(-1); canvas.style.cursor=''; });
+canvas.addEventListener('click',function(){
+  if(introT<1) return;
+  if(hoverIdx>=0){
+    var E=ENTRIES[hoverIdx];
+    var max=Math.max(1,space.offsetHeight-innerHeight);
+    window.scrollTo({top:max*E.p, behavior:'smooth'});
+  }
+});
+
+/* ================= 加载页：压制 ================= */
+var INTRO_LEN = RM||STILL||PIN!==null ? 0.001 : (AUTO ? 1.9 : 3.4);
+var introT = (INTRO_LEN<=0.01) ? 1 : 0;
+var introDone=false;
+var pressEl=document.getElementById('press');
+var lastPct=-1;
+function finalizeIntro(){
+  if(introDone) return;
+  introDone=true;
+  lid.visible=false;
+  for(var i=0;i<3;i++) pings[i].material.opacity=0;
+  pressEl.classList.add('off');
+  document.body.classList.add('ready');
+  sheets[0].printMat.opacity=1;
+}
+function skipIntro(){ if(AUTO||RM||STILL) return; if(introT<1){ introT=1; finalizeIntro(); } }
+['wheel','touchstart','keydown'].forEach(function(ev){
+  window.addEventListener(ev, skipIntro, {passive:true});
+});
+function updateIntro(dt){
+  if(introDone){ return; }
+  if(INTRO_AT!==null){ introT=INTRO_AT; }
+  else introT=Math.min(1, introT+dt/INTRO_LEN);
+  var t=introT;
+  // 压板
+  if(t<0.34){
+    lid.position.y=14.5-(14.5-0.34)*easeIO(Math.min(1,t/0.34));
+    lid.material.frostUni.uOp.value=0.4*Math.min(1,t*4);
+    lid.position.x=1.5;
+  }else if(t<0.58){
+    lid.position.y=0.34;
+    // 三声压合轻响
+  }else{
+    var u2=ss(0.58,0.96,t);
+    lid.position.y=0.34+(18.0-0.34)*easeIO(u2);
+    lid.position.x=1.5+u2*5.5;
+    lid.material.frostUni.uOp.value=0.4*(1-u2);
+  }
+  // 印纹显现（压合瞬间）
+  sheets[0].printMat.opacity=ss(0.34,0.52,t);
+  for(var i=0;i<3;i++){
+    var tg=0.36+i*0.07;
+    var d2=t-tg;
+    if(d2>0&&d2<0.18){
+      pings[i].material.opacity=(1-d2/0.18)*0.55;
+      var s=1+d2*16;
+      pings[i].scale.set(s,s,1);
+    }else pings[i].material.opacity=0;
+  }
+  // 进度字
+  var pct=Math.round(t*100);
+  if(pct!==lastPct){
+    lastPct=pct;
+    pressEl.textContent = t<0.55 ? '正在压平世界 · '+pct+'%' : '压制完毕 · '+pct+'%';
+  }
+  if(t>=1) finalizeIntro();
+}
+
+/* ================= 滚动与主循环 ================= */
+var space=document.getElementById('scrollspace');
+function readScroll(){
+  var max=space.offsetHeight-innerHeight;
+  return max>0?Math.min(1,Math.max(0,window.scrollY/max)):0;
+}
+var targetP=0, smoothP=0;
+function enforceScrollHold(){
+  if(PIN!==null&&!STILL){ targetP=PIN; window.scrollTo(0,(space.offsetHeight-innerHeight)*PIN); }
+}
+enforceScrollHold();
+targetP=(PIN!==null)?PIN:readScroll();
+smoothP=targetP;
+
+var CN=['封面 · 目次','目次 · 解压中','册侧','夹层 · 一','夹层 · 二','将近末页','末页'];
+var NOTE_P=[0.035,0.3,0.5,0.755,0.9,0.96];
+var noteEl=document.getElementById('pagenote');
+var hintEl=document.getElementById('hint');
+var toidxEl=document.getElementById('toindex');
+var lastNote='', lastHint=null, lastIdx=null;
+toidxEl.addEventListener('click',function(ev){
+  ev.preventDefault();
+  var max=Math.max(1,space.offsetHeight-innerHeight);
+  window.scrollTo({top:max*0.1,behavior:'smooth'});
+});
+window.addEventListener('scroll',skipIntro,{passive:true});
+window.addEventListener('scroll',function(){
+  if(PIN===null&&!AUTO) targetP=readScroll();
+  if(RM||STILL){ smoothP=(PIN!==null)?PIN:readScroll(); update(smoothP,0); renderer.render(scene,camera); }
+},{passive:true});
+
+/* —— 状态更新（纯函数；位姿就地写入） —— */
+var _lilyY=new THREE.Vector3();
+function update(p, t){
+  var dream=ss(0.3,0.95,p);
+  var introK=0.74+0.26*ss(0.34,0.9,introT);
+  lerpPal(PAL.voidc,dream,_bg).multiplyScalar(introK);
+  renderer.setClearColor(_bg);
+  scene.fog.color.copy(_bg);
+  lerpPal(PAL.tint,dream,_tint);
+  for(var i=0;i<4;i++){
+    sheets[i].printMat.color.copy(_tint);
+    sheets[i].paperMat.color.copy(_tint).multiplyScalar(0.965);
+    sheets[i].glowUni.uFogCol.value.copy(_bg);
+    sheets[i].glowUni.uTime.value=t;
+  }
+  lerpPal(PAL.dust,dream,_dust);
+  dustUni.uCol.value.copy(_dust);
+  dustUni.uTime.value=t;
+  lerpPal(PAL.frost,dream,_frost);
+  var fcol=_frost;
+
+  // —— 百合：解压参数 ——
+  var lb=ss(0.05,0.28,p);
+  var hb=hoverIdx===0?hoverK[0]:0;
+  var rise=ss(0.06,0.9,lb);
+  lily.grp.position.y=0.06+2.32*rise;
+  lily.grp.position.x=3.28+Math.sin(t*0.16)*0.05;
+  var sy=0.045+0.955*ss(0.0,0.5,lb);
+  lily.petalsGrp.scale.set(1,Math.max(0.02,sy),1);
+  lily.petalsGrp.rotation.y=t*0.02;
+  var pitch=-1.05*(1-ss(0.28,1,lb));
+  for(i=0;i<lily.petals.length;i++) lily.petals[i].rotation.x=pitch;
+  for(i=0;i<lily.mats.length;i++){
+    lily.mats[i].frostUni.uOpMul.value=lb*(0.35+0.65*Math.min(1,lb*1.4));
+    lily.mats[i].frostUni.uGlow.value=hb*0.7;
+    lily.mats[i].frostUni.uCol.value.copy(lily.mats[i].frostUni.uBase.value).lerp(PAL.warm,0.12*hb+0.08*dream);
+    lily.mats[i].frostUni.uFogCol.value.copy(_bg);
+  }
+  lily.shadow.material.opacity=0.22*rise*(1-rise*0.35);
+  lily.shadow.scale.setScalar(1+rise*0.4);
+  // —— 环 ——
+  var rb=ss(0.52,0.66,p);
+  var hb1=hoverIdx===1?hoverK[1]:0;
+  ring.grp.position.y=-5.11+2.76*easeIO(rb)+Math.sin(t*0.4+1)*0.07*rb;
+  ring.grp.scale.set(1,Math.max(0.02,0.04+0.96*rb),1);
+  ring.grp.rotation.x=-0.42*rb+Math.sin(t*0.3)*0.04*rb;
+  ring.grp.rotation.y=t*0.1*rb;
+  ring.mat.frostUni.uOpMul.value=Math.min(1,rb*1.5);
+  ring.mat.frostUni.uGlow.value=hb1*0.7;
+  ring.mat.frostUni.uCol.value.copy(ring.mat.frostUni.uBase.value).lerp(PAL.warm,0.12*hb1+0.08*dream);
+  ring.mat.frostUni.uFogCol.value.copy(_bg);
+  // —— 玻片 ——
+  var sb=ss(0.70,0.84,p);
+  var hb2=hoverIdx===2?hoverK[2]:0;
+  slide.grp.position.y=-10.33+2.78*easeIO(sb)+Math.sin(t*0.34+2)*0.06*sb;
+  slide.grp.scale.set(1,Math.max(0.02,0.04+0.96*sb),1);
+  slide.grp.rotation.z=0.09*sb+Math.sin(t*0.27)*0.04*sb;
+  slide.grp.rotation.y=0.2*sb;
+  slide.grp.rotation.x=-0.5*sb;
+  slide.mat.frostUni.uOpMul.value=Math.min(1,sb*1.5);
+  slide.mat.frostUni.uGlow.value=hb2*0.7;
+  slide.mat.frostUni.uCol.value.copy(slide.mat.frostUni.uBase.value).lerp(PAL.warm,0.12*hb2+0.08*dream);
+  slide.mat.frostUni.uFogCol.value.copy(_bg);
+  // 命中球跟随标本
+  artHits[0].position.set(lily.grp.position.x, lily.grp.position.y+0.4, lily.grp.position.z);
+  artHits[1].position.copy(ring.grp.position);
+  artHits[2].position.copy(slide.grp.position);
+  // —— 丝带 ——
+  ribbon.rotation.x=Math.sin(t*0.4)*0.045*(RM?0:1);
+  ribbon.rotation.z=Math.sin(t*0.31+1)*0.03*(RM?0:1);
+  // —— hover 辉光插值（raycast 在 pointermove 事件里做） ——
+  if(!pointerOn&&hoverIdx>=0){ hoverIdx=-1; setCard(-1); canvas.style.cursor=''; }
+  for(i=0;i<3;i++){
+    var want=(hoverIdx===i)?1:0;
+    hoverK[i]+= (want-hoverK[i])*0.14;
+    if(hoverK[i]<0.004&&want===0) hoverK[i]=0;
+  }
+  // —— 相机 / DOM ——
+  updateCamera(p,t);
+  var note=CN[0];
+  for(i=0;i<NOTE_P.length;i++) if(p>NOTE_P[i]) note=CN[i+1];
+  if(note!==lastNote){ noteEl.textContent=note; lastNote=note; }
+  var hintWant=(introDone&&p<0.03&&!STILL);
+  if(hintWant!==lastHint){ document.body.classList.toggle('hintable',hintWant); lastHint=hintWant; }
+  var idxWant=p>0.42;
+  if(idxWant!==lastIdx){ toidxEl.classList.toggle('on',idxWant); lastIdx=idxWant; }
+}
+/* updateIntro 由 loop 供 dt；上式占位避免双调，见 loop */
+
+var clockT=0, lastNow=null;
+function loop(now){
+  if(lastNow===null) lastNow=now;
+  var dt=Math.min(0.05,(now-lastNow)/1000);
+  lastNow=now; clockT+=dt;
+  if(AUTO) targetP=autoP(now);
+  else if(PIN===null&&!STILL) targetP=readScroll();
+  smoothP+=(targetP-smoothP)*Math.min(1,dt*4.4);
+  if(Math.abs(targetP-smoothP)<0.0004) smoothP=targetP;
+  updateIntro(dt*(AUTO?FAST:1)*(RM?0:1)||0);
+  update(smoothP,clockT);
+  renderer.render(scene,camera);
+  if(!STILL&&!RM) requestAnimationFrame(loop);
+}
+
+/* ================= ?auto 定时驱动 ================= */
+var SCHED=[[0,0],[2.2,0],[3.6,0.10],[5.2,0.26],[7,0.44],[8.8,0.58],[10.6,0.70],[12.4,0.86],[14.2,0.95],[16,1],[17.6,1]];
+var autoT0=null;
+function autoP(now){
+  if(autoT0===null) autoT0=now;
+  var t=((now-autoT0)*FAST/1000)%(SCHED[SCHED.length-1][0]+0.0001);
+  for(var i=0;i<SCHED.length-1;i++){
+    if(t>=SCHED[i][0]&&t<=SCHED[i+1][0]){
+      var a=SCHED[i],b=SCHED[i+1];
+      var u=(t-a[0])/Math.max(0.001,b[0]-a[0]);
+      return a[1]+(b[1]-a[1])*(u*u*(3-2*u));
+    }
+  }
+  return 1;
+}
+
+/* ================= 视口 ================= */
+function onResize(){
+  var w=Math.max(1,innerWidth), h=Math.max(1,innerHeight);
+  var aspect=w/h;
+  NARROW=aspect<0.8;
+  camera.fov=NARROW?57:42;
+  DISTMUL=NARROW?1.6:1;
+  // 窄屏机位拉远，雾密度随之降低防洗白
+  FOG_D = NARROW?0.012:0.030;
+  scene.fog.density = FOG_D;
+  for(var i=0;i<fogUniforms.length;i++) fogUniforms[i].value=FOG_D;
+  camera.aspect=aspect;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w,h);
+  if(STILL||RM){ updateCamera(smoothP,0); update(smoothP,0); renderer.render(scene,camera); }
+}
+window.addEventListener('resize',onResize);
+
+/* ================= 无头验证接口 ================= */
+window.__renderOnce=function(p){
+  smoothP=targetP=Math.min(1,Math.max(0,p===undefined?smoothP:p));
+  if(introT<1){ introT=1; finalizeIntro(); }
+  update(smoothP,clockT);
+  renderer.render(scene,camera);
+};
+window.__mockSnap=function(){
+  var c=renderer.domElement;
+  if(!c.width||!c.height||c.width!==Math.floor(innerWidth*DPR)||c.height!==Math.floor(innerHeight*DPR)) onResize();
+  loop(performance.now());
+  return c.toDataURL('image/png');
+};
+window.__mockDbg={scene:scene,camera:camera,ENTRIES:ENTRIES};
+
+/* ================= 字体就绪重绘印页 ================= */
+if(document.fonts&&document.fonts.ready){
+  document.fonts.ready.then(function(){
+    for(var i=0;i<textRedraws.length;i++) textRedraws[i]();
+    if(RM||STILL){ update(smoothP,0); renderer.render(scene,camera); }
+  }).catch(function(){});
+}
+
+onResize();
+if(INTRO_AT!==null) updateIntro(0);
+if(introT>=1) finalizeIntro();
+if(RM||STILL){ update(smoothP,0); renderer.render(scene,camera); }
+else requestAnimationFrame(loop);
+
+}catch(e){ fail(e); }
+})();
+</script>
+</body>
+</html>

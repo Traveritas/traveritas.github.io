@@ -1,0 +1,1436 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>压印 · 醒梦</title>
+<meta name="theme-color" content="#ece8de">
+<link rel="preconnect" href="https://fastly.jsdelivr.net" crossorigin>
+<link rel="stylesheet" href="https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5.0.5/500.css">
+<link rel="stylesheet" href="https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5.0.5/600.css">
+<style>
+  :root{ --ink:#37424d; --ink-faint:#5f6a75; --gold:#a9853f; }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:auto}
+  body{
+    background:#ccd6dc;
+    font-family:"Noto Serif SC", serif;
+    color:var(--ink);
+    overflow-x:hidden;
+  }
+  #fallback{
+    position:fixed;inset:0;z-index:0;display:none;
+    background:linear-gradient(160deg,#d8dcdf 0%,#e3ddd6 55%,#efe3d5 100%);
+  }
+  body.no-gl #fallback{display:block}
+  canvas#gl{position:fixed;inset:0;width:100%;height:100%;z-index:1;display:block}
+  #scrollspace{height:470vh;position:relative;z-index:0;pointer-events:none}
+
+  /* ══ DOM UI 层 ══ */
+  .ui{position:fixed;z-index:10}
+  #brand{
+    top:4.4vh;left:4vw;
+    font-size:15px;font-weight:600;letter-spacing:.3em;color:var(--ink);
+    opacity:0;transition:opacity .9s ease .15s;
+  }
+  body.ready #brand{opacity:1}
+  #brand small{
+    display:block;margin-top:7px;
+    font-size:10px;font-weight:500;letter-spacing:.32em;color:var(--ink-faint);opacity:.72;
+  }
+  /* 印次：顶右小字 + 五枚印次点 */
+  #pressinfo{
+    top:4.8vh;right:4vw;text-align:right;
+    font-size:10.5px;letter-spacing:.34em;color:var(--ink-faint);
+    opacity:0;transition:opacity .9s ease .3s;
+  }
+  body.ready #pressinfo{opacity:.92}
+  #pressinfo .dots{display:flex;gap:7px;justify-content:flex-end;margin-top:8px}
+  #pressinfo .dots i{
+    width:5px;height:5px;border-radius:50%;
+    border:1px solid var(--ink-faint);opacity:.5;
+    transition:background .5s ease,opacity .5s ease,transform .5s ease;
+    transform:scale(.86);
+  }
+  #pressinfo .dots i.on{background:var(--ink);border-color:var(--ink);opacity:.85;transform:scale(1)}
+  #pressinfo .dots i.gold{border-color:var(--gold)}
+  #pressinfo .dots i.gold.on{background:var(--gold);border-color:var(--gold)}
+
+  /* 版权页：版记（JS 投影锚定到纸面左下框内；窄屏退化为视口固定） */
+  #colophon{
+    left:0;top:0;z-index:10;
+    width:236px;padding:14px 4px 10px 16px;
+    opacity:0;transform:translateY(10px);
+    transition:opacity 1.1s ease,transform 1.1s cubic-bezier(.22,.9,.3,1),filter .8s ease;
+    pointer-events:none;
+    filter:grayscale(.4) opacity(.52);        /* 未上墨：淡 */
+  }
+  #colophon.on{opacity:.62;transform:translateY(0);pointer-events:auto}
+  #colophon.on.inked{opacity:1}
+  #colophon.inked{filter:none}
+  #colophon h2{
+    font-size:10px;font-weight:500;letter-spacing:.5em;color:var(--ink-faint);
+    margin-bottom:9px;
+  }
+  #colophon .row{display:flex;align-items:baseline;gap:10px;margin:8px 0;text-decoration:none}
+  /* 活字钉：镜像小铅字，hover 翻正上墨 */
+  #colophon .nail{
+    flex:0 0 auto;width:19px;height:19px;
+    display:flex;align-items:center;justify-content:center;
+    background:linear-gradient(150deg,#5a646d,#454f58);
+    border-radius:2.5px;
+    box-shadow:0 1px 0 rgba(255,255,255,.35) inset,0 1px 2px rgba(40,50,60,.25);
+    transform:translateY(1.5px);
+  }
+  #colophon .nail span{
+    display:block;font-size:11.5px;font-weight:600;color:#dfe5e9;
+    transform:scaleX(-1);                       /* 活字是反的 */
+    transition:transform .45s cubic-bezier(.3,1.4,.4,1),color .45s ease;
+  }
+  #colophon .row:hover .nail{background:linear-gradient(150deg,#4d5761,#333d46)}
+  #colophon .row:hover .nail span{transform:scaleX(0);color:#f2ede2}  /* 翻正：中途翻过背面 */
+  #colophon .row:hover .nail span{animation:nailflip .55s cubic-bezier(.3,1.2,.4,1) forwards}
+  @keyframes nailflip{
+    0%{transform:scaleX(-1);color:#dfe5e9}
+    49%{transform:scaleX(0);color:#dfe5e9}
+    51%{transform:scaleX(0);color:#2c353d}
+    100%{transform:scaleX(1);color:#f2ede2}
+  }
+  #colophon .t{
+    font-size:13px;font-weight:500;letter-spacing:.22em;color:var(--ink);
+    transition:letter-spacing .35s ease;
+  }
+  #colophon .row:hover .t{letter-spacing:.3em}
+  #colophon .lead{
+    flex:1 1 auto;height:1px;position:relative;top:-3px;
+    background-image:radial-gradient(circle,rgba(55,66,77,.55) .8px,transparent 1.1px);
+    background-size:6px 3px;background-repeat:repeat-x;opacity:.7;
+  }
+  #colophon .d{
+    flex:0 0 auto;font-size:10px;letter-spacing:.14em;color:var(--ink-faint);
+  }
+
+  #hint{
+    right:4vw;bottom:4.6vh;
+    font-size:11px;letter-spacing:.32em;color:var(--ink-faint);
+    opacity:.85;transition:opacity .8s ease;
+  }
+  #hint.off{opacity:0}
+  #vignette{
+    inset:0;z-index:5;pointer-events:none;
+    background:
+      linear-gradient(to bottom, rgba(90,86,80,.07), rgba(90,86,80,0) 22%),
+      radial-gradient(ellipse 126% 106% at 50% 46%, rgba(0,0,0,0) 58%, rgba(74,66,60,.14) 100%);
+  }
+
+  /* ══ 无 GL 静态回退：宣言直接以 DOM 排出 ══ */
+  #staticManifesto{
+    position:fixed;inset:0;z-index:2;display:none;
+    padding:16vh 8vw;
+  }
+  body.no-gl #staticManifesto{display:block}
+  #staticManifesto .s1{font-size:max(1.8rem,4vw);font-weight:600}
+  #staticManifesto .s2{font-size:.95rem;letter-spacing:.35em;color:var(--ink-faint);margin-top:1.4rem}
+  #staticManifesto .s3{font-size:max(1.2rem,2.4vw);margin-top:9vh;color:var(--ink-soft,#4d5a64)}
+  #staticManifesto .s4{font-size:max(1.5rem,3.2vw);font-weight:600;margin-top:1.2rem}
+
+  .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+  /* ══ 加载页：活字排版 ══ */
+  #loader{
+    position:fixed;inset:0;z-index:40;
+    background:
+      radial-gradient(70vw 60vh at 18% 8%, rgba(169,189,201,.16), transparent 70%),
+      radial-gradient(60vw 55vh at 86% 92%, rgba(216,196,201,.15), transparent 70%),
+      #ece8de;
+    transition:opacity .65s ease;
+  }
+  #loader.done{opacity:0;pointer-events:none}
+  .ld-brand{
+    position:absolute;top:4.4vh;left:4vw;
+    font-size:14px;font-weight:600;letter-spacing:.34em;color:var(--ink);
+  }
+  .ld-brand small{display:block;margin-top:6px;font-size:9.5px;letter-spacing:.3em;color:var(--ink-faint);font-weight:500}
+  .ld-status{
+    position:absolute;top:4.8vh;right:4vw;text-align:right;
+    font-size:10.5px;letter-spacing:.36em;color:var(--ink-faint);
+  }
+  .ld-status .rule{
+    display:block;height:1px;width:130px;margin:9px 0 0 auto;
+    background:rgba(55,66,77,.16);position:relative;overflow:hidden;
+  }
+  .ld-status .rule i{
+    position:absolute;left:0;top:0;bottom:0;width:0%;
+    background:var(--ink);transition:width .3s ease;
+  }
+  #ldForm{
+    position:absolute;left:50%;top:50%;transform:translate(-50%,-52%);
+    display:flex;flex-direction:column;gap:clamp(14px,2.6vh,26px);
+    width:min(80vw,760px);
+  }
+  .ld-line{
+    display:flex;justify-content:flex-start;gap:.14em;
+    font-size:clamp(19px,3vw,36px);
+  }
+  .ld-line:nth-child(1){margin-left:6%}
+  .ld-line:nth-child(2){margin-left:34%}
+  .ld-line:nth-child(3){margin-left:2%}
+  .ld-line:nth-child(4){margin-left:18%}
+  .ld-t{
+    width:1.28em;height:1.28em;flex:0 0 auto;
+    display:flex;align-items:center;justify-content:center;
+    background:linear-gradient(152deg,#59636c,#414b54);
+    border-radius:.06em;position:relative;
+    box-shadow:0 1px 0 rgba(255,255,255,.3) inset,0 2px 3px rgba(40,50,60,.18);
+    opacity:0;transform:translateY(-14px);
+    transition:transform .4s cubic-bezier(.25,.9,.35,1);
+  }
+  .ld-t::after{ /* 铅字侧壁 */
+    content:"";position:absolute;left:6%;right:6%;bottom:-2px;height:3px;
+    background:rgba(35,42,49,.5);border-radius:0 0 2px 2px;
+  }
+  .ld-t span{
+    font-size:.82em;font-weight:600;color:#dfe5e9;line-height:1;
+    transform:scaleX(-1);                       /* 活字：反字 */
+    transition:transform .3s ease,color .3s ease;
+  }
+  .ld-t.set{opacity:1;transform:translateY(0)}  /* opacity 走类翻转（无头环境动画会冻结），缓动交给 transform */
+  #loader.pressed .ld-t{background:transparent;box-shadow:none}
+  #loader.pressed .ld-t::after{opacity:0}
+  #loader.pressed .ld-t span{
+    transform:scaleX(1);color:#333d47;
+    transition:transform .4s cubic-bezier(.3,1.25,.4,1),color .4s ease;
+  }
+  #ldTray{
+    position:absolute;left:50%;bottom:9vh;transform:translateX(-50%);
+    display:flex;gap:9px;padding:8px 12px 10px;
+    border:1px solid rgba(55,66,77,.22);border-bottom-width:3px;border-radius:3px;
+    background:rgba(255,255,255,.28);
+  }
+  #ldTray .ld-t{opacity:.9;transform:none;width:20px;height:20px}
+  #ldTray .ld-t span{font-size:12px}
+  #ldPlaten{
+    position:absolute;left:-2%;right:-2%;top:0;height:26%;
+    background:linear-gradient(to bottom, rgba(44,53,61,.20), rgba(44,53,61,.05) 70%, rgba(44,53,61,0));
+    transform:translateY(-130%);
+    pointer-events:none;
+  }
+  #loader.pressed #ldPlaten{animation:platen .5s cubic-bezier(.5,0,.3,1) forwards}
+  @keyframes platen{
+    0%{transform:translateY(-130%)}
+    100%{transform:translateY(460%)}
+  }
+  .ld-skip{
+    position:absolute;right:4vw;bottom:4.6vh;
+    font-size:10.5px;letter-spacing:.3em;color:var(--ink-faint);opacity:.7;
+  }
+  @media (max-width:760px){
+    #brand{top:3.2vh;left:5.6vw;font-size:13px}
+    #pressinfo{top:3.6vh;right:5.6vw}
+    #pressinfo .label{display:none}
+    #colophon{
+      position:fixed !important;left:5.6vw !important;top:auto !important;bottom:3.8vh !important;
+      width:auto;padding:0;transform:none;
+    }
+    #colophon h2{display:none}
+    #colophon .row{margin:5px 0}
+    #colophon .t{font-size:12.5px}
+    #colophon .d{display:none}
+    #colophon .lead{display:none}
+    #hint{display:none}
+    .ld-line{font-size:clamp(15px,4.6vw,24px)}
+    #ldTray{bottom:7vh}
+  }
+  @media (prefers-reduced-motion: reduce){
+    .ld-t{transition-duration:.01s !important;animation-duration:.01s !important}
+  }
+</style>
+</head>
+<body>
+<div id="fallback"></div>
+<canvas id="gl"></canvas>
+<div id="scrollspace"></div>
+
+<h1 class="sr-only">这里不是梦，也不是现实。它是人在即将醒来时，看见的最后一层世界。世界应当始终保留一种感觉：它可能马上消失。</h1>
+
+<!-- 无 GL 静态回退 -->
+<div id="staticManifesto" aria-hidden="true">
+  <div class="s1">这里不是梦，</div>
+  <div class="s2">也不是现实。</div>
+  <div class="s3">它是人在即将醒来时，</div>
+  <div class="s4">看见的最后一层世界。</div>
+</div>
+
+<div class="ui" id="brand">醒梦集<small>Traveritas · 活字初印</small></div>
+<div class="ui" id="pressinfo" aria-hidden="true">
+  <span class="label" id="piText">待印</span>
+  <div class="dots"><i></i><i></i><i></i><i></i><i class="gold"></i></div>
+</div>
+
+<div class="ui" id="colophon" aria-label="站内入口 · 版记">
+  <h2>版 记</h2>
+  <a class="row" href="#/articles" aria-label="随笔">
+    <span class="nail" aria-hidden="true"><span>随</span></span>
+    <span class="t">随笔</span><span class="lead"></span><span class="d">想明白的路</span>
+  </a>
+  <a class="row" href="#/projects" aria-label="项目">
+    <span class="nail" aria-hidden="true"><span>项</span></span>
+    <span class="t">项目</span><span class="lead"></span><span class="d">做成过的事</span>
+  </a>
+  <a class="row" href="#/about" aria-label="关于">
+    <span class="nail" aria-hidden="true"><span>关</span></span>
+    <span class="t">关于</span><span class="lead"></span><span class="d">执笔者自述</span>
+  </a>
+</div>
+<div class="ui" id="hint" aria-hidden="true">向下滚动 · 开印</div>
+<div class="ui" id="vignette"></div>
+
+<!-- ══ 加载页：活字排版 ══ -->
+<div id="loader" role="status" aria-label="排版中">
+  <div class="ld-brand">醒梦集<small>TRAVERITAS PRESS · 初版</small></div>
+  <div class="ld-status"><span id="ldPhase">拣字</span><div class="rule"><i id="ldRule"></i></div></div>
+  <div id="ldForm"></div>
+  <div id="ldTray" aria-hidden="true"></div>
+  <div id="ldPlaten"></div>
+  <div class="ld-skip" id="ldSkip">点按任意处 · 跳过</div>
+</div>
+
+<script src="vendor/three.min.js"></script>
+<script>
+(function(){
+"use strict";
+/* 错误捕获：window.onerror + console.error 双钩子（着色器编译错误只走 console.error） */
+var ERRS = [];
+window.__swarmErr = null;
+function fail(e){ var m = (e && (e.stack||e.message)) || String(e); ERRS.push(m); window.__swarmErr = ERRS.join(' || '); document.title = 'ERR'; }
+window.addEventListener('error', function(ev){ fail(ev.error || ev.message); });
+(function(){
+  var oce = console.error.bind(console);
+  console.error = function(){ try{ ERRS.push([].slice.call(arguments).join(' ')); window.__swarmErr = ERRS.join(' || '); }catch(_){} oce.apply(null, arguments); };
+})();
+
+try{
+
+/* ================= 参数解析（裸旗标兼容） ================= */
+var Q = {};
+location.search.replace(/[?&]([^=&]+)(?:=([^&]*))?/g, function(m,k,v){ Q[k] = (v===undefined)? '' : v; return ''; });
+var AUTO  = ('auto'  in Q);
+var FAST  = ('fast'  in Q) ? 6 : 1;
+var PIN   = ('pin'   in Q) ? Math.min(1, Math.max(0, parseFloat(Q.pin))) : null;
+var STILL = ('still' in Q);
+var RM    = ('rm'    in Q) || (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+if (RM) STILL = true;
+
+/* ================= 文案 ================= */
+var LINES = [
+  '这里不是梦，',
+  '也不是现实。',
+  '它是人在即将醒来时，',
+  '看见的最后一层世界。'
+];
+var GOLD_SUB = '最后一层世界';
+
+/* ================= 基础 ================= */
+var canvas = document.getElementById('gl');
+var renderer;
+try{ renderer = new THREE.WebGLRenderer({canvas:canvas, antialias:true, alpha:true, preserveDrawingBuffer:true, powerPreference:'high-performance'}); }
+catch(e){ fail(e); document.body.classList.add('no-gl'); loaderFail(); return; }
+var DPR = Math.min(window.devicePixelRatio || 1, 1.5);
+renderer.setPixelRatio(DPR);
+renderer.setSize(Math.max(1,innerWidth), Math.max(1,innerHeight));
+renderer.setClearColor(0xccd6dc, 1);
+
+var scene  = new THREE.Scene();
+scene.fog  = new THREE.FogExp2(0xccd6dc, 0.024);       // 供 Basic 材质（色版/印样/浮尘）用
+var camera = new THREE.PerspectiveCamera(42, Math.max(0.1,innerWidth/Math.max(1,innerHeight)), 0.1, 300);
+
+/* ================= 调色板：冷晨（醒）→ 暖纸（梦被记下） ================= */
+function h2r(h){ return new THREE.Color(h); }
+var PAL = {
+  fog:   [h2r('#c2ced6'), h2r('#e7d4c6')],
+  paper: [h2r('#f0ece2'), h2r('#f3e6d5')],
+  ink:   [h2r('#37424d'), h2r('#4a3e3a')],
+  washA: [h2r('#a9bdc9'), h2r('#cbb2a9')],
+  washB: [h2r('#c9c3cc'), h2r('#ddc1b2')],
+  wm:    [h2r('#93a7b4'), h2r('#a97f63')],
+  gold:   h2r('#a9853f')
+};
+var _bg = new THREE.Color(), _paper = new THREE.Color(), _ink = new THREE.Color(),
+    _wa = new THREE.Color(), _wb = new THREE.Color(), _wm = new THREE.Color();
+function lerpPal(pair, t, out){ out.copy(pair[0]).lerp(pair[1], t); return out; }
+function smooth(a,b,x){ return THREE.MathUtils.smoothstep(x, a, b); }
+
+var FOG_D = 0.0165;
+var NOISE2 = [
+  'float n2(vec2 p){',
+  '  vec2 i = floor(p), f = fract(p);',
+  '  f = f*f*(3.0-2.0*f);',
+  '  float a = fract(sin(dot(i, vec2(127.1,311.7)))*43758.5453);',
+  '  float b = fract(sin(dot(i+vec2(1.,0.), vec2(127.1,311.7)))*43758.5453);',
+  '  float c = fract(sin(dot(i+vec2(0.,1.), vec2(127.1,311.7)))*43758.5453);',
+  '  float d = fract(sin(dot(i+vec2(1.,1.), vec2(127.1,311.7)))*43758.5453);',
+  '  return mix(mix(a,b,f.x), mix(c,d,f.x), f.y);',
+  '}'
+].join('\n');
+var FOGFN = 'float fogF(float d){ return 1.0 - exp(-d*d*uFogD*uFogD); }';
+
+/* ================= 版面几何常量（纸面局部坐标，中心为原点） ================= */
+var PAPW = 17.8, PAPH = 10.0;                 // 纸张尺寸
+var LAYOUT = [
+  { x:-4.50, y: 3.25, ch:0.72, track:0.07 },
+  { x: 3.70, y: 2.10, ch:0.44, track:0.52 },
+  { x:-3.20, y:-0.70, ch:0.60, track:0.08 },
+  { x: 1.30, y:-2.55, ch:1.02, track:0.06 }
+];
+var PRESSES = [
+  { a:0.045, b:0.245, via:[ 0.25, 3.25] },
+  { a:0.265, b:0.465, via:[ 0.70, 2.55] },
+  { a:0.485, b:0.685, via:[ 0.90, 0.30] },
+  { a:0.705, b:0.885, via:[ 1.10, 0.15] }
+];
+var FINAL = { a:0.90, b:1.0, x:0.55, y:-3.52 };
+var WM = { x:3.50, y:1.70, s:6.8 };
+var CIRC = -0.50;                              // 字面触及纸面（字面朝 +z 观者，压印=向纸沉入）
+var RESTZ = 1.15;
+
+/* ================= 活字压印时间轴（p 的纯函数） ================= */
+function winU(p, w){ return Math.min(1, Math.max(0, (p - w.a) / (w.b - w.a))); }
+function useWin(p, i){
+  var w = PRESSES[i];
+  if(i===3 && p > w.b){ finalPose(p, poseOut); return true; }   // 终压接管
+  return p>=w.a && p<=w.b;
+}
+function seg(u, t0, t1){ return Math.min(1, Math.max(0, (u - t0) / Math.max(0.0001, t1 - t0))); }
+function ss(x){ return x*x*(3-2*x); }
+function pressPose(i, u, out){
+  var L = LAYOUT[i], w = PRESSES[i];
+  var px = L.x - lineW(i)/2 + 0.55, py = L.y;   // 压在线首
+  var prev = (i===0) ? [-3.4, 3.80] : [ LAYOUT[i-1].x - lineW(i-1)/2 + 0.55, LAYOUT[i-1].y + 1.5 ];
+  var k0=[prev[0],prev[1],RESTZ], k1=[w.via[0],w.via[1],0.06], k2=[px+0.30,py+1.30,1.05],
+      k3=[px,py,CIRC], k4=[px,py,CIRC], k5=[px,py+1.5,RESTZ];
+  var u1=0.18, u2=0.40, u3=0.55, u4=0.68, u5=1.0;
+  var a,b,t;
+  if(u<=u1){ a=k0;b=k1;t=ss(seg(u,0,u1)); }
+  else if(u<=u2){ a=k1;b=k2;t=ss(seg(u,u1,u2)); }
+  else if(u<=u3){ a=k2;b=k3;t=ss(seg(u,u2,u3)); }
+  else if(u<=u4){ a=k3;b=k4;t=0; }
+  else { a=k4;b=k5;t=ss(seg(u,u4,u5)); }
+  out.pos[0]=a[0]+(b[0]-a[0])*t; out.pos[1]=a[1]+(b[1]-a[1])*t; out.pos[2]=a[2]+(b[2]-a[2])*t;
+  out.contact = ss(seg(u,0.53,0.57));
+  return out;
+}
+function finalPose(p, out){
+  var u = winU(p, FINAL);
+  var t = ss(seg(u, 0.0, 0.62));
+  out.pos[0] = 0.9 + (FINAL.x - 0.9)*ss(seg(u,0,0.35));
+  out.pos[1] = -1.05 + (FINAL.y + 1.05)*ss(seg(u,0,0.4));
+  out.pos[2] = RESTZ + (-0.95 - RESTZ)*t;
+  out.u = u;
+  return out;
+}
+function lineW(i){ var L=LAYOUT[i]; return LINES[i].length * L.ch * (1 + L.track); }
+
+/* ================= 纸张（含印刷版面 + 毛边 + 压痕着色器） ================= */
+var paperUni = {
+  uMap:{value:null}, uFogCol:{value:new THREE.Color()}, uPaper:{value:new THREE.Color()},
+  uFogD:{value:FOG_D}, uTime:{value:0},
+    uD0:{value:new THREE.Vector4(0,0,0,0)}, uG0:{value:0}, uR0:{value:new THREE.Vector4(0,0,0,0)},
+  uD1:{value:new THREE.Vector4(0,0,0,0)}, uG1:{value:0}, uR1:{value:new THREE.Vector4(0,0,0,0)},
+  uD2:{value:new THREE.Vector4(0,0,0,0)}, uG2:{value:0}, uR2:{value:new THREE.Vector4(0,0,0,0)},
+  uD3:{value:new THREE.Vector4(0,0,0,0)}, uG3:{value:0}, uR3:{value:new THREE.Vector4(0,0,0,0)},
+  uD4:{value:new THREE.Vector4(0,0,0,0)}, uG4:{value:0}, uR4:{value:new THREE.Vector4(0,0,0,0)},
+  uFoot:{value:new THREE.Vector4(FINAL.x, FINAL.y, 1.02, 1.02)},
+  uFootA:{value:0}
+};
+var paperMat = new THREE.ShaderMaterial({
+  uniforms: paperUni, transparent:true, depthWrite:true,
+  vertexShader:[
+    'varying vec2 vLocal; varying vec2 vUv; varying float vD;',
+    'void main(){',
+    '  vLocal = position.xy; vUv = uv;',
+    '  vec4 mv = modelViewMatrix * vec4(position,1.0); vD = -mv.z;',
+    '  gl_Position = projectionMatrix * mv;',
+    '}'
+  ].join('\n'),
+  fragmentShader: (function(){
+    var PD = parseInt(Q.pd || '0', 10);
+    if(PD === 1) return 'void main(){ gl_FragColor = vec4(texture2D(uMap, vUv).rgb, 1.0); }';
+    if(PD === 4) return 'void main(){ gl_FragColor = vec4(0.8,0.1,0.1,1.0); }';
+    var head = [
+      'uniform sampler2D uMap;',
+      'uniform vec3 uFogCol, uPaper;',
+      'uniform float uFogD, uTime, uFootA;',
+      'uniform vec4 uD0, uD1, uD2, uD3, uD4;',
+      'uniform float uG0, uG1, uG2, uG3, uG4;',
+      'uniform vec4 uR0, uR1, uR2, uR3, uR4;',
+      'uniform vec4 uFoot;',
+      'varying vec2 vLocal; varying vec2 vUv; varying float vD;',
+      NOISE2, FOGFN,
+      'float sdRBox(vec2 p, vec2 b, float r){',
+      '  vec2 q = abs(p) - b + r;',
+      '  return length(max(q,0.0)) + min(max(q.x,q.y),0.0) - r;',
+      '}',
+      'vec3 pressFX(vec3 col, vec2 lp, vec4 D, float glow, vec4 R){',
+      '  float dz = clamp(D.z, 0.0, 1.0);',
+      '  if(dz > 0.002){',
+      '    float r = distance(lp, D.xy);',
+      '    float rr = max(D.w, 0.2);',
+      '    float qq = r*r/(rr*rr);',
+      '    float q2 = (r-rr*0.88)/(rr*0.30);',
+      '    col *= 1.0 + dz*(exp(-min(qq*2.3,60.0))*(-0.22) + exp(-min(q2*q2,60.0))*0.12);',
+      '    float q3 = r/(rr*0.9);',
+      '    col += vec3(1.0,0.88,0.72) * glow * exp(-min(q3*q3,60.0)) * 0.75;',
+      '    if(R.z > 0.001){',
+      '      float qb = (r - R.z*2.9)/(0.14+R.z*0.6);',
+      '      float band = exp(-min(qb*qb,60.0)) * R.w * (1.0-R.z);',
+      '      col = clamp(col*(1.0 - band*0.45), 0.0, 2.0);',
+      '    }',
+      '  }',
+      '  return col;',
+      '}',
+      'void main(){',
+      '  vec3 col = texture2D(uMap, vUv).rgb;'
+    ];
+    var body = [
+      // 纸纤维颗粒 + 顶部受光
+      '  float g = n2(vLocal*7.0)*0.5 + n2(vLocal*23.0+13.1)*0.5;',
+      '  col *= 0.977 + (g-0.5)*0.055;',
+      '  col *= 0.968 + (vLocal.y/'+PAPH.toFixed(1)+'*0.5+0.5)*0.055;'
+    ];
+    var rim = [
+      // 毛边：边缘噪声锯齿 + 轻微透光变淡
+      '  float dEdge = min('+ (PAPW/2).toFixed(2) +'-abs(vLocal.x), '+ (PAPH/2).toFixed(2) +'-abs(vLocal.y));',
+      '  float nB = n2(vLocal*2.6)*0.6 + n2(vLocal*0.8+3.7)*0.4;',
+      '  float e2 = 0.42*(0.35+1.15*nB);',
+      '  float rim = 1.0 - smoothstep(0.0, e2, dEdge);',
+      '  float alpha = 1.0 - rim*rim*(0.68+0.28*nB);',
+      '  col *= 1.0 - rim*0.12;'
+    ];
+    var pressList = [
+      '  col = pressFX(col, vLocal, uD0, uG0, uR0);',
+      '  col = pressFX(col, vLocal, uD1, uG1, uR1);',
+      '  col = pressFX(col, vLocal, uD2, uG2, uR2);',
+      '  col = pressFX(col, vLocal, uD3, uG3, uR3);',
+      '  col = pressFX(col, vLocal, uD4, uG4, uR4);'
+    ];
+    var footList = [
+      // 终压足印
+      '  float fd = sdRBox(vLocal - uFoot.xy, uFoot.zw, 0.22);',
+      '  float inner = (1.0 - smoothstep(-0.06, 0.03, fd)) * uFootA;',
+      '  col *= 1.0 - inner*0.13;',
+      '  float qf = fd/0.10;\n  col += vec3(0.05,0.04,0.03) * uFootA * exp(-min(qf*qf,60.0)) * 0.6;'
+    ];
+    // pd5=仅 pressFX；pd6=仅足印；pd2=都不要
+    var dimples = (PD === 2) ? [] : (PD === 5) ? pressList : (PD === 6) ? footList : pressList.concat(footList);
+    var tail = (PD === 3) ? [
+      '  gl_FragColor = vec4(col, 1.0);'
+    ] : [
+      // 雾
+      '  float f = fogF(vD)*0.35;',
+      '  col = mix(col, uFogCol, f);',
+      '  gl_FragColor = vec4(col, alpha);'
+    ];
+    return head.concat(body, rim, dimples, tail).join('\n') + '\n}';
+  })()
+});
+var paper = new THREE.Mesh(new THREE.PlaneGeometry(PAPW, PAPH, 1, 1), paperMat);
+paper.renderOrder = 1;
+scene.add(paper);
+
+/* —— 纸面版画（canvas 纹理：版框/规矩线/鱼尾/角注/版记框/藏版印） —— */
+function drawSheetDesign(ctx, W, H, u2px){
+  var ink = '#37424d';
+  function rect(x,y,w,h,lw,a){ ctx.strokeStyle=ink; ctx.globalAlpha=a; ctx.lineWidth=lw; ctx.strokeRect(x,y,w,h); }
+  var m1 = 0.55*u2px, m2 = 0.68*u2px;
+  ctx.globalAlpha = 1;
+  rect(m1, m1, W-2*m1, H-2*m1, 4.0, 0.66);            // 外框（粗）
+  rect(m2, m2, W-2*m2, H-2*m2, 1.2, 0.45);            // 内框（细）
+  // 鱼尾（上缺口）：内框上边中央的小燕尾
+  ctx.globalAlpha=0.38; ctx.fillStyle=ink;
+  var cx = W/2, ty = m2;
+  ctx.beginPath();
+  ctx.moveTo(cx-13, ty-1); ctx.lineTo(cx-4, ty+9); ctx.lineTo(cx, ty+5); ctx.lineTo(cx+4, ty+9); ctx.lineTo(cx+13, ty-1);
+  ctx.closePath(); ctx.fill();
+  // 规矩线（四角 + 边中点）
+  function reg(x,y){ ctx.globalAlpha=0.6; ctx.lineWidth=1.5; ctx.strokeStyle=ink;
+    ctx.beginPath(); ctx.arc(x,y,7,0,Math.PI*2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x-11,y); ctx.lineTo(x+11,y); ctx.moveTo(x,y-11); ctx.lineTo(x,y+11); ctx.stroke(); }
+  var mg = 0.26*u2px;
+  reg(mg, mg); reg(W-mg, mg); reg(mg, H-mg); reg(W-mg, H-mg);
+  reg(W/2, mg); reg(W/2, H-mg); reg(mg, H/2); reg(W-mg, H/2);
+  // 角注小字
+  ctx.globalAlpha=0.62; ctx.fillStyle=ink; ctx.textBaseline='middle';
+  ctx.font='500 '+Math.round(0.22*u2px)+'px "Noto Serif SC", serif';
+  ctx.textAlign='center';
+  var sp = 0.30*u2px;
+  var t1='醒 梦 集'; var x1 = W/2 - t1.length*sp/2 + sp/2;
+  for(var i=0;i<t1.length;i++){ if(t1[i]!==' ') ctx.fillText(t1[i], x1+i*sp, m1*0.5); }
+  var t2='TRAVERITAS · 初版 · MMXXVI';
+  ctx.font='500 '+Math.round(0.17*u2px)+'px "Noto Serif SC", serif';
+  ctx.fillText(t2, W*0.34, H-m1*0.52);
+  function py(ly){ return (PAPH/2 - ly)*u2px; }
+  // 账目细线（两条，浅）
+  ctx.globalAlpha=0.18; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(m2+ (W-2*m2)*0.05, py(1.15)); ctx.lineTo(m2+(W-2*m2)*0.42, py(1.15)); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(m2+ (W-2*m2)*0.60, py(-1.52)); ctx.lineTo(m2+(W-2*m2)*0.95, py(-1.52)); ctx.stroke();
+  // 版记框（左下；DOM 版权页锚定此处）
+  var bx = (-7.65+PAPW/2)*u2px, by = py(-2.56), bw = 4.35*u2px, bh = 1.62*u2px;
+  rect(bx, by, bw, bh, 1.4, 0.5);
+  ctx.globalAlpha=0.68; ctx.font='500 '+Math.round(0.19*u2px)+'px "Noto Serif SC", serif';
+  ctx.textAlign='left'; ctx.fillStyle='#ece8de';
+  ctx.fillText('版 记', bx+0.22*u2px, by+1);
+  ctx.globalAlpha=0.68; ctx.fillStyle=ink;
+  ctx.fillText('版 记', bx+0.22*u2px, by+1);
+  // 藏版印（右下小方印，唯一暖赭）
+  var sx = (6.55+PAPW/2)*u2px, sy = py(-3.10), ss2 = 0.42*u2px;
+  ctx.globalAlpha=0.74; ctx.fillStyle='#9c5f50';
+  ctx.fillRect(sx, sy, ss2, ss2);
+  ctx.globalAlpha=0.9; ctx.fillStyle='#f0e8dc'; ctx.textAlign='center';
+  ctx.font='600 '+Math.round(ss2*0.34)+'px "Noto Serif SC", serif';
+  ctx.fillText('藏', sx+ss2/2, sy+ss2*0.32);
+  ctx.fillText('版', sx+ss2/2, sy+ss2*0.74);
+  ctx.globalAlpha=1;
+}
+function buildSheetTexture(){
+  var c = document.createElement('canvas');
+  c.width = 1600; c.height = Math.round(1600*PAPH/PAPW);
+  var ctx = c.getContext('2d');
+  ctx.fillStyle = '#f0ece2'; ctx.fillRect(0,0,c.width,c.height);
+  // 极轻纸纹（大面积低频）
+  var u2px = c.width / PAPW;
+  drawSheetDesign(ctx, c.width, c.height, u2px);
+  var tex = new THREE.CanvasTexture(c);
+  tex.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
+  return tex;
+}
+paperUni.uMap.value = buildSheetTexture();
+
+/* ================= 色版（印刷底色版：两块透明软边形） ================= */
+function washTexture(blobs){
+  var c = document.createElement('canvas'); c.width = 512; c.height = 300;
+  var ctx = c.getContext('2d');
+  for(var i=0;i<blobs.length;i++){
+    var b = blobs[i];
+    var gr = ctx.createRadialGradient(b[0]*512, b[1]*300, 0, b[0]*512, b[1]*300, b[3]*512);
+    gr.addColorStop(0, 'rgba(255,255,255,'+b[2]+')');
+    gr.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = gr; ctx.fillRect(0,0,512,300);
+  }
+  return new THREE.CanvasTexture(c);
+}
+function makeWash(z, order, blobs){
+  var m = new THREE.MeshBasicMaterial({
+    map: washTexture(blobs), transparent:true, depthWrite:false, opacity:1, fog:true,
+    color: 0xffffff
+  });
+  var mesh = new THREE.Mesh(new THREE.PlaneGeometry(PAPW*1.02, PAPH*1.02), m);
+  mesh.position.z = z; mesh.renderOrder = order;
+  paper.add(mesh);
+  return mesh;
+}
+var washA = makeWash(0.055, 3, [[0.24,0.32,0.8,0.34],[0.62,0.72,0.55,0.30],[0.80,0.2,0.45,0.22]]);
+var washB = makeWash(0.105, 4, [[0.78,0.62,0.72,0.36],[0.18,0.75,0.5,0.26]]);
+washA.material.color.copy(PAL.washA[0]);
+washB.material.color.copy(PAL.washB[0]);
+
+/* ================= 底纹大字（「醒」，可被活字穿插其前后） ================= */
+function glyphAlphaTex(ch, weight){
+  var c = document.createElement('canvas'); c.width = c.height = 560;
+  var ctx = c.getContext('2d');
+  ctx.fillStyle = '#fff';
+  ctx.font = (weight||'500') + ' 470px "Noto Serif SC", serif';
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(ch, 280, 300);
+  var tex = new THREE.CanvasTexture(c);
+  tex.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
+  return tex;
+}
+var wmMat = new THREE.MeshBasicMaterial({
+  map: glyphAlphaTex('醒'), transparent:true, depthWrite:false, opacity:0.20, fog:true,
+  color: PAL.wm[0].clone()
+});
+var watermark = new THREE.Mesh(new THREE.PlaneGeometry(WM.s, WM.s), wmMat);
+watermark.position.set(WM.x, WM.y, 0.17);
+watermark.renderOrder = 6;
+paper.add(watermark);
+
+/* ================= 活字组（磨砂玻璃字身 + 「梦」反字浮雕 + 墨面） ================= */
+var typeGroup = new THREE.Group();       // 世界坐标（不在 paper 内，独立穿插层间）
+scene.add(typeGroup);
+var slabUni = {
+  uCol:{value:new THREE.Color('#c3cfd8')}, uFogCol:{value:new THREE.Color()},
+  uFogD:{value:FOG_D}, uWarm:{value:new THREE.Color('#ffd9a8')},
+  uLight:{value:new THREE.Vector3(-0.42,0.62,0.66).normalize()}
+};
+var reliefUni = {
+  uCol:{value:new THREE.Color('#e8e5dd')}, uFogCol:{value:new THREE.Color()},
+  uFogD:{value:FOG_D}, uWarm:{value:new THREE.Color('#ffd9a8')},
+  uInked:{value:0},
+  uLight:{value:new THREE.Vector3(-0.42,0.62,0.66).normalize()}
+};
+function frostedFrag(extra){
+  return [
+    'uniform vec3 uCol, uFogCol, uWarm, uLight;',
+    'uniform float uFogD;',
+    (extra||''),
+    'varying vec3 vN, vW; varying float vD;',
+    FOGFN,
+    'void main(){',
+    '  vec3 N = normalize(vN);',
+    '  vec3 V = normalize(cameraPosition - vW);',
+    '  float ndl = dot(N, normalize(uLight));',
+    '  float lamp = pow(ndl*0.5+0.5, 1.5);',                       // 半兰伯特
+    '  float back = pow(clamp(dot(V, -normalize(uLight)),0.0,1.0), 3.2);', // 逆光透光
+    '  float fres = pow(1.0-abs(dot(N,V)), 2.3);',                  // 菲涅尔白边
+    '  vec3 col = uCol * (0.5 + 0.62*lamp);',
+    '  col += uWarm * back * 0.20;',
+    '  col += vec3(1.0) * fres * 0.24;',
+    INKED_LINE,
+    '  float f = fogF(vD);',
+    '  col = mix(col, uFogCol, f);',
+    '  gl_FragColor = vec4(col, 0.96);',
+    '}'
+  ].join('\n');
+}
+var INKED_LINE = '';
+var frostedVert = [
+  'varying vec3 vN, vW; varying float vD;',
+  'void main(){',
+  '  vec4 wp = modelMatrix * vec4(position,1.0); vW = wp.xyz;',
+  '  vN = normalize(mat3(modelMatrix) * normal);',
+  '  vec4 mv = viewMatrix * wp; vD = -mv.z;',
+  '  gl_Position = projectionMatrix * mv;',
+  '}'
+].join('\n');
+var slabMat = new THREE.ShaderMaterial({uniforms:slabUni, vertexShader:frostedVert, fragmentShader:frostedFrag(), transparent:true, depthWrite:true});
+
+/* —— 字身：圆角方铅字 —— */
+function roundedRectShape(w, h, r){
+  var s = new THREE.Shape(), x=-w/2, y=-h/2;
+  s.moveTo(x+r, y);
+  s.lineTo(x+w-r, y);  s.quadraticCurveTo(x+w, y, x+w, y+r);
+  s.lineTo(x+w, y+h-r); s.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
+  s.lineTo(x+r, y+h);  s.quadraticCurveTo(x, y+h, x, y+h-r);
+  s.lineTo(x, y+r);    s.quadraticCurveTo(x, y, x+r, y);
+  return s;
+}
+var SLAB = 2.30, SLABD = 0.86;
+var slabGeo = new THREE.ExtrudeGeometry(roundedRectShape(SLAB, SLAB, 0.17), {
+  depth: SLABD, bevelEnabled:true, bevelThickness:0.05, bevelSize:0.05, bevelSegments:2, curveSegments:6
+});
+slabGeo.translate(0,0,-SLABD/2);
+var slab = new THREE.Mesh(slabGeo, slabMat);
+typeGroup.add(slab);
+
+/* —— 「梦」反字浮雕：字形位图 → marching squares 轮廓 → 挤出 —— */
+function glyphBitmap(ch, S){
+  var cv = document.createElement('canvas'); cv.width = cv.height = S;
+  var ctx = cv.getContext('2d', {willReadFrequently:true});
+  ctx.fillStyle='#000'; ctx.fillRect(0,0,S,S);
+  ctx.save();
+  ctx.translate(S/2, S/2); ctx.scale(-1,1);              // 镜像 = 活字反字
+  ctx.fillStyle='#fff';
+  ctx.font='600 '+Math.floor(S*0.80)+'px "Noto Serif SC", serif';
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(ch, 0, S*0.03);
+  ctx.restore();
+  return ctx.getImageData(0,0,S,S).data;
+}
+function rdp(pts, eps){
+  if(pts.length < 3) return pts;
+  var keep = new Array(pts.length); keep[0]=keep[pts.length-1]=true;
+  var stack=[[0,pts.length-1]];
+  while(stack.length){
+    var se = stack.pop(), a=se[0], b=se[1];
+    var ax=pts[a][0], ay=pts[a][1], bx=pts[b][0], by=pts[b][1];
+    var dx=bx-ax, dy=by-ay, L2=dx*dx+dy*dy, dmax=0, imax=-1;
+    for(var i=a+1;i<b;i++){
+      var px=pts[i][0]-ax, py=pts[i][1]-ay;
+      var t = L2>0 ? (px*dx+py*dy)/L2 : 0; t=Math.max(0,Math.min(1,t));
+      var qx=ax+dx*t-pts[i][0], qy=ay+dy*t-pts[i][1];
+      var d=qx*qx+qy*qy;
+      if(d>dmax){ dmax=d; imax=i; }
+    }
+    if(dmax > eps*eps && imax>0){ keep[imax]=true; stack.push([a,imax],[imax,b]); }
+  }
+  var out=[]; for(var j=0;j<pts.length;j++) if(keep[j]) out.push(pts[j]);
+  return out;
+}
+function traceGlyph(ch){
+  var S=128, data=glyphBitmap(ch,S), T=0.5;
+  function v(x,y){ if(x<0||y<0||x>=S||y>=S) return 0; return data[(y*S+x)*4]/255; }
+  function mid(x,y){ return v(x,y)>T; }
+  var segs=[];
+  for(var y=0;y<S-1;y++)for(var x=0;x<S-1;x++){
+    var a=mid(x,y),b=mid(x+1,y),c=mid(x+1,y+1),d=mid(x,y+1);
+    var idx=(a?8:0)|(b?4:0)|(c?2:0)|(d?1:0);
+    if(idx===0||idx===15) continue;
+    var top=[x+0.5,y], right=[x+1,y+0.5], bot=[x+0.5,y+1], left=[x,y+0.5];
+    switch(idx){
+      case 1: segs.push([left,bot]); break;
+      case 2: segs.push([bot,right]); break;
+      case 3: segs.push([left,right]); break;
+      case 4: segs.push([top,right]); break;
+      case 5: segs.push([top,left]); segs.push([bot,right]); break;
+      case 6: segs.push([top,bot]); break;
+      case 7: segs.push([top,left]); break;
+      case 8: segs.push([left,top]); break;
+      case 9: segs.push([top,bot]); break;
+      case 10: segs.push([top,right]); segs.push([left,bot]); break;
+      case 11: segs.push([top,right]); break;
+      case 12: segs.push([left,right]); break;
+      case 13: segs.push([bot,right]); break;
+      case 14: segs.push([left,bot]); break;
+    }
+  }
+  // 端点哈希接环
+  function key(p){ return Math.round(p[0]*2)+'_'+Math.round(p[1]*2); }
+  var map={};
+  segs.forEach(function(s,i){ var k=key(s[0]); (map[k]=map[k]||[]).push(i); });
+  var used=segs.map(function(){return false;}), loops=[];
+  for(var s0=0;s0<segs.length;s0++){
+    if(used[s0]) continue;
+    var loop=[], si=s0, guard=0;
+    while(guard++<20000){
+      used[si]=true; loop.push([segs[si][0][0], segs[si][0][1]]);
+      var cands=map[key(segs[si][1])] || [], nxt=-1;
+      for(var ci=0;ci<cands.length;ci++){ if(!used[cands[ci]]){ nxt=cands[ci]; break; } }
+      if(nxt<0) break;
+      si=nxt;
+    }
+    if(loop.length>9) loops.push(rdp(loop, 0.9));
+  }
+  // 像素 → 纸面局部（字面 2.02 宽，y 翻转）
+  var F=2.02;
+  return loops.map(function(lp){
+    return lp.map(function(p){ return [ (p[0]/S-0.5)*F, (0.5-p[1]/S)*F ]; });
+  });
+}
+function pip(pt, poly){
+  var x=pt[0], y=pt[1], inside=false;
+  for(var i=0,j=poly.length-1;i<poly.length;j=i++){
+    var xi=poly[i][0], yi=poly[i][1], xj=poly[j][0], yj=poly[j][1];
+    if(((yi>y)!==(yj>y)) && (x < (xj-xi)*(y-yi)/(yj-yi)+xi)) inside=!inside;
+  }
+  return inside;
+}
+function polyArea(lp){
+  var a=0;
+  for(var i=0,j=lp.length-1;i<lp.length;j=i++) a += (lp[j][0]*lp[i][1] - lp[i][0]*lp[j][1]);
+  return Math.abs(a/2);
+}
+function buildRelief(ch){
+  var loops = traceGlyph(ch);
+  if(!loops.length) return null;
+  // 嵌套深度（evenodd）：偶数层=外环，奇数层=所属最小偶层环的洞
+  var depth = loops.map(function(lp,i){
+    var d=0;
+    for(var j=0;j<loops.length;j++){ if(j!==i && pip(lp[0], loops[j])) d++; }
+    return d;
+  });
+  var areas = loops.map(polyArea);
+  var shapes = [];
+  loops.forEach(function(lp,i){
+    if(depth[i]%2===0){
+      var sh = new THREE.Shape(lp.map(function(p){ return new THREE.Vector2(p[0],p[1]); }));
+      shapes.push({shape:sh, holes:[], i:i});
+    }
+  });
+  loops.forEach(function(lp,i){
+    if(depth[i]%2===1){
+      // 找包含它的最小偶层环
+      var best=-1, bestA=Infinity;
+      for(var j=0;j<loops.length;j++){
+        if(depth[j]%2===0 && pip(lp[0], loops[j]) && areas[j]<bestA){ bestA=areas[j]; best=j; }
+      }
+      for(var s=0;s<shapes.length;s++){
+        if(shapes[s].i===best){
+          shapes[s].holes.push(new THREE.Path(lp.map(function(p){ return new THREE.Vector2(p[0],p[1]); })));
+          break;
+        }
+      }
+    }
+  });
+  var group = new THREE.Group();
+  var mat = new THREE.ShaderMaterial({
+    uniforms:reliefUni, vertexShader:frostedVert, fragmentShader:frostedFrag(), transparent:true, depthWrite:true
+  });
+  shapes.forEach(function(item){
+    var g = new THREE.ExtrudeGeometry(item.shape, {
+      depth:0.17, bevelEnabled:true, bevelThickness:0.03, bevelSize:0.022, bevelSegments:1, steps:1
+    });
+    var m = new THREE.Mesh(g, mat);
+    group.add(m);
+  });
+  return group;
+}
+var relief = null;
+var inkFaceMat = null;
+function buildInkFace(ch){
+  // 墨面：字面薄贴片（反字），uInked 控制上墨浓度
+  var c = document.createElement('canvas'); c.width = c.height = 256;
+  var ctx = c.getContext('2d');
+  ctx.save();
+  ctx.translate(128,128); ctx.scale(-1,1);
+  ctx.fillStyle='#fff';
+  ctx.font='600 200px "Noto Serif SC", serif';
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(ch, 0, 8);
+  ctx.restore();
+  var tex = new THREE.CanvasTexture(c);
+  var mat = new THREE.MeshBasicMaterial({
+    map:tex, transparent:true, opacity:0.16, depthWrite:false, fog:false, color:0x2c353d
+  });
+  var m = new THREE.Mesh(new THREE.PlaneGeometry(2.02, 2.02), mat);
+  return m;
+}
+var inkFace = buildInkFace('梦');
+inkFace.position.z = SLABD/2 + 0.05 + 0.17 + 0.03;
+typeGroup.add(inkFace);
+
+/* 字体就绪后建浮雕 + 重绘纹理 */
+function fontsReady(){
+  var loads = [];
+  if(document.fonts && document.fonts.load){
+    var t = LINES.join('') + '梦醒藏版随项关记一二三';
+    loads.push(document.fonts.load('600 100px "Noto Serif SC"', t));
+    loads.push(document.fonts.load('500 100px "Noto Serif SC"', t));
+  }
+  return Promise.all(loads).catch(function(){});
+}
+var fontsBuilt = false;
+fontsReady().then(function(){ rebuildFonts(); });
+setTimeout(function(){ if(!fontsBuilt) rebuildFonts(); }, 3000);
+function rebuildFonts(){
+  if(fontsBuilt) return; fontsBuilt = true;
+  try{
+    paperUni.uMap.value = buildSheetTexture();
+    wmMat.map = glyphAlphaTex('醒');
+    wmMat.needsUpdate = true;
+    if(!relief){
+      relief = buildRelief('梦');
+      if(relief){
+        relief.position.z = SLABD/2 + 0.05 - 0.02;
+        typeGroup.add(relief);
+      }
+    }
+    rebuildInkFace();
+    rebuildLineTex();
+  }catch(e){ fail(e); }
+  if(STILL || RM){ applyStill(); }
+}
+function rebuildInkFace(){
+  var c = document.createElement('canvas'); c.width = c.height = 256;
+  var ctx = c.getContext('2d');
+  ctx.save();
+  ctx.translate(128,128); ctx.scale(-1,1);
+  ctx.fillStyle='#fff';
+  ctx.font='600 200px "Noto Serif SC", serif';
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText('梦', 0, 8);
+  ctx.restore();
+  inkFace.material.map = new THREE.CanvasTexture(c);
+  inkFace.material.needsUpdate = true;
+}
+function rebuildLineTex(){
+  for(var i=0;i<4;i++){
+    var t = lineTexture(LINES[i], LAYOUT[i].ch, LAYOUT[i].track, false);
+    lineMeshes[i].mesh.material.map = t.tex;
+    lineMeshes[i].mesh.material.needsUpdate = true;
+  }
+  if(goldMesh){
+    var tg = lineTexture(LINES[3], LAYOUT[3].ch, LAYOUT[3].track, true);
+    goldMesh.material.map = tg.tex;
+    goldMesh.material.needsUpdate = true;
+  }
+}
+
+/* ================= 印出的宣言行 + 套金 + 「梦」钤印 ================= */
+function lineTexture(text, ch, track, gold){
+  var px = 128;
+  var c = document.createElement('canvas');
+  var probe = c.getContext('2d');
+  var font = (gold?'600 ':'500 ') + px + 'px "Noto Serif SC", serif';
+  probe.font = font;
+  var ls = px*track, w = 0;
+  for(var i=0;i<text.length;i++) w += probe.measureText(text[i]).width + ls;
+  c.width = Math.ceil(w + px*0.5); c.height = Math.ceil(px*1.5);
+  var ctx = c.getContext('2d');
+  ctx.font = font; ctx.fillStyle = '#fff'; ctx.textBaseline='middle';
+  var x = px*0.25;
+  for(var j=0;j<text.length;j++){
+    if(!gold || GOLD_SUB.indexOf(text[j])>=0){
+      // 套金只印「最后一层世界」，并带套印微偏
+      ctx.fillText(text[j], x + (gold? px*0.055 : 0), c.height*0.54 + (gold? -px*0.04 : 0));
+    }
+    x += ctx.measureText(text[j]).width + ls;
+  }
+  var tex = new THREE.CanvasTexture(c);
+  tex.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
+  return {tex:tex, w:c.width/px*ch, h:c.height/px*ch};
+}
+var lineMeshes = [], goldMesh = null, stampMesh = null;
+function buildLines(){
+  for(var i=0;i<4;i++){
+    var L = LAYOUT[i];
+    var t = lineTexture(LINES[i], L.ch, L.track, false);
+    var m = new THREE.MeshBasicMaterial({map:t.tex, transparent:true, opacity:0, depthWrite:false, fog:true, color:0x37424d});
+    var mesh = new THREE.Mesh(new THREE.PlaneGeometry(t.w, t.h), m);
+    mesh.position.set(L.x, L.y, 0.035);
+    mesh.renderOrder = 8;
+    paper.add(mesh);
+    lineMeshes.push({mesh:mesh, w:t.w, h:t.h, base:PAL.ink[0].clone()});
+  }
+  // 套金（末行的「最后一层世界」）
+  var tg = lineTexture(LINES[3], LAYOUT[3].ch, LAYOUT[3].track, true);
+  var gm = new THREE.MeshBasicMaterial({map:tg.tex, transparent:true, opacity:0, depthWrite:false, fog:true, color:PAL.gold.clone()});
+  goldMesh = new THREE.Mesh(new THREE.PlaneGeometry(tg.w, tg.h), gm);
+  goldMesh.position.set(LAYOUT[3].x, LAYOUT[3].y, 0.05);
+  goldMesh.renderOrder = 9;
+  paper.add(goldMesh);
+  // 终压钤印：「梦」正字（压印翻正）
+  var cs = document.createElement('canvas'); cs.width = cs.height = 256;
+  var cx2 = cs.getContext('2d');
+  cx2.fillStyle='#fff';
+  cx2.font='600 190px "Noto Serif SC", serif';
+  cx2.textAlign='center'; cx2.textBaseline='middle';
+  cx2.fillText('梦', 128, 136);
+  var sm = new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(cs), transparent:true, opacity:0, depthWrite:false, fog:true, color:0x4a3e38});
+  stampMesh = new THREE.Mesh(new THREE.PlaneGeometry(1.38,1.38), sm);
+  stampMesh.position.set(FINAL.x, FINAL.y, 0.045);
+  stampMesh.renderOrder = 8;
+  paper.add(stampMesh);
+}
+buildLines();
+
+/* ================= 远处印样 + 浮尘 ================= */
+var sheetMat1 = new THREE.MeshBasicMaterial({color:0xe6e3da, transparent:true, opacity:0.32, fog:true, depthWrite:false});
+var sheet1 = new THREE.Mesh(new THREE.PlaneGeometry(8.5, 5.3), sheetMat1);
+sheet1.position.set(-7.5, 2.6, -13.5); sheet1.rotation.set(0.10, 0.42, 0.05); sheet1.renderOrder = 2;
+scene.add(sheet1);
+var sheetMat2 = new THREE.MeshBasicMaterial({color:0xe9e2d8, transparent:true, opacity:0.2, fog:true, depthWrite:false});
+var sheet2 = new THREE.Mesh(new THREE.PlaneGeometry(10.5, 6.4), sheetMat2);
+sheet2.position.set(9.5, -3.4, -19); sheet2.rotation.set(-0.06, -0.5, -0.07); sheet2.renderOrder = 2;
+scene.add(sheet2);
+
+var MOTES = 130;
+var moteGeo = new THREE.BufferGeometry();
+var motePos = new Float32Array(MOTES*3);
+for(var mi=0;mi<MOTES;mi++){
+  motePos[mi*3]   = (Math.random()-0.5)*30;
+  motePos[mi*3+1] = (Math.random()-0.5)*14;
+  motePos[mi*3+2] = -6 + Math.random()*9;
+}
+moteGeo.setAttribute('position', new THREE.BufferAttribute(motePos, 3));
+var moteMat = new THREE.PointsMaterial({color:0xcfd4d6, size:0.05, transparent:true, opacity:0.5, depthWrite:false, sizeAttenuation:true, fog:true});
+var motes = new THREE.Points(moteGeo, moteMat);
+motes.renderOrder = 10;
+scene.add(motes);
+
+/* ================= 接触软影（活字贴近纸面时） ================= */
+function shadowTexture(){
+  var c = document.createElement('canvas'); c.width = c.height = 128;
+  var ctx = c.getContext('2d');
+  var gr = ctx.createRadialGradient(64,64,4,64,64,62);
+  gr.addColorStop(0,'rgba(48,56,64,0.55)'); gr.addColorStop(1,'rgba(48,56,64,0)');
+  ctx.fillStyle=gr; ctx.fillRect(0,0,128,128);
+  return new THREE.CanvasTexture(c);
+}
+var shadow = new THREE.Mesh(new THREE.PlaneGeometry(3.4,3.4),
+  new THREE.MeshBasicMaterial({map:shadowTexture(), transparent:true, opacity:0, depthWrite:false, fog:true}));
+shadow.position.z = 0.02; shadow.renderOrder = 7;
+scene.add(shadow);
+
+/* ================= 相机 ================= */
+var CAM = { pos:new THREE.Vector3(), look:new THREE.Vector3() };
+var narrow = false, KS = 1;      // 移动端：纸组缩放 + 特写机位
+function applyScale(){
+  narrow = (innerWidth/innerHeight) < 0.8;
+  KS = narrow ? 0.62 : 1;
+  typeGroup.scale.setScalar(KS);
+  paper.scale.setScalar(KS);
+  sheet1.scale.setScalar(KS); sheet2.scale.setScalar(KS);
+}
+function updateCamera(p){
+  if(!narrow){
+    var x = -0.55 + 1.3*p, y = 0.55 - 0.37*p, z = 16.6 - 1.1*p;
+    CAM.pos.set(x,y,z);
+    CAM.look.set(x*0.22, 0.05 + y*0.35, 0);
+  }else{
+    // 窄屏：特写巡读（机位追随压点）
+    var tx, ty, tz;
+    if(p < PRESSES[0].a){ tx=-2.6; ty=2.6; tz=14.2; }
+    else if(p >= FINAL.a){ tx=0.9; ty=-1.55; tz=19.5; }
+    else{
+      var wi=0; for(var i=0;i<4;i++){ if(p>=PRESSES[i].a) wi=i; }
+      var w = PRESSES[wi], u = winU(p, w);
+      var L = LAYOUT[wi];
+      var px = (L.x - lineW(wi)/2 + 0.55)*KS, py = L.y*KS;
+      tx = px*0.94; ty = py + 0.15;
+      tz = 14.6 - 1.6*Math.sin(u*Math.PI);
+      if(u>0.42 && u<0.75){ tz = 12.9; }
+    }
+    CAM.pos.set(tx, ty, tz);
+    CAM.look.set(tx*0.85, ty*0.75, 0);
+  }
+  camera.position.copy(CAM.pos);
+  camera.lookAt(CAM.look);
+}
+
+/* ================= 每帧更新（p 与 t 的纯函数） ================= */
+var contactU = [0,0,0,0];
+var _v3a = new THREE.Vector3();
+var colophonEl = document.getElementById('colophon');
+var piText = document.getElementById('piText');
+var dotEls = document.querySelectorAll('#pressinfo .dots i');
+var hintEl = document.getElementById('hint');
+var stColo = false, stHint = true, stPi = '';
+var poseOut = {pos:[0,0,0], contact:0, u:0};
+
+function update(p, t){
+  var palT = Math.min(1, p*0.62 + smooth(0.90,1.0,p)*0.38);
+  lerpPal(PAL.fog, palT, _bg);
+  renderer.setClearColor(_bg, 1);
+  scene.fog.color.copy(_bg);
+  paperUni.uFogCol.value.copy(_bg);
+  lerpPal(PAL.paper, palT, _paper);
+  lerpPal(PAL.ink, palT, _ink);
+  lerpPal(PAL.washA, palT, _wa); washA.material.color.copy(_wa);
+  lerpPal(PAL.washB, palT, _wb); washB.material.color.copy(_wb);
+  lerpPal(PAL.wm, palT, _wm);
+  wmMat.color.copy(_wm);
+  var behindK = 1 - Math.min(1, Math.max(0, (typeGroup.position.z/KS - 0.10)/0.55));
+  wmMat.opacity = 0.17 + behindK*0.15 + smooth(0.90,1.0,p)*0.14;
+
+  /* 活字位姿 */
+  var zi = 0, inked = 0;
+  for(var i=0;i<4;i++){
+    var w = PRESSES[i], u = winU(p, w);
+    pressPose(i, u, poseOut);
+    if(useWin(p,i)) {
+      typeGroup.position.set(poseOut.pos[0]*KS, poseOut.pos[1]*KS, poseOut.pos[2]*KS);
+      contactU[i] = poseOut.contact;
+    }
+    var li = smooth(0.52,0.66,u) * (p>=w.a ? 1 : 0);
+    var L = lineMeshes[i];
+    L.mesh.material.opacity = li*0.94;
+    var settle = 1 + 0.05*Math.pow(1 - smooth(0.52,0.80,u), 2);
+    L.mesh.scale.set(settle, settle, 1);
+    var dry = smooth(0.58,0.96,u);
+    L.mesh.material.color.copy(L.base).lerp(_ink, palT).multiplyScalar(1 + (1-dry)*0.22);
+    var di = smooth(0.50,0.56,u)*(1 - 0.30*smooth(0.72,1.0,u));
+    paperUni['uD'+i].value.set(
+      (LAYOUT[i].x - lineW(i)/2 + 0.55), LAYOUT[i].y, di, 1.30);
+    var glow = di * Math.exp(-Math.pow((u-0.545)*16,2));
+    paperUni['uG'+i].value = glow*0.9;
+    paperUni['uR'+i].value.set(
+      (LAYOUT[i].x - lineW(i)/2 + 0.55), LAYOUT[i].y,
+      Math.min(1, Math.max(0, (u-0.52)/0.40)), di*0.8);
+    inked += smooth(0.58,0.66,u);
+    var dotOn = u >= 0.58;
+    if(!!dotEls[i].classList.contains('on') !== dotOn) dotEls[i].classList.toggle('on', dotOn);
+  }
+  if(p < PRESSES[0].a){
+    typeGroup.position.set(-3.4*KS, 3.80*KS, RESTZ*KS);
+  }
+  typeGroup.position.x += Math.sin(t*0.35)*0.05*(1-p);
+  typeGroup.position.y += Math.sin(t*0.27+1.7)*0.06*(1-p);
+  typeGroup.rotation.y = Math.sin(t*0.22)*0.045 + 0.03;
+  typeGroup.rotation.x = -0.02 + Math.sin(t*0.18+0.6)*0.012;
+  typeGroup.renderOrder = (typeGroup.position.z/KS < 0.14) ? 5 : 7;
+
+  /* 终压 */
+  var fu = winU(p, FINAL);
+  var sink = ss(seg(fu, 0.05, 0.62));
+  paperUni.uFootA.value = smooth(0.28,0.72,fu);
+  if(stampMesh){
+    stampMesh.material.opacity = smooth(0.55,0.82,fu)*0.85;
+    stampMesh.position.set(FINAL.x + Math.sin(t*0.3)*0.004, FINAL.y, 0.045);
+  }
+  if(goldMesh){
+    goldMesh.material.opacity = smooth(0.72,0.95,fu)*0.8;
+  }
+  if(dotEls[4]){
+    var gOn = fu >= 0.72;
+    if(!!dotEls[4].classList.contains('on') !== gOn) dotEls[4].classList.toggle('on', gOn);
+  }
+  reliefUni.uInked.value = Math.min(0.85, 0.18 + inked*0.16);
+  inkFace.material.opacity = 0.13 + reliefUni.uInked.value*0.30;
+
+  /* 接触软影 */
+  var sz = typeGroup.position.z/KS;
+  var shA = 0.30 * (1 - Math.min(1, Math.max(0,(sz-0.45)/1.6)));
+  shadow.position.set(typeGroup.position.x, typeGroup.position.y - 0.25, 0.02*KS);
+  shadow.material.opacity = Math.max(0, Math.min(0.32, shA));
+  var shScale = (0.7 + Math.max(0, sz)*0.55);
+  shadow.scale.set(shScale, shScale, 1);
+
+  /* 印样漂移 + 浮尘 */
+  sheet1.position.y = 2.6*KS + Math.sin(t*0.07)*0.5;
+  sheet2.position.y = -3.4*KS + Math.cos(t*0.05)*0.6;
+  sheet1.material.opacity = 0.32; sheet2.material.opacity = 0.2;
+  var mp = moteGeo.attributes.position.array;
+  for(var k=0;k<MOTES;k++){
+    mp[k*3+1] += 0.0016; if(mp[k*3+1] > 7) mp[k*3+1] = -7;
+    mp[k*3]   += Math.sin(t*0.3 + k)*0.0006;
+    var dx = mp[k*3]-CAM.pos.x, dy = mp[k*3+1]-CAM.pos.y;
+    if(dx*dx + dy*dy < 9) mp[k*3+1] = -100;            // 距机位过近压到纸下（防巨斑）
+    if(mp[k*3+1] === -100 && dx*dx+dy*dy > 16) mp[k*3+1] = -7;
+  }
+  moteGeo.attributes.position.needsUpdate = true;
+  moteMat.color.setHex(palT > 0.5 ? 0xd6cfc6 : 0xcfd4d6);
+
+  paperUni.uTime.value = t;
+
+  /* DOM 联动 */
+  var wantColo = p > 0.05;
+  if(wantColo !== stColo){ colophonEl.classList.toggle('on', wantColo); stColo = wantColo; }
+  var inkedAll = p > 0.955;
+  if(inkedAll !== colophonEl.classList.contains('inked')) colophonEl.classList.toggle('inked', inkedAll);
+  var wantHintOff = p > 0.04;
+  if(wantHintOff !== stHint){ hintEl.classList.toggle('off', wantHintOff); stHint = wantHintOff; }
+  var label;
+  if(p < PRESSES[0].a) label = '待印 · 版已上机';
+  else if(p < PRESSES[0].b) label = contactU[0]>0.5 ? '压印中' : '第一压';
+  else if(p < PRESSES[1].b) label = contactU[1]>0.5 ? '压印中' : '第二压';
+  else if(p < PRESSES[2].b) label = contactU[2]>0.5 ? '压印中' : '第三压';
+  else if(p < PRESSES[3].b) label = contactU[3]>0.5 ? '压印中' : '第四压';
+  else if(p < 0.97) label = '终压 · 落版';
+  else label = '印毕 · 初版第一份';
+  if(label !== stPi){ piText.textContent = label; stPi = label; }
+
+  anchorColophon();
+}
+function sierp(z){ return 0; }  // （已弃用）
+
+/* 版权页锚定到版记框（桌面）；窄屏走 CSS 固定 */
+var _pv = new THREE.Vector3();
+function anchorColophon(){
+  if(narrow) { colophonEl.style.transform=''; return; }
+  _pv.set(-7.55*KS, -4.12*KS, 0.1*KS);
+  paper.localToWorld(_pv);
+  _pv.project(camera);
+  var x = (_pv.x*0.5+0.5)*innerWidth, y = (-_pv.y*0.5+0.5)*innerHeight;
+  colophonEl.style.left = x + 'px';
+  colophonEl.style.top  = (y - 118) + 'px';
+}
+
+/* ================= 加载页（活字排版） ================= */
+var loaderEl = document.getElementById('loader');
+var ldForm = document.getElementById('ldForm');
+var ldTray = document.getElementById('ldTray');
+var ldPhase = document.getElementById('ldPhase');
+var ldRule = document.getElementById('ldRule');
+var ldSkip = document.getElementById('ldSkip');
+var loaderDone = false, loaderT0 = null;
+var LDUR = RM ? 0.01 : 2.9;                     // 秒（FAST 另乘）
+var tileEls = [];
+function buildLoader(){
+  var idx = 0, total = 0;
+  LINES.forEach(function(s){ total += s.length; });
+  LINES.forEach(function(s, li){
+    var row = document.createElement('div');
+    row.className = 'ld-line';
+    for(var i=0;i<s.length;i++){
+      var tile = document.createElement('div');
+      tile.className = 'ld-t';
+      var sp = document.createElement('span');
+      sp.textContent = s[i];
+      tile.appendChild(sp);
+      row.appendChild(tile);
+      tileEls.push({el:tile, at:0.14 + 1.55*(idx/total)});
+      idx++;
+    }
+    ldForm.appendChild(row);
+  });
+  var trayChars = '风雨山河光尘灯笼春秋';
+  for(var t=0;t<8;t++){
+    var tile = document.createElement('div');
+    tile.className = 'ld-t';
+    var sp = document.createElement('span');
+    sp.textContent = trayChars[t];
+    tile.appendChild(sp);
+    ldTray.appendChild(tile);
+  }
+}
+buildLoader();
+function loaderFail(){
+  // no-gl：加载页立即收场，DOM 静态宣言顶上，版权页常显
+  loaderDone = true;
+  loaderEl.classList.add('done');
+  document.body.classList.add('ready');
+  var c = document.getElementById('colophon');
+  if(c){ c.classList.add('on','inked'); }
+  var h = document.getElementById('hint');
+  if(h){ h.classList.add('off'); }
+  setTimeout(function(){ if(loaderEl.parentNode) loaderEl.parentNode.removeChild(loaderEl); }, 300);
+}
+function loaderUpdate(now){
+  if(loaderDone) return true;
+  if(loaderT0 === null) loaderT0 = now;
+  var e = ((now - loaderT0)/1000)*FAST / LDUR;
+  var done = e >= 1;
+  e = Math.min(1, e);
+  for(var i=0;i<tileEls.length;i++){
+    var T = tileEls[i];
+    if(e >= T.at) T.el.classList.add('set');
+  }
+  var tray = ldTray.children, tHide = Math.floor(e*8);
+  for(var k=0;k<tray.length;k++) tray[k].style.opacity = (k < tHide) ? '0' : '0.9';
+  var ph = e<0.14?'拣字': e<0.6?'排字': e<0.78?'校版': e<0.9?'上墨':'付印';
+  if(ldPhase.textContent !== ph) ldPhase.textContent = ph;
+  ldRule.style.width = Math.round(e*100)+'%';
+  if(e >= 0.88 && !loaderEl.classList.contains('pressed')) loaderEl.classList.add('pressed');
+  if(done) finishLoader();
+  return done;
+}
+function finishLoader(){
+  if(loaderDone) return;
+  loaderDone = true;
+  loaderEl.classList.add('done');
+  document.body.classList.add('ready');
+  setTimeout(function(){ if(loaderEl.parentNode) loaderEl.parentNode.removeChild(loaderEl); }, 800);
+  dropT0 = null;                                    // 活字落场开始
+}
+if(AUTO || STILL || RM){ /* auto：循环内推进 */ }
+else{
+  loaderEl.addEventListener('click', function(){ if(!loaderDone && loaderT0!==null) { /* 快进 */ loaderT0 = performance.now() - (LDUR*1000/FAST)*0.97; } });
+  setTimeout(function(){ if(!loaderDone && loaderT0===null) loaderT0 = performance.now(); }, 350);
+}
+var dropT0 = null, dropK = 0;
+function dropUpdate(dt){
+  if(!loaderDone){ return; }
+  if(dropT0 === null) dropT0 = 0;
+  dropT0 += dt;
+  var k = Math.min(1, dropT0/0.9);
+  dropK = 1 - Math.pow(1-k, 3);
+}
+
+/* ================= 滚动 ================= */
+var space = document.getElementById('scrollspace');
+function readScroll(){
+  var max = space.offsetHeight - innerHeight;
+  return max > 0 ? Math.min(1, Math.max(0, window.scrollY / max)) : 0;
+}
+var targetP = 0, smoothP = 0;
+function enforceScrollHold(){
+  if(PIN !== null && !STILL){ targetP = PIN; window.scrollTo(0, (space.offsetHeight - innerHeight)*PIN); }
+}
+enforceScrollHold();
+targetP = (PIN !== null) ? PIN : readScroll();
+smoothP = targetP;
+
+function applyStill(){
+  updateCamera(smoothP);
+  update(smoothP, 0);
+  renderer.render(scene, camera);
+}
+applyStill();                                       // 初始位姿就地写入 + 首帧
+
+window.addEventListener('scroll', function(){
+  if(PIN === null && !AUTO) targetP = readScroll();
+  if(STILL || RM){ smoothP = (PIN !== null) ? PIN : readScroll(); applyStill(); }
+}, {passive:true});
+
+/* ================= ?auto 调度 ================= */
+var SCHED = [
+  [0.0,0],[3.2,0],[6.0,0.10],[8.6,0.168],[10.4,0.24],
+  [13.0,0.30],[15.8,0.389],[17.6,0.465],
+  [20.2,0.52],[23.2,0.609],[25.0,0.685],
+  [27.6,0.74],[30.6,0.817],[32.4,0.885],
+  [35.2,0.94],[37.6,0.985],[39.0,1.0],[41.0,1.0]
+];
+var autoT0 = null;
+function autoP(now){
+  if(autoT0 === null) autoT0 = now;
+  var t = ((now - autoT0)*FAST/1000) % (SCHED[SCHED.length-1][0] + 0.0001);
+  for(var i=0;i<SCHED.length-1;i++){
+    if(t >= SCHED[i][0] && t <= SCHED[i+1][0]){
+      var a = SCHED[i], b = SCHED[i+1];
+      var u = (t - a[0]) / Math.max(0.001, b[0] - a[0]);
+      return a[1] + (b[1]-a[1]) * (u*u*(3-2*u));
+    }
+  }
+  return 1;
+}
+
+/* ================= 主循环 ================= */
+var clock = {t:0, last:null};
+function loop(now){
+  if(clock.last === null) clock.last = now;
+  var dt = Math.min(0.05, (now - clock.last)/1000);
+  clock.last = now; clock.t += dt;
+  if(!loaderDone) loaderUpdate(now);
+  else dropUpdate(dt);
+  if(AUTO){ targetP = autoP(now); enforceScrollHold(); }
+  else if(PIN === null){ targetP = readScroll(); }
+  smoothP += (targetP - smoothP) * Math.min(1, dt*4.2);
+  if(Math.abs(targetP - smoothP) < 0.0004) smoothP = targetP;
+  updateCamera(smoothP);
+  update(smoothP, clock.t);
+  if(!loaderDone){ typeGroup.visible = false; }     // 排版未毕，活字候场
+  else{
+    var drop = 1 - dropK;                           // 落场：从上方落下
+    typeGroup.position.y += drop * 2.4;
+    typeGroup.visible = dropK > 0.03 || STILL || RM;
+  }
+  renderer.render(scene, camera);
+  if(!STILL && !RM) requestAnimationFrame(loop);
+}
+
+/* ================= 视口 ================= */
+function onResize(){
+  var aspect = innerWidth/Math.max(1,innerHeight);
+  camera.fov = aspect < 0.8 ? 54 : 42;
+  camera.aspect = aspect;
+  camera.updateProjectionMatrix();
+  renderer.setSize(Math.max(1,innerWidth), Math.max(1,innerHeight));
+  applyScale();
+  if(STILL || RM) applyStill();
+}
+window.addEventListener('resize', onResize);
+applyScale();
+onResize();
+
+/* ================= 无头验证接口 ================= */
+window.__renderOnce = function(p){
+  smoothP = targetP = Math.min(1, Math.max(0, p===undefined?smoothP:p));
+  dropK = 1;
+  updateCamera(smoothP);
+  update(smoothP, clock.t);
+  renderer.render(scene, camera);
+};
+window.__mockSnap = function(){
+  if(canvas.width < 4){ onResize(); }
+  loop(performance.now());
+  return renderer.domElement.toDataURL('image/png');
+};
+window.__mockDbg = {scene:scene, camera:camera, paper:paper, type:typeGroup, renderer:renderer};
+window.__probe = function(x, y){                    // 屏幕坐标（左上原点），渲染一帧并直读像素
+  renderer.render(scene, camera);
+  var gl = renderer.getContext();
+  var dpr = renderer.getPixelRatio();
+  var px = new Uint8Array(4);
+  gl.readPixels(Math.round(x*dpr), renderer.domElement.height - Math.round(y*dpr), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+  return [px[0], px[1], px[2], px[3]];
+};
+window.__loaderState = function(){ return {done:loaderDone, pressed:loaderEl.classList.contains('pressed'), n:tileEls.filter(function(T){return T.el.classList.contains('set');}).length}; };
+window.__finishLoader = finishLoader;
+
+onResize();
+if(STILL || RM){
+  finishLoader();
+  applyStill();
+}else if(AUTO){
+  /* 本环境 rAF 可能被节流到不 tick：auto 一律 setInterval 驱动（33ms） */
+  setInterval(function(){ loop(performance.now()); }, 33);
+  loop(performance.now());
+}else{
+  requestAnimationFrame(loop);
+}
+
+}catch(e){ fail(e); document.body.classList.add('no-gl'); }
+})();
+</script>
+</body>
+</html>

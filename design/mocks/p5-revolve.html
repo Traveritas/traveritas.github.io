@@ -1,0 +1,748 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>方案 · 旋门 Revolve（活体）</title>
+<style>
+  /* ═══ 概念：旋门 Revolve ═══
+     主页是一座巨大的旋转门。相机立在转筒内环，从头到尾不移动——
+     滚动 = 转动整座环形巨构。「世界绕你转，而非你走向世界」。
+     局部规则：
+     · 四个章节各占 90° 环壁：晨（醒）→ 晌 → 暮（梦）→ 夜，宣言四句
+       竖排刻在环壁上，转过一章读一句。
+     · 章节之间立着四扇磨砂玻璃翼：翼扫过镜头的一瞬画面被轻轻合上
+       再打开——换章即换气，光与雾在翼后完成过渡。
+     · 环壁留缝：缝外的原野与远处巨构不随环转（它们是静止的世界），
+       从缝里看它们缓缓转过去——旋转的第二个证据。
+     · 地面的同弧行车痕随环一起转：这座门已经转了很久。
+     · 尾章回到晨——门永远在转，没有"到达"。
+     技术约束：无后处理、DPR≤1.5、reduced-motion 静帧、?auto 无头自检、
+     &pin=<0..1> 锁相位、&still=1 单帧、window.__mockSnap() 强制出帧。 */
+
+  @font-face {
+    font-family: 'Noto Serif SC Web';
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url('https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/files/noto-serif-sc-chinese-simplified-500-normal.woff2') format('woff2');
+  }
+  @font-face {
+    font-family: 'Noto Serif SC Web';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url('https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/files/noto-serif-sc-chinese-simplified-600-normal.woff2') format('woff2');
+  }
+
+  :root {
+    --ink: #454c54;
+    --ink-soft: #6d747c;
+    --paper: #e3eaef;
+    --font-display: 'Noto Serif SC Web', 'Noto Serif SC', 'Palatino Linotype', Georgia, 'Songti SC', SimSun, serif;
+    --font-body: system-ui, -apple-system, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: auto; }
+  body {
+    margin: 0;
+    font-family: var(--font-body);
+    color: var(--ink);
+    background: linear-gradient(to bottom, #e3eaef 0%, #ecebe4 40%, #f1e3da 72%, #d9dee4 100%);
+  }
+  html.no-webgl #gl { display: none; }
+  html.no-webgl .fallback { display: flex; }
+
+  #gl { position: fixed; inset: 0; }
+  #gl canvas { display: block; width: 100%; height: 100%; }
+
+  /* 滚动高度：420vh，四分之一环每 105vh */
+  #track { height: 420vh; }
+
+  .fallback {
+    display: none; position: fixed; inset: 0; z-index: 5;
+    align-items: center; justify-content: center; text-align: center;
+  }
+  .fallback div { font-family: var(--font-display); font-size: 22px; line-height: 2.2; letter-spacing: .12em; }
+
+  /* 账目卡 */
+  .card {
+    position: fixed; left: 22px; bottom: 20px; z-index: 10;
+    max-width: 300px; padding: 14px 18px 13px;
+    background: rgba(252, 251, 248, .78);
+    border: 1px solid rgba(70, 78, 86, .18);
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    font-size: 12px; line-height: 1.75; color: var(--ink-soft);
+  }
+  .card b {
+    display: block; margin-bottom: 4px;
+    font-family: var(--font-display); font-weight: 600;
+    font-size: 15px; letter-spacing: .2em; color: var(--ink);
+  }
+  .card i { font-style: normal; color: #9aa2aa; }
+
+  /* 右下：环形进度 + 提示 */
+  .hint {
+    position: fixed; right: 24px; bottom: 22px; z-index: 10;
+    display: flex; align-items: center; gap: 12px;
+    color: var(--ink-soft); font-size: 12px; letter-spacing: .32em;
+  }
+  .hint svg { display: block; transform: rotate(-90deg); }
+  .hint .ring-bg { stroke: rgba(70,78,86,.18); }
+  .hint .ring-fg { stroke: #6d747c; transition: stroke-dashoffset .12s linear; }
+  .hint .dot { fill: #6d747c; }
+
+  @media (max-width: 640px) {
+    .card { left: 14px; right: 14px; bottom: 14px; max-width: none; padding: 11px 14px 10px; font-size: 11px; }
+    .card i { display: none; }
+    .hint { right: 16px; bottom: 15px; }
+    .hint span { display: none; }
+  }
+</style>
+</head>
+<body>
+<div id="gl"></div>
+<div id="track"></div>
+
+<div class="fallback"><div>这里不是梦，也不是现实。<br/>它是人在即将醒来时，看见的最后一层世界。</div></div>
+
+<div class="card">
+  <b>旋门 <i>Revolve</i></b>
+  主页是一座旋转门：你不动，滚动转动整座环。<br/>
+  磨砂玻璃翼在章节之间扫过——翼过即换气；<br/>
+  环壁留缝，缝外的原野不跟着转。<br/>
+  <i>晨 → 晌 → 暮 → 夜 → 晨，门永远在转。</i>
+</div>
+
+<div class="hint">
+  <span>滚动 · 转动</span>
+  <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true">
+    <circle class="ring-bg" cx="17" cy="17" r="14" fill="none" stroke-width="1.5"/>
+    <circle class="ring-fg" id="ringFg" cx="17" cy="17" r="14" fill="none" stroke-width="1.5"
+            stroke-dasharray="87.96" stroke-dashoffset="87.96" stroke-linecap="round"/>
+    <circle class="dot" id="ringDot" cx="17" cy="3" r="2"/>
+  </svg>
+</div>
+
+<script src="vendor/three.min.js"></script>
+<script>
+(function () {
+'use strict';
+
+window.addEventListener('error', function (e) {
+  window.__swarmErr = (e.message || 'error') + ' @' + (e.lineno || '?');
+});
+window.addEventListener('unhandledrejection', function (e) {
+  window.__swarmErr = 'rejection: ' + (e.reason && e.reason.message || e.reason);
+});
+
+/* ───────── URL 参数（裸旗标兼容） ───────── */
+var qs = location.search;
+function q(name) {
+  var m = qs.match(new RegExp('[?&]' + name + '(?:=([^&]*))=?'));
+  return m ? (m[1] !== undefined ? decodeURIComponent(m[1]) : '') : null;
+}
+var IS_AUTO  = qs.indexOf('auto')  >= 0;
+var IS_FAST  = qs.indexOf('fast')  >= 0;
+var IS_STILL = qs.indexOf('still') >= 0;
+var PIN      = q('pin');   // 0..1 锁相位
+var RM = false;
+try { RM = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+
+/* ───────── 常量与几何布局 ───────── */
+var R_WALL = 17;      // 环殿半径（碑板立在此环上）
+var R_CAM  = 3.2;     // 相机所在半径（近圆心，不动）
+var R_VEIL = 9.5;     // 玻璃翼半径
+var H_WALL = 6.78;    // 碑板高度（顶部之下是天空）
+var SECTORS = 4;
+var DEG = Math.PI / 180;
+
+/* 相机：固定在角 0 处，视线 = 切向为主、略向内 */
+var camPos = new THREE.Vector3(0, 1.9, R_CAM);
+var lookBlend = new THREE.Vector3(0.93, 0, -0.368).normalize(); // 切向×内偏
+var LOOK = camPos.clone().addScaledVector(lookBlend, 10); LOOK.y = 2.9;
+
+/* 视线与环壁交点角（内容排布基准） */
+function wallHitAngle() {
+  var px = camPos.x, pz = camPos.z, dx = lookBlend.x, dz = lookBlend.z;
+  var b = px * dx + pz * dz;
+  var c = px * px + pz * pz - R_WALL * R_WALL;
+  var t = -b + Math.sqrt(Math.max(0.0001, b * b - c));
+  return Math.atan2(px + dx * t, pz + dz * t); // 注意：角以 atan2(x,z) 计
+}
+var AHEAD = wallHitAngle(); // 内容 k 在 drum 本地角 = AHEAD − k·90°
+
+/* ───────── 调色板（晨/晌/暮/夜） ───────── */
+var PAL = [
+  { fog: 0xe3eaef, sky: 0xeef3f7, gnd: 0xc9ccd1, sun: 0xdfe9f2, sunI: 0.8 },
+  { fog: 0xecebe4, sky: 0xf4f3ec, gnd: 0xd4d2c8, sun: 0xf5efe2, sunI: 0.95 },
+  { fog: 0xf1e3da, sky: 0xf6ebe2, gnd: 0xd8c2b8, sun: 0xffd9c0, sunI: 1.05 },
+  { fog: 0xd0d7df, sky: 0xd3dbe4, gnd: 0xaab2bb, sun: 0xcfd8e2, sunI: 0.5 }
+];
+var PAL_KEYS = ['fog', 'sky', 'gnd', 'sun', 'sunI'];
+var tmpC = {};
+PAL_KEYS.forEach(function (k) { tmpC[k] = { a: new THREE.Color(), b: new THREE.Color() }; });
+
+/* ───────── 渲染器 ───────── */
+var container = document.getElementById('gl');
+var renderer;
+try {
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
+} catch (e) {
+  document.documentElement.classList.add('no-webgl');
+  return;
+}
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+renderer.setSize(window.innerWidth, window.innerHeight);
+container.appendChild(renderer.domElement);
+
+var scene = new THREE.Scene();
+var fogCol = new THREE.Color(PAL[0].fog);
+scene.fog = new THREE.Fog(fogCol.getHex(), 12, 64);
+scene.background = fogCol; // 同一实例，逐帧联动
+
+var camera = new THREE.PerspectiveCamera(46, window.innerWidth / window.innerHeight, 0.1, 200);
+camera.position.copy(camPos);
+camera.lookAt(LOOK);
+
+var hemi = new THREE.HemisphereLight(PAL[0].sky, PAL[0].gnd, 0.9);
+scene.add(hemi);
+var sun = new THREE.DirectionalLight(PAL[0].sun, PAL[0].sunI);
+sun.position.set(18, 26, 9);
+scene.add(sun);
+
+/* ───────── 材质 ───────── */
+var noiseTex = (function () {
+  var c = document.createElement('canvas'); c.width = c.height = 128;
+  var g = c.getContext('2d'), img = g.createImageData(128, 128);
+  for (var i = 0; i < img.data.length; i += 4) {
+    var v = 234 + (Math.random() - 0.5) * 20;
+    img.data[i] = img.data[i+1] = img.data[i+2] = v; img.data[i+3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+  var t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(2, 2);
+  return t;
+})();
+
+var wallTints = [0xe4e8ec, 0xeceae2, 0xf2e4dc, 0xdde2e8];
+var wallMats = wallTints.map(function (c) {
+  return new THREE.MeshStandardMaterial({ color: c, roughness: 0.95, metalness: 0.0, map: noiseTex });
+});
+var mullionMat = new THREE.MeshStandardMaterial({ color: 0xb4b9be, roughness: 0.85, metalness: 0.05 });
+var skirtMat   = new THREE.MeshStandardMaterial({ color: 0xa9a49c, roughness: 0.95, map: noiseTex });
+var outGndMat  = new THREE.MeshBasicMaterial({ color: 0xd9d3c7 });
+var farMat     = new THREE.MeshStandardMaterial({ color: 0xcdd3d8, roughness: 0.92, map: noiseTex });
+var warmWinMat = new THREE.MeshBasicMaterial({ color: 0xffdcae });
+var goldMat    = new THREE.MeshBasicMaterial({ color: 0xd8b46a, transparent: true, opacity: 0.85 });
+
+/* ───────── 天空穹顶（竖向渐变，随调色重绘） ───────── */
+var skyCanvas = document.createElement('canvas'); skyCanvas.width = 32; skyCanvas.height = 256;
+var skyTex = new THREE.CanvasTexture(skyCanvas);
+var skyDome = new THREE.Mesh(
+  new THREE.SphereGeometry(140, 24, 12),
+  new THREE.MeshBasicMaterial({ map: skyTex, side: THREE.BackSide, fog: false, depthWrite: false })
+);
+skyDome.renderOrder = -1;
+scene.add(skyDome);
+var skyTmp = new THREE.Color();
+var SKY_WHITE = new THREE.Color(0xffffff);
+function redrawSky() {
+  var g = skyCanvas.getContext('2d');
+  var grad = g.createLinearGradient(0, 0, 0, 256);
+  skyTmp.copy(cur.sky).lerp(SKY_WHITE, 0.42);
+  grad.addColorStop(0.0, '#' + skyTmp.getHexString());      // 天顶
+  grad.addColorStop(0.42, '#' + cur.sky.getHexString());    // 中天
+  grad.addColorStop(0.62, '#' + cur.fog.getHexString());    // 地平融雾
+  grad.addColorStop(1.0, '#' + cur.fog.getHexString());
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 32, 256);
+  /* 8bit 色带抖动（散点，不成行） */
+  for (var di = 0; di < 160; di++) {
+    g.fillStyle = (di % 2 ? 'rgba(255,255,255,0.035)' : 'rgba(90,100,110,0.03)');
+    g.fillRect(Math.random() * 32, Math.random() * 256, 1, 1);
+  }
+  skyTex.needsUpdate = true;
+}
+
+/* ───────── drum（随滚动转动的整座环） ───────── */
+var drum = new THREE.Group();
+scene.add(drum);
+
+function localAngle(arrivalP, offsetDeg) {
+  return AHEAD - arrivalP * Math.PI * 2 + offsetDeg * DEG;
+}
+function placeOnRing(obj, ang, radius, y) {
+  obj.position.set(Math.sin(ang) * radius, y, Math.cos(ang) * radius);
+  obj.lookAt(0, y, 0);
+  drum.add(obj);
+}
+
+/* 环壁碑板：每章一块主碑（12°）+ 两块伴碑（±16°，10°），边界 45° 处是玻璃翼 */
+var mainGeo  = new THREE.BoxGeometry(2 * R_WALL * Math.sin(6 * DEG), H_WALL, 0.35);
+var compGeo  = new THREE.BoxGeometry(2 * R_WALL * Math.sin(5 * DEG), H_WALL, 0.35);
+for (var s = 0; s < SECTORS; s++) {
+  for (var pi = -1; pi <= 1; pi++) {
+    var wide = pi === 0;
+    var m = new THREE.Mesh(wide ? mainGeo : compGeo, wallMats[s]);
+    var ang = localAngle(s / 4, pi * 16);
+    m.position.set(Math.sin(ang) * R_WALL, H_WALL / 2, Math.cos(ang) * R_WALL);
+    m.lookAt(0, H_WALL / 2, 0);
+    drum.add(m);
+  }
+}
+/* 竖梃（主碑与伴碑两侧的窄柱） */
+var mullionGeo = new THREE.BoxGeometry(0.16, H_WALL + 0.3, 0.5);
+var mullions = new THREE.InstancedMesh(mullionGeo, mullionMat, SECTORS * 6);
+var mi = 0, mtx = new THREE.Matrix4(), mq = new THREE.Quaternion(), mvp = new THREE.Vector3(), mup = new THREE.Vector3(0, 1, 0), ms1 = new THREE.Vector3(1, 1, 1);
+for (s = 0; s < SECTORS; s++) {
+  for (pi = -1; pi <= 1; pi++) {
+    for (var e = -1; e <= 1; e += 2) {
+      var halfArc = (pi === 0 ? 6 : 5) + 0.55;
+      var a2 = localAngle(s / 4, pi * 16 + e * halfArc);
+      mvp.set(Math.sin(a2) * (R_WALL - 0.02), (H_WALL + 0.3) / 2, Math.cos(a2) * (R_WALL - 0.02));
+      mq.setFromUnitVectors(new THREE.Vector3(0, 0, 1), new THREE.Vector3(Math.sin(a2), 0, Math.cos(a2)).negate());
+      mtx.compose(mvp, mq, ms1);
+      mullions.setMatrixAt(mi++, mtx);
+    }
+  }
+}
+drum.add(mullions);
+
+/* 矮环墙（踢脚）+ 地面（地面入 drum：行车痕随环转） */
+var skirt = new THREE.Mesh(
+  new THREE.CylinderGeometry(R_WALL + 0.3, R_WALL + 0.3, 1.05, 96, 1, true),
+  skirtMat
+);
+skirt.material.side = THREE.BackSide;
+skirt.position.y = 0.52;
+drum.add(skirt);
+
+var floorTex = (function () {
+  var c = document.createElement('canvas'); c.width = c.height = 1024;
+  var g = c.getContext('2d');
+  g.fillStyle = '#e9e4da'; g.fillRect(0, 0, 1024, 1024);
+  var cx = 512, cy = 512;
+  /* 放射状拼缝（露台石板） */
+  g.strokeStyle = 'rgba(160,154,142,0.12)';
+  g.lineWidth = 2;
+  for (var k = 0; k < 24; k++) {
+    var aa = k / 24 * Math.PI * 2;
+    g.beginPath();
+    g.moveTo(cx + Math.cos(aa) * 80, cy + Math.sin(aa) * 80);
+    g.lineTo(cx + Math.cos(aa) * 740, cy + Math.sin(aa) * 740);
+    g.stroke();
+  }
+  /* 同弧行车痕：一组弧线（世界在环里转了很久） */
+  for (var i = 0; i < 26; i++) {
+    var r = 100 + Math.random() * 640;
+    var a0 = Math.random() * Math.PI * 2;
+    var a1 = a0 + 0.5 + Math.random() * 2.6;
+    g.strokeStyle = Math.random() < 0.5 ? 'rgba(150,141,124,' + (0.10 + Math.random() * 0.12) + ')'
+                                        : 'rgba(148,156,162,' + (0.09 + Math.random() * 0.10) + ')';
+    g.lineWidth = 4 + Math.random() * 13;
+    g.beginPath(); g.arc(cx, cy, r, a0, a1); g.stroke();
+  }
+  var rg = g.createRadialGradient(cx, cy, 40, cx, cy, 500);
+  rg.addColorStop(0, 'rgba(140,132,118,0.22)'); rg.addColorStop(1, 'rgba(140,132,118,0)');
+  g.fillStyle = rg; g.fillRect(0, 0, 1024, 1024);
+  var t = new THREE.CanvasTexture(c);
+  t.anisotropy = 4;
+  return t;
+})();
+var floor = new THREE.Mesh(
+  new THREE.CircleGeometry(R_WALL + 0.4, 96),
+  new THREE.MeshBasicMaterial({ map: floorTex })   // 烘焙色，不受光晕裁剪
+);
+floor.rotation.x = -Math.PI / 2;
+floor.position.y = 0;
+drum.add(floor);
+
+/* ───────── 玻璃翼 ×4（章节之间的磨砂幕） ───────── */
+var veilFrag = [
+  'precision mediump float;',
+  'varying vec2 vUv; varying vec3 vN; varying vec3 vV;',
+  'uniform float uTime; uniform vec3 uTint;',
+  'float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }',
+  'float vnoise(vec2 p){',
+  '  vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);',
+  '  return mix(mix(h21(i), h21(i+vec2(1,0)), f.x), mix(h21(i+vec2(0,1)), h21(i+vec2(1,1)), f.x), f.y);',
+  '}',
+  'float fbm(vec2 p){ float v=0.0, a=0.55; for(int i=0;i<3;i++){ v+=a*vnoise(p); p=p*2.13+7.7; a*=0.5; } return v; }',
+  'void main(){',
+  '  vec2 uv = vUv;',
+  '  float mott = fbm(uv * vec2(3.2, 1.4) + vec2(uTime * 0.008, 0.0));',
+  '  vec3 V = normalize(vV);',
+  '  float fres = pow(1.0 - abs(dot(V, normalize(vN))), 3.2);',
+  '  float edge = smoothstep(0.0, 0.06, uv.x) * smoothstep(0.0, 0.06, 1.0 - uv.x);',
+  '  float rim  = (1.0 - edge) * 0.5;',                                     // 侧缘亮棱
+  '  float yfade = smoothstep(0.0, 0.10, uv.y) * smoothstep(0.0, 0.12, 1.0 - uv.y);',
+  '  float alpha = (0.34 + mott * 0.10 + fres * 0.16 + rim * 0.14) * yfade;',
+  '  vec3 col = uTint * (0.92 + mott * 0.10) + vec3(1.0) * fres * 0.30 + vec3(1.0) * rim * 0.35;',
+  '  gl_FragColor = vec4(col, clamp(alpha, 0.0, 0.85));',
+  '}'
+].join('\n');
+var veilVert = [
+  'varying vec2 vUv; varying vec3 vN; varying vec3 vV;',
+  'void main(){',
+  '  vUv = uv;',
+  '  vec4 wp = modelMatrix * vec4(position, 1.0);',
+  '  vN = normalize(mat3(modelMatrix) * normal);',
+  '  vV = cameraPosition - wp.xyz;',
+  '  gl_Position = projectionMatrix * viewMatrix * wp;',
+  '}'
+].join('\n');
+var veilMat = new THREE.ShaderMaterial({
+  vertexShader: veilVert, fragmentShader: veilFrag,
+  uniforms: { uTime: { value: 0 }, uTint: { value: new THREE.Color(0xf2f0ea) } },
+  transparent: true, depthWrite: false, side: THREE.DoubleSide
+});
+var veilGeo = new THREE.CylinderGeometry(R_VEIL, R_VEIL, 7.6, 26, 1, true, -12 * DEG, 24 * DEG);
+for (s = 0; s < SECTORS; s++) {
+  var veil = new THREE.Mesh(veilGeo, veilMat);
+  var va = localAngle(s / 4 + 0.125, 0); // 边界 = 章节中心 + 45°
+  veil.position.set(Math.sin(va) * R_VEIL, 3.9, Math.cos(va) * R_VEIL);
+  veil.rotation.y = va; // 让圆柱开口朝向弦向
+  veil.renderOrder = 5;
+  drum.add(veil);
+}
+/* 注：CylinderGeometry 的 thetaStart 以其自身局部坐标计；
+   整体再随 drum 旋转。开口朝向由 rotation.y 对齐本地角 va。 */
+
+/* ───────── 宣言文字（CanvasTexture 竖排） ───────── */
+var LINES = ['这里不是梦，', '也不是现实。', '它是人在即将醒来时，', '看见的最后一层世界。'];
+var INKS = ['#3f464e', '#4a473f', '#5a4644', '#333a44'];
+var SECT_LABELS = ['晨', '晌', '暮', '夜'];
+var textMats = [];
+function drawPanelCanvas(idx) {
+  var c = document.createElement('canvas'); c.width = 768; c.height = 1408;
+  var g = c.getContext('2d');
+  g.clearRect(0, 0, c.width, c.height);
+  var line = LINES[idx];
+  var n = line.length;
+  var size = n <= 6 ? 170 : n <= 8 ? 148 : 114;
+  var pitch = size * (n <= 6 ? 1.14 : 1.12);
+  var total = pitch * (n - 1) + size;
+  var y0 = (c.height * 0.46) - total / 2 + size / 2;
+  var xc = c.width * 0.60;
+  var longLine = n > 6;
+  g.fillStyle = INKS[idx];
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.font = '600 ' + size + 'px "Noto Serif SC Web", "Noto Serif SC", SimSun, serif';
+  for (var i = 0; i < n; i++) {
+    var ch = line[i];
+    var yy = y0 + i * pitch;
+    if (ch === '，' || ch === '。') {
+      g.font = '600 ' + Math.round(size * 0.8) + 'px "Noto Serif SC Web", "Noto Serif SC", SimSun, serif';
+      g.fillText(ch, xc + size * 0.24, yy - size * 0.06);
+      g.font = '600 ' + size + 'px "Noto Serif SC Web", "Noto Serif SC", SimSun, serif';
+    } else {
+      g.fillText(ch, xc, yy);
+    }
+  }
+  /* 小节令：短句在左下（竖排单字+细线）；长句移到左上，避开字列 */
+  g.font = '500 54px "Noto Serif SC Web", "Noto Serif SC", SimSun, serif';
+  g.fillStyle = 'rgba(63,70,78,0.55)';
+  var labelX = c.width * (longLine ? 0.17 : 0.20);
+  var labelY = c.height * (longLine ? 0.20 : 0.80);
+  g.fillText(SECT_LABELS[idx], labelX, labelY);
+  g.strokeStyle = 'rgba(63,70,78,0.30)'; g.lineWidth = 2;
+  g.beginPath();
+  if (longLine) { g.moveTo(labelX, labelY + 46); g.lineTo(labelX, labelY + 118); }
+  else { g.moveTo(labelX, labelY + 46); g.lineTo(labelX, labelY + 128); }
+  g.stroke();
+  /* S0：记字标（顶部小环） */
+  if (idx === 0) {
+    g.strokeStyle = 'rgba(63,70,78,0.5)'; g.lineWidth = 2.5;
+    g.beginPath(); g.arc(c.width * 0.60, c.height * 0.055, 38, 0, Math.PI * 2); g.stroke();
+    g.fillStyle = 'rgba(63,70,78,0.72)';
+    g.font = '500 38px "Noto Serif SC Web", "Noto Serif SC", SimSun, serif';
+    g.fillText('记', c.width * 0.60, c.height * 0.055 + 2);
+  }
+  /* S3：导航行（长句字列居右，导航落左下） */
+  if (idx === 3) {
+    g.fillStyle = 'rgba(51,58,68,0.82)';
+    g.font = '500 42px "Noto Serif SC Web", "Noto Serif SC", SimSun, serif';
+    g.textAlign = 'center';
+    g.fillText('随笔 · 关于 · 项目', c.width * 0.28, c.height * 0.905);
+    g.strokeStyle = 'rgba(51,58,68,0.28)'; g.lineWidth = 2;
+    g.beginPath(); g.moveTo(c.width * 0.10, c.height * 0.905 - 46); g.lineTo(c.width * 0.46, c.height * 0.905 - 46); g.stroke();
+  }
+  var t = new THREE.CanvasTexture(c);
+  t.anisotropy = 8;
+  return t;
+}
+function buildText(idx) {
+  var mat = new THREE.MeshBasicMaterial({ map: drawPanelCanvas(idx), transparent: true, depthWrite: false });
+  textMats.push(mat);
+  var mesh = new THREE.Mesh(new THREE.PlaneGeometry(3.55, 6.5), mat);
+  var ang = localAngle(idx / 4, 0);
+  mesh.position.set(Math.sin(ang) * (R_WALL - 0.32), 3.42, Math.cos(ang) * (R_WALL - 0.32));
+  mesh.lookAt(0, 3.42, 0);
+  mesh.renderOrder = 2;
+  drum.add(mesh);
+  return mesh;
+}
+var textMeshes = [0, 1, 2, 3].map(function (i) { return null; });
+/* 字体就绪后再画（否则 canvas 落在回退字体上） */
+function drawAllText() { for (var i = 0; i < 4; i++) if (!textMeshes[i]) textMeshes[i] = buildText(i); }
+if (document.fonts && document.fonts.ready) {
+  document.fonts.ready.then(function () { drawAllText(); });
+  setTimeout(function () { if (!textMeshes[0]) drawAllText(); }, 2600);
+} else { drawAllText(); }
+
+/* 章内小件：暮章暖窗、夜章金线 */
+var warmWin = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.92), warmWinMat);
+(function () {
+  var ang = localAngle(2 / 4, -16);
+  warmWin.position.set(Math.sin(ang) * (R_WALL - 0.33), 2.3, Math.cos(ang) * (R_WALL - 0.33));
+  warmWin.lookAt(0, 2.3, 0);
+  drum.add(warmWin);
+})();
+var goldLine = new THREE.Mesh(new THREE.PlaneGeometry(0.055, 4.4), goldMat);
+(function () {
+  var ang = localAngle(3 / 4, 16);
+  goldLine.position.set(Math.sin(ang) * (R_WALL - 0.33), 3.55, Math.cos(ang) * (R_WALL - 0.33));
+  goldLine.lookAt(0, 3.55, 0);
+  drum.add(goldLine);
+})();
+
+/* ───────── 缝外世界（不随环转） ───────── */
+var outGnd = new THREE.Mesh(new THREE.CircleGeometry(130, 48), outGndMat);
+outGnd.rotation.x = -Math.PI / 2; outGnd.position.y = -0.03;
+scene.add(outGnd);
+function farStruct(geo, x, z, ry) {
+  var m = new THREE.Mesh(geo, farMat);
+  m.position.set(x, 0, z); m.rotation.y = ry || 0;
+  scene.add(m); return m;
+}
+farStruct(new THREE.CylinderGeometry(0.8, 1.2, 26, 6), 34, -26);           // 针塔一
+farStruct(new THREE.CylinderGeometry(1.2, 1.7, 36, 6), -44, -30, 0.5);     // 针塔二
+(function(){ var m = farStruct(new THREE.TorusGeometry(9, 0.85, 10, 40), -20, 48); m.position.y = 14; m.rotation.x = 1.1; })();
+farStruct(new THREE.BoxGeometry(6, 15, 1.3), 30, 40, -0.4).position.y = 7.5;  // 远板
+farStruct(new THREE.BoxGeometry(4, 22, 1.3), -52, 22, 0.9).position.y = 11;   // 远板二
+/* 地平微光带 */
+var horizon = new THREE.Mesh(
+  new THREE.CylinderGeometry(110, 110, 7, 48, 1, true),
+  new THREE.MeshBasicMaterial({ color: 0xf6efe4, transparent: true, opacity: 0.5, side: THREE.BackSide, fog: false, depthWrite: false })
+);
+horizon.position.y = 3;
+scene.add(horizon);
+
+/* ───────── 尘埃（环内缓浮） ───────── */
+var DUST_N = 130;
+var dustGeo = new THREE.BufferGeometry();
+var dustPos = new Float32Array(DUST_N * 3);
+var dustSeed = new Float32Array(DUST_N);
+for (var d = 0; d < DUST_N; d++) {
+  var rr = 1.2 + Math.random() * 12.5, aa = Math.random() * Math.PI * 2;
+  dustPos[d*3] = Math.sin(aa) * rr;
+  dustPos[d*3+1] = 0.3 + Math.random() * 6.2;
+  dustPos[d*3+2] = Math.cos(aa) * rr;
+  dustSeed[d] = Math.random() * Math.PI * 2;
+}
+dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPos, 3));
+var dustTex = (function () {
+  var c = document.createElement('canvas'); c.width = c.height = 32;
+  var g = c.getContext('2d');
+  var rg = g.createRadialGradient(16, 16, 0, 16, 16, 15);
+  rg.addColorStop(0, 'rgba(255,255,255,0.9)'); rg.addColorStop(0.5, 'rgba(255,255,255,0.28)'); rg.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = rg; g.fillRect(0, 0, 32, 32);
+  return new THREE.CanvasTexture(c);
+})();
+var dust = new THREE.Points(dustGeo, new THREE.PointsMaterial({
+  size: 0.075, map: dustTex, transparent: true, opacity: 0.5, depthWrite: false, sizeAttenuation: true, color: 0xffffff
+}));
+dust.renderOrder = 7;
+scene.add(dust);
+
+/* ───────── 滚动 ───────── */
+var scrollP = 0;
+var PIN_P = PIN !== null && PIN !== '' ? Math.min(1, Math.max(0, parseFloat(PIN))) : null;
+function readScroll() {
+  if (PIN_P !== null) { scrollP = PIN_P; return; }
+  var max = document.documentElement.scrollHeight - window.innerHeight;
+  var y = window.scrollY || window.pageYOffset || 0;
+  if (max > 0) scrollP = Math.min(1, Math.max(0, y / max));
+}
+window.addEventListener('scroll', readScroll, { passive: true });
+
+var theta = 0;          // 当前环角
+var nudge = -8 * DEG;   // 开场致意：环轻轻落定
+var nudgeT = 0;
+
+/* ───────── 调色混合 ───────── */
+var cur = {};
+PAL_KEYS.forEach(function (k) { cur[k] = new THREE.Color(PAL[0][k]); });
+var curSunI = PAL[0].sunI;
+function wrapDeg(d) { d = d % 360; if (d > 180) d -= 360; if (d < -180) d += 360; return d; }
+function applyPalette(thetaDeg) {
+  var w = [0, 0, 0, 0], sum = 0;
+  for (var k = 0; k < 4; k++) {
+    w[k] = Math.max(0, 1 - Math.abs(wrapDeg(thetaDeg - k * 90)) / 50);
+    sum += w[k];
+  }
+  if (sum <= 0.0001) { var kk = Math.round(wrapDeg(thetaDeg) / 90) % 4; if (kk < 0) kk += 4; w[kk] = 1; sum = 1; }
+  for (var ki = 0; ki < PAL_KEYS.length; ki++) {
+    var key = PAL_KEYS[ki];
+    if (key === 'sunI') {
+      var v = 0;
+      for (k = 0; k < 4; k++) v += (w[k] / sum) * PAL[k][key];
+      curSunI += (v - curSunI) * 0.12;
+      sun.intensity = curSunI;
+      continue;
+    }
+    tmpC[key].a.setHex(PAL[0][key]); // 占位，实际下面按权重合成
+    var cr = 0, cg = 0, cb = 0;
+    for (k = 0; k < 4; k++) {
+      tmpC[key].b.setHex(PAL[k][key]);
+      cr += tmpC[key].b.r * (w[k] / sum);
+      cg += tmpC[key].b.g * (w[k] / sum);
+      cb += tmpC[key].b.b * (w[k] / sum);
+    }
+    cur[key].r += (cr - cur[key].r) * 0.12;
+    cur[key].g += (cg - cur[key].g) * 0.12;
+    cur[key].b += (cb - cur[key].b) * 0.12;
+  }
+  fogCol.copy(cur.fog);
+  scene.fog.color.copy(cur.fog);
+  scene.background = fogCol;
+  hemi.color.copy(cur.sky);
+  hemi.groundColor.copy(cur.gnd);
+  sun.color.copy(cur.sun);
+  horizon.material.color.copy(cur.fog).lerp(SKY_WHITE, 0.35);
+  floor.material.color.copy(cur.fog).lerp(SKY_WHITE, 0.55);   // 纸面地面随天色微染
+  redrawSky();
+}
+
+/* ───────── 主更新 ───────── */
+var ringFg = document.getElementById('ringFg');
+var RING_C = 87.96;
+function update(dt, t) {
+  readScroll();
+  /* 章节驻留：每章滚动区间的前 28% 停在章中心供阅读，中段转动，尾 15% 缓入下一章 */
+  var f = scrollP * 4;
+  var kk = Math.floor(f), fr = f - kk;
+  var shp = fr < 0.28 ? 0 : fr > 0.85 ? 1 : (fr - 0.28) / 0.57;
+  shp = shp * shp * (3 - 2 * shp);
+  var target = (Math.min(kk, 3) + shp) / 4 * Math.PI * 2;
+  if (RM || IS_STILL) theta = target;   // 静帧/减动效：直接落位，不走逐帧缓动
+  else theta += (target - theta) * Math.min(1, dt * 3.2);
+
+  if (!RM && !IS_STILL) {
+    nudgeT += dt;
+    var k = Math.min(1, nudgeT / 2.4);
+    k = 1 - Math.pow(1 - k, 3);
+    var idle = Math.sin(t * 0.00011) * 0.35 * DEG;
+    drum.rotation.y = theta + nudge * (1 - k) + idle;
+  } else {
+    drum.rotation.y = theta;
+  }
+
+  applyPalette((drum.rotation.y * 180 / Math.PI % 360 + 360) % 360);
+
+  veilMat.uniforms.uTime.value = t;
+  /* 尘埃缓浮 */
+  if (!RM && !IS_STILL) {
+    for (var i = 0; i < DUST_N; i++) {
+      dustPos[i*3+1] += dt * 0.05;
+      dustPos[i*3] += Math.sin(t * 0.0002 + dustSeed[i]) * dt * 0.02;
+      if (dustPos[i*3+1] > 6.8) dustPos[i*3+1] = 0.3;
+    }
+    dustGeo.attributes.position.needsUpdate = true;
+  }
+
+  if (ringFg) ringFg.style.strokeDashoffset = (RING_C * (1 - scrollP)).toFixed(1);
+}
+
+/* ───────── 帧循环 / 静帧 / auto ───────── */
+var lastT = 0, rafId = 0;
+function loop(t) {
+  rafId = requestAnimationFrame(loop);
+  var dt = Math.min(0.05, (t - lastT) / 1000 || 0.016);
+  lastT = t;
+  update(dt, t);
+  renderer.render(scene, camera);
+}
+
+function renderOnce() {
+  update(0.016, performance.now());
+  renderer.render(scene, camera);
+}
+
+var autoDir = 1, autoVal = 0;
+function autoStep() {
+  var T = IS_FAST ? 6000 : 15000;
+  var now = performance.now();
+  var ph = (now % (T * 2)) / T;            // 0..2 ping-pong
+  var tri = ph < 1 ? ph : 2 - ph;          // 0..1
+  /* 在章节中心驻留：4k + f，f 平滑 */
+  var u = tri * 4;
+  var kk = Math.floor(u), f = u - kk;
+  var s = f < 0.18 ? 0 : f > 0.82 ? 1 : (f - 0.18) / 0.64;
+  s = s * s * (3 - 2 * s);
+  var p = Math.min(1, Math.max(0, (kk + s) / 4));
+  window.scrollTo(0, p * (document.documentElement.scrollHeight - window.innerHeight));
+}
+
+if (IS_AUTO) {
+  setInterval(autoStep, 33);
+  requestAnimationFrame(function t0() { loop(performance.now()); });
+} else if (RM || IS_STILL) {
+  renderOnce();
+  window.addEventListener('scroll', function () { requestAnimationFrame(renderOnce); }, { passive: true });
+} else {
+  requestAnimationFrame(loop);
+}
+
+window.__mockSnap = function () {
+  /* 隐藏面板中定时器会停摆：出帧前先自愈画布尺寸 */
+  var w = window.innerWidth, h = window.innerHeight, c = renderer.domElement;
+  if (w > 0 && h > 0 && (c.width === 0 || c.height === 0 ||
+      Math.abs(c.width - Math.floor(w * renderer.getPixelRatio())) > 2 ||
+      Math.abs(c.height - Math.floor(h * renderer.getPixelRatio())) > 2)) {
+    renderer.setSize(w, h);
+    camera.aspect = w / h;
+    camera.fov = h > w * 1.15 ? 38 : 46;
+    camera.updateProjectionMatrix();
+  }
+  update(0.016, performance.now());
+  renderer.render(scene, camera);
+  return renderer.domElement.toDataURL('image/png');
+};
+window.__mockDbg = { scene: scene, camera: camera, drum: drum };
+
+/* ───────── resize ───────── */
+function onResize() {
+  var w = window.innerWidth, h = window.innerHeight;
+  var portrait = h > w * 1.15;
+  camera.aspect = w / h;
+  camera.fov = portrait ? 38 : 46;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+  if (RM || IS_STILL) requestAnimationFrame(renderOnce);
+}
+window.addEventListener('resize', onResize);
+onResize();
+readScroll();
+/* 尺寸看门狗：无头/标签页恢复时 innerWidth 可能晚至数百毫秒才就绪 */
+(function () {
+  var n = 0;
+  var timer = setInterval(function () {
+    n++;
+    var w = window.innerWidth, h = window.innerHeight;
+    var c = renderer.domElement;
+    if (w > 0 && h > 0 && (c.width === 0 || c.height === 0 ||
+        Math.abs(c.width - Math.floor(w * renderer.getPixelRatio())) > 2 ||
+        Math.abs(c.height - Math.floor(h * renderer.getPixelRatio())) > 2)) {
+      onResize();
+    }
+    if (n > 24) clearInterval(timer);
+  }, 125);
+})();
+
+})();
+</script>
+</body>
+</html>

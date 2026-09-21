@@ -1,0 +1,768 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>梦游 · Somnambule — 醒梦主页探索 N①</title>
+<meta name="description" content="不被注视的东西才会移动。雾原上的石碑群悬在错误的落脚点上方，你看它，它就是入睡那一刻的样子。">
+<style>
+  @font-face {
+    font-family: 'Noto Serif SC Web';
+    font-style: normal; font-weight: 500; font-display: swap;
+    src: url('https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/files/noto-serif-sc-chinese-simplified-500-normal.woff2') format('woff2');
+  }
+  @font-face {
+    font-family: 'Noto Serif SC Web';
+    font-style: normal; font-weight: 600; font-display: swap;
+    src: url('https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/files/noto-serif-sc-chinese-simplified-600-normal.woff2') format('woff2');
+  }
+  :root {
+    --ink: #3a373b;
+    --ink-soft: #5f6a75;
+    --ink-faint: #6e696e;
+    --gold: #b98a4f;
+    --card-bg: rgba(246, 244, 242, 0.66);
+    --card-line: rgba(58, 55, 59, 0.15);
+    --font-display: 'Noto Serif SC Web', 'Noto Serif SC', 'Palatino Linotype', Georgia, 'Songti SC', SimSun, serif;
+    --font-body: system-ui, -apple-system, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+  }
+  body.night {
+    --ink: #e9e1d6;
+    --ink-soft: #beb3a7;
+    --ink-faint: #8f857b;
+    --gold: #e0b075;
+    --card-bg: rgba(40, 35, 47, 0.62);
+    --card-line: rgba(233, 225, 214, 0.16);
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: auto; }
+  body {
+    margin: 0; font-family: var(--font-body); color: var(--ink);
+    background: linear-gradient(178deg, #ccd3d9 0%, #c3ccd3 55%, #b8bfc8 100%);
+    transition: background 1.6s ease;
+  }
+  body.night { background: linear-gradient(178deg, #37303f 0%, #322b3a 60%, #2c2634 100%); }
+  body.nogl { background: linear-gradient(150deg, #ccd3d9 0%, #c9bfc6 48%, #cbb3a8 100%); }
+  ::selection { background: rgba(185, 138, 79, 0.28); }
+
+  #stage { position: fixed; inset: 0; z-index: 1; }
+  #stage canvas { display: block; width: 100%; height: 100%; }
+  body.nogl #stage { display: none; }
+
+  /* 暗角：醒/夜两层交叉淡化 */
+  .vig { position: fixed; inset: 0; z-index: 3; pointer-events: none; }
+  .vig-wake { background: radial-gradient(ellipse 120% 90% at 50% 40%, rgba(0,0,0,0) 52%, rgba(48,58,66,0.26) 100%); }
+  .vig-night { background: radial-gradient(ellipse 120% 90% at 50% 42%, rgba(0,0,0,0) 46%, rgba(12,9,16,0.62) 100%); opacity: 0; transition: opacity 1.6s ease; }
+  body.night .vig-night { opacity: 1; }
+
+  .scroll-length { height: 380vh; }
+
+  /* 顶部 */
+  header {
+    position: fixed; z-index: 20; top: 0; left: 0; right: 0;
+    display: flex; justify-content: space-between; align-items: flex-start;
+    padding: 2rem 2.4rem; pointer-events: none;
+  }
+  .brand {
+    pointer-events: auto; display: inline-flex; align-items: center; gap: 0.55rem;
+    font-family: var(--font-display); font-size: 0.98rem; font-weight: 600;
+    letter-spacing: 0.06em; color: var(--ink); text-decoration: none;
+    transition: color 1.4s ease;
+  }
+  .brand .ring { width: 11px; height: 11px; border: 1.5px solid var(--ink-soft); border-radius: 50%; transition: border-color 1.4s ease; }
+  .nav { display: flex; gap: 0.35rem; }
+  .nav a {
+    pointer-events: auto; position: relative; writing-mode: vertical-rl; letter-spacing: 0.5em;
+    font-size: 0.86rem; padding: 0.4rem 0.55rem; color: var(--ink-soft); text-decoration: none;
+    transition: color 1.4s ease;
+  }
+  .nav a:hover { color: var(--ink); }
+
+  /* 左下账目卡 */
+  .ledger {
+    position: fixed; z-index: 10; left: 2.4rem; bottom: 2.4rem; width: 15.5rem;
+    background: var(--card-bg); border: 1px solid var(--card-line);
+    -webkit-backdrop-filter: blur(9px); backdrop-filter: blur(9px);
+    padding: 1rem 1.15rem 0.9rem; transition: background 1.4s ease, border-color 1.4s ease;
+  }
+  .ledger h2 {
+    margin: 0 0 0.65rem; font-family: var(--font-body); font-weight: 400;
+    font-size: 0.66rem; letter-spacing: 0.3em; color: var(--ink-faint);
+  }
+  .slip { display: block; text-decoration: none; padding: 0.42rem 0; border-top: 1px solid var(--card-line); transition: border-color 1.4s ease; }
+  .slip .d { display: block; font-size: 0.7rem; letter-spacing: 0.12em; color: var(--ink-faint); font-variant-numeric: tabular-nums; margin-bottom: 0.3rem; transition: color 1.4s ease; }
+  .slip .t { display: block; font-family: var(--font-display); font-size: 0.94rem; color: var(--ink); line-height: 1.55; transition: color 1.4s ease; }
+  .slip:hover .t { color: var(--gold); }
+  .more { display: inline-block; margin-top: 0.55rem; font-size: 0.72rem; letter-spacing: 0.22em; color: var(--ink-faint); text-decoration: none; transition: color 1.4s ease; }
+  .more:hover { color: var(--ink); }
+
+  /* 宣言 */
+  .seg { position: fixed; z-index: 8; writing-mode: vertical-rl; pointer-events: none;
+    font-family: var(--font-display); font-weight: 600; color: var(--ink);
+    text-shadow: 0 0 22px rgba(220, 226, 232, 0.5); transition: color 1.4s ease; }
+  body.night .seg { text-shadow: 0 0 26px rgba(20, 14, 28, 0.85); }
+  .big1 { right: 8vw; top: 16vh; height: 40vh; font-size: clamp(1.35rem, 2.4vw, 2.2rem); letter-spacing: 0.44em; line-height: 2; }
+  .big2 { left: 9vw; top: 24vh; height: 47vh; font-size: clamp(1.05rem, 1.8vw, 1.6rem); letter-spacing: 0.42em; line-height: 2.15; font-weight: 500; }
+  .fin {
+    position: fixed; z-index: 8; left: 0; right: 0; bottom: 17vh; text-align: center;
+    pointer-events: none; font-family: var(--font-display); font-weight: 500;
+    font-size: clamp(1rem, 1.7vw, 1.5rem); letter-spacing: 0.55em; color: var(--gold);
+    opacity: 0; transform: translateY(0.6em);
+  }
+  /* 规则提示 */
+  .hint {
+    position: fixed; z-index: 8; left: 0; right: 0; bottom: 6.5vh; text-align: center;
+    pointer-events: none; font-size: 0.78rem; letter-spacing: 0.5em; color: var(--ink-faint);
+    transition: color 1.4s ease;
+  }
+  .hint .dot { display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: var(--ink-faint); margin: 0 0.9em 0.18em; vertical-align: middle; transition: background 1.4s ease; }
+
+  .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+  @media (max-width: 760px) {
+    header { padding: 1.3rem 1.2rem; }
+    .nav { gap: 0.1rem; }
+    .nav a { writing-mode: horizontal-tb; font-size: 0.8rem; letter-spacing: 0.22em; padding: 0.3rem 0.35rem; }
+    .ledger { left: 1.1rem; bottom: 1.1rem; width: 13rem; padding: 0.8rem 0.9rem 0.7rem; }
+    .seg { position: fixed; writing-mode: horizontal-tb; height: auto; }
+    .big1 { right: auto; top: 14vh; left: 1.4rem; font-size: 1.5rem; letter-spacing: 0.3em; line-height: 1.9; }
+    .big2 { left: 1.4rem; top: auto; bottom: 26vh; font-size: 1.1rem; letter-spacing: 0.28em; line-height: 1.9; }
+    .fin { bottom: 20vh; letter-spacing: 0.4em; }
+    .hint { bottom: 4.2vh; font-size: 0.68rem; letter-spacing: 0.34em; }
+  }
+</style>
+</head>
+<body>
+  <div id="stage" aria-hidden="true"></div>
+  <div class="vig vig-wake" aria-hidden="true"></div>
+  <div class="vig vig-night" aria-hidden="true"></div>
+
+  <h1 class="sr-only">不是梦，也不是现实。它是人在即将醒来时，看见的最后一层世界——它可能马上消失。</h1>
+
+  <header>
+    <a class="brand" href="/"><span class="ring" aria-hidden="true"></span>Traveritas</a>
+    <nav class="nav" aria-label="站内导航">
+      <a href="/articles/">随笔</a>
+      <a href="/projects/">项目</a>
+      <a href="/about/">关于</a>
+    </nav>
+  </header>
+
+  <div class="seg big1" aria-hidden="true">不是梦，<br>也不是现实。</div>
+  <div class="seg big2" aria-hidden="true">它是人在即将醒来时，看见的最后一层世界。</div>
+  <div class="fin" aria-hidden="true">它可能马上消失。</div>
+  <div class="hint" id="hint" aria-hidden="true">它们只在你移开视线时移动<span class="dot"></span></div>
+
+  <section class="ledger" aria-label="最近的随笔">
+    <h2>最近的随笔</h2>
+    <a class="slip" href="/articles/first-notes/"><span class="d">2026.08.30</span><span class="t">关于“醒梦”的第一份笔记</span></a>
+    <a class="slip" href="/articles/motif/"><span class="d">2026.07.12</span><span class="t">母题探索记录</span></a>
+    <a class="more" href="/articles/">全部随笔 →</a>
+  </section>
+
+  <div class="scroll-length" aria-hidden="true"></div>
+
+<script src="vendor/three.min.js"></script>
+<script>
+(function () {
+'use strict';
+
+/* ---------- 参数 ---------- */
+function QS(n) { var m = location.search.match(new RegExp('[?&]' + n + '(?:=([^&]*))?')); return m ? (m[1] === undefined ? '' : m[1]) : null; }
+var AUTO  = QS('auto') !== null;
+var FAST  = QS('fast') !== null;
+var STILL = QS('still') !== null || QS('rm') !== null;
+var PIN   = QS('pin');
+var FORCE_ARRIVE = QS('arrive');
+var clockScale = FAST ? 5 : 1;
+var SCROLL_LEN_VH = 380;
+
+/* ---------- WebGL 兜底 ---------- */
+var stage = document.getElementById('stage');
+function fallback() {
+  document.body.classList.add('nogl');
+  document.getElementById('hint').style.display = 'none';
+}
+if (!window.WebGLRenderingContext) { fallback(); return; }
+var renderer;
+try {
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance', preserveDrawingBuffer: true });
+} catch (e) { fallback(); return; }
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+renderer.setSize(window.innerWidth, window.innerHeight);
+stage.appendChild(renderer.domElement);
+
+var scene  = new THREE.Scene();
+var camera = new THREE.PerspectiveCamera(46, window.innerWidth / window.innerHeight, 0.1, 240);
+
+/* ---------- 调色板（醒 / 梦） ---------- */
+function C(h) { return new THREE.Color(h); }
+var PAL = {
+  fog:     [C(0xccd3d9), C(0x373040)],
+  gndA:    [C(0xb5bec6), C(0x332d3a)],
+  gndB:    [C(0xc7ced4), C(0x3f3648)],
+  streak:  [C(0x87939d), C(0x262030)],
+  spot:    [C(0xd8ccba), C(0xf2bd7e)],
+  stele:   [C(0xd3dade), C(0x8a8194)],
+  hemiS:   [C(0xe3e9ee), C(0x6b5f74)],
+  hemiG:   [C(0xafb7be), C(0x463d4e)],
+  dust:    [C(0xe9edf0), C(0xeccd9f)],
+  print:   [C(0x4d5863), C(0xffc98c)]
+};
+var FOG_N = 14, FOG_F = 62;
+scene.fog = new THREE.Fog(PAL.fog[0].getHex(), FOG_N, FOG_F);
+scene.background = PAL.fog[0].clone();
+
+var hemi = new THREE.HemisphereLight(PAL.hemiS[0].getHex(), PAL.hemiG[0].getHex(), 0.9);
+scene.add(hemi);
+var dirL = new THREE.DirectionalLight(0xffe6c8, 0.0);
+dirL.position.set(-8, 12, -14);
+scene.add(dirL);
+
+/* ---------- 程序纹理 ---------- */
+function surfTex() {
+  var c = document.createElement('canvas'); c.width = c.height = 128;
+  var x = c.getContext('2d');
+  x.fillStyle = '#c8c8c8'; x.fillRect(0, 0, 128, 128);
+  var img = x.getImageData(0, 0, 128, 128), d = img.data;
+  for (var i = 0; i < d.length; i += 4) {
+    var v = 200 + (Math.random() - 0.5) * 34;
+    d[i] = d[i+1] = d[i+2] = v;
+  }
+  x.putImageData(img, 0, 0);
+  var t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  return t;
+}
+function circTex() {
+  var c = document.createElement('canvas'); c.width = c.height = 64;
+  var x = c.getContext('2d');
+  var g = x.createRadialGradient(32, 32, 0, 32, 32, 30);
+  g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.4, 'rgba(255,255,255,0.7)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+  x.fillStyle = g; x.fillRect(0, 0, 64, 64);
+  return new THREE.CanvasTexture(c);
+}
+function haloTex() {
+  var c = document.createElement('canvas'); c.width = c.height = 128;
+  var x = c.getContext('2d');
+  var g = x.createRadialGradient(64, 64, 4, 64, 64, 62);
+  g.addColorStop(0, 'rgba(255,214,160,0.6)'); g.addColorStop(0.5, 'rgba(255,206,150,0.2)'); g.addColorStop(1, 'rgba(255,200,140,0)');
+  x.fillStyle = g; x.fillRect(0, 0, 128, 128);
+  return new THREE.CanvasTexture(c);
+}
+function printTex() {
+  var c = document.createElement('canvas'); c.width = c.height = 256;
+  var x = c.getContext('2d');
+  x.translate(128, 128);
+  x.strokeStyle = 'rgba(0,0,0,0.9)'; x.lineWidth = 9;
+  var segs = 9;
+  for (var s = 0; s < segs; s++) {
+    var a0 = (s / segs) * Math.PI * 2 + 0.12;
+    var a1 = a0 + (Math.PI * 2 / segs) * (0.55 + Math.random() * 0.3);
+    x.beginPath(); x.ellipse(0, 0, 104, 84, 0, a0, a1); x.stroke();
+  }
+  x.strokeStyle = 'rgba(0,0,0,0.35)'; x.lineWidth = 3;
+  x.beginPath(); x.ellipse(0, 0, 66, 52, 0, 0, Math.PI * 2); x.stroke();
+  return new THREE.CanvasTexture(c);
+}
+var TEX_SURF = surfTex();
+
+/* ---------- 地面（连续域晕染雾原，继承 J 底盘语法） ---------- */
+var groundUni = {
+  uCA:      { value: PAL.gndA[0].clone() },
+  uCB:      { value: PAL.gndB[0].clone() },
+  uStreak:  { value: PAL.streak[0].clone() },
+  uSpot:    { value: new THREE.Vector3(0, 0, 0) },
+  uSpotC:   { value: PAL.spot[0].clone() },
+  uFogColor:{ value: PAL.fog[0].clone() },
+  uFogNear: { value: FOG_N },
+  uFogFar:  { value: FOG_F }
+};
+var groundMat = new THREE.ShaderMaterial({
+  uniforms: groundUni,
+  vertexShader: [
+    'varying vec3 vW; varying float vDist; varying float vNdcY;',
+    'void main(){',
+    '  vec4 w = modelMatrix * vec4(position,1.0); vW = w.xyz;',
+    '  vec4 mv = viewMatrix * w; vDist = -mv.z;',
+    '  vec4 pr = projectionMatrix * mv;',
+    '  vNdcY = pr.y / pr.w;',
+    '  gl_Position = pr;',
+    '}'
+  ].join('\n'),
+  fragmentShader: [
+    'uniform vec3 uCA; uniform vec3 uCB; uniform vec3 uStreak;',
+    'uniform vec3 uSpot; uniform vec3 uSpotC;',
+    'uniform vec3 uFogColor; uniform float uFogNear; uniform float uFogFar;',
+    'varying vec3 vW; varying float vDist; varying float vNdcY;',
+    'float h21(vec2 p){ p = fract(p*vec2(123.34,456.21)); p += dot(p,p+45.32); return fract(p.x*p.y); }',
+    'float vnoise(vec2 p){',
+    '  vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);',
+    '  float a = h21(i), b = h21(i+vec2(1.0,0.0)), c = h21(i+vec2(0.0,1.0)), d = h21(i+vec2(1.0,1.0));',
+    '  return mix(mix(a,b,f.x), mix(c,d,f.x), f.y);',
+    '}',
+    'float fbm(vec2 p){ float v=0.0; float a=0.5;',
+    '  for(int k=0;k<4;k++){ v += a*vnoise(p); p = p*2.03 + vec2(17.3,9.1); a *= 0.5; }',
+    '  return v; }',
+    'void main(){',
+    '  vec2 p = vW.xz * 0.055;',
+    '  vec2 q = vec2(fbm(p), fbm(p + vec2(5.2,1.3)));',
+    '  float f = fbm(p + 1.6*q);',
+    '  vec3 col = mix(uCA, uCB, clamp(f*0.9, 0.0, 1.0));',
+    '  float s = fbm(vec2(p.x*2.3, p.y*0.5) + 3.7*q);',
+    '  col = mix(col, uStreak, 0.15*s);',
+    '  float d = length(vW.xz - uSpot.xy);',
+    '  col = mix(col, uSpotC, uSpot.z * 0.22 * exp(-d*d*0.16));',
+    '  float fogF = smoothstep(uFogNear, uFogFar, vDist);',
+    '  col = mix(col, uFogColor, fogF);',
+    '  col *= 1.0 - smoothstep(0.2, 0.9, -vNdcY) * 0.10;',
+    '  gl_FragColor = vec4(col, 1.0);',
+    '}'
+  ].join('\n')
+});
+var ground = new THREE.Mesh(new THREE.PlaneGeometry(460, 460), groundMat);
+ground.rotation.x = -Math.PI / 2;
+ground.position.y = 0;
+scene.add(ground);
+
+/* ---------- 相机路径 ---------- */
+var camPos = new THREE.CatmullRomCurve3([
+  new THREE.Vector3(-2.4, 2.05, 12.5),
+  new THREE.Vector3( 1.2, 2.30,  6.0),
+  new THREE.Vector3( 3.4, 2.70,  0.6),
+  new THREE.Vector3( 1.6, 3.00, -6.0),
+  new THREE.Vector3( 7.5, 7.00,  4.0)
+]);
+var camTgt = new THREE.CatmullRomCurve3([
+  new THREE.Vector3( 0.6, 1.7,   2.0),
+  new THREE.Vector3(-1.2, 1.5,  -4.5),
+  new THREE.Vector3(-3.0, 1.7, -10.0),
+  new THREE.Vector3(-2.0, 1.5, -18.0),
+  new THREE.Vector3(-2.5, 0.5, -10.5)
+]);
+
+/* ---------- 石碑群（行为实体表） ---------- */
+// kind: 0 磨砂石板 / 1 六棱尖碑 / 2 斜靠板 / 3 碎块
+var ENT = [
+  { x:  4.6, z:  -4.2, kind: 0, h: 4.4, w: 1.7, dd: 0.70, rot: -0.50, hover: 1.3, r: 1.5, home: [ 5.4,  -7.4] },
+  { x: -3.4, z:  -8.5, kind: 0, h: 4.2, w: 1.5, dd: 0.60, rot:  0.40, hover: 1.2, r: 1.4, home: [-5.0,  -6.6] },
+  { x: -6.8, z: -14.0, kind: 1, h: 6.2, w: 0.75, dd: 0.75, rot: 0.00, hover: 1.7, r: 1.8, home: [-5.6, -11.6] },
+  { x: -5.2, z: -17.5, kind: 1, h: 4.6, w: 0.55, dd: 0.55, rot: 0.30, hover: 1.1, r: 1.2, home: [-3.8, -15.2] },
+  { x: -9.5, z: -19.0, kind: 2, h: 5.0, w: 1.6, dd: 0.65, rot: -0.90, hover: 1.0, r: 1.3, home: [-8.0, -16.6] },
+  { x:-12.0, z: -23.0, kind: 0, h: 7.0, w: 2.2, dd: 0.80, rot:  0.20, hover: 2.0, r: 2.0, home: [-10.4, -20.4] },
+  { x:  2.8, z: -16.0, kind: 1, h: 8.0, w: 0.90, dd: 0.90, rot: 0.00, hover: 2.2, r: 1.7, home: [ 1.4, -13.4] },
+  { x:  5.5, z: -10.0, kind: 0, h: 3.0, w: 1.0, dd: 0.50, rot:  0.80, hover: 0.9, r: 1.1, home: [ 4.4,  -8.2] },
+  { x:  7.8, z: -18.0, kind: 1, h: 5.6, w: 0.70, dd: 0.70, rot: -0.20, hover: 1.6, r: 1.5, home: [ 6.6, -15.4] },
+  { x:  0.5, z: -25.0, kind: 0, h: 4.8, w: 1.6, dd: 0.60, rot: -0.30, hover: 1.3, r: 1.6, home: [ 1.8, -22.6] },
+  { x:  9.5, z: -26.0, kind: 0, h: 6.4, w: 2.4, dd: 0.80, rot:  0.15, hover: 1.9, r: 2.1, home: [ 8.2, -23.4] },
+  { x:-15.0, z: -12.0, kind: 0, h: 3.4, w: 1.1, dd: 0.50, rot:  1.10, hover: 2.6, r: 2.4, home: [-14.0, -16.8], stray: true },
+  // 右侧补衡（首屏右半不空）
+  { x:  8.5, z:  -5.0, kind: 1, h: 3.4, w: 0.50, dd: 0.50, rot:  0.50, hover: 1.2, r: 1.2, home: [ 7.6,  -7.6] },
+  { x: 11.5, z: -13.0, kind: 0, h: 5.2, w: 2.0, dd: 0.70, rot: -0.35, hover: 1.6, r: 1.6, home: [10.2, -15.0] },
+  // 远景巨板（半入雾）
+  { x: -4.0, z: -38.0, kind: 0, h: 10.0, w: 3.4, dd: 1.0, rot: 0.10, hover: 1.2, r: 0.8, home: null },
+  { x:  7.0, z: -40.0, kind: 0, h: 12.0, w: 4.0, dd: 1.1, rot: -0.08, hover: 1.0, r: 0.7, home: null },
+  { x:-16.0, z: -36.0, kind: 1, h: 9.0, w: 1.1, dd: 1.1, rot: 0.20, hover: 1.4, r: 0.9, home: null },
+  // 碎块
+  { x:  5.4, z:  -2.8, kind: 3, h: 0.5, w: 0.7, dd: 0.5, rot: 0.4, hover: 0.8, r: 1.0, home: [ 5.0,  -3.8] },
+  { x: -4.5, z: -14.0, kind: 3, h: 0.5, w: 0.7, dd: 0.5, rot: -0.6, hover: 1.0, r: 1.2, home: [-4.0, -12.6] },
+  { x: -7.4, z: -19.5, kind: 3, h: 0.6, w: 0.8, dd: 0.55, rot: 1.2, hover: 0.9, r: 1.1, home: [-6.8, -18.4] },
+  { x:  5.6, z: -20.0, kind: 3, h: 0.4, w: 0.55, dd: 0.45, rot: -0.9, hover: 1.1, r: 1.3, home: [ 5.2, -19.2] }
+];
+
+var steleMat = new THREE.MeshStandardMaterial({
+  color: PAL.stele[0].clone(), map: TEX_SURF, roughness: 0.88, metalness: 0.0
+});
+var prismMat = new THREE.MeshStandardMaterial({
+  color: PAL.stele[0].clone(), map: TEX_SURF, roughness: 0.85, metalness: 0.0, flatShading: true
+});
+var windowCol = C(0xffd9a4);
+
+var entities = [];
+var seed = 91;
+function rnd() { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }
+
+ENT.forEach(function (e, i) {
+  var grp = new THREE.Group();
+  var mat = (e.kind === 1) ? prismMat : steleMat;
+  var body;
+  if (e.kind === 1) {
+    body = new THREE.Mesh(new THREE.CylinderGeometry(e.w * 0.22, e.w, e.h, 6), mat);
+    body.position.y = e.h / 2;
+  } else if (e.kind === 3) {
+    body = new THREE.Mesh(new THREE.BoxGeometry(e.w, e.h, e.dd), mat);
+    body.position.y = e.h / 2;
+    body.rotation.set(rnd() * 0.5 - 0.25, rnd() * Math.PI, rnd() * 0.5 - 0.25);
+  } else {
+    body = new THREE.Mesh(new THREE.BoxGeometry(e.w, e.h, e.dd), mat);
+    body.position.y = e.h / 2;
+    if (e.kind === 2) { body.rotation.z = 0.30; } // 斜靠姿态
+  }
+  grp.add(body);
+  grp.position.set(e.x, e.hover, e.z);
+  grp.rotation.y = e.rot;
+  scene.add(grp);
+
+  // 磨砂石板加一块顶帽，破整齐
+  if (e.kind === 0 && e.h > 3.2) {
+    var cap = new THREE.Mesh(new THREE.BoxGeometry(e.w * 1.1, e.h * 0.07, e.dd * 1.1), mat);
+    cap.position.y = e.h * 1.035;
+    grp.add(cap);
+  }
+
+  // 暖窗（梦侧发光）
+  var wins = [];
+  if (e.kind !== 3 && e.home) {
+    var nWin = 2 + Math.floor(rnd() * 3);
+    for (var k = 0; k < nWin; k++) {
+      var wm = new THREE.MeshBasicMaterial({ color: windowCol, transparent: true, opacity: 0.0, depthWrite: false });
+      var wW = 0.16 + rnd() * 0.16, wH = 0.24 + rnd() * 0.4;
+      var win = new THREE.Mesh(new THREE.PlaneGeometry(wW, wH), wm);
+      var face = rnd() < 0.75 ? 1 : -1;
+      var lx = (rnd() - 0.5) * e.w * 0.5;
+      var ly = e.h * (0.2 + rnd() * 0.55);
+      if (e.kind === 1) {
+        // 六棱锥随高度收窄，暖窗贴着当高度的锥面
+        var rY = e.w * (1 - 0.78 * (ly / e.h));
+        win.position.set(lx * rY / Math.max(0.2, e.w), ly, rY + 0.05);
+      } else {
+        win.position.set(lx, ly, (e.dd / 2 + 0.03) * face);
+      }
+      win.rotation.y = face > 0 ? 0 : Math.PI;
+      grp.add(win);
+      wins.push(wm);
+    }
+  }
+
+  // 脚印（归位处）
+  var print = null, printGlow = null;
+  if (e.home) {
+    var pm = new THREE.MeshBasicMaterial({ map: printTex(), transparent: true, opacity: 0.15, depthWrite: false, color: PAL.print[0].clone() });
+    print = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 1.2), pm);
+    print.rotation.x = -Math.PI / 2;
+    print.rotation.z = rnd() * Math.PI;
+    print.position.set(e.home[0], 0.02, e.home[1]);
+    scene.add(print);
+    var gm = new THREE.SpriteMaterial({ map: haloTex(), color: 0xffcf96, transparent: true, opacity: 0, depthWrite: false, fog: false });
+    printGlow = new THREE.Sprite(gm);
+    printGlow.scale.set(3.2, 2.4, 1);
+    printGlow.position.set(e.home[0], 0.5, e.home[1]);
+    scene.add(printGlow);
+  }
+
+  entities.push({
+    d: e, grp: grp, wins: wins, print: print, printGlow: printGlow,
+    tL: rnd() * 40,                    // 局部漂移时钟（只在无人注视时前进）
+    f: 0,                              // 冻结系数 0 自由 / 1 凝驻
+    frozen: new THREE.Vector3(),       // 被看见的瞬间所捕获的位置
+    hadObs: false,
+    phase: [rnd() * 6.28, rnd() * 6.28, rnd() * 6.28],
+    wSpd: [0.05 + rnd() * 0.05, 0.09 + rnd() * 0.06, 0.4 + rnd() * 0.25],
+    wRad: [e.r, e.r * 0.55, 0.22],
+    settleDelay: (i % 7) * 0.035 + rnd() * 0.06,
+    rotW: 0.06 + rnd() * 0.05,
+    baseY: e.hover
+  });
+});
+
+/* ---------- 尘埃与注视野环 ---------- */
+var dustGeo = new THREE.BufferGeometry();
+(function () {
+  var N = 110, pos = new Float32Array(N * 3);
+  for (var i = 0; i < N; i++) {
+    pos[i*3]   = -16 + rnd() * 30;
+    pos[i*3+1] = 0.4 + rnd() * 7;
+    pos[i*3+2] = -30 + rnd() * 42;
+  }
+  dustGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+})();
+var dustMat = new THREE.PointsMaterial({
+  size: 0.08, map: circTex(), transparent: true, opacity: 0.4,
+  color: PAL.dust[0].clone(), depthWrite: false, sizeAttenuation: true
+});
+scene.add(new THREE.Points(dustGeo, dustMat));
+
+var halo = new THREE.Sprite(new THREE.SpriteMaterial({
+  map: haloTex(), color: 0xffffff, transparent: true, opacity: 0, depthWrite: false, fog: false
+}));
+halo.scale.set(9, 7, 1);
+halo.position.y = 0.06;
+scene.add(halo);
+
+/* ---------- 注视 / 滚动 / 到场 ---------- */
+var pointer = { x: 0, y: -0.05, has: false, speed: 0 };
+var reveal = 0;
+var arrived = false, arriveDist = 0;
+var scrollP = 0, dream = 0, homeP = 0;
+var scrollLen = 0;
+
+function markArrive(dx, dy) {
+  if (arrived) return;
+  arriveDist += Math.abs(dx || 0) + Math.abs(dy || 0);
+  if (arriveDist > 60) arrived = true;
+}
+window.addEventListener('pointermove', function (ev) {
+  var nx = (ev.clientX / window.innerWidth) * 2 - 1;
+  var ny = -(ev.clientY / window.innerHeight) * 2 + 1;
+  if (pointer.has) {
+    var dx = nx - pointer.x, dy = ny - pointer.y;
+    pointer.speed = Math.min(1, pointer.speed + Math.sqrt(dx*dx + dy*dy) * 1.4);
+    markArrive(dx * window.innerWidth, dy * window.innerHeight);
+  }
+  pointer.x = nx; pointer.y = ny; pointer.has = true;
+}, { passive: true });
+window.addEventListener('wheel', function () { arrived = true; }, { passive: true });
+window.addEventListener('touchstart', function () { arrived = true; }, { passive: true });
+window.addEventListener('touchmove', function (ev) {
+  arrived = true;
+  if (ev.touches && ev.touches[0]) {
+    pointer.x = (ev.touches[0].clientX / window.innerWidth) * 2 - 1;
+    pointer.y = -(ev.touches[0].clientY / window.innerHeight) * 2 + 1;
+    pointer.has = true;
+  }
+}, { passive: true });
+
+function readScroll() {
+  if (PIN !== null) { scrollP = Math.min(1, Math.max(0, parseFloat(PIN) || 0)); return; }
+  if (STILL) { scrollP = 0.35; return; }
+  var max = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+  scrollP = Math.min(1, Math.max(0, (window.scrollY || window.pageYOffset || 0) / max));
+}
+function enforceScrollHold() {
+  if (PIN === null || !AUTO) return;
+  var max = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+  window.scrollTo(0, (parseFloat(PIN) || 0) * max);
+}
+
+/* ---------- 工具 ---------- */
+function smooth(a, b, x) { var t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); }
+var vTmp = new THREE.Vector3();
+var cA = new THREE.Color(), cB = new THREE.Color();
+
+/* ---------- DOM 引用 ---------- */
+var elBig1 = document.querySelector('.big1');
+var elBig2 = document.querySelector('.big2');
+var elFin  = document.querySelector('.fin');
+var elHint = document.getElementById('hint');
+var bodyEl = document.body;
+var nightOn = false;
+
+function updateDom() {
+  var o1 = 1 - smooth(0.14, 0.34, scrollP);
+  elBig1.style.opacity = o1.toFixed(3);
+  elBig1.style.transform = 'translateY(' + (-14 * smooth(0.10, 0.34, scrollP)).toFixed(1) + 'px)';
+  var o2 = smooth(0.32, 0.44, scrollP) * (1 - smooth(0.62, 0.74, scrollP));
+  elBig2.style.opacity = o2.toFixed(3);
+  var oF = smooth(0.80, 0.90, scrollP);
+  elFin.style.opacity = (oF * 0.92).toFixed(3);
+  elFin.style.transform = 'translateY(' + ((1 - oF) * 0.6).toFixed(3) + 'em)';
+  var oH = (1 - smooth(0.16, 0.30, scrollP)) * (1 - smooth(0.55, 0.66, scrollP));
+  elHint.style.opacity = (oH * 0.9).toFixed(3);
+  var wantNight = nightOn ? scrollP > 0.60 : scrollP > 0.64;
+  if (wantNight !== nightOn) { nightOn = wantNight; bodyEl.classList.toggle('night', wantNight); }
+}
+
+/* ---------- 每帧更新 ---------- */
+var tGlobal = 0;
+var camDir = new THREE.Vector3();
+function update(dt) {
+  readScroll();
+  enforceScrollHold();
+  dream = smooth(0.25, 0.95, scrollP);
+  homeP = smooth(0.60, 0.92, scrollP);
+  tGlobal += dt;
+
+  // 调色
+  groundUni.uCA.value.lerpColors(PAL.gndA[0], PAL.gndA[1], dream);
+  groundUni.uCB.value.lerpColors(PAL.gndB[0], PAL.gndB[1], dream);
+  groundUni.uStreak.value.lerpColors(PAL.streak[0], PAL.streak[1], dream);
+  groundUni.uSpotC.value.lerpColors(PAL.spot[0], PAL.spot[1], dream);
+  groundUni.uFogColor.value.lerpColors(PAL.fog[0], PAL.fog[1], dream);
+  scene.fog.color.copy(groundUni.uFogColor.value);
+  scene.background.copy(groundUni.uFogColor.value);
+  hemi.color.lerpColors(PAL.hemiS[0], PAL.hemiS[1], dream);
+  hemi.groundColor.lerpColors(PAL.hemiG[0], PAL.hemiG[1], dream);
+  hemi.intensity = 1.05 - 0.45 * dream;
+  dirL.intensity = 0.32 * dream;
+  steleMat.color.lerpColors(PAL.stele[0], PAL.stele[1], dream);
+  prismMat.color.lerpColors(PAL.stele[0], PAL.stele[1], dream);
+  dustMat.color.lerpColors(PAL.dust[0], PAL.dust[1], dream);
+  dustMat.opacity = 0.3 + 0.18 * dream;
+
+  // 注视衰减：指针越快，「凝视」越弱
+  pointer.speed *= Math.max(0, 1 - dt * 3.2);
+  var observeK = 1 - pointer.speed * 0.85;
+
+  // 注视野环：指针射线与地面交点
+  reveal += (((pointer.has && arrived) ? 1 : 0) - reveal) * Math.min(1, dt * 3);
+  if (pointer.has && reveal > 0.01) {
+    vTmp.set(pointer.x, pointer.y, 0.5).unproject(camera).sub(camera.position).normalize();
+    if (vTmp.y < -0.02) {
+      var tt = -camera.position.y / vTmp.y;
+      if (tt > 0 && tt < 90) {
+        halo.position.set(camera.position.x + vTmp.x * tt, 0.06, camera.position.z + vTmp.z * tt);
+      }
+    }
+    var spotStr = reveal * observeK * 0.85;
+    halo.material.opacity = spotStr * 0.5;
+    groundUni.uSpot.value.set(halo.position.x, halo.position.z, spotStr);
+  } else {
+    halo.material.opacity = 0;
+    groundUni.uSpot.value.z = 0;
+  }
+
+  // 相机
+  var cp = scrollP;
+  var camE = cp; // 相机路径本身已平滑，不再缓动（保持滚动手感）
+  camPos.getPoint(camE, camera.position);
+  camTgt.getPoint(camE, vTmp);
+  camera.lookAt(vTmp);
+
+  // 实体：注视门控运动
+  camera.getWorldDirection(camDir);
+
+  for (var i = 0; i < entities.length; i++) {
+    var en = entities[i], e = en.d, g = en.grp;
+
+    // 归位相位（末段，注视规则失效——世界光明正大地回家）
+    var raw = (homeP - en.settleDelay) / (1 - en.settleDelay);
+    var settle = e.stray ? Math.min(0.52, smooth(0, 1, Math.max(0, raw))) : smooth(0, 1, Math.max(0, raw));
+    var settleE = settle * settle * (3 - 2 * settle);
+
+    // 注视检测（以碑身几何中心为准）
+    var observed = false;
+    if (!STILL && arrived && observeK > 0.05 && settle < 0.02) {
+      vTmp.set(g.position.x - camera.position.x, g.position.y + e.h * 0.5 - camera.position.y, g.position.z - camera.position.z);
+      var dist = vTmp.length();
+      vTmp.normalize();
+      var dot = vTmp.dot(camDir);
+      var halfAng = 0.13 + Math.min(0.24, (e.kind === 1 ? e.w * 1.2 : e.w) / Math.max(2.5, dist));
+      observed = dot > Math.cos(halfAng);
+    }
+
+    if (observed && !en.hadObs) { en.frozen.copy(g.position); }
+    en.hadObs = observed;
+    en.f += ((observed ? 1 : 0) - en.f) * Math.min(1, dt * 2.8);
+    if (!observed) en.tL += dt;
+
+    // 自由漂移位置
+    var px = e.x + Math.cos(en.tL * en.wSpd[0] + en.phase[0]) * en.wRad[0]
+                 + Math.cos(en.tL * en.wSpd[1] + en.phase[1]) * en.wRad[1];
+    var pz = e.z + Math.sin(en.tL * en.wSpd[0] * 0.8 + en.phase[1]) * en.wRad[0]
+                 + Math.sin(en.tL * en.wSpd[1] + en.phase[2]) * en.wRad[1];
+    var py = e.hover + Math.sin(en.tL * 0.5 + en.phase[2]) * 0.24;
+    var pr = e.rot + Math.sin(en.tL * en.rotW + en.phase[0]) * 0.16;
+
+    // 凝驻混合：看见时停在「被看见的那一刻」
+    var fx = en.frozen.x + (px - en.frozen.x) * (1 - en.f);
+    var fy = en.frozen.y + (py - en.frozen.y) * (1 - en.f);
+    var fz = en.frozen.z + (pz - en.frozen.z) * (1 - en.f);
+
+    if (e.home && settleE > 0.001) {
+      var hx = e.home[0], hz = e.home[1];
+      var hy = (e.kind === 3 ? e.h * 0.5 : e.h * 0.5) + 0.03;
+      g.position.x = fx + (hx - fx) * settleE;
+      g.position.z = fz + (hz - fz) * settleE;
+      g.position.y = fy + (hy - fy) * settleE + Math.sin(settleE * Math.PI) * 0.2;
+      var targetRot = e.kind === 2 ? 0 : e.rot * 0.12;
+      g.rotation.y = pr + (targetRot - pr) * settleE;
+      if (e.kind === 2) {
+        // 斜靠的碑归位时立直
+        g.children[0].rotation.z = 0.30 * (1 - settleE);
+      }
+    } else {
+      g.position.set(fx, fy, fz);
+      g.rotation.y = pr;
+      if (e.kind === 2) g.children[0].rotation.z = 0.30;
+    }
+
+    // 暖窗：醒侧沉睡不亮，入梦渐次亮起（夜里才看得见的窗）；被凝视时屏息
+    for (var w = 0; w < en.wins.length; w++) {
+      var breath = 0.82 + 0.18 * Math.sin(tGlobal * (0.7 + i * 0.13) + en.phase[1]);
+      en.wins[w].opacity = (0.55 * Math.max(0, dream * 1.25 - 0.25)) * breath * (1 - 0.4 * en.f);
+    }
+
+    // 脚印与暖光
+    if (en.print) {
+      var glow = smooth(0.45, 1.0, settleE);
+      en.print.material.opacity = 0.26 + 0.34 * glow;
+      en.print.material.color.lerpColors(PAL.print[0], PAL.print[1], Math.max(glow, dream * 0.35));
+      en.printGlow.material.opacity = glow * 0.30;
+    }
+  }
+
+  // 尘埃缓升；近镜头的点压到地面下（防止 sizeAttenuation 放大成巨斑）
+  if (!STILL) {
+    var arr = dustGeo.attributes.position.array;
+    for (var d2 = 0; d2 < arr.length; d2 += 3) {
+      arr[d2 + 1] += dt * 0.05;
+      if (arr[d2 + 1] > 7) arr[d2 + 1] = 0.3;
+      var ddx = arr[d2] - camera.position.x, ddz = arr[d2 + 2] - camera.position.z;
+      if (ddx * ddx + ddz * ddz < 49) arr[d2 + 1] = -100;
+    }
+    dustGeo.attributes.position.needsUpdate = true;
+  }
+
+  updateDom();
+}
+
+function render() { renderer.render(scene, camera); }
+
+/* ---------- 主循环 ---------- */
+var last = 0, hidden = false;
+document.addEventListener('visibilitychange', function () { hidden = document.hidden; });
+function loop(t) {
+  if (hidden) { last = t; requestAnimationFrame(loop); return; }
+  if (!last) last = t;
+  var dt = Math.min(0.05, (t - last) / 1000) * clockScale;
+  last = t;
+  update(dt);
+  render();
+  if (AUTO || STILL) return; // auto/still 不走 rAF
+  requestAnimationFrame(loop);
+}
+
+/* ---------- resize ---------- */
+window.addEventListener('resize', function () {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  if (STILL) render();
+});
+
+/* ---------- 静帧 / 自动模式 ---------- */
+function composeStill() {
+  arrived = true;
+  pointer.has = true;
+  pointer.speed = 0;
+  reveal = 0.75;
+  for (var i = 0; i < entities.length; i++) { entities[i].tL += 18 + entities[i].phase[0] * 4; }
+  update(0.016);
+  render();
+}
+window.__renderOnce = function (tSec) {
+  if (tSec !== undefined) tGlobal = tSec;
+  update(0.016);
+  render();
+};
+window.__mockSnap = function () {
+  update(0.016);
+  render();
+  return renderer.domElement.toDataURL('image/png');
+};
+
+if (STILL) {
+  composeStill();
+  if (FORCE_ARRIVE === '0') { arrived = false; reveal = 0; window.__renderOnce(); }
+} else if (AUTO) {
+  arrived = FORCE_ARRIVE !== '0';
+  setInterval(function () { loop(performance.now()); }, 33);
+} else {
+  if (FORCE_ARRIVE === '1') arrived = true;
+  requestAnimationFrame(loop);
+}
+
+})();
+</script>
+</body>
+</html>

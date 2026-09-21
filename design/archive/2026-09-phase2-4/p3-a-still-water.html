@@ -1,0 +1,652 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>方案 A · 水面剧场</title>
+<style>
+  /* ═══ 概念 ═══
+     醒是水上的世界，梦是水中的倒影。
+     地平线抬高，水面占据大半画面（空旷即巨构）；
+     远处柱列切出画面上缘（尺度），栈道伸向地平线，
+     尽头一把椅子（现实锚点）。宣言在水上、水下各存在一次。
+     层三明治（Kage 语法）：雾空 → 远巨构 → 地平线 → 水与倒影
+     → 涟漪 → 栈道与椅子 → 前景芦苇 → 排版层。 */
+
+  @font-face {
+    font-family: 'Noto Serif SC Web';
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url('https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/files/noto-serif-sc-chinese-simplified-500-normal.woff2') format('woff2');
+  }
+  @font-face {
+    font-family: 'Noto Serif SC Web';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url('https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/files/noto-serif-sc-chinese-simplified-600-normal.woff2') format('woff2');
+  }
+
+  :root {
+    --paper: #f6f8f9;
+    --air: #eef3f5;
+    --air-low: #dde8ee;
+    --water-far: #d3dfe4;
+    --water-mid: #b9ccd5;
+    --water-near: #9fb4bf;
+    --ripple: #f2f6f7;
+    --ripple-dim: #a4b8c2;
+    --ink: #26313a;
+    --ink-soft: #545f6a;
+    --ink-faint: #5f6a75;
+    --mist-ink: #4c6a80;
+    --gold: #c2b08a;
+    --blush: #d8c4c9;
+    --font-display: 'Noto Serif SC Web', 'Noto Serif SC', 'Palatino Linotype', Georgia, 'Songti SC', SimSun, serif;
+    --font-body: system-ui, -apple-system, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+    --horizon: 42vh;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    font-family: var(--font-body);
+    color: var(--ink);
+    background: var(--paper);
+    overflow: hidden;
+  }
+
+  .stage {
+    position: relative;
+    height: 100dvh;
+    overflow: clip;
+    /* 天空 */
+    background: linear-gradient(to bottom, var(--air) 0%, var(--air-low) calc(var(--horizon) - 9vh), var(--water-far) var(--horizon));
+  }
+
+  /* ── 水体（地平线以下） ── */
+  .water {
+    position: absolute;
+    left: 0; right: 0;
+    top: var(--horizon);
+    bottom: 0;
+    background:
+      radial-gradient(46vw 30vh at 88% 100%, rgba(216, 196, 201, 0.14), transparent 70%),
+      linear-gradient(to bottom, var(--water-far), var(--water-mid) 38%, var(--water-near));
+  }
+
+  /* 地平线：一根几乎不存在的线 */
+  .horizon {
+    position: absolute;
+    left: 0; right: 0;
+    top: var(--horizon);
+    height: 1px;
+    background: rgba(76, 106, 128, 0.30);
+    z-index: 4;
+  }
+
+  /* ── 远巨构：切出画面上缘的柱列 ── */
+  .colonnade {
+    position: absolute;
+    right: 2vw;
+    top: -4vh;
+    width: 44vw;
+    height: calc(var(--horizon) + 4vh);
+    z-index: 2;
+    /* 左缘没入雾：没有“摆进去”的边界 */
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 32%);
+            mask-image: linear-gradient(to right, transparent, #000 32%);
+  }
+  .colonnade svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+  /* 柱列在水中的倒影：自地平线向下垂、渐深渐虚、被涟漪打断 */
+  .colonnade-reflection {
+    position: absolute;
+    right: 2vw;
+    top: calc(var(--horizon) + 1px);
+    width: 44vw;
+    height: 30vh;
+    z-index: 1;
+    filter: blur(3.5px);
+    opacity: 0.42;
+    -webkit-mask-image: linear-gradient(to bottom, #000 0%, rgba(0,0,0,0.55) 34%, transparent 88%);
+            mask-image: linear-gradient(to bottom, #000 0%, rgba(0,0,0,0.55) 34%, transparent 88%);
+  }
+  .colonnade-reflection svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+  /* ── 涟漪场：长短不一的水平光痕，越近越疏越宽 ── */
+  .ripples {
+    position: absolute;
+    left: 0; right: 0;
+    top: var(--horizon);
+    bottom: 0;
+    z-index: 3;
+    pointer-events: none;
+  }
+  .ripples svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .ripples .drift { animation: ripple-drift 52s linear infinite alternate; }
+
+  @keyframes ripple-drift {
+    from { transform: translateX(-14px); }
+    to   { transform: translateX(18px); }
+  }
+
+  /* ── 栈道：从左下伸向地平线，尽头一把椅子 ── */
+  .walkway {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    pointer-events: none;
+  }
+  .walkway svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+  /* ── 前景芦苇：切出画面底缘与左缘 ── */
+  .reeds {
+    position: absolute;
+    left: -1.5vw;
+    bottom: -2vh;
+    width: 22vw;
+    height: 34vh;
+    z-index: 7;
+    pointer-events: none;
+  }
+  .reeds svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .reeds .sway, .reeds-r .sway { animation: reed-sway 13s ease-in-out infinite alternate; transform-origin: 50% 100%; }
+
+  @keyframes reed-sway {
+    from { transform: rotate(-1.1deg); }
+    to   { transform: rotate(1.2deg); }
+  }
+
+  .reeds-r {
+    position: absolute;
+    right: -1vw;
+    bottom: -2vh;
+    width: 13vw;
+    height: 22vh;
+    z-index: 7;
+    pointer-events: none;
+    opacity: 0.85;
+  }
+  .reeds-r svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+  /* ── 漂浮的花瓣（花只作为痕迹出现，不作为母题） ── */
+  .petal {
+    position: absolute;
+    z-index: 6;
+    pointer-events: none;
+    animation: petal-float 11s ease-in-out infinite alternate;
+  }
+  .petal svg { display: block; }
+  .petal.p1 { right: 12vw; top: 60vh; }
+  .petal.p2 { right: 7vw;  top: 71vh; animation-delay: -4s; }
+  .petal.p3 { right: 16vw; top: 82vh; animation-delay: -8s; }
+
+  @keyframes petal-float {
+    from { transform: translateY(0) rotate(-8deg); }
+    to   { transform: translateY(-7px) rotate(9deg); }
+  }
+
+  /* ── 宣言：水上是醒，水下是倒影 ── */
+  .manifesto {
+    position: absolute;
+    left: 8vw;
+    top: 13vh;
+    z-index: 6;
+    margin: 0;
+    font-family: var(--font-display);
+    line-height: 1.75;
+    letter-spacing: 0.02em;
+    color: var(--ink);
+  }
+  .manifesto .l1 { display: block; font-size: clamp(1.7rem, 3.5vw, 3.3rem); font-weight: 600; }
+  .manifesto .l2 {
+    display: block;
+    font-size: clamp(0.95rem, 1.5vw, 1.35rem);
+    font-weight: 500;
+    letter-spacing: 0.28em;
+    color: var(--ink-faint);
+    margin-block: 0.9em 0.8em;
+  }
+  .manifesto .l3 { display: block; font-size: clamp(1.5rem, 3.1vw, 2.9rem); font-weight: 600; }
+
+  .manifesto-mirror {
+    position: absolute;
+    left: 8vw;
+    top: calc(var(--horizon) + 12px);
+    z-index: 2;
+    margin: 0;
+    font-family: var(--font-display);
+    line-height: 1.75;
+    letter-spacing: 0.02em;
+    color: #3d505e;
+    transform: scaleY(-1);
+    filter: blur(2px);
+    opacity: 0.4;
+    -webkit-mask-image: linear-gradient(to top, #000 0%, rgba(0,0,0,0.5) 40%, transparent 78%);
+            mask-image: linear-gradient(to top, #000 0%, rgba(0,0,0,0.5) 40%, transparent 78%);
+    pointer-events: none;
+  }
+  .manifesto-mirror .l1 { display: block; font-size: clamp(1.7rem, 3.5vw, 3.3rem); font-weight: 600; }
+  .manifesto-mirror .l2 {
+    display: block;
+    font-size: clamp(0.95rem, 1.5vw, 1.35rem);
+    font-weight: 500;
+    letter-spacing: 0.34em;
+    margin-block: 0.9em 0.8em;
+  }
+  .manifesto-mirror .l3 { display: block; font-size: clamp(1.5rem, 3.1vw, 2.9rem); font-weight: 600; }
+
+  /* ── 竖排旁注：交代这个世界的局部规则 ── */
+  .side-note {
+    position: absolute;
+    left: 3.2vw;
+    top: 30vh;
+    z-index: 6;
+    writing-mode: vertical-rl;
+    font-size: 0.8rem;
+    letter-spacing: 0.52em;
+    color: var(--ink-faint);
+    opacity: 0.85;
+  }
+
+  /* ── 站名 ── */
+  .brand {
+    position: absolute;
+    top: 4.5vh;
+    left: 4vw;
+    z-index: 9;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 1.02rem;
+    letter-spacing: 0.06em;
+    color: var(--ink);
+    text-decoration: none;
+  }
+  .brand .ring {
+    width: 11px; height: 11px;
+    border: 1.5px solid var(--mist-ink);
+    border-radius: 50%;
+    opacity: 0.85;
+  }
+
+  /* ── 竖排导航 ── */
+  .nav {
+    position: absolute;
+    right: 3.4vw;
+    top: 22vh;
+    z-index: 9;
+    display: flex;
+    flex-direction: column;
+    gap: 2.3rem;
+  }
+  .nav a {
+    position: relative;
+    writing-mode: vertical-rl;
+    letter-spacing: 0.5em;
+    padding: 0.4rem 0.7rem;
+    color: var(--ink-soft);
+    text-decoration: none;
+    font-size: 0.95rem;
+    transition: color 0.18s ease;
+  }
+  .nav a::after {
+    content: '';
+    position: absolute;
+    top: 46%;
+    right: calc(100% + 0.35rem);
+    width: 1.3rem;
+    height: 1px;
+    background: rgba(76, 106, 128, 0.35);
+    transition: width 0.18s ease, background 0.18s ease;
+  }
+  .nav a:hover { color: var(--ink); }
+  .nav a:hover::after { width: 2rem; background: var(--mist-ink); }
+
+  /* ── 最近的随笔：浮在水面上的纸签（封面到内容的交接） ── */
+  .floating-ledger {
+    position: absolute;
+    left: 28vw;
+    right: 15vw;
+    bottom: 6vh;
+    z-index: 8;
+  }
+  .floating-ledger h2 {
+    margin: 0 0 1.1rem;
+    font-family: var(--font-body);
+    font-weight: 500;
+    font-size: 0.82rem;
+    letter-spacing: 0.3em;
+    color: var(--ink-faint);
+  }
+  .floating-ledger .all {
+    margin-top: 1rem;
+    text-align: right;
+    font-size: 0.85rem;
+  }
+  .floating-ledger .all a { color: var(--ink-soft); }
+  .slips { display: flex; gap: 1.2rem 1.8rem; align-items: flex-start; }
+  .slip {
+    display: block;
+    padding: 0.85rem 1rem 0.95rem;
+    background: rgba(252, 253, 253, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.65);
+    box-shadow: 0 12px 26px -14px rgba(76, 106, 128, 0.45), 0 2px 6px -2px rgba(76, 106, 128, 0.22);
+    text-decoration: none;
+    animation: slip-bob 9s ease-in-out infinite alternate;
+  }
+  /* 纸签不等宽、高低散落：像漂在水上，而不是一排卡片 */
+  .slip:nth-child(1) { width: 13.5rem; transform: rotate(-1.2deg); }
+  .slip:nth-child(2) { width: 15.5rem; transform: rotate(0.7deg) translateY(10px); animation-delay: -3s; }
+  .slip:nth-child(3) { width: 12.5rem; transform: rotate(-0.5deg) translateY(3px); animation-delay: -6s; }
+  .slip .d {
+    display: block;
+    font-size: 0.72rem;
+    letter-spacing: 0.12em;
+    color: var(--ink-faint);
+    font-variant-numeric: tabular-nums;
+    margin-bottom: 0.35rem;
+  }
+  .slip .t {
+    display: block;
+    font-family: var(--font-display);
+    font-size: 0.98rem;
+    color: var(--ink);
+    line-height: 1.5;
+  }
+  .slip:hover .t { color: var(--mist-ink); }
+
+  @keyframes slip-bob {
+    from { translate: 0 0; }
+    to   { translate: 0 -4px; }
+  }
+
+  /* ── 降级与回退 ── */
+  @media (prefers-reduced-motion: reduce) {
+    .ripples .drift, .reeds .sway, .reeds-r .sway, .petal, .slip { animation: none; }
+  }
+
+  /* 矮视口：整体下移地平线，避免宣言与倒影挤压 */
+  @media (max-height: 700px) {
+    :root { --horizon: 48vh; }
+    .manifesto { top: 9vh; }
+    .manifesto .l1 { font-size: clamp(1.5rem, 3vw, 2.6rem); }
+    .manifesto .l3 { font-size: clamp(1.3rem, 2.7vw, 2.3rem); }
+  }
+
+  /* 窄屏：倒影收短、纸签改为纵向流、导航转横排 */
+  @media (max-width: 760px) {
+    :root { --horizon: 40vh; }
+    .colonnade { right: -14vw; width: 74vw; }
+    .colonnade-reflection { right: -14vw; width: 74vw; height: 18vh; }
+    .manifesto { top: 11vh; left: 9vw; right: 9vw; }
+    .manifesto-mirror { left: 9vw; }
+    .side-note, .reeds-r { display: none; }
+    .nav {
+      position: static;
+      margin: 0.6rem 9vw 0;
+      flex-direction: row;
+      gap: 1.8rem;
+    }
+    .nav a { writing-mode: horizontal-tb; letter-spacing: 0.24em; font-size: 0.9rem; }
+    .nav a::after { display: none; }
+    .floating-ledger { position: static; margin: 3rem 9vw 8vh; }
+    .slips { flex-direction: column; gap: 0.9rem; }
+    .slip { width: 100%; animation: none; transform: none; }
+    .stage { overflow-y: auto; }
+    .reeds { width: 34vw; height: 24vh; }
+  }
+</style>
+</head>
+<body>
+<div class="stage">
+
+  <!-- 远巨构：柱列 + 残拱 + 一扇亮着的小窗（记忆点） -->
+  <div class="colonnade" aria-hidden="true">
+    <svg viewBox="0 0 640 420" preserveAspectRatio="xMidYMax slice">
+      <defs>
+        <linearGradient id="fog-l" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#8fa5b3" stop-opacity="0"/>
+          <stop offset="1" stop-color="#8fa5b3" stop-opacity="0.55"/>
+        </linearGradient>
+      </defs>
+      <!-- 柱列：间距与宽度刻意不规律（“重复但不规律”） -->
+      <g fill="url(#fog-l)">
+        <rect x="60"  y="96" width="15" height="324"/>
+        <rect x="118" y="64" width="12" height="356"/>
+        <rect x="205" y="110" width="16" height="310"/>
+        <rect x="291" y="52" width="13" height="368"/>
+        <rect x="398" y="88" width="17" height="332"/>
+        <rect x="504" y="118" width="12" height="302"/>
+        <rect x="576" y="70" width="15" height="350"/>
+      </g>
+      <!-- 柱头暗示：每根柱顶一道略深的短横，部分柱头还压着断梁 -->
+      <g fill="#7d94a3" opacity="0.5">
+        <rect x="55"  y="96"  width="25" height="4"/>
+        <rect x="113" y="64"  width="22" height="4"/>
+        <rect x="200" y="110" width="26" height="4"/>
+        <rect x="286" y="52"  width="23" height="4"/>
+        <rect x="393" y="88"  width="27" height="4"/>
+        <rect x="499" y="118" width="22" height="4"/>
+        <rect x="571" y="70"  width="25" height="4"/>
+      </g>
+      <!-- 断梁：搁在柱头上的残段（各自属于更早的秩序） -->
+      <rect x="200" y="104" width="60" height="7" fill="#7d94a3" opacity="0.45"/>
+      <rect x="386" y="82"  width="78" height="7" fill="#7d94a3" opacity="0.5"/>
+      <rect x="558" y="64"  width="52" height="7" fill="#7d94a3" opacity="0.42"/>
+      <!-- 水线处的半淹没残拱（虚线为缺失的一半） -->
+      <path d="M 224 420 A 92 66 0 0 1 392 420" fill="none"
+            stroke="#7d94a3" stroke-opacity="0.55" stroke-width="6"/>
+      <path d="M 240 384 A 92 66 0 0 1 376 384" fill="none"
+            stroke="#8fa5b3" stroke-opacity="0.4" stroke-width="4"
+            stroke-dasharray="10 12"/>
+      <!-- 亮着的小窗（记忆点，克制） -->
+      <rect x="402" y="200" width="7" height="10" fill="#cbb98f" opacity="0.92"/>
+    </svg>
+  </div>
+
+  <!-- 水体 -->
+  <div class="water" aria-hidden="true"></div>
+
+  <!-- 柱列倒影 -->
+  <div class="colonnade-reflection" aria-hidden="true">
+    <svg viewBox="0 0 640 420" preserveAspectRatio="xMidYMin slice">
+      <g fill="#8fa5b3" opacity="0.6">
+        <rect x="60"  y="0" width="15" height="150"/>
+        <rect x="118" y="0" width="12" height="180"/>
+        <rect x="205" y="0" width="16" height="140"/>
+        <rect x="291" y="0" width="13" height="190"/>
+        <rect x="398" y="0" width="17" height="160"/>
+        <rect x="504" y="0" width="12" height="130"/>
+        <rect x="576" y="0" width="15" height="175"/>
+      </g>
+      <rect x="402" y="26" width="9" height="12" fill="#c2b08a" opacity="0.8"/>
+    </svg>
+  </div>
+
+  <!-- 涟漪场 -->
+  <div class="ripples" aria-hidden="true">
+    <svg viewBox="0 0 1440 520" preserveAspectRatio="none">
+      <g class="drift" stroke-linecap="round">
+        <!-- 远处：密、短、轻 -->
+        <g stroke="#f2f6f7">
+          <line x1="120" y1="14"  x2="300" y2="14"  stroke-width="1" opacity="0.55"/>
+          <line x1="820" y1="20"  x2="1010" y2="20" stroke-width="1" opacity="0.5"/>
+          <line x1="420" y1="30"  x2="540" y2="30"  stroke-width="1.2" opacity="0.6"/>
+          <line x1="1080" y1="38" x2="1240" y2="38" stroke-width="1" opacity="0.45"/>
+          <line x1="240" y1="52"  x2="470" y2="52"  stroke-width="1.4" opacity="0.6"/>
+          <line x1="700" y1="58"  x2="860" y2="58"  stroke-width="1.2" opacity="0.5"/>
+          <line x1="1150" y1="70" x2="1340" y2="70" stroke-width="1.2" opacity="0.55"/>
+          <line x1="90"  y1="82"  x2="330" y2="82"  stroke-width="1.6" opacity="0.65"/>
+          <line x1="540" y1="94"  x2="760" y2="94"  stroke-width="1.4" opacity="0.55"/>
+          <line x1="980" y1="106" x2="1200" y2="106" stroke-width="1.6" opacity="0.6"/>
+        </g>
+        <!-- 中景：渐疏渐长，混入暗痕 -->
+        <g stroke="#f2f6f7">
+          <line x1="200" y1="140" x2="620" y2="140" stroke-width="2" opacity="0.7"/>
+          <line x1="860" y1="156" x2="1240" y2="156" stroke-width="2" opacity="0.65"/>
+          <line x1="60"  y1="178" x2="420" y2="178" stroke-width="2.2" opacity="0.7"/>
+          <line x1="1060" y1="204" x2="1400" y2="204" stroke-width="2" opacity="0.6"/>
+        </g>
+        <g stroke="#a4b8c2">
+          <line x1="480" y1="132" x2="700" y2="132" stroke-width="1.6" opacity="0.5"/>
+          <line x1="120" y1="196" x2="380" y2="196" stroke-width="1.8" opacity="0.45"/>
+          <line x1="760" y1="226" x2="1080" y2="226" stroke-width="1.8" opacity="0.4"/>
+        </g>
+        <!-- 近景：长而缓 -->
+        <g stroke="#f2f6f7">
+          <line x1="160" y1="270" x2="900" y2="270" stroke-width="2.6" opacity="0.62"/>
+          <line x1="1020" y1="300" x2="1440" y2="300" stroke-width="2.8" opacity="0.55"/>
+          <line x1="40"  y1="340" x2="760" y2="340" stroke-width="3" opacity="0.5"/>
+          <line x1="840" y1="390" x2="1380" y2="390" stroke-width="3.2" opacity="0.45"/>
+          <line x1="20"  y1="440" x2="680" y2="440" stroke-width="3.4" opacity="0.4"/>
+          <line x1="720" y1="480" x2="1300" y2="480" stroke-width="3.6" opacity="0.35"/>
+        </g>
+      </g>
+    </svg>
+  </div>
+
+  <!-- 地平线 -->
+  <div class="horizon" aria-hidden="true"></div>
+
+  <!-- 栈道与椅子（现实锚点）：消失点沉入柱列脚下的雾里 -->
+  <div class="walkway" aria-hidden="true">
+    <svg viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        <linearGradient id="path-fade" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0"   stop-color="#8fa5b3" stop-opacity="0"/>
+          <stop offset="0.5" stop-color="#8fa5b3" stop-opacity="0.9"/>
+          <stop offset="1"   stop-color="#8fa5b3"/>
+        </linearGradient>
+        <mask id="to-mist">
+          <linearGradient x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0"    stop-color="#fff" stop-opacity="0"/>
+            <stop offset="0.42" stop-color="#fff" stop-opacity="0.65"/>
+            <stop offset="0.7"  stop-color="#fff"/>
+          </linearGradient>
+        </mask>
+      </defs>
+      <!-- 木栈道：由左下角收束于地平线（消失点 940,378，隐入巨构脚下的雾） -->
+      <g mask="url(#to-mist)">
+        <polygon points="0,900 190,900 946,380 933,380" fill="#b1aba1"/>
+        <!-- 板缝：只留在近处，远处被雾吃掉 -->
+        <g stroke="#cbc5b9" stroke-width="2">
+          <line x1="46"  y1="900" x2="940" y2="384"/>
+          <line x1="84"  y1="812" x2="940" y2="384"/>
+          <line x1="128" y1="736" x2="940" y2="384"/>
+          <line x1="188" y1="672" x2="940" y2="384"/>
+          <line x1="286" y1="580" x2="940" y2="384"/>
+          <line x1="414" y1="498" x2="940" y2="384"/>
+        </g>
+        <!-- 侧缘：比板面略深的边线 -->
+        <line x1="0"   y1="900" x2="933" y2="380.5" stroke="#97917f" stroke-width="2.5" opacity="0.8"/>
+        <line x1="190" y1="900" x2="946" y2="380.5" stroke="#97917f" stroke-width="2"   opacity="0.6"/>
+        <!-- 近侧一根细栏杆（细线母题）与三根栏杆柱 -->
+        <line x1="30"  y1="764" x2="936" y2="382" stroke="#66727a" stroke-width="1.6" opacity="0.55"/>
+        <g stroke="#66727a" stroke-width="1.6" opacity="0.55">
+          <line x1="118" y1="700" x2="118" y2="742"/>
+          <line x1="292" y1="576" x2="292" y2="606"/>
+          <line x1="486" y1="478" x2="486" y2="500"/>
+        </g>
+      </g>
+      <!-- 椅子：背对观者，面朝地平线（比栈道宽处略小，处于远处） -->
+      <g transform="translate(756,446) scale(1.5)" stroke="#39454e" stroke-width="2.2" stroke-linecap="round" opacity="0.82" fill="none">
+        <path d="M4 0 v26"/>
+        <path d="M4 14 h18"/>
+        <path d="M22 14 v16"/>
+        <path d="M4 30 l-3 8 M4 30 l3 8 M22 30 l-3 8 M22 30 l3 8"/>
+        <path d="M4 6 h14" opacity="0.55"/>
+      </g>
+      <!-- 椅子的水中残影 -->
+      <g transform="translate(760,514) scale(1.1, -0.7)" stroke="#5d7180" stroke-width="2" stroke-linecap="round" opacity="0.3" fill="none">
+        <path d="M4 14 h18"/>
+        <path d="M22 14 v16"/>
+        <path d="M4 30 l-3 8 M4 30 l3 8"/>
+      </g>
+    </svg>
+  </div>
+
+  <!-- 漂浮的花瓣（痕迹，不是母题） -->
+  <div class="petal p1" aria-hidden="true"><svg width="13" height="8" viewBox="0 0 13 8"><ellipse cx="6.5" cy="4" rx="6" ry="2.8" fill="#d8c4c9" opacity="0.75" transform="rotate(-14 6.5 4)"/></svg></div>
+  <div class="petal p2" aria-hidden="true"><svg width="10" height="7" viewBox="0 0 10 7"><ellipse cx="5" cy="3.5" rx="4.6" ry="2.1" fill="#d8c4c9" opacity="0.6" transform="rotate(22 5 3.5)"/></svg></div>
+  <div class="petal p3" aria-hidden="true"><svg width="15" height="9" viewBox="0 0 15 9"><ellipse cx="7.5" cy="4.5" rx="7" ry="3" fill="#d8c4c9" opacity="0.5" transform="rotate(-6 7.5 4.5)"/></svg></div>
+
+  <!-- 前景芦苇 -->
+  <div class="reeds" aria-hidden="true">
+    <svg viewBox="0 0 300 420" preserveAspectRatio="xMidYMax slice">
+      <g class="sway" fill="none" stroke-linecap="round">
+        <path d="M52 420 C 50 340, 44 280, 20 210" stroke="#7d95a2" stroke-width="4" opacity="0.9"/>
+        <path d="M96 420 C 96 330, 100 250, 84 160" stroke="#7d95a2" stroke-width="5" opacity="0.95"/>
+        <path d="M142 420 C 146 350, 152 300, 176 230" stroke="#8ba2ae" stroke-width="3.6" opacity="0.8"/>
+        <path d="M188 420 C 190 360, 196 320, 214 280" stroke="#7d95a2" stroke-width="3" opacity="0.75"/>
+        <path d="M230 420 C 234 380, 244 350, 262 330" stroke="#8ba2ae" stroke-width="2.6" opacity="0.65"/>
+        <!-- 两枚穗 -->
+        <ellipse cx="84" cy="150" rx="5" ry="15" fill="#7d95a2" opacity="0.9" transform="rotate(6 84 150)"/>
+        <ellipse cx="18" cy="200" rx="4" ry="12" fill="#8ba2ae" opacity="0.8" transform="rotate(-10 18 200)"/>
+      </g>
+    </svg>
+  </div>
+  <div class="reeds-r" aria-hidden="true">
+    <svg viewBox="0 0 200 300" preserveAspectRatio="xMidYMax slice">
+      <g fill="none" stroke-linecap="round" class="sway">
+        <path d="M60 300 C 62 240, 58 190, 40 130" stroke="#8ba2ae" stroke-width="3.4" opacity="0.8"/>
+        <path d="M120 300 C 124 250, 132 210, 150 170" stroke="#7d95a2" stroke-width="3" opacity="0.7"/>
+        <ellipse cx="39" cy="122" rx="4" ry="11" fill="#8ba2ae" opacity="0.75"/>
+      </g>
+    </svg>
+  </div>
+
+  <!-- 宣言（水） -->
+  <h1 class="manifesto">
+    <span class="l1">这里不是梦，也不是现实。</span>
+    <span class="l2">它是人在即将醒来时</span>
+    <span class="l3">看见的最后一层世界。</span>
+  </h1>
+
+  <!-- 宣言（倒影） -->
+  <div class="manifesto-mirror" aria-hidden="true">
+    <span class="l1">这里不是梦，也不是现实。</span>
+    <span class="l2">它是人在即将醒来时</span>
+    <span class="l3">看见的最后一层世界。</span>
+  </div>
+
+  <!-- 竖排旁注 -->
+  <p class="side-note" aria-hidden="true">水上为醒　水下为梦</p>
+
+  <!-- 站名 -->
+  <a class="brand" href="/"><span class="ring" aria-hidden="true"></span>Traveritas</a>
+
+  <!-- 竖排导航 -->
+  <nav class="nav" aria-label="站内入口">
+    <a href="/articles/">随笔</a>
+    <a href="/projects/">项目</a>
+    <a href="/about/">关于</a>
+  </nav>
+
+  <!-- 最近的随笔：浮在水面上的纸签 -->
+  <section class="floating-ledger" aria-label="最近的随笔">
+    <h2>最近的随笔</h2>
+    <div class="slips">
+      <a class="slip" href="#">
+        <span class="d">2026.09.12</span>
+        <span class="t">母题探索记录</span>
+      </a>
+      <a class="slip" href="#">
+        <span class="d">2026.08.30</span>
+        <span class="t">关于“醒梦”的第一份笔记</span>
+      </a>
+      <a class="slip" href="#">
+        <span class="d">2026.08.11</span>
+        <span class="t">把网站做成一个房间</span>
+      </a>
+    </div>
+    <p class="all"><a href="/articles/">全部随笔</a></p>
+  </section>
+</div>
+</body>
+</html>

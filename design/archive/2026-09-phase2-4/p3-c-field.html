@@ -1,0 +1,617 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>方案 C · 花是旷野</title>
+<style>
+  /* ═══ 概念 ═══
+     花不是被摆放的物，而是在场的旷野：
+     数千枚不规律的小花痕迹按远/中/近三个深度带铺满地面，
+     一座巨门框立在花田中——门里是同一片花田，只是更暖。
+     （梦的局部规则，不需要解释。）
+     层三明治：雾空 → 远带花 → 巨门（门里更暖） → 中带花
+     → 宣言（站在花里，被近带花压住笔画的边缘）
+     → 近带花与草 → 晾布细线 → 编辑层。 */
+
+  @font-face {
+    font-family: 'Noto Serif SC Web';
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url('https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/files/noto-serif-sc-chinese-simplified-500-normal.woff2') format('woff2');
+  }
+  @font-face {
+    font-family: 'Noto Serif SC Web';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url('https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/files/noto-serif-sc-chinese-simplified-600-normal.woff2') format('woff2');
+  }
+
+  :root {
+    --paper: #f6f6f1;
+    --fog: #f2f4ee;
+    --field-far: #e9ecdf;
+    --field-mid: #dfe4d3;
+    --field-near: #d5dccb;
+    --ink: #2b3230;
+    --ink-soft: #59635d;
+    --ink-faint: #626c66;
+    --frame: #79828a;
+    --frame-ink: #5d666d;
+    --blush: #d8c4c9;
+    --rose: #c9aeb4;
+    --gold: #c9bd93;
+    --bone: #eef0ea;
+    --green: #a9bdb0;
+    --warm: #f3ead2;
+    --font-display: 'Noto Serif SC Web', 'Noto Serif SC', 'Palatino Linotype', Georgia, 'Songti SC', SimSun, serif;
+    --font-body: system-ui, -apple-system, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+    --horizon: 30vh;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    font-family: var(--font-body);
+    color: var(--ink);
+    background: var(--paper);
+    overflow: hidden;
+  }
+
+  .stage {
+    position: relative;
+    height: 100dvh;
+    overflow: clip;
+    background:
+      linear-gradient(to bottom,
+        var(--fog) 0%,
+        #eef1e8 calc(var(--horizon) - 6vh),
+        var(--field-far) var(--horizon),
+        var(--field-mid) 62%,
+        var(--field-near) 100%);
+  }
+
+  /* 田垄：极淡的水平暗示线，向远处加密 */
+  .furrows {
+    position: absolute;
+    left: 0; right: 0;
+    top: var(--horizon);
+    bottom: 0;
+    z-index: 1;
+    pointer-events: none;
+  }
+  .furrows svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+  /* ── 花的三个深度带 ── */
+  .band { position: absolute; inset: 0; pointer-events: none; }
+  .band svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .band-far  { z-index: 2; }
+  .band-mid  { z-index: 3; }
+  .band-near { z-index: 5; }
+  .band-near .sway-root { animation: field-sway 16s ease-in-out infinite alternate; transform-origin: 50% 100%; }
+  @keyframes field-sway {
+    from { transform: skewX(-0.25deg); }
+    to   { transform: skewX(0.3deg); }
+  }
+
+  /* ── 巨门框：立在花田里，门里更暖 ── */
+  .gate {
+    position: absolute;
+    left: 62vw;
+    top: 9vh;
+    height: 47vh;
+    aspect-ratio: 220 / 420;
+    transform: translateX(-50%) rotate(0.5deg);
+    z-index: 4;
+  }
+  .gate svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+  /* 门的接触阴影 */
+  .gate-shadow {
+    position: absolute;
+    left: 62vw;
+    top: 55vh;
+    width: 26vw;
+    height: 5vh;
+    transform: translateX(-46%);
+    z-index: 3;
+    background: radial-gradient(50% 60% at 50% 50%, rgba(89, 99, 93, 0.28), transparent 72%);
+    filter: blur(3px);
+  }
+
+  /* ── 晾布细线：上部几根悬垂的布 ── */
+  .lines {
+    position: absolute;
+    inset: 0;
+    z-index: 6;
+    pointer-events: none;
+  }
+  .lines svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .lines .hanger { transform-origin: 50% 0; animation: scrap-sway 12s ease-in-out infinite alternate; }
+  .lines .hanger:nth-child(odd) { animation-duration: 15s; }
+  @keyframes scrap-sway {
+    from { transform: rotate(-2.2deg); }
+    to   { transform: rotate(2.4deg); }
+  }
+
+  /* ── 宣言：站在花里 ── */
+  .manifesto {
+    position: absolute;
+    z-index: 4;
+    margin: 0;
+    font-family: var(--font-display);
+    line-height: 1.7;
+    letter-spacing: 0.02em;
+    color: var(--ink);
+  }
+  .m1 { top: 11vh; left: 8vw; }
+  .m1 .big { font-size: clamp(1.7rem, 3.5vw, 3.3rem); font-weight: 600; display: block; }
+  .m2 {
+    top: 33vh;
+    left: 10vw;
+    font-size: clamp(0.95rem, 1.5vw, 1.35rem);
+    font-weight: 500;
+    letter-spacing: 0.3em;
+    color: var(--ink-faint);
+  }
+  .m3 { top: 54vh; left: 24vw; }
+  .m3 .big { font-size: clamp(1.5rem, 3.1vw, 2.9rem); font-weight: 600; display: block; }
+  .m3 .big em { font-style: normal; color: var(--frame-ink); }
+
+  /* ── 编辑层 ── */
+  .brand {
+    position: absolute;
+    top: 4.5vh;
+    left: 4vw;
+    z-index: 9;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 1.02rem;
+    letter-spacing: 0.06em;
+    color: var(--ink);
+    text-decoration: none;
+  }
+  .brand .ring {
+    width: 11px; height: 11px;
+    border: 1.5px solid var(--frame-ink);
+    border-radius: 50%;
+    opacity: 0.85;
+  }
+
+  .nav {
+    position: absolute;
+    right: 3.4vw;
+    top: 22vh;
+    z-index: 9;
+    display: flex;
+    flex-direction: column;
+    gap: 2.3rem;
+  }
+  .nav a {
+    position: relative;
+    writing-mode: vertical-rl;
+    letter-spacing: 0.5em;
+    padding: 0.4rem 0.7rem;
+    color: var(--ink-soft);
+    text-decoration: none;
+    font-size: 0.95rem;
+    transition: color 0.18s ease;
+  }
+  .nav a::after {
+    content: '';
+    position: absolute;
+    top: 46%;
+    right: calc(100% + 0.35rem);
+    width: 1.3rem;
+    height: 1px;
+    background: rgba(93, 102, 109, 0.4);
+    transition: width 0.18s ease, background 0.18s ease;
+  }
+  .nav a:hover { color: var(--ink); }
+  .nav a:hover::after { width: 2rem; background: var(--frame-ink); }
+
+  .side-note {
+    position: absolute;
+    left: 3.2vw;
+    top: 40vh;
+    z-index: 9;
+    writing-mode: vertical-rl;
+    font-size: 0.8rem;
+    letter-spacing: 0.52em;
+    color: var(--ink-faint);
+  }
+
+  /* 最近的随笔：系在细线上的三枚小签 */
+  .hang-ledger {
+    position: absolute;
+    left: 26vw;
+    right: 14vw;
+    bottom: 4.5vh;
+    z-index: 8;
+  }
+  .hang-thread {
+    display: block;
+    width: 100%;
+    height: 26px;
+    margin-bottom: -6px;
+  }
+  .tags { display: flex; justify-content: space-between; gap: 1.2rem; }
+  .tag {
+    position: relative;
+    display: block;
+    padding: 0.7rem 0.95rem 0.8rem;
+    background: rgba(250, 250, 246, 0.94);
+    border: 1px solid rgba(122, 130, 138, 0.28);
+    box-shadow: 0 10px 22px -12px rgba(89, 99, 93, 0.4);
+    text-decoration: none;
+    transform-origin: 50% -22px;
+    animation: tag-sway 11s ease-in-out infinite alternate;
+  }
+  .tag:nth-child(2) { animation-delay: -4s; margin-top: 10px; }
+  .tag:nth-child(3) { animation-delay: -7s; }
+  @keyframes tag-sway {
+    from { transform: rotate(-1deg); }
+    to   { transform: rotate(1.1deg); }
+  }
+  .tag::before {
+    content: '';
+    position: absolute;
+    top: -22px;
+    left: 50%;
+    width: 1px;
+    height: 22px;
+    background: rgba(93, 102, 109, 0.5);
+  }
+  .tag .d {
+    display: block;
+    font-size: 0.7rem;
+    letter-spacing: 0.12em;
+    color: var(--ink-faint);
+    font-variant-numeric: tabular-nums;
+    margin-bottom: 0.3rem;
+  }
+  .tag .t {
+    display: block;
+    font-family: var(--font-display);
+    font-size: 0.95rem;
+    color: var(--ink);
+    line-height: 1.55;
+  }
+  .tag:hover .t { color: var(--frame-ink); }
+
+  /* ── 回退 ── */
+  @media (prefers-reduced-motion: reduce) {
+    .band-near .sway-root, .lines .hanger, .tag { animation: none; }
+  }
+
+  @media (max-height: 700px) {
+    .gate { top: 7vh; height: 40vh; }
+    .gate-shadow { top: 46vh; }
+    .m1 .big { font-size: clamp(1.5rem, 3vw, 2.6rem); }
+    .m3 { top: 48vh; }
+    .m3 .big { font-size: clamp(1.3rem, 2.7vw, 2.3rem); }
+  }
+
+  @media (max-width: 760px) {
+    :root { --horizon: 26vh; }
+    .gate { left: 68vw; top: 6vh; height: 34vh; }
+    .gate-shadow { left: 68vw; top: 39vh; width: 34vw; }
+    .m1 { top: 9vh; left: 9vw; right: 30vw; }
+    .m1 .big { font-size: clamp(1.4rem, 6.2vw, 2rem); }
+    .m2 { top: 30vh; left: 9vw; }
+    .m3 { top: 56vh; left: 9vw; }
+    .m3 .big { font-size: clamp(1.25rem, 5.6vw, 1.8rem); }
+    .side-note, .lines { display: none; }
+    .nav {
+      position: static;
+      margin: 1.8rem 9vw 0;
+      flex-direction: row;
+      gap: 1.8rem;
+    }
+    .nav a { writing-mode: horizontal-tb; letter-spacing: 0.24em; font-size: 0.9rem; }
+    .nav a::after { display: none; }
+    .hang-ledger { position: static; margin: 2.4rem 9vw 7vh; }
+    .hang-thread { display: none; }
+    .tags { flex-direction: column; }
+    .tag { animation: none; transform: none; }
+    .tag::before { display: none; }
+    .tag .t { white-space: normal; }
+    .stage { overflow-y: auto; }
+  }
+</style>
+</head>
+<body>
+<div class="stage">
+
+  <!-- 田垄 -->
+  <div class="furrows" aria-hidden="true">
+    <svg viewBox="0 0 1440 630" preserveAspectRatio="none">
+      <g stroke="#c6cfb9" stroke-width="1">
+        <line x1="80"  y1="20"  x2="1360" y2="20"  opacity="0.5"/>
+        <line x1="30"  y1="44"  x2="1410" y2="44"  opacity="0.42"/>
+        <line x1="140" y1="74"  x2="1300" y2="74"  opacity="0.4"/>
+        <line x1="60"  y1="112" x2="1380" y2="112" opacity="0.36"/>
+        <line x1="210" y1="158" x2="1240" y2="158" opacity="0.32"/>
+        <line x1="100" y1="214" x2="1340" y2="214" opacity="0.28"/>
+        <line x1="30"  y1="286" x2="1410" y2="286" opacity="0.24"/>
+        <line x1="180" y1="378" x2="1270" y2="378" opacity="0.2"/>
+        <line x1="60"  y1="500" x2="1380" y2="500" opacity="0.16"/>
+      </g>
+    </svg>
+  </div>
+
+  <!-- 远带花（JS 生成） -->
+  <div class="band band-far" aria-hidden="true"><svg viewBox="0 0 1440 900" preserveAspectRatio="none"></svg></div>
+
+  <!-- 巨门框：门里是同一片花田，只是更暖 -->
+  <div class="gate" aria-hidden="true">
+    <svg viewBox="0 0 220 420">
+      <defs>
+        <linearGradient id="door-warm" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0"   stop-color="#f6eed9"/>
+          <stop offset="0.6" stop-color="#f0e4c6"/>
+          <stop offset="1"   stop-color="#e8d9ba"/>
+        </linearGradient>
+        <linearGradient id="frame-grad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0"   stop-color="#8a9299"/>
+          <stop offset="1"   stop-color="#6d767e"/>
+        </linearGradient>
+      </defs>
+      <!-- 门内的暖花田（更亮，与门外拉开） -->
+      <rect x="38" y="36" width="144" height="384" fill="url(#door-warm)"/>
+      <rect x="38" y="36" width="144" height="384" fill="#fff" opacity="0.18"/>
+      <!-- 门内更亮的花痕 -->
+      <g>
+        <circle cx="72"  cy="330" r="3.4" fill="#dfb8b0" opacity="0.95"/>
+        <circle cx="128" cy="356" r="2.8" fill="#cbb584" opacity="0.95"/>
+        <circle cx="156" cy="322" r="3"   fill="#e6c6bf" opacity="0.9"/>
+        <circle cx="96"  cy="378" r="2.6" fill="#dfb8b0" opacity="0.9"/>
+        <circle cx="182" cy="368" r="2.4" fill="#cbb584" opacity="0.85"/>
+        <circle cx="60"  cy="382" r="2.2" fill="#e6c6bf" opacity="0.85"/>
+        <circle cx="118" cy="316" r="2.2" fill="#e6c6bf" opacity="0.8"/>
+      </g>
+      <!-- 门框 -->
+      <path d="M20 20 H200 V38 H38 V402 H20 Z" fill="url(#frame-grad)"/>
+      <rect x="182" y="38" width="18" height="382" fill="url(#frame-grad)"/>
+      <rect x="20"  y="20" width="180" height="18" fill="#8f979e"/>
+      <!-- 框内侧的阴影：给门洞厚度 -->
+      <rect x="38" y="36" width="6" height="384" fill="#5d666d" opacity="0.35"/>
+      <rect x="176" y="36" width="6" height="384" fill="#5d666d" opacity="0.3"/>
+      <rect x="38" y="36" width="144" height="6" fill="#5d666d" opacity="0.3"/>
+      <!-- 框的柱础 -->
+      <rect x="14" y="396" width="30" height="10" fill="#666f77"/>
+      <rect x="176" y="396" width="30" height="10" fill="#666f77"/>
+      <!-- 小凳：给门以尺度 -->
+      <g transform="translate(-46,372)" stroke="#5d666d" stroke-width="2.5" stroke-linecap="round" opacity="0.72">
+        <line x1="0" y1="18" x2="34" y2="18"/>
+        <line x1="4" y1="18" x2="4" y2="38"/>
+        <line x1="30" y1="18" x2="30" y2="38"/>
+        <line x1="4" y1="30" x2="30" y2="30" opacity="0.6"/>
+      </g>
+    </svg>
+  </div>
+  <div class="gate-shadow" aria-hidden="true"></div>
+
+  <!-- 中带花（JS 生成） -->
+  <div class="band band-mid" aria-hidden="true"><svg viewBox="0 0 1440 900" preserveAspectRatio="none"></svg></div>
+
+  <!-- 宣言：站在花里 -->
+  <h1 class="manifesto m1" aria-label="这里不是梦，也不是现实。它是人在即将醒来时，看见的最后一层世界。"><span class="big" aria-hidden="true">这里不是梦，也不是现实。</span></h1>
+  <p class="manifesto m2" aria-hidden="true">它是人在即将醒来时</p>
+  <p class="manifesto m3" aria-hidden="true"><span class="big">看见的<em>最后一层世界</em>。</span></p>
+
+  <!-- 近带花与草（JS 生成，压在宣言之上） -->
+  <div class="band band-near" aria-hidden="true">
+    <svg viewBox="0 0 1440 900" preserveAspectRatio="none">
+      <g class="sway-root"></g>
+    </svg>
+  </div>
+
+  <!-- 晾布细线 -->
+  <div class="lines" aria-hidden="true">
+    <svg viewBox="0 0 1440 900" preserveAspectRatio="none">
+      <!-- 两根垂弧的细线 -->
+      <path d="M-20 150 C 360 210, 1080 190, 1460 128" fill="none" stroke="#8b968f" stroke-width="1.2" opacity="0.55"/>
+      <path d="M-20 268 C 420 318, 1020 300, 1460 250" fill="none" stroke="#8b968f" stroke-width="1" opacity="0.42"/>
+      <!-- 布片：挂在细线上 -->
+      <g class="hanger">
+        <line x1="286" y1="176" x2="286" y2="186" stroke="#8b968f" stroke-width="1" opacity="0.55"/>
+        <rect x="277" y="186" width="18" height="30" fill="#e9dcda" opacity="0.9" transform="rotate(-3 286 186)"/>
+      </g>
+      <g class="hanger">
+        <line x1="560" y1="192" x2="560" y2="200" stroke="#8b968f" stroke-width="1" opacity="0.55"/>
+        <rect x="549" y="200" width="22" height="26" fill="#f0eee6" opacity="0.92" transform="rotate(2 560 200)"/>
+      </g>
+      <g class="hanger">
+        <line x1="836" y1="189" x2="836" y2="196" stroke="#8b968f" stroke-width="1" opacity="0.55"/>
+        <rect x="828" y="196" width="16" height="22" fill="#e9dcda" opacity="0.85" transform="rotate(-2 836 196)"/>
+      </g>
+      <g class="hanger">
+        <line x1="1092" y1="176" x2="1092" y2="184" stroke="#8b968f" stroke-width="1" opacity="0.5"/>
+        <rect x="1081" y="184" width="20" height="28" fill="#f0eee6" opacity="0.85" transform="rotate(3 1092 184)"/>
+      </g>
+      <!-- 一枚纸签 -->
+      <g class="hanger">
+        <line x1="1216" y1="167" x2="1216" y2="178" stroke="#8b968f" stroke-width="1" opacity="0.5"/>
+        <rect x="1206" y="178" width="20" height="14" fill="#fafaf5" stroke="#b9c1b3" stroke-width="1" opacity="0.9" transform="rotate(-2 1216 178)"/>
+      </g>
+      <!-- 第二根线上的两片 -->
+      <g class="hanger">
+        <line x1="420" y1="304" x2="420" y2="312" stroke="#8b968f" stroke-width="1" opacity="0.45"/>
+        <rect x="411" y="312" width="18" height="24" fill="#e9dcda" opacity="0.8" transform="rotate(2 420 312)"/>
+      </g>
+      <g class="hanger">
+        <line x1="948" y1="296" x2="948" y2="304" stroke="#8b968f" stroke-width="1" opacity="0.45"/>
+        <rect x="939" y="304" width="18" height="22" fill="#f0eee6" opacity="0.8" transform="rotate(-3 948 304)"/>
+      </g>
+    </svg>
+  </div>
+
+  <!-- 站名 -->
+  <a class="brand" href="/"><span class="ring" aria-hidden="true"></span>Traveritas</a>
+
+  <!-- 竖排旁注 -->
+  <p class="side-note" aria-hidden="true">门里门外　同一片花田</p>
+
+  <!-- 竖排导航 -->
+  <nav class="nav" aria-label="站内入口">
+    <a href="/articles/">随笔</a>
+    <a href="/projects/">项目</a>
+    <a href="/about/">关于</a>
+  </nav>
+
+  <!-- 最近的随笔：系在细线上的三枚小签 -->
+  <section class="hang-ledger" aria-label="最近的随笔">
+    <svg class="hang-thread" viewBox="0 0 1000 26" preserveAspectRatio="none" aria-hidden="true">
+      <path d="M0 4 C 250 18, 750 18, 1000 4" fill="none" stroke="#8b968f" stroke-width="1.2" opacity="0.55"/>
+    </svg>
+    <div class="tags">
+      <a class="tag" href="#">
+        <span class="d">2026.09.12</span>
+        <span class="t">母题探索记录</span>
+      </a>
+      <a class="tag" href="#">
+        <span class="d">2026.08.30</span>
+        <span class="t">关于“醒梦”的第一份笔记</span>
+      </a>
+      <a class="tag" href="#">
+        <span class="d">2026.08.11</span>
+        <span class="t">把网站做成一个房间</span>
+      </a>
+    </div>
+  </section>
+</div>
+
+<script>
+/* 花田散布：确定性伪随机（每次生成前重置种子），坐标以舞台实际像素生成，
+   并在 resize 时重建——避免 viewBox 非均匀拉伸把花压扁（移动端曾因此崩坏） */
+(function () {
+  var NS = 'http://www.w3.org/2000/svg';
+  var colors = ['#d8c4c9', '#c9aeb4', '#c9bd93', '#eef0ea', '#a9bdb0', '#e8d3cd'];
+  var seed = 42;
+  function reset() { seed = 42; }
+  function rnd() { seed = (seed * 1664525 + 1013904223) % 4294967296; return seed / 4294967296; }
+  function pick(a) { return a[Math.floor(rnd() * a.length)]; }
+
+  function dot(x, y, r, fill, op) {
+    var c = document.createElementNS(NS, 'circle');
+    c.setAttribute('cx', x); c.setAttribute('cy', y); c.setAttribute('r', r);
+    c.setAttribute('fill', fill); c.setAttribute('opacity', op);
+    return c;
+  }
+  /* 不规律的小花：4-6 枚椭圆花瓣 + 花心，开角与大小带抖动 */
+  function bloom(x, y, s, fill, op) {
+    var g = document.createElementNS(NS, 'g');
+    var petals = 4 + Math.floor(rnd() * 3);
+    var rot = rnd() * 360;
+    for (var i = 0; i < petals; i++) {
+      var e = document.createElementNS(NS, 'ellipse');
+      var a = rot + (360 / petals) * i + (rnd() - 0.5) * 26;
+      var rr = rnd();
+      e.setAttribute('cx', x + Math.cos(a * Math.PI / 180) * s * (0.7 + rr * 0.5));
+      e.setAttribute('cy', y + Math.sin(a * Math.PI / 180) * s * (0.7 + rr * 0.5));
+      e.setAttribute('rx', s * (0.38 + rnd() * 0.22));
+      e.setAttribute('ry', s * (0.24 + rnd() * 0.18));
+      e.setAttribute('transform', 'rotate(' + (a + 90) + ' ' + x + ' ' + y + ')');
+      e.setAttribute('fill', fill); e.setAttribute('opacity', op);
+      g.appendChild(e);
+    }
+    g.appendChild(dot(x, y, s * 0.16, '#c9bd93', Math.min(1, op + 0.1)));
+    return g;
+  }
+  /* 草叶：两三笔弯线 */
+  function blade(x, y, s, op) {
+    var g = document.createElementNS(NS, 'g');
+    var n = 2 + Math.floor(rnd() * 2);
+    for (var i = 0; i < n; i++) {
+      var p = document.createElementNS(NS, 'path');
+      var dx = (rnd() - 0.5) * s * 0.8;
+      var cx = x + dx * 0.4, cy = y - s * 0.55;
+      var ex = x + dx, ey = y - s * (0.75 + rnd() * 0.5);
+      p.setAttribute('d', 'M' + x + ' ' + y + ' Q ' + cx + ' ' + cy + ' ' + ex + ' ' + ey);
+      p.setAttribute('stroke', pick(['#9db193', '#a9bdb0', '#93a88d']));
+      p.setAttribute('stroke-width', Math.max(1, s * 0.08));
+      p.setAttribute('fill', 'none');
+      p.setAttribute('opacity', op);
+      p.setAttribute('stroke-linecap', 'round');
+      g.appendChild(p);
+    }
+    return g;
+  }
+
+  var farSvg, midSvg, nearRoot;
+
+  function layout() {
+    var stage = document.querySelector('.stage');
+    var w = stage.clientWidth, h = stage.clientHeight;
+    var horizon = 0.30 * h;
+    var i, t, y, x, s;
+
+    /* viewBox 与舞台像素一致：SVG 内 1 单位 = 1 像素，不拉伸 */
+    [farSvg, midSvg, nearRoot.ownerSVGElement].forEach(function (svg) {
+      svg.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
+    });
+    farSvg.textContent = '';
+    midSvg.textContent = '';
+    nearRoot.textContent = '';
+    reset();
+
+    /* 远带：密、小、淡（近地平线更密） */
+    for (i = 0; i < 170; i++) {
+      t = rnd();
+      y = horizon + 0.007 * h + Math.pow(t, 2.1) * 0.127 * h;
+      x = rnd() * w;
+      s = 1.4 + rnd() * 1.4;
+      farSvg.appendChild(dot(x, y, s, pick(colors), 0.5 + rnd() * 0.4));
+    }
+    /* 中介尺度层：点与花形之间的过渡 */
+    for (i = 0; i < 60; i++) {
+      t = rnd();
+      y = horizon + 0.027 * h + Math.pow(t, 1.6) * 0.107 * h;
+      x = rnd() * w;
+      s = 2.4 + rnd() * 2.6;
+      farSvg.appendChild(dot(x, y, s, pick(['#c9aeb4', '#c9bd93', '#d8c4c9']), 0.5 + rnd() * 0.35));
+    }
+    /* 中带：可见的小花与草 */
+    for (i = 0; i < 92; i++) {
+      t = rnd();
+      y = 0.436 * h + t * 0.209 * h;
+      x = rnd() * w;
+      s = 3 + rnd() * 4.5;
+      if (rnd() < 0.62) midSvg.appendChild(bloom(x, y, s, pick(colors), 0.5 + rnd() * 0.38));
+      else midSvg.appendChild(blade(x, y, s * 3.2, 0.4 + rnd() * 0.3));
+      if (rnd() < 0.5) midSvg.appendChild(dot(x + (rnd() - 0.5) * 46, y + (rnd() - 0.5) * 20, 1.2 + rnd() * 1.2, pick(colors), 0.4 + rnd() * 0.3));
+    }
+    /* 近带：大而稀，压过宣言 */
+    for (i = 0; i < 44; i++) {
+      t = Math.pow(rnd(), 0.8);
+      y = 0.622 * h + t * 0.378 * h;
+      x = rnd() * w;
+      s = 7 + rnd() * 9;
+      if (rnd() < 0.5) nearRoot.appendChild(bloom(x, y, s, pick(colors), 0.55 + rnd() * 0.35));
+      else nearRoot.appendChild(blade(x, y, s * 4.2, 0.45 + rnd() * 0.35));
+      if (rnd() < 0.6) nearRoot.appendChild(dot(x + (rnd() - 0.5) * 90, y + (rnd() - 0.5) * 36, 1.6 + rnd() * 2, pick(colors), 0.4 + rnd() * 0.35));
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    farSvg = document.querySelector('.band-far svg');
+    midSvg = document.querySelector('.band-mid svg');
+    nearRoot = document.querySelector('.band-near .sway-root');
+    layout();
+    var pending = null;
+    window.addEventListener('resize', function () {
+      if (pending) cancelAnimationFrame(pending);
+      pending = requestAnimationFrame(layout);
+    });
+  });
+})();
+</script>
+</body>
+</html>

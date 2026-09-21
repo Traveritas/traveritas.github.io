@@ -1,0 +1,879 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>醒梦 · 在醒与梦之间</title>
+<meta name="description" content="主页探索稿 p7「落针」：站级醒梦缝在主页尺度的重发明——醒与梦分立缝线两侧，访客可以亲手落针。">
+<script>
+/* 入场初始态只在有 JS 时生效，避免无 JS 白屏 */
+document.documentElement.classList.add('js');
+if (!matchMedia('(prefers-reduced-motion: reduce)').matches) document.documentElement.classList.add('boot');
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<style>
+/* ==================================================================
+   p7 · 落针 —— 醒梦缝（seam-stitch）叙事在主页尺度的重发明
+   内页是被缝线穿过的页；主页是缝线开始的地方。
+   站级常量与 design/explore/seam-stitch.html 完全一致：
+   14° 缝线 / 醒侧冷灰 / 梦侧暖沙 / 琥珀锚点 / 思源宋体
+   ================================================================== */
+:root{
+  --paper:#E9ECEF;
+  --ink:#262C33;
+  --ink-soft:#59626C;
+  --wake:#A7B1BA;      /* 醒侧线色（冷灰） */
+  --dream:#C2A382;     /* 梦侧线色（暖沙） */
+  --umber:#8A6A4F;     /* 深处暖墨 */
+  --amber:#D9A05B;     /* 锚点光，全站唯一的异质色，用在极少处 */
+  --seam-angle:14deg;
+  --read:0;
+  --warmA:calc(.068 + var(--read)*.092);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  background:var(--paper);
+  color:var(--ink);
+  font-family:'Noto Serif SC','Songti SC','SimSun',serif;
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+  overflow-x:hidden;
+}
+::selection{background:rgba(217,160,91,.28)}
+a{color:inherit}
+:focus-visible{outline:1px solid var(--amber);outline-offset:4px}
+/* 浏览器自带面：滚动条也归调色板管 */
+::-webkit-scrollbar{width:10px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(89,98,108,.32);border:3px solid var(--paper);border-radius:6px}
+html{scrollbar-width:thin;scrollbar-color:rgba(89,98,108,.38) transparent}
+
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* ============ 底层：冷角气色 + 随滚动加深的暖侧光晕 ============ */
+.ambient{
+  position:fixed;inset:-10%;z-index:0;pointer-events:none;
+  background:
+    linear-gradient(284deg, rgba(185,198,210,calc(.10 - var(--read)*.04)) 0%, transparent 34%),
+    linear-gradient(104deg, transparent 46%, rgba(227,201,168,var(--warmA)) 76%, rgba(227,201,168,calc(var(--warmA)*.7)) 100%);
+}
+/* 纸面颗粒 */
+.noise{
+  position:fixed;inset:0;z-index:30;pointer-events:none;opacity:.05;mix-blend-mode:multiply;
+  background:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='160' height='160' filter='url(%23n)' opacity='0.55'/></svg>");
+}
+
+/* ============ 醒梦缝：站级常量 ============ */
+.seam{
+  position:fixed;left:50%;top:36vh;width:170vmax;height:1px;z-index:1;
+  transform:translate(-50%,-50%) rotate(var(--seam-angle)) scaleX(var(--draw,1));
+  transform-origin:50% 50%;
+  background:linear-gradient(90deg, rgba(167,177,186,.0) 0%, var(--wake) 10%, #AFA898 55%, var(--dream) 100%);
+  opacity:.8;
+  transition:transform 1.15s cubic-bezier(.22,.8,.25,1), opacity .6s ease;
+}
+.seam .glow{
+  position:absolute;left:52%;right:0;top:-55px;height:110px;
+  background:linear-gradient(90deg, transparent, rgba(217,160,91,calc(.10 + var(--read)*.10)) 55%, rgba(217,160,91,calc(.13 + var(--read)*.10)) 82%, transparent);
+  filter:blur(16px);
+  opacity:calc(.5 + var(--read)*.5);
+}
+.seam .anchor{
+  position:absolute;top:50%;left:46%;
+  width:8px;height:8px;border-radius:50%;
+  background:var(--amber);
+  box-shadow:0 0 0 4px rgba(217,160,91,.16), 0 0 16px 2px rgba(217,160,91,.38);
+  transform:translate(-50%,-50%);
+  transition:left .45s cubic-bezier(.25,.7,.3,1), opacity .6s ease;
+}
+/* 页脚：锚点在缝的末端呼吸 */
+body.deep .anchor{animation:breathe 4.6s ease-in-out infinite}
+@keyframes breathe{
+  0%,100%{box-shadow:0 0 0 0 rgba(217,160,91,.20), 0 0 14px 2px rgba(217,160,91,.26)}
+  50%{box-shadow:0 0 0 9px rgba(217,160,91,0), 0 0 22px 4px rgba(217,160,91,.44)}
+}
+
+/* ============ 页头：刊名 + 磨砂导航 ============ */
+.mast{
+  position:fixed;left:clamp(20px,3vw,44px);top:26px;z-index:40;
+  font-size:15px;font-weight:700;letter-spacing:.34em;color:var(--ink);
+  transition:opacity .6s ease;
+}
+/* 离开首屏后刊名淡出：巨字「醒梦」才是主页的刊名，避免与段落标题挤在左上角 */
+body.past-hero .mast{opacity:0;pointer-events:none}
+.mast small{
+  display:block;margin-top:5px;
+  font-size:9.5px;font-weight:300;letter-spacing:.42em;color:var(--ink-soft);
+}
+.nav{
+  position:fixed;top:22px;right:24px;z-index:40;
+  display:flex;gap:2px;padding:4px;border-radius:999px;
+  background:rgba(236,238,241,.55);
+  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+  border:1px solid rgba(38,44,51,.08);
+  transition:opacity .8s ease .65s;
+}
+.nav a{
+  font-size:12.5px;letter-spacing:.14em;color:var(--ink-soft);
+  text-decoration:none;padding:6px 13px;border-radius:999px;
+  transition:color .3s, background .3s;
+}
+.nav a:hover{color:var(--ink);background:rgba(255,255,255,.6)}
+
+/* ============ 第一屏：醒 / 梦 分立缝线两侧 ============ */
+.hero{
+  position:relative;height:100vh;min-height:620px;z-index:10;
+  cursor:crosshair;
+}
+.hero a,.hero .nav{cursor:pointer}
+:root{
+  --gfs:clamp(140px,18.5vw,240px);
+  /* 醒：底边与缝在其左缘处保持 24px 间距（缝左缘 y = 36vh + 6vw·tan14°） */
+  --wakeTop:calc(36vh + 1.5vw - var(--gfs) - 24px);
+  /* 梦：顶边与缝在其右缘处保持 26px 间距 */
+  --dreamTop:calc(36vh + (var(--gfs) - 33vw)*0.2493 + 26px);
+}
+.giant{
+  position:absolute;font-weight:900;line-height:1;color:var(--ink);
+  transition:opacity .9s ease, transform .9s cubic-bezier(.22,.8,.25,1);
+}
+.giant.wake{left:56vw;top:var(--wakeTop);font-size:var(--gfs)}
+.giant.dream{left:17vw;top:var(--dreamTop);font-size:var(--gfs);color:#453B30}
+.vsub{
+  position:absolute;left:calc(56vw + var(--gfs) + 30px);top:var(--wakeTop);
+  writing-mode:vertical-rl;font-size:13px;font-weight:300;
+  letter-spacing:.52em;color:var(--ink-soft);
+  transition:opacity .9s ease .2s;
+}
+.vlat{
+  position:absolute;left:calc(17vw - 30px);top:var(--dreamTop);
+  writing-mode:vertical-rl;font-size:10.5px;font-weight:300;
+  letter-spacing:.4em;color:var(--ink-soft);opacity:.8;
+  transition:opacity .9s ease .3s;
+}
+.hero-quote{
+  position:absolute;left:17vw;top:calc(var(--dreamTop) + var(--gfs) + 40px);
+  max-width:30em;font-size:15px;font-weight:300;letter-spacing:.06em;
+  line-height:2.05;color:var(--ink-soft);
+  transition:opacity .9s ease .4s;
+}
+.hero-quote b{font-weight:500;color:var(--ink)}
+.hero-quote small{
+  display:block;margin-top:1.1em;font-size:12px;letter-spacing:.2em;
+}
+.hint{
+  position:absolute;right:6vw;bottom:7vh;
+  font-size:13px;font-weight:300;letter-spacing:.26em;color:var(--ink-soft);
+  transition:opacity .9s ease .6s;
+}
+.hint i{
+  display:inline-block;width:24px;height:2px;background:var(--amber);
+  opacity:.5;transform:rotate(calc(var(--seam-angle) * -1));
+  vertical-align:middle;margin-right:12px;
+}
+/* 落针提示：右缘竖排微字，指向首屏的交互 */
+.fellcue{
+  position:absolute;right:clamp(14px,2.8vw,42px);top:56vh;
+  writing-mode:vertical-rl;font-size:11px;font-weight:300;
+  letter-spacing:.42em;color:var(--ink-soft);
+  transition:opacity .9s ease .75s;
+}
+.stitchcount{
+  position:absolute;right:6vw;bottom:calc(7vh + 34px);min-height:1.2em;
+  font-size:12.5px;font-weight:300;letter-spacing:.18em;color:var(--ink-soft);
+  text-align:right;max-width:16em;
+}
+/* 落针：访客亲手缝下的针脚 */
+.fells{position:absolute;inset:0;pointer-events:none}
+.fell{
+  position:absolute;width:42px;height:1px;
+  transform-origin:0 50%;transform:rotate(var(--seam-angle)) scaleX(0);
+  background:linear-gradient(90deg, var(--wake), var(--dream));
+  opacity:.85;transition:transform .45s cubic-bezier(.22,.8,.25,1);
+}
+.fell::after{
+  content:"";position:absolute;right:-2px;top:50%;
+  width:5px;height:5px;background:var(--paper);
+  border:1px solid var(--dream);
+  transform:translateY(-50%) rotate(45deg);
+  opacity:0;transition:opacity .3s ease .25s;
+}
+.fell.on{transform:rotate(var(--seam-angle)) scaleX(1)}
+.fell.on::after{opacity:1}
+
+/* ============ 主体：各站沿缝的角度错落下行 ============ */
+main{position:relative;z-index:10;padding:6vh 0 0}
+.station{
+  position:relative;margin:0 0 24vh var(--shift);
+  max-width:600px;scroll-margin-top:0;
+  opacity:0;transform:translateY(16px);
+  transition:opacity .8s ease, transform .8s cubic-bezier(.22,.8,.25,1);
+}
+.station.in{opacity:1;transform:none}
+#secProjects{--shift:clamp(24px,7vw,130px)}
+#secEssays{--shift:clamp(24px,26vw,470px)}
+#secAbout{--shift:clamp(24px,40vw,730px)}
+#secLab{--shift:clamp(24px,16vw,300px)}
+
+/* 站头：一道针脚 + 一个结（与内页同构） */
+.stitchwrap{position:relative;height:calc(var(--tfs,32px) * 1.5 + 34px);width:230px}
+.stitch{
+  position:absolute;left:0;width:186px;height:1px;
+  top:calc(var(--tfs,32px) * 1.5 + 14px);
+  transform-origin:0 50%;
+  transform:rotate(var(--seam-angle)) scaleX(var(--draw,1));
+  background:linear-gradient(90deg, var(--wake), #AFA898 55%, var(--dream));
+  opacity:.75;transition:transform .9s cubic-bezier(.22,.8,.25,1), opacity .35s ease;
+}
+.knot{
+  position:absolute;left:181px;top:calc(var(--tfs,32px) * 1.5 + 59px);
+  width:10px;height:10px;
+  transform:translate(-50%,-50%) rotate(45deg);
+  background:var(--paper);border:1px solid var(--ink-soft);
+  transition:background .35s, border-color .35s, box-shadow .35s;
+}
+.station:hover .stitch{opacity:1}
+.station:hover .knot,
+.knot.lit{
+  background:var(--amber);border-color:var(--amber);
+  box-shadow:0 0 0 5px rgba(217,160,91,.14), 0 0 14px rgba(217,160,91,.35);
+}
+.tagname{
+  position:absolute;left:0;top:0;margin:0;
+  font-size:var(--tfs,32px);font-weight:var(--tfw,700);
+  letter-spacing:.06em;line-height:1.5;color:var(--ink);white-space:nowrap;
+}
+.tagname small{
+  font-size:12px;font-weight:300;letter-spacing:.24em;
+  color:var(--ink-soft);margin-left:.9em;
+}
+.secbrief{
+  max-width:33em;font-size:14.5px;font-weight:300;letter-spacing:.06em;
+  color:var(--ink-soft);line-height:2.05;margin:0 0 7vh;
+}
+.secbrief b{font-weight:500;color:var(--ink)}
+.secbrief.post{margin:10vh 0 0 186px}
+
+/* ---- 醒侧 · 项目账目：绝对静止，经得起醒来看 ---- */
+.ledger{list-style:none}
+.row{
+  display:grid;grid-template-columns:64px 1fr auto;gap:22px;
+  padding:26px 0;border-top:1px solid rgba(38,44,51,.14);
+}
+.row:last-child{border-bottom:1px solid rgba(38,44,51,.14)}
+.row .no{
+  font-size:12.5px;letter-spacing:.14em;color:var(--ink-soft);
+  font-variant-numeric:tabular-nums;padding-top:5px;
+}
+.row h3{font-size:18px;font-weight:700;letter-spacing:.04em;line-height:1.5}
+.row h3 a{
+  text-decoration:none;border-bottom:1px solid transparent;padding-bottom:2px;
+  transition:border-color .3s;
+}
+.row h3 a:hover{border-bottom-color:rgba(217,160,91,.6)}
+.row .desc{
+  font-size:13.5px;font-weight:300;letter-spacing:.04em;
+  color:var(--ink-soft);line-height:1.9;margin-top:6px;
+}
+.meter{display:flex;gap:8px;margin-top:15px}
+.meter i{
+  width:15px;height:1px;background:rgba(38,44,51,.15);
+  transform:rotate(calc(var(--seam-angle) * -1));
+}
+.meter i.on{
+  background:linear-gradient(90deg, var(--wake), var(--dream));opacity:.85;
+}
+.meter-note{
+  display:inline-block;margin-left:14px;font-size:11px;font-weight:300;
+  letter-spacing:.18em;color:var(--ink-soft);opacity:.85;
+  font-variant-numeric:tabular-nums;
+}
+.st{
+  display:inline-flex;align-items:center;gap:9px;
+  font-size:12px;letter-spacing:.22em;color:var(--ink-soft);padding-top:7px;
+  white-space:nowrap;
+}
+.st::before{
+  content:"";width:7px;height:7px;flex:none;
+  transform:rotate(45deg);border:1px solid var(--ink-soft);
+}
+.st.solid::before{background:var(--ink-soft)}
+
+/* ---- 梦侧 · 随笔：字在轻轻浮动，还没完全醒。头→挑线→列表直接相连，导语作收束 ---- */
+.arts{position:relative;list-style:none;margin:2.8em 0 0 186px}
+.arts::before{
+  content:"";position:absolute;left:-5px;top:-2.8em;width:1px;height:2.8em;
+  background:linear-gradient(rgba(38,44,51,.42), rgba(38,44,51,.10));
+}
+.arts li{
+  margin-bottom:1.4em;
+  animation:drift var(--d,10s) ease-in-out var(--dl,0s) infinite alternate;
+}
+@keyframes drift{from{transform:translateY(-2.5px)}to{transform:translateY(2.5px)}}
+.arts a{
+  display:inline-block;text-decoration:none;
+  font-size:16.5px;font-weight:500;letter-spacing:.02em;color:var(--ink);
+  border-bottom:1px solid transparent;padding-bottom:2px;
+  transition:border-color .3s, color .3s;
+}
+.arts a:hover{border-bottom-color:rgba(217,160,91,.6)}
+.arts time{
+  font-size:12.5px;font-weight:300;letter-spacing:.12em;
+  color:var(--ink-soft);margin-left:1.2em;
+  font-variant-numeric:tabular-nums;white-space:nowrap;
+}
+
+/* ---- 关于：缝上的结。滚到这里，锚点会走到结上 ---- */
+#secAbout{min-height:64vh;margin-bottom:12vh}
+.bigknot{
+  position:absolute;left:calc(8vw - 5px);top:calc(36vh - .5vw - 5px);
+  width:11px;height:11px;z-index:11;
+  transform:translate(0,0) rotate(45deg);
+  background:var(--paper);border:1px solid var(--ink-soft);
+  transition:background .5s, border-color .5s, box-shadow .5s;
+}
+/* 锚点停在这段时，结点亮 */
+.bigknot.lit{
+  background:var(--amber);border-color:var(--amber);
+  box-shadow:0 0 0 6px rgba(217,160,91,.13), 0 0 18px rgba(217,160,91,.4);
+}
+.about-body{margin-top:calc(36vh + 5vh)}
+.about-body h2{
+  font-size:34px;font-weight:900;letter-spacing:.08em;
+}
+.about-body h2 small{
+  font-size:12.5px;font-weight:300;letter-spacing:.3em;
+  color:var(--ink-soft);margin-left:1em;
+}
+.about-body p{
+  margin-top:2.2em;max-width:30em;
+  font-size:15px;font-weight:300;letter-spacing:.06em;
+  line-height:2.1;color:var(--ink-soft);
+}
+.about-body p b{font-weight:500;color:var(--ink)}
+.about-link{
+  display:inline-flex;align-items:center;gap:.9em;margin-top:3.4em;
+  font-size:15px;letter-spacing:.16em;text-decoration:none;color:var(--ink);
+  border-bottom:1px solid rgba(38,44,51,.22);padding-bottom:.4em;
+  transition:border-color .3s;
+}
+.about-link::before{
+  content:"";width:20px;height:1px;background:var(--amber);opacity:.55;
+  transform:rotate(calc(var(--seam-angle) * -1));
+}
+.about-link:hover{border-color:var(--amber)}
+
+/* ---- 试验场：垂下的游丝 ---- */
+.labwrap{position:relative;height:330px;margin-top:8vh}
+.labbar{
+  position:absolute;left:0;top:14px;width:min(560px,80vw);height:1px;
+  transform-origin:0 50%;transform:rotate(6.2deg);
+  background:linear-gradient(90deg, rgba(167,177,186,.2), var(--wake) 22%, #AFA898 55%, var(--dream));
+  opacity:.7;
+}
+.thread{
+  position:absolute;width:1px;height:var(--h);
+  transform-origin:50% 0;
+  background:linear-gradient(180deg, rgba(89,98,108,.55), rgba(194,163,130,.85));
+  animation:swayT var(--dur,7s) ease-in-out infinite alternate;
+  transition:opacity .3s;
+}
+@keyframes swayT{from{transform:rotate(-1.7deg)}to{transform:rotate(1.7deg)}}
+.thread:hover{animation-duration:1.5s}
+.thread .tag{
+  position:absolute;left:12px;bottom:-6px;
+  font-size:12.5px;font-weight:300;letter-spacing:.2em;
+  color:var(--ink-soft);white-space:nowrap;
+  transition:color .3s;
+}
+.thread:hover .tag{color:var(--ink)}
+.thread.bare{opacity:.45}
+.lab-note{
+  margin-top:2.4em;font-size:12.5px;font-weight:300;
+  letter-spacing:.18em;color:var(--ink-soft);
+}
+
+/* ============ 收针 ============ */
+footer{
+  position:relative;z-index:10;
+  padding:20vh 8vw 12vh;text-align:right;
+}
+.end1{font-size:15px;letter-spacing:.3em;color:var(--ink)}
+.end2{
+  margin-top:1.3em;font-size:13px;font-weight:300;
+  letter-spacing:.22em;color:var(--ink-soft);
+}
+.endq{
+  margin-top:8vh;font-size:15px;font-weight:300;
+  letter-spacing:.1em;line-height:2;color:var(--ink-soft);
+}
+.colophon{
+  margin-top:10vh;font-size:12.5px;font-weight:300;
+  letter-spacing:.14em;color:var(--ink-soft);
+}
+.colophon a{
+  text-decoration:none;margin-left:1.6em;
+  border-bottom:1px solid rgba(38,44,51,.2);padding-bottom:2px;
+  transition:border-color .3s;
+}
+.colophon a:hover{border-color:var(--amber)}
+.colophon .fn{white-space:nowrap}
+
+/* 调试角标（仅 ?debug=1 出现） */
+.dbg{
+  position:fixed;left:10px;bottom:10px;z-index:60;
+  font-size:11px;letter-spacing:.08em;color:var(--ink-soft);
+  background:rgba(236,238,241,.7);padding:4px 8px;border-radius:4px;
+}
+
+/* ============ 入场编排 ============ */
+html.boot{--draw:.02}
+html.boot .seam{opacity:0}
+html.boot .giant{opacity:0;transform:translateY(20px)}
+html.boot .giant.wake{transition-delay:.4s}
+html.boot .giant.dream{transition-delay:.62s}
+html.boot .vsub,html.boot .vlat,html.boot .hero-quote,html.boot .hint,
+html.boot .fellcue,html.boot .mast,html.boot .nav{opacity:0}
+html.boot .mast{transition:opacity .8s ease .55s}
+html.boot .vsub{transition-delay:.9s}
+html.boot .vlat{transition-delay:1s}
+html.boot .hero-quote{transition-delay:1.05s}
+html.boot .hint{transition-delay:1.3s}
+
+/* ============ 响应式 ============ */
+@media (max-width:760px){
+  :root{
+    --gfs:clamp(104px,34vw,150px);
+    --wakeTop:calc(30vh - .5vw - var(--gfs) - 18px);
+    --dreamTop:calc(30vh - 2.5vw + 20px);
+  }
+  .seam{top:30vh}
+  .mast{left:16px;top:16px}
+  .mast small{display:none}
+  .nav{top:14px;right:14px}
+  .nav a{font-size:11.5px;padding:5px 9px;letter-spacing:.08em}
+  .giant.wake{left:48vw}
+  .giant.dream{left:6vw}
+  .vsub{
+    writing-mode:horizontal-tb;
+    left:6vw;top:calc(var(--dreamTop) + var(--gfs) + 36px);
+    letter-spacing:.4em;
+  }
+  .vlat{display:none}
+  .hero-quote{left:6vw;top:calc(var(--dreamTop) + var(--gfs) + 76px);font-size:14px}
+  .hint{right:auto;left:6vw;bottom:6vh}
+  .fellcue{right:12px;top:44vh;letter-spacing:.3em}
+  .stitchcount{right:auto;left:6vw;text-align:left;bottom:calc(6vh + 32px)}
+  .station{margin-left:calc(var(--shift) * .12);margin-bottom:18vh;max-width:100%}
+  .stitchwrap{width:170px}
+  .stitch{width:132px}
+  .knot{left:127px}
+  .arts{margin-left:132px}
+  .arts a{font-size:15.5px}
+  .secbrief.post{margin-left:132px;margin-top:12vh}
+  .row{grid-template-columns:52px 1fr;gap:14px}
+  .st{grid-column:2;justify-self:start;padding-top:0;margin-top:4px}
+  #secAbout{min-height:56vh}
+  .bigknot{left:calc(48vw - 5px);top:calc(30vh - .5vw - 5px)}
+  .about-body{margin-top:calc(30vh + 7vh)}
+  .labwrap{height:280px;margin-top:6vh}
+  footer{text-align:left;padding:16vh 6vw 10vh}
+  .colophon{line-height:2.3}
+  .colophon .fn{display:block;margin-top:.4em}
+  .colophon a{margin-left:0;margin-right:1.4em}
+}
+
+/* ============ 动效克制 ============ */
+@media (prefers-reduced-motion: reduce){
+  html{scroll-behavior:auto}
+  .seam,.anchor,.stitch,.knot,.station,.giant,.thread,.fell{transition:none}
+  .arts li,.thread{animation:none}
+  body.deep .anchor{animation:none}
+}
+html.rm .seam,html.rm .anchor,html.rm .stitch,html.rm .knot,
+html.rm .station,html.rm .giant,html.rm .thread,html.rm .fell{transition:none}
+html.rm .arts li,html.rm .thread,html.rm body.deep .anchor{animation:none}
+/* 验收静帧模式：?still=1&pin=0..1 —— 一切落定终值 */
+html.still{scroll-behavior:auto}
+html.still *{transition:none!important;animation:none!important}
+html.still .station{opacity:1;transform:none}
+html.still .giant,html.still .vsub,html.still .vlat,html.still .hero-quote,
+html.still .hint,html.still .fellcue,html.still .nav{opacity:1;transform:none}
+html.still .fell{transform:rotate(var(--seam-angle)) scaleX(1)}
+html.still .fell::after{opacity:1}
+</style>
+</head>
+<body>
+
+<div class="ambient"></div>
+<div class="noise"></div>
+
+<!-- 醒梦缝：站级常量 -->
+<div class="seam" id="seam" aria-hidden="true">
+  <i class="glow"></i>
+  <i class="anchor" id="anchor"></i>
+</div>
+
+<header class="mast">醒梦<small>XINGMENG</small></header>
+
+<nav class="nav" aria-label="站内导航">
+  <a href="#secProjects">项目</a>
+  <a href="#secEssays">随笔</a>
+  <a href="#secAbout">关于</a>
+  <a href="#secLab">试验场</a>
+</nav>
+
+<!-- ================= 第一屏：醒 / 梦 分立缝线两侧 ================= -->
+<section class="hero" id="hero" aria-label="醒梦 · 首屏">
+  <h1 class="mark">
+    <span class="giant wake" id="charWake">醒</span><span class="giant dream" id="charDream">梦</span><span class="sr">——在醒与梦之间</span>
+  </h1>
+  <p class="vsub">在醒与梦之间</p>
+  <p class="vlat">XINGMENG · MMXXVI</p>
+  <p class="hero-quote">
+    已经意识到自己在做梦，<b>却仍停留在梦里</b>；已经醒来，
+    还留着梦里的感受与残影。<br>
+    这里是那条缝开始的地方——往下走，针脚会带你穿过整座站。
+    <small>—— 醒梦审美简报</small>
+  </p>
+  <p class="hint"><i></i>顺着针脚，往下走</p>
+  <p class="fellcue">点一下 · 落一针</p>
+  <p class="stitchcount" id="stitchCount" aria-live="polite"></p>
+  <div class="fells" id="fells" aria-hidden="true"></div>
+</section>
+
+<main>
+  <!-- ================= 醒侧 · 项目账目 ================= -->
+  <section class="station" id="secProjects" style="--tfs:38px;--tfw:900">
+    <div class="stitchwrap">
+      <div class="stitch"></div><i class="knot"></i>
+      <h2 class="tagname">项目<small>两项 · 账目</small></h2>
+    </div>
+    <p class="secbrief">
+      醒着的时候，把梦见过的，一件件兑现。这一侧的东西<b>不浮动</b>——
+      账目要经得起醒来以后再看。
+    </p>
+    <ol class="ledger">
+      <li class="row">
+        <span class="no">PRJ-01</span>
+        <div>
+          <h3><a href="#" title="示例稿不接路由">这个网站本身</a></h3>
+          <p class="desc">Astro 与智能体共建；「醒梦」审美的第一次完整落地，含标签、归档与相邻文章。</p>
+          <div class="meter" aria-label="施工进度：八针里缝了四针">
+            <i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i>
+            <span class="meter-note">四 / 八针</span>
+          </div>
+        </div>
+        <span class="st solid">在建</span>
+      </li>
+      <li class="row">
+        <span class="no">PRJ-02</span>
+        <div>
+          <h3><a href="#" title="示例稿不接路由">醒梦 · 视觉母题探索</a></h3>
+          <p class="desc">为醒梦寻找能反复出现的核心意象：花、水面、细线、帷幕——直到某个意象自己站出来。</p>
+          <div class="meter" aria-label="施工进度：八针里缝了一针">
+            <i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+            <span class="meter-note">一 / 八针</span>
+          </div>
+        </div>
+        <span class="st">构想中</span>
+      </li>
+    </ol>
+  </section>
+
+  <!-- ================= 梦侧 · 随笔针脚 ================= -->
+  <section class="station" id="secEssays" style="--tfs:38px;--tfw:900">
+    <div class="stitchwrap">
+      <div class="stitch"></div><i class="knot"></i>
+      <h2 class="tagname">随笔<small>三篇 · 残影</small></h2>
+    </div>
+    <ul class="arts">
+      <li style="--d:9.5s;--dl:0s"><a href="#" title="示例稿不接路由">与智能体一起造一个网站</a><time>2026 年 9 月 19 日</time></li>
+      <li style="--d:11.5s;--dl:1.4s"><a href="#" title="示例稿不接路由">开站：在醒与梦之间</a><time>2026 年 9 月 19 日</time></li>
+      <li style="--d:10s;--dl:2.8s"><a href="#" title="示例稿不接路由">母题探索记录：从碎块到花</a><time>2026 年 9 月 19 日</time></li>
+    </ul>
+    <p class="secbrief post">
+      醒时落笔，记下的都是梦的残影。这一侧的字在<b>轻轻浮动</b>——
+      它们还没有完全醒，也不打算醒。
+    </p>
+  </section>
+
+  <!-- ================= 关于：缝上的结 ================= -->
+  <section class="station" id="secAbout">
+    <i class="bigknot" aria-hidden="true"></i>
+    <div class="about-body">
+      <h2>关于<small>缝上的结</small></h2>
+      <p>
+        执针的人：在<b>醒侧</b>做工程，在<b>梦侧</b>写字。
+        把两边缝在一起的那条线，叫醒梦。滚到这里的时候，
+        缝上的锚点会走过来，停在这个结上。
+      </p>
+      <a class="about-link" href="#" title="示例稿不接路由">展开执针人的档案</a>
+    </div>
+  </section>
+
+  <!-- ================= 试验场：垂下的游丝 ================= -->
+  <section class="station" id="secLab" style="--tfs:34px;--tfw:700">
+    <div class="stitchwrap">
+      <div class="stitch"></div><i class="knot"></i>
+      <h2 class="tagname">试验场<small>游丝 · 三根</small></h2>
+    </div>
+    <p class="secbrief">
+      没有缝进正文的线头，从缝的末端垂下来。它们还会轻轻摆——
+      <b>够得着的，将来都能玩</b>。
+    </p>
+    <div class="labwrap" role="img" aria-label="三根垂下的线头与一根空线头">
+      <div class="labbar" aria-hidden="true"></div>
+      <div class="thread" style="--h:168px;--dur:7.4s;left:0;top:14px">
+        <span class="tag">缝线演示 · 把这条缝演示给你看</span>
+      </div>
+      <div class="thread" style="--h:132px;--dur:6.3s;left:140px;top:29px">
+        <span class="tag">醒梦时钟 · 按醒梦计时</span>
+      </div>
+      <div class="thread" style="--h:104px;--dur:8.1s;left:280px;top:44px">
+        <span class="tag">纸上花园 · 种一朵不谢的花</span>
+      </div>
+      <div class="thread bare" style="--h:64px;--dur:9s;left:420px;top:59px"></div>
+    </div>
+    <p class="lab-note">最短的那根是空线头，留给还没梦见的东西。</p>
+  </section>
+</main>
+
+<!-- ================= 收针 ================= -->
+<footer>
+  <p class="end1">针脚到这里暂歇。</p>
+  <p class="end2">下一针，会从梦的那一侧缝进来。</p>
+  <p class="endq">「世界应当始终保留一种感觉：它可能马上消失。」</p>
+  <p class="colophon">
+    © MMXXVI 醒梦 · 在醒与梦之间
+    <span class="fn">
+      <a href="#" title="示例稿不接路由">随笔</a>
+      <a href="#" title="示例稿不接路由">项目</a>
+      <a href="#" title="示例稿不接路由">关于</a>
+      <a href="#" title="示例稿不接路由">试验场</a>
+    </span>
+  </p>
+</footer>
+
+<script>
+(function(){
+  var doc = document.documentElement;
+  var body = document.body;
+
+  /* ---- 验收钩子：错误外露 ---- */
+  window.__swarmErr = 'none';
+  window.addEventListener('error', function(e){
+    window.__swarmErr = String(e.message || 'error').slice(0, 200);
+  });
+  var _ce = console.error;
+  console.error = function(){
+    window.__swarmErr = 'console.error';
+    try{ _ce.apply(console, arguments); }catch(_){}
+  };
+
+  /* ---- 验收参数：?still=1&pin=0..1 静帧；?debug=1 角标 ---- */
+  var Q = new URLSearchParams(location.search);
+  var STILL = Q.get('still') === '1';
+  var PINS = Q.get('pin') || '0';
+  var PIN = parseFloat(PINS) || 0;
+  if (STILL){
+    doc.classList.add('still');
+    doc.classList.remove('boot');
+    doc.style.setProperty('--draw', '1');
+  }
+  if (Q.get('debug') === '1'){
+    var dbg = document.createElement('div');
+    dbg.className = 'dbg';
+    document.body.appendChild(dbg);
+    setInterval(function(){
+      var p = Math.max(0, Math.min(1, scrollY / Math.max(1, doc.scrollHeight - innerHeight)));
+      dbg.textContent = 'cls=' + doc.className +
+        ' · err=' + window.__swarmErr +
+        ' · sy=' + Math.round(window.pageYOffset || 0) +
+        ' · sh=' + doc.scrollHeight + ' · ih=' + innerHeight +
+        ' · iw=' + innerWidth + ' · p=' + p.toFixed(2);
+    }, 400);
+  }
+
+  function el(id){ return document.getElementById(id); }
+  var seam = el('seam');
+  var anchor = el('anchor');
+  var ANG = 14 * Math.PI / 180;
+  var hoverP = null;
+  var baseT = null;
+  /* 站头的结们：进入阅读带（14%–60% 视口高）即成为锚点的停靠位 */
+  var knotTargets = Array.prototype.map.call(
+    document.querySelectorAll('.station .knot, .bigknot'),
+    function(k){ return k; }
+  );
+
+  function geom(){
+    var r = seam.getBoundingClientRect();
+    return {
+      cx:(r.left + r.right)/2,
+      cy:(r.top + r.bottom)/2,
+      L:seam.offsetWidth,
+      ux:Math.cos(ANG),
+      uy:Math.sin(ANG)
+    };
+  }
+  function project(g, px, py){
+    return (((px - g.cx) * g.ux + (py - g.cy) * g.uy) / g.L + 0.5);
+  }
+  function setAnchor(p){
+    anchor.style.left = (Math.max(0, Math.min(1, p)) * 100) + '%';
+  }
+  /* 首屏：锚点停在醒 / 梦两字的缝间中点上 */
+  function heroT(){
+    var w = el('charWake').getBoundingClientRect();
+    var d = el('charDream').getBoundingClientRect();
+    var mx = (w.left + w.width/2 + d.left + d.width/2) / 2;
+    var my = (w.top + w.height/2 + d.top + d.height/2) / 2;
+    return project(geom(), mx, my);
+  }
+
+  function update(){
+    var g = geom();
+    if (baseT == null){
+      try{ baseT = heroT(); }catch(_){ baseT = 0.46; }
+    }
+    var max = Math.max(1, doc.scrollHeight - innerHeight);
+    var sy = window.pageYOffset || doc.scrollTop || 0;
+    var p = Math.max(0, Math.min(1, sy / max));
+    doc.style.setProperty('--read', p.toFixed(3));
+    /* 离开首屏：刊名淡出（巨字即刊名），回顶再淡入 */
+    body.classList.toggle('past-hero', sy > innerHeight * 0.5);
+
+    var t;
+    var focus = null, focusDist = Infinity;
+    Array.prototype.forEach.call(knotTargets, function(k){
+      var kr = k.getBoundingClientRect();
+      if (kr.top > innerHeight * 0.05 && kr.top < innerHeight * 0.62){
+        var d = Math.abs(kr.top - innerHeight * 0.37);
+        if (d < focusDist){ focusDist = d; focus = k; }
+      }
+    });
+    Array.prototype.forEach.call(knotTargets, function(k){
+      k.classList.toggle('lit', k === focus);
+    });
+    if (focus){
+      /* 有站头的结停在阅读带：锚点走过去，停在这个结上 */
+      var fr = focus.getBoundingClientRect();
+      t = project(g, fr.left + fr.width/2, fr.top + fr.height/2);
+    } else {
+      t = baseT + (0.88 - baseT) * p;
+    }
+    if (hoverP != null) t = hoverP;
+    setAnchor(t);
+    body.classList.toggle('deep', p > 0.9);
+  }
+
+  /* 悬停站头结：锚点光滑过去 */
+  Array.prototype.forEach.call(document.querySelectorAll('.station .knot, .bigknot'), function(k){
+    var host = k.closest('.station') || k;
+    host.addEventListener('mouseenter', function(){
+      var kr = k.getBoundingClientRect();
+      hoverP = project(geom(), kr.left + kr.width/2, kr.top + kr.height/2);
+      setAnchor(hoverP);
+    });
+    host.addEventListener('mouseleave', function(){
+      hoverP = null;
+      update();
+    });
+  });
+
+  /* 落针：在首屏亲手缝一针 */
+  var hero = el('hero');
+  var fells = el('fells');
+  var counter = el('stitchCount');
+  var n = 0;
+  var caps = {
+    1:'你落了第一针。',
+    2:'两针。',
+    3:'三针——这一页开始有你的针脚。',
+    5:'五针，缝得很稳。',
+    7:'七针。针脚够密了，往下走吧。'
+  };
+  hero.addEventListener('click', function(e){
+    if (e.target.closest('a, button, nav, .mast')) return;
+    var hr = hero.getBoundingClientRect();
+    var f = document.createElement('i');
+    f.className = 'fell';
+    f.style.left = (e.clientX - hr.left - 4) + 'px';
+    f.style.top  = (e.clientY - hr.top) + 'px';
+    fells.appendChild(f);
+    requestAnimationFrame(function(){
+      requestAnimationFrame(function(){ f.classList.add('on'); });
+    });
+    n++;
+    if (caps[n]) counter.textContent = caps[n];
+    else if (n > 7) counter.textContent = caps[7];
+  });
+
+  /* 段落入场 */
+  var stations = document.querySelectorAll('.station');
+  if ('IntersectionObserver' in window && !STILL){
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(en){
+        if (en.isIntersecting){ en.target.classList.add('in'); io.unobserve(en.target); }
+      });
+    }, {threshold:0.12});
+    Array.prototype.forEach.call(stations, function(s){ io.observe(s); });
+  } else {
+    Array.prototype.forEach.call(stations, function(s){ s.classList.add('in'); });
+  }
+
+  /* 滚动 / 尺寸：rAF 节流 */
+  var ticking = false;
+  function onTick(){
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(function(){ ticking = false; update(); });
+  }
+  window.addEventListener('scroll', onTick, {passive:true});
+  window.addEventListener('resize', function(){ baseT = null; onTick(); });
+
+  /* 示例稿：内容链接不真的跳转 */
+  Array.prototype.forEach.call(document.querySelectorAll('a[title="示例稿不接路由"]'), function(a){
+    a.addEventListener('click', function(e){ e.preventDefault(); });
+  });
+
+  /* 揭幕 + 看门狗：不绑死 load（字体 CDN 挂起时 load 不触发），多重触发 + 硬兜底 */
+  function reveal(){
+    if (!STILL){
+      var unboot = function(){
+        setTimeout(function(){ doc.classList.remove('boot'); }, 60);
+      };
+      if (document.readyState === 'complete' || document.readyState === 'interactive') unboot();
+      else window.addEventListener('DOMContentLoaded', unboot);
+      window.addEventListener('load', unboot);
+      setTimeout(unboot, 1500);
+      setTimeout(function(){ doc.style.setProperty('--draw', '1'); }, 2600);
+    }
+    var settle = function(){
+      if (STILL){
+        var max = Math.max(1, doc.scrollHeight - innerHeight);
+        if (isNaN(parseFloat(PINS)) && el(PINS)){
+          /* ?pin=about / essays / projects / lab：把该段落滚到视口顶 */
+          var tr = el(PINS).getBoundingClientRect();
+          window.scrollTo(0, tr.top + (window.pageYOffset || doc.scrollTop || 0));
+        } else {
+          window.scrollTo(0, PIN * max);
+        }
+      }
+      update();
+    };
+    if (document.fonts && document.fonts.ready){
+      document.fonts.ready.then(function(){ baseT = null; settle(); });
+    }
+    settle();
+    if (STILL) setTimeout(settle, 250);
+  }
+  reveal();
+})();
+</script>
+</body>
+</html>

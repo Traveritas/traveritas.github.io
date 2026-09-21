@@ -1,0 +1,624 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>方案 G · 沉水花田（活体）</title>
+<style>
+  /* ═══ 概念 ═══（F 的活体版，按用户反馈重构）
+     不再是 SVG 插画，而是 Three.js 实时场景（Kage 语法）：
+     固定 WebGL 环境层 + DOM 编辑层；滚动驱动镜头缓推；
+     雾是合成器。纯抽象架空世界——没有椅子、没有桥，
+     只有：水面、上疏下盛的两片花场、雾中巨构柱列、漂的花瓣。
+     局部规则（材料化）：水上的花受这个世界的光（Lambert 受光），
+     水下的花自己发光（Basic 不受光）——醒被照亮，梦自体明亮。
+     柱列水上只有一扇微亮窗，水下亮着更多暖窗。
+     性能（按选型决议）：实例化网格、无阴影无后处理、DPR≤1.5、
+     环境动效 ~30fps、reduced-motion 静帧按需渲染、隐藏标签页暂停。 */
+
+  @font-face {
+    font-family: 'Noto Serif SC Web';
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url('https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/files/noto-serif-sc-chinese-simplified-500-normal.woff2') format('woff2');
+  }
+  @font-face {
+    font-family: 'Noto Serif SC Web';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url('https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/files/noto-serif-sc-chinese-simplified-600-normal.woff2') format('woff2');
+  }
+
+  :root {
+    --fog: #dfe7e2;
+    --ink: #2c3431;
+    --ink-soft: #55605c;
+    --ink-faint: #5f6a66;
+    --mist-ink: #46686a;
+    --font-display: 'Noto Serif SC Web', 'Noto Serif SC', 'Palatino Linotype', Georgia, 'Songti SC', SimSun, serif;
+    --font-body: system-ui, -apple-system, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: auto; }
+  body {
+    margin: 0;
+    font-family: var(--font-body);
+    color: var(--ink);
+    background: var(--fog);
+  }
+
+  /* 固定环境层 + 编辑层（Kage 三明治）；下面垫一段滚动长度驱动镜头 */
+  .stage {
+    position: fixed;
+    inset: 0;
+    overflow: clip;
+    background: linear-gradient(to bottom, #f4f6f1 0%, #e8ece3 26%, #d7e2d8 34%, #b9c9c1 100%);
+  }
+  .scroll-length { height: 85vh; }
+
+  canvas#gl { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+  /* 极轻暗角（不用后处理） */
+  .vignette {
+    position: absolute; inset: 0;
+    z-index: 2;
+    pointer-events: none;
+    background: radial-gradient(120% 90% at 50% 44%, transparent 62%, rgba(60, 82, 78, 0.10) 100%);
+  }
+
+  /* ── 编辑层：从画面中浮现 ── */
+  .rise { opacity: 0; transform: translateY(10px); animation: rise-in 1.3s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+  .rise.d1 { animation-delay: 0.15s; }
+  .rise.d2 { animation-delay: 0.45s; }
+  .rise.d3 { animation-delay: 0.7s; }
+  .rise.d4 { animation-delay: 1.0s; }
+  @keyframes rise-in {
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .manifesto {
+    position: absolute;
+    left: 8vw;
+    top: 9vh;
+    z-index: 10;
+    margin: 0;
+    font-family: var(--font-display);
+    line-height: 1.68;
+    letter-spacing: 0.02em;
+    color: var(--ink);
+    /* 雾衬：任何背景下保持可读（Kage 的 text-shadow 手法） */
+    text-shadow: 0 2px 26px rgba(244, 246, 241, 0.85), 0 0 10px rgba(244, 246, 241, 0.6);
+  }
+  .manifesto .l1 { display: block; font-size: clamp(1.6rem, 3.3vw, 3.1rem); font-weight: 600; }
+  .manifesto .l2 {
+    display: block;
+    font-size: clamp(0.9rem, 1.4vw, 1.25rem);
+    font-weight: 500;
+    letter-spacing: 0.28em;
+    color: var(--ink-faint);
+    margin-block: 0.55em 0.5em;
+  }
+  .manifesto .l3 { display: block; font-size: clamp(1.35rem, 2.8vw, 2.6rem); font-weight: 600; }
+
+  .brand {
+    position: absolute;
+    top: 4.5vh;
+    left: 4vw;
+    z-index: 10;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 1.02rem;
+    letter-spacing: 0.06em;
+    color: var(--ink);
+    text-decoration: none;
+    text-shadow: 0 1px 18px rgba(244, 246, 241, 0.9);
+  }
+  .brand .ring {
+    width: 11px; height: 11px;
+    border: 1.5px solid var(--mist-ink);
+    border-radius: 50%;
+    opacity: 0.85;
+  }
+
+  .nav {
+    position: absolute;
+    right: 3.4vw;
+    top: 24vh;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    gap: 2.3rem;
+  }
+  .nav a {
+    position: relative;
+    writing-mode: vertical-rl;
+    letter-spacing: 0.5em;
+    padding: 0.4rem 0.7rem;
+    color: var(--ink-soft);
+    text-decoration: none;
+    font-size: 0.95rem;
+    transition: color 0.18s ease;
+    text-shadow: 0 1px 16px rgba(244, 246, 241, 0.9);
+  }
+  .nav a::after {
+    content: '';
+    position: absolute;
+    top: 46%;
+    right: calc(100% + 0.35rem);
+    width: 1.3rem;
+    height: 1px;
+    background: rgba(70, 104, 106, 0.4);
+    transition: width 0.18s ease, background 0.18s ease;
+  }
+  .nav a:hover { color: var(--ink); }
+  .nav a:hover::after { width: 2rem; background: var(--mist-ink); }
+
+  .side-note {
+    position: absolute;
+    left: 3.2vw;
+    top: 13vh;
+    z-index: 10;
+    writing-mode: vertical-rl;
+    font-size: 0.8rem;
+    letter-spacing: 0.52em;
+    color: var(--ink-faint);
+    text-shadow: 0 0 10px rgba(244, 246, 241, 0.95), 0 0 4px rgba(244, 246, 241, 0.9);
+  }
+
+  /* 最近的随笔：浮在水面上的纸签 */
+  .floating-ledger {
+    position: absolute;
+    left: 26vw;
+    right: 16vw;
+    bottom: 6vh;
+    z-index: 10;
+  }
+  .floating-ledger h2 {
+    margin: 0 0 1rem;
+    font-family: var(--font-body);
+    font-weight: 500;
+    font-size: 0.82rem;
+    letter-spacing: 0.3em;
+    color: var(--ink-faint);
+    text-shadow: 0 1px 14px rgba(244, 246, 241, 0.9);
+  }
+  .slips { display: flex; gap: 1.2rem 1.8rem; align-items: flex-start; }
+  .slip {
+    position: relative;
+    display: block;
+    padding: 0.85rem 1rem 0.95rem;
+    background: rgba(250, 252, 249, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    /* 阴影与场景光一致：光从左上来，影落右下、短而带雾色 */
+    box-shadow: 5px 4px 10px -6px rgba(70, 104, 106, 0.32);
+    text-decoration: none;
+    overflow: clip;
+  }
+  .slip::after {
+    content: '';
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 38%;
+    background: linear-gradient(to bottom, transparent, rgba(154, 178, 172, 0.22));
+    pointer-events: none;
+  }
+  .slip:nth-child(1) { width: 13rem; transform: rotate(-1.2deg); }
+  .slip:nth-child(2) { width: 15.5rem; transform: rotate(0.7deg) translateY(10px); }
+  .slip:nth-child(3) { width: 12.5rem; transform: rotate(-0.5deg) translateY(3px); }
+  .slip .d {
+    display: block;
+    font-size: 0.72rem;
+    letter-spacing: 0.12em;
+    color: var(--ink-faint);
+    font-variant-numeric: tabular-nums;
+    margin-bottom: 0.35rem;
+  }
+  .slip .t {
+    display: block;
+    font-family: var(--font-display);
+    font-size: 0.98rem;
+    color: var(--ink);
+    line-height: 1.55;
+  }
+  .slip:hover .t { color: var(--mist-ink); }
+
+  /* WebGL 不可用：保留 DOM，世界退回静态渐变 */
+  .stage.no3d canvas#gl { display: none; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .rise { animation: none; opacity: 1; transform: none; }
+  }
+
+  @media (max-width: 760px) {
+    .manifesto { top: 10vh; left: 9vw; right: 16vw; }
+    .side-note { display: none; }
+    .nav {
+      position: static;
+      margin: 0.6rem 9vw 0;
+      flex-direction: row;
+      gap: 1.8rem;
+    }
+    .nav a { writing-mode: horizontal-tb; letter-spacing: 0.24em; font-size: 0.9rem; }
+    .nav a::after { display: none; }
+    .floating-ledger { position: static; margin: 2.8rem 9vw 8vh; }
+    .slips { flex-direction: column; gap: 0.9rem; }
+    .slip { width: 100%; transform: none; }
+    /* 窄屏：编辑层回到文档流（场景仍固定在背后） */
+    .stage { position: relative; min-height: 100dvh; }
+    .scroll-length { display: none; }
+    .stage::before { content: ''; display: block; height: 0; }
+    .manifesto { position: relative; top: 0; left: 0; right: 0; margin: 10vh 9vw 0; }
+  }
+</style>
+</head>
+<body>
+<div class="stage" id="stage">
+  <canvas id="gl" aria-hidden="true"></canvas>
+  <div class="vignette" aria-hidden="true"></div>
+
+  <!-- 编辑层（固定，覆盖在活体场景上） -->
+  <h1 class="manifesto rise">
+    <span class="l1">这里不是梦，也不是现实。</span>
+    <span class="l2">它是人在即将醒来时</span>
+    <span class="l3">看见的最后一层世界。</span>
+  </h1>
+
+  <a class="brand rise d1" href="/"><span class="ring" aria-hidden="true"></span>Traveritas</a>
+
+  <p class="side-note rise d2" aria-hidden="true">花开两遍　水里更盛</p>
+
+  <nav class="nav rise d2" aria-label="站内入口">
+    <a href="/articles/">随笔</a>
+    <a href="/projects/">项目</a>
+    <a href="/about/">关于</a>
+  </nav>
+
+  <section class="floating-ledger rise d3" aria-label="最近的随笔">
+    <h2>最近的随笔</h2>
+    <div class="slips">
+      <a class="slip" href="#">
+        <span class="d">2026.09.12</span>
+        <span class="t">母题探索记录</span>
+      </a>
+      <a class="slip" href="#">
+        <span class="d">2026.08.30</span>
+        <span class="t">关于“醒梦”的第一份笔记</span>
+      </a>
+      <a class="slip" href="#">
+        <span class="d">2026.08.11</span>
+        <span class="t">把网站做成一个房间</span>
+      </a>
+    </div>
+  </section>
+</div>
+<div class="scroll-length" aria-hidden="true"></div>
+
+<script src="vendor/three.min.js"></script>
+<script>
+/* ═══ 活体场景：沉水花田 ═══
+   确定性布局（LCG 种子固定），材料即规则：
+   水上 Lambert（受光＝醒）／水下 Basic（自明＝梦）。 */
+(function () {
+  if (!window.THREE) return;
+  var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  var seed = 42;
+  function rnd() { seed = (seed * 1664525 + 1013904223) % 4294967296; return seed / 4294967296; }
+  function pick(a) { return a[Math.floor(rnd() * a.length)]; }
+  function range(a, b) { return a + rnd() * (b - a); }
+
+  var canvas = document.getElementById('gl');
+  var renderer;
+  try {
+    renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: false });
+  } catch (e) {
+    document.getElementById('stage').classList.add('no3d');
+    return;
+  }
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+
+  var scene = new THREE.Scene();
+  var FOG = 0xdfe7e2;
+  scene.background = new THREE.Color(FOG);
+  scene.fog = new THREE.Fog(FOG, 15, 66);
+
+  var camera = new THREE.PerspectiveCamera(42, 1, 0.1, 200);
+
+  /* ── 光：天光偏冷、地光偏暖、一盏低角度晨光 ── */
+  scene.add(new THREE.HemisphereLight(0xf4f6f1, 0x9cb2ae, 0.95));
+  var sun = new THREE.DirectionalLight(0xfff2dd, 0.4);
+  sun.position.set(-4, 7, 5);
+  scene.add(sun);
+
+  /* ── 水面（微波动）与深底 ── */
+  var waterGeo = new THREE.PlaneGeometry(150, 150, 48, 48);
+  var water = new THREE.Mesh(waterGeo, new THREE.MeshLambertMaterial({
+    color: 0xa4bfc4, transparent: true, opacity: 0.46, side: THREE.DoubleSide
+  }));
+  water.rotation.x = -Math.PI / 2;
+  scene.add(water);
+
+  var floor = new THREE.Mesh(
+    new THREE.PlaneGeometry(150, 150),
+    new THREE.MeshLambertMaterial({ color: 0x5e7a76 })
+  );
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.y = -3.6;
+  scene.add(floor);
+
+  /* ── 花场 ──
+     花形：对顶双锥（上下两枚低锥拼成）——任何视角都是“一朵”，不退化为纸片 */
+  function blossomGeometry() {
+    var g = new THREE.Group();
+    var top = new THREE.ConeGeometry(0.72, 0.62, 6);
+    var bot = new THREE.ConeGeometry(0.72, 0.62, 6);
+    var geo = new THREE.BufferGeometry();
+    /* 用合并思路：直接给 InstancedMesh 一个双锥几何 */
+    var a = new THREE.ConeGeometry(0.72, 0.62, 6);
+    a.translate(0, 0.31, 0);
+    a.rotateX(Math.PI);              /* 上锥尖朝上 */
+    var b = new THREE.ConeGeometry(0.72, 0.62, 6);
+    b.rotateX(Math.PI);              /* 下锥尖朝下 */
+    b.translate(0, -0.31, 0);
+    return mergeGeos([a, b]);
+  }
+  /* r149 无 BufferGeometryUtils（min 版），手写最简合并：同为非索引 ConeGeometry */
+  function mergeGeos(list) {
+    var posArr = [], normArr = [];
+    list.forEach(function (g) {
+      var p = g.attributes.position, n = g.attributes.normal;
+      for (var i = 0; i < p.count; i++) {
+        posArr.push(p.getX(i), p.getY(i), p.getZ(i));
+        normArr.push(n.getX(i), n.getY(i), n.getZ(i));
+      }
+    });
+    var out = new THREE.BufferGeometry();
+    out.setAttribute('position', new THREE.Float32BufferAttribute(posArr, 3));
+    out.setAttribute('normal', new THREE.Float32BufferAttribute(normArr, 3));
+    return out;
+  }
+  var blossomGeo = blossomGeometry();
+  var stemGeo = new THREE.CylinderGeometry(0.012, 0.016, 1, 5);
+  var dummy = new THREE.Object3D();
+  var tmpColor = new THREE.Color();
+
+  function makeField(count, side) {
+    var blossom = new THREE.InstancedMesh(
+      blossomGeo,
+      side === 'above'
+        ? new THREE.MeshLambertMaterial({ color: 0xffffff })
+        : new THREE.MeshBasicMaterial({ color: 0xffffff }),
+      count
+    );
+    var stems = new THREE.InstancedMesh(
+      stemGeo,
+      side === 'above'
+        ? new THREE.MeshLambertMaterial({ color: 0x8ba39c })
+        : new THREE.MeshBasicMaterial({ color: 0x7e979b }),
+      count
+    );
+    var aboveColors = [0xd8c4c9, 0xe6e9df, 0xeef0ea, 0xc9c6b8];
+    /* 水下花整体提亮一档：穿过 0.46 的水后仍保得住暖性 */
+    var belowColors = [0xe8b898, 0xecbf87, 0xdfa8b6, 0xe2b277, 0xf0cbaa];
+    var deepColors  = [0xd8aec0, 0xccacba, 0xe8b898, 0xecbf87];
+    var data = [];
+    for (var i = 0; i < count; i++) {
+      var x, z, y, s, stemH;
+      if (side === 'above') {
+        /* 水上：稀疏冷调 */
+        x = range(-17, 17);
+        z = range(-44, -2);
+        stemH = range(0.25, 1.0);
+        y = stemH;
+        s = range(0.12, 0.26);
+        tmpColor.set(pick(aboveColors));
+      } else {
+        /* 水下：更盛暖调，贴近水面（透过水更可见），深处偏暖紫 */
+        x = range(-17, 17);
+        z = range(-50, -2);
+        y = range(-2.6, -0.06);
+        stemH = range(0.3, 1.4);
+        s = range(0.14, 0.32);
+        tmpColor.set(y < -1.4 ? pick(deepColors) : pick(belowColors));
+      }
+      blossom.setColorAt(i, tmpColor);
+      dummy.position.set(x, y, z);
+      dummy.rotation.set(rnd() * 0.4, rnd() * Math.PI, rnd() * 0.4);
+      dummy.scale.set(s, s * 0.8, s);
+      dummy.updateMatrix();
+      blossom.setMatrixAt(i, dummy.matrix);
+
+      /* 茎：从花心向下扎 */
+      var baseY = side === 'above' ? 0 : y; /* 水上茎插到水面，水下茎自由 */
+      dummy.position.set(x, (side === 'above' ? y / 2 : y - stemH / 2), z);
+      dummy.rotation.set(0, 0, (rnd() - 0.5) * 0.16);
+      dummy.scale.set(1, stemH, 1);
+      dummy.updateMatrix();
+      stems.setMatrixAt(i, dummy.matrix);
+      data.push({ x: x, z: z, y: y, phase: rnd() * Math.PI * 2 });
+    }
+    blossom.instanceMatrix.needsUpdate = true;
+    if (blossom.instanceColor) blossom.instanceColor.needsUpdate = true;
+    stems.instanceMatrix.needsUpdate = true;
+    scene.add(blossom);
+    scene.add(stems);
+    return { blossom: blossom, stems: stems, data: data };
+  }
+
+  var fieldAbove = makeField(140, 'above');
+  var fieldBelow = makeField(760, 'below');
+
+  /* ── 雾中巨构柱列（抽象碑柱：出水挺拔、双色阶、左右微错位） ── */
+  var monoMatA = new THREE.MeshLambertMaterial({ color: 0x9fb0ad });
+  var monoMatB = new THREE.MeshLambertMaterial({ color: 0x8a9c99 });
+  var monoliths = [
+    [2.6, -38, 1.1, 13], [6.0, -43, 0.8, 16], [9.5, -36, 1.2, 10],
+    [13.5, -44, 0.7, 14], [-3.2, -47, 0.9, 17], [-7.0, -41, 1.2, 11],
+    [17.5, -39, 0.8, 12], [-11, -52, 1.0, 15], [21, -50, 1.1, 16]
+  ];
+  monoliths.forEach(function (m, idx) {
+    var box = new THREE.Mesh(new THREE.BoxGeometry(m[2], m[3], m[2] * 0.85), idx % 2 ? monoMatB : monoMatA);
+    /* 柱底沉水 0.9：柱身穿过水面，水下段被水色浸染 */
+    box.position.set(m[0] + (rnd() - 0.5) * 0.8, m[3] / 2 - 0.9, m[1]);
+    box.rotation.y = (rnd() - 0.5) * 0.3;
+    scene.add(box);
+  });
+
+  /* 窗：水上只一扇微亮，水下亮着一排暖窗（局部规则） */
+  function litWindow(x, y, z, w, h, color, glow) {
+    var g = new THREE.Group();
+    var win = new THREE.Mesh(
+      new THREE.PlaneGeometry(w, h),
+      new THREE.MeshBasicMaterial({ color: color })
+    );
+    g.add(win);
+    if (glow) {
+      var halo = new THREE.Mesh(
+        new THREE.PlaneGeometry(w * 3.4, h * 3.4),
+        new THREE.MeshBasicMaterial({ color: 0xe8cd9d, transparent: true, opacity: 0.16, depthWrite: false })
+      );
+      halo.position.z = -0.01;
+      g.add(halo);
+    }
+    g.position.set(x, y, z);
+    scene.add(g);
+  }
+  litWindow(6.02, 3.4, -42.2, 0.12, 0.2, 0xd9c08a, false);           /* 水上：一扇微亮 */
+  litWindow(2.65, -0.35, -37.2, 0.1, 0.16, 0xe3c795, true);            /* 水下：更多暖窗（贴柱身水下段） */
+  litWindow(6.05, -0.6, -42.6, 0.1, 0.16, 0xe3c795, true);
+  litWindow(9.55, -0.3, -35.2, 0.09, 0.15, 0xe3c795, true);
+  litWindow(-7.05, -0.5, -40.2, 0.1, 0.16, 0xe3c795, false);
+  litWindow(13.55, -0.4, -43.2, 0.09, 0.15, 0xe3c795, false);
+
+  /* ── 漂浮花瓣 ── */
+  var petalGeo = new THREE.PlaneGeometry(0.085, 0.055);
+  var petalMat = new THREE.MeshBasicMaterial({ color: 0xd8c4c9, transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthWrite: false });
+  var PETALS = 34;
+  var petals = new THREE.InstancedMesh(petalGeo, petalMat, PETALS);
+  var petalData = [];
+  for (var p = 0; p < PETALS; p++) {
+    petalData.push({
+      x: range(-14, 14), y: range(0.02, 0.14), z: range(-26, 0),
+      vx: range(0.02, 0.07) * (rnd() < 0.5 ? 1 : -1),
+      rot: rnd() * Math.PI, vr: range(-0.3, 0.3)
+    });
+  }
+  scene.add(petals);
+
+  /* ── 镜头：滚动缓推（Kage：每一屏是一个被安排的镜头） ── */
+  var camPos = { x: 0, y: 1.35, z: 8.5 };
+  var look = { x: 0, y: 0.35, z: -30 };
+  var pointer = { x: 0, y: 0 };
+  var scrollP = 0;
+
+  function updateCameraTargets() {
+    var p = scrollP;
+    camPos.z = 8.5 - 3.4 * p;
+    camPos.y = 1.35 + 1.6 * p;
+    look.y = 0.35 - 1.3 * p;
+  }
+  function readScroll() {
+    var max = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+    scrollP = Math.min(1, Math.max(0, window.scrollY / max || 0));
+    updateCameraTargets();
+  }
+
+  function onResize() {
+    var w = window.innerWidth, h = window.innerHeight;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+    renderOnce();
+  }
+
+  /* ── 微波动（隔帧更新法线） ── */
+  var frame = 0;
+  function waves(t) {
+    var pos = waterGeo.attributes.position;
+    for (var i = 0; i < pos.count; i++) {
+      var x = pos.getX(i), y = pos.getY(i);
+      pos.setZ(i, 0.045 * Math.sin(x * 0.55 + t * 0.7) + 0.03 * Math.sin(y * 0.4 + t * 0.5 + x * 0.2));
+    }
+    pos.needsUpdate = true;
+    if (frame % 2 === 0) waterGeo.computeVertexNormals();
+  }
+
+  function driftPetals(dt) {
+    for (var i = 0; i < PETALS; i++) {
+      var d = petalData[i];
+      d.x += d.vx * dt;
+      d.rot += d.vr * dt;
+      if (d.x > 15) d.x = -15;
+      if (d.x < -15) d.x = 15;
+      dummy.position.set(d.x, d.y, d.z);
+      dummy.rotation.set(-Math.PI / 2 + 0.2, 0, d.rot);
+      dummy.scale.set(1, 1, 1);
+      dummy.updateMatrix();
+      petals.setMatrixAt(i, dummy.matrix);
+    }
+    petals.instanceMatrix.needsUpdate = true;
+  }
+
+  function renderOnce() {
+    camera.position.set(camPos.x + pointer.x * 0.35, camPos.y + pointer.y * -0.12, camPos.z);
+    camera.lookAt(look.x, look.y, look.z);
+    renderer.render(scene, camera);
+  }
+
+  /* ── 帧循环：~30fps 上限、隐藏暂停；reduced-motion 静帧按需渲染 ── */
+  var rafId = null, lastT = 0, running = false;
+  function loop(now) {
+    rafId = requestAnimationFrame(loop);
+    if (now - lastT < 33) return;
+    var dt = Math.min(0.1, (now - lastT) / 1000);
+    lastT = now;
+    frame++;
+    var t = now / 1000;
+    waves(t);
+    driftPetals(dt);
+    /* 花场的呼吸：整体极轻的沉浮 */
+    fieldBelow.blossom.position.y = Math.sin(t * 0.35) * 0.02;
+    renderOnce();
+  }
+  function start() {
+    if (running || reduceMotion) return;
+    running = true;
+    lastT = performance.now();
+    rafId = requestAnimationFrame(loop);
+  }
+  function stop() {
+    running = false;
+    if (rafId !== null) cancelAnimationFrame(rafId);
+    rafId = null;
+  }
+
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) stop(); else start();
+  });
+
+  if (!reduceMotion) {
+    start();
+    window.addEventListener('pointermove', function (e) {
+      pointer.x = (e.clientX / window.innerWidth - 0.5) * 2;
+      pointer.y = (e.clientY / window.innerHeight - 0.5) * 2;
+    }, { passive: true });
+  }
+  window.addEventListener('scroll', function () {
+    readScroll();
+    if (reduceMotion) renderOnce();
+  }, { passive: true });
+  window.addEventListener('resize', onResize);
+
+  onResize();
+  readScroll();
+  renderOnce();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,1252 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>晷园 · sundial-garden</title>
+<!--
+  晷园 Sundial Garden — 主页探索 · 第六波组合轮（会话 X）
+  盘点视角：时间与光。组合配方：
+    印刷园图地面（atlas「印刷面即世界」升到大地尺度 + draft 制图家具）
+    × J✦ 巨环改成日晷晷针（影子=钟指针，巨影/悬窗时刻读数供体）
+    × 印的太阳支配真的影子（纸鸢「印的月/真的鸢」反转成局部规则）
+    × 三只玻璃花罩做入口（atlas 信标的「不像导航」语法 → 花罩/铭牌语义）
+    × 夜里印刷层自发光（幻灯光墨规则反转）+ 日出加载 + J✦ 已批色板的一天弧
+  测试入口：
+    ?still=1&pin=0..1   静帧锁态（不真滚动）     &load=0..1  锁日出加载帧
+    ?auto[&fast]        定时器活体（逻辑冒烟）    &hover=0..2 锁花罩悬停
+    ?rm                 强制静帧                  __renderOnce(p,L) / __mockSnap() / __swarmErr
+-->
+<link rel="preconnect" href="https://fastly.jsdelivr.net">
+<link rel="stylesheet" href="https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5.2.5/500.css">
+<link rel="stylesheet" href="https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5.2.5/600.css">
+<style>
+  :root {
+    --ink: #3d4148; --ink-faint: #8a8f96; --paper: #f4efe7; --gold: #a8842f; --rose: #a9738a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: linear-gradient(to bottom, #b9c6cd 0%, #e3e4de 55%, #eee9dc 100%);
+    color: var(--ink);
+    font-family: 'Noto Serif SC', '思源宋体', 'Songti SC', serif;
+    font-weight: 500;
+    overflow-x: hidden;
+  }
+  #track { height: 560vh; }
+  canvas#gl { position: fixed; inset: 0; width: 100%; height: 100%; display: block; z-index: 0; }
+
+  /* ---- DOM 层（chrome） ---- */
+  .ui { position: fixed; z-index: 10; pointer-events: none; }
+  #brand { top: 34px; left: 40px; }
+  #brand h1 { font-weight: 600; font-size: 27px; letter-spacing: .34em; line-height: 1; }
+  #brand .en { margin-top: 9px; font-size: 10px; letter-spacing: .3em; color: var(--ink-faint); }
+
+  #nav { top: 38px; right: 42px; text-align: right; pointer-events: auto; }
+  #nav a {
+    display: block; color: var(--ink); text-decoration: none; font-size: 14.5px;
+    letter-spacing: .34em; line-height: 2.3; opacity: .72; transition: opacity .25s;
+    writing-mode: vertical-rl; float: left; margin-left: 15px;
+  }
+  #nav a.on, #nav a:hover { opacity: 1; }
+  #nav .rule { clear: both; display: block; margin: 10px 0 0 auto; width: 1px; height: 44px; background: var(--ink); opacity: .38; }
+
+  #clock { left: 40px; bottom: 36px; display: flex; align-items: baseline; gap: 12px; }
+  #clock .t { font-weight: 600; font-size: 24px; letter-spacing: .12em; font-variant-numeric: tabular-nums; }
+  #clock .p { font-size: 12px; letter-spacing: .4em; color: var(--ink-faint); }
+  #clock .cap { font-size: 10.5px; letter-spacing: .22em; color: var(--ink-faint); margin-left: 4px; }
+
+  #hint { right: 42px; bottom: 36px; text-align: right; font-size: 11px; letter-spacing: .3em; color: var(--ink-faint); transition: opacity .8s; }
+  #hint .line { display: block; width: 1px; height: 34px; background: var(--ink-faint); margin: 10px 4px 0 auto; opacity: .6; }
+
+  #jarcard {
+    z-index: 11; left: 0; top: 0; transform: translate(-50%, -130%);
+    background: rgba(250, 246, 238, .9); border: 1px solid #cfc6b4; padding: 12px 18px 11px;
+    opacity: 0; transition: opacity .22s; min-width: 148px;
+  }
+  #jarcard .n { font-weight: 600; font-size: 16px; letter-spacing: .3em; }
+  #jarcard .e { margin-top: 5px; font-size: 10px; letter-spacing: .2em; color: var(--ink-faint); }
+  #jarcard .go { margin-top: 7px; font-size: 10.5px; letter-spacing: .3em; color: var(--gold); }
+
+  /* ---- 加载帷 ---- */
+  #veil {
+    position: fixed; inset: 0; z-index: 30; background: #232833;
+    display: flex; align-items: center; justify-content: center; flex-direction: column;
+    color: #d8d3c8; transition: none;
+  }
+  #veil .big { font-weight: 600; font-size: clamp(22px, 3.4vw, 34px); letter-spacing: .6em; text-indent: .6em; opacity: .92; }
+  #veil .sub { margin-top: 18px; font-size: 12px; letter-spacing: .3em; color: #9aa0ac; }
+  #veil .skip { position: absolute; bottom: 30px; font-size: 10.5px; letter-spacing: .3em; color: #6d7482; }
+
+  body.booted #veil { display: none; }
+  body.scrolled #hint { opacity: 0; }
+
+  /* ---- nogl 回退 ---- */
+  #nogltext { display: none; position: fixed; inset: 0; z-index: 5; padding: 18vh 10vw; }
+  #nogltext p { font-size: clamp(20px, 3.2vw, 34px); letter-spacing: .14em; line-height: 2.1; color: #454a52; }
+  #nogltext .last { color: var(--gold); margin-top: 5vh; }
+  body.nogl #nogltext { display: block; }
+  body.nogl canvas#gl, body.nogl #veil { display: none; }
+
+  @media (max-width: 760px) {
+    #brand { top: 20px; left: 20px; } #brand h1 { font-size: 21px; }
+    #nav { top: 22px; right: 20px; } #nav a { font-size: 12.5px; margin-left: 10px; } #nav .rule { height: 30px; }
+    #clock { left: 20px; bottom: 20px; } #clock .t { font-size: 18px; }
+    #hint { right: 20px; bottom: 20px; }
+  }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+</style>
+</head>
+<body>
+<div id="track"></div>
+<canvas id="gl"></canvas>
+
+<div class="ui" id="brand"><h1>晷园</h1><div class="en">SUNDIAL GARDEN · 主页提案 · 组合轮</div></div>
+<nav class="ui" id="nav" aria-label="站内导航">
+  <a href="#" data-i="0">随笔</a><a href="#" data-i="1">项目</a><a href="#" data-i="2">关于</a>
+  <span class="rule"></span>
+</nav>
+<div class="ui" id="clock"><span class="t" id="ckT">06:08</span><span class="p" id="ckP">晨</span><span class="cap" id="ckC">园中时刻</span></div>
+<div class="ui" id="hint">滚动 · 时间向前<span class="line"></span></div>
+<div class="ui" id="jarcard"><div class="n" id="jcN"></div><div class="e" id="jcE"></div><div class="go">由此进入</div></div>
+<div id="veil"><div class="big">天将亮</div><div class="sub" id="veilSub">太阳正沿印好的弧线升起</div><div class="skip">任意输入跳过</div></div>
+<div id="nogltext">
+  <p>这里不是梦，也不是现实。<br>它是人在即将醒来时，<br>看见的最后一层世界。</p>
+  <p class="last">它可能马上消失。</p>
+</div>
+
+<script src="vendor/three.min.js"></script>
+<script>
+/* ============ 错误钩子（最先挂；title 哨兵「✗」与常规标题不相交——W②教训） ============ */
+window.__swarmErr = 'none';
+window.addEventListener('error', e => { __swarmErr = (e.message || 'err') + ' @' + (e.filename || '').split('/').pop() + ':' + e.lineno; document.title = '✗ ' + __swarmErr; });
+window.addEventListener('unhandledrejection', e => { __swarmErr = 'rej: ' + ((e.reason && e.reason.message) || e.reason); });
+(function(){ const ce = console.error; console.error = function(){ try { __swarmErr = 'ce: ' + [].join.call(arguments, ' ').slice(0, 300); } catch(_){} ce.apply(console, arguments); }; })();
+
+/* ============ 参数（裸旗标兼容——I① 正则） ============ */
+function clamp01(v){ return v<0?0:(v>1?1:v); }
+function clamp(v,a,b){ return v<a?a:(v>b?b:v); }
+function lerp(a,b,t){ return a+(b-a)*t; }
+function smooth(a,b,v){ const t = clamp01((v-a)/(b-a)); return t*t*(3-2*t); }
+function easeInOut(t){ return t<.5 ? 2*t*t : 1-Math.pow(-2*t+2,2)/2; }
+const $ = id => document.getElementById(id);
+
+const Q = {};
+(function(){ const re = /[?&]([^=&]+)(?:=([^&]*))?/g; let m;
+  while ((m = re.exec(location.search))) Q[decodeURIComponent(m[1])] = m[2] !== undefined ? decodeURIComponent(m[2]) : '';
+})();
+const IS_AUTO  = 'auto'  in Q;
+const IS_FAST  = 'fast'  in Q;
+const IS_STILL = 'still' in Q;
+const IS_RM    = 'rm' in Q || (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+const PIN      = (Q.pin  !== undefined && Q.pin  !== '') ? clamp01(parseFloat(Q.pin) || 0) : null;
+const LOAD_L   = (Q.load !== undefined && Q.load !== '') ? clamp01(parseFloat(Q.load) || 0) : null;
+const HOVER_F  = (Q.hover !== undefined && Q.hover !== '') ? parseInt(Q.hover) : null;
+
+/* ============ 色板：一天弧（冷晨→上午→正午→暮玫瑰→夜青；J✦ 已批色系） ============ */
+const PAL = [ /* p 关键帧 0 / .22 / .45 / .68 / .84，其后持夜 */
+  { top:'#b9c6cd', mid:'#dfe3e2', bot:'#eee9dc', fog:'#e3e4de', gnd:'#aebcb9', sunCol:'#f2e3c2', sunI:.42, hemiS:'#dfe8ea', hemiG:'#9fb0b5', night:0, dust:'#b9b3a6' },
+  { top:'#c4d2d6', mid:'#e6e5df', bot:'#f2ecdc', fog:'#e8e6da', gnd:'#b3bcb2', sunCol:'#f8e6bd', sunI:.47, hemiS:'#e6edee', hemiG:'#a4b2b0', night:0, dust:'#c2bcab' },
+  { top:'#ccd6d8', mid:'#e9e7e0', bot:'#f5efe1', fog:'#eae8dd', gnd:'#b8bfb4', sunCol:'#faf0cd', sunI:.52, hemiS:'#eaefef', hemiG:'#a8b4b0', night:0, dust:'#cbc5b4' },
+  { top:'#b3a2b4', mid:'#ddc3b8', bot:'#efcfae', fog:'#e0d2c6', gnd:'#a8928c', sunCol:'#f2b183', sunI:.4, hemiS:'#e2d4da', hemiG:'#a08e92', night:0, dust:'#c8ac9c' },
+  { top:'#2f3745', mid:'#4e525f', bot:'#647079', fog:'#4a505c', gnd:'#45505a', sunCol:'#cfdce2', sunI:.05, hemiS:'#5a616e', hemiG:'#3e4750', night:1, dust:'#ffd9a0' },
+];
+const KEYS = [0, .22, .45, .68, .84];
+function hex2rgb(h){ const n = parseInt(h.slice(1), 16); return [n>>16&255, n>>8&255, n&255]; }
+const RGB_PAL = PAL.map(p => { const o = {}; for (const k in p) o[k] = (typeof p[k] === 'string') ? hex2rgb(p[k]) : p[k]; return o; });
+function palAt(p, out){
+  let i = 0; while (i < KEYS.length-2 && p > KEYS[i+1]) i++;
+  const t = clamp01((p - KEYS[i]) / (KEYS[i+1] - KEYS[i]));
+  const A = RGB_PAL[i], B = RGB_PAL[i+1];
+  for (const k in A) {
+    if (typeof A[k] === 'number') { out[k] = lerp(A[k], B[k], t); continue; }
+    if (!out[k]) out[k] = [0,0,0];
+    out[k][0] = lerp(A[k][0], B[k][0], t); out[k][1] = lerp(A[k][1], B[k][1], t); out[k][2] = lerp(A[k][2], B[k][2], t);
+  }
+  out.idx = i; out.f = t;
+  out.effIdx = Math.min(KEYS.length-1, i + (t > .5 ? 1 : 0));   /* 海报底色离散重绘用：过半取下一帧 */
+}
+
+/* ============ 初始化守卫 / 全局 ============ */
+let W = 0, H = 0, renderer = null, scene, camera, has3D = true;
+const canvas = $('gl');
+const DPR = Math.min(window.devicePixelRatio || 1, 1.5);
+let MOB = false;
+const S = {
+  booted: false, L: (IS_RM || IS_STILL) ? 1 : 0, t: 12.0, p: PIN !== null ? PIN : 0,
+  hover: HOVER_F !== null ? HOVER_F : -1, hoverWant: HOVER_F !== null ? HOVER_F : -1,
+  hoverT: [0, 0, 0], pRaw: 0,
+};
+
+/* ============ 太阳：印在天空海报上，却支配全世界的影子 ============ */
+/* sunT: 0 日出 → .5 正午 → 1 日落（p/0.8）。方位 ±58°，高度 14°→60°→14° */
+function sunAt(p){
+  const sunT = clamp01(p / 0.8);
+  const a = (sunT*2 - 1) * 58 * Math.PI/180;
+  const el = (14 + 46*Math.sin(sunT*Math.PI)) * Math.PI/180;
+  const dir = new THREE.Vector3(Math.sin(a)*Math.cos(el), Math.sin(el), -Math.cos(a)*Math.cos(el));
+  /* 海报上的印位（构图参数，非光学投影；横向幅度随视口收放） */
+  const asp = Math.max(W/Math.max(H,1), .4);
+  const uamp = 0.19 * clamp(asp/1.6, .3, 1);
+  const u = .5 + Math.sin(a)*uamp;
+  const v = .264 + .065*(Math.sin(el)/Math.sin(60*Math.PI/180));
+  const below = p > 0.8 ? (p-0.8)/0.06 : 0;   /* 日落后沉入雾带 */
+  return { dir, el, a, u, v: v - below*0.5, up: below < 1 };
+}
+/* 晷针影子的方位角（供表盘刻度定位，与真实影子同一函数系） */
+function shadowAz(p){
+  const s = sunAt(p);
+  return Math.atan2(-s.dir.x, -s.dir.z);   /* 影子指向的方向（x,z） */
+}
+
+/* ============ 场景构件定义 ============ */
+const JARS = [
+  { name:'随笔', en:'ESSAYS · 三篇', go:'三篇 · 由此进入', x:-6.4, z:4.6, s:1.00, jp:.18, kind:'lily', seed:1.7 },
+  { name:'项目', en:'WORKS · 两件',  go:'两件 · 由此进入', x: 7.2, z:3.2, s:1.12, jp:.45, kind:'ring', seed:4.2 },
+  { name:'关于', en:'ABOUT · 一页',  go:'一页 · 由此进入', x: 5.6, z:-8.8, s:.92,  jp:.66, kind:'key',  seed:7.9 },
+];
+const SHEET = { w: 96, d: 64 };
+const DIAL_R = 6.5;
+const NEEDLE = { len: 4.6, tilt: 30*Math.PI/180 };   /* 朝 -z（远处）倾斜 */
+
+let sheetTopMat = null, baseMat = null, posterMat = null, posterMesh = null;
+let ringMesh = null, needleMesh = null, steleMesh = null, finalMesh = null;
+let sunLight, hemi, ambient;
+const jarObjs = [];   /* {group, glass, glow, light, plaque, hit, seed, kind, mini} */
+let dust = null, dustData = null;
+const U = {
+  uFogColor:{value:new THREE.Color()}, uFogNear:{value:30}, uFogFar:{value:84},
+  uCamPos:{value:new THREE.Vector3()},
+  uLightDir:{value:new THREE.Vector3(0,1,0)}, uLightCol:{value:new THREE.Color()},
+  uNight:{value:0}, uTime:{value:0},
+};
+const CUR = {};
+palAt(0, CUR);
+
+/* ============ 磨砂玻璃 shader（G穹骨/W悬窗 族） ============ */
+const FROST_VS = `
+varying vec3 vN; varying vec3 vW;
+void main(){
+  vN = normalize(mat3(modelMatrix) * normal);
+  vec4 w = modelMatrix * vec4(position, 1.0);
+  vW = w.xyz;
+  gl_Position = projectionMatrix * viewMatrix * w;
+}`;
+const FROST_FS = `
+uniform vec3 uBase, uDeep, uLightCol, uLightDir, uWarm, uFogColor;
+uniform float uFogNear, uFogFar, uNight;
+uniform vec3 uCamPos;
+varying vec3 vN; varying vec3 vW;
+void main(){
+  vec3 N = normalize(vN) * (gl_FrontFacing ? 1.0 : -1.0);
+  vec3 V = normalize(uCamPos - vW);
+  float ndl = dot(N, uLightDir) * .5 + .5;
+  float back = clamp(dot(V, -uLightDir), 0.0, 1.0);
+  back = back * back;
+  float fr = 1.0 - max(dot(N, V), 0.0);
+  fr = fr * fr * fr;
+  vec3 col = mix(uDeep, uBase, ndl);
+  col += uLightCol * back * 0.28;
+  col += uBase * fr * 0.5;
+  col += uWarm * uNight * 0.4;
+  float f = smoothstep(uFogNear, uFogFar, distance(vW, uCamPos));
+  col = mix(col, uFogColor, f);
+  gl_FragColor = vec4(col, 1.0);
+}`;
+function frostMat(base, deep, opts){
+  opts = opts || {};
+  return new THREE.ShaderMaterial({
+    vertexShader: FROST_VS, fragmentShader: FROST_FS,
+    uniforms: {
+      uBase:{value:new THREE.Color(base)}, uDeep:{value:new THREE.Color(deep)},
+      uLightCol:{value:new THREE.Color('#f2e3c2')}, uLightDir:U.uLightDir,
+      uWarm:{value:new THREE.Color(opts.warm || '#ffb36b')},
+      uFogColor:U.uFogColor, uFogNear:U.uFogNear, uFogFar:U.uFogFar,
+      uNight:U.uNight, uCamPos:U.uCamPos,
+    },
+  });
+}
+
+/* ============ 玻璃花罩 shader ============ */
+const GLASS_FS = `
+uniform vec3 uTint, uWarm, uFogColor;
+uniform float uFogNear, uFogFar, uNight, uHover;
+uniform vec3 uCamPos, uLightDir;
+varying vec3 vN; varying vec3 vW;
+void main(){
+  vec3 N = normalize(vN) * (gl_FrontFacing ? 1.0 : -1.0);
+  vec3 V = normalize(uCamPos - vW);
+  float fr = 1.0 - max(dot(N, V), 0.0);
+  fr = fr * fr;
+  float back = clamp(dot(V, -uLightDir), 0.0, 1.0);
+  back = back * back;
+  vec3 litTarget = mix(vec3(0.98, 0.97, 0.93), uWarm * 0.5 + vec3(0.20, 0.16, 0.12), uNight);
+  vec3 col = mix(uTint, litTarget, fr * .9);
+  col += uWarm * (uNight * .3 + uHover * .6);
+  float a = 0.10 + fr * .42 + back * .08 + uHover * .20 + uNight * .08;
+  float f = smoothstep(uFogNear, uFogFar, distance(vW, uCamPos));
+  col = mix(col, uFogColor, f);
+  gl_FragColor = vec4(col, clamp(a, 0.0, 0.9));
+}`;
+function jarGlassMat(){
+  return new THREE.ShaderMaterial({
+    vertexShader: FROST_VS, fragmentShader: GLASS_FS,
+    uniforms: {
+      uTint:{value:new THREE.Color('#e8e2d6')}, uWarm:{value:new THREE.Color('#ffb36b')},
+      uFogColor:U.uFogColor, uFogNear:U.uFogNear, uFogFar:U.uFogFar,
+      uNight:U.uNight, uHover:{value:0}, uCamPos:U.uCamPos, uLightDir:U.uLightDir,
+    },
+    transparent: true, depthWrite: false, side: THREE.DoubleSide,
+  });
+}
+
+/* ============ 建 场景 ============ */
+function buildScene(){
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(42, 1, .1, 320);
+  scene.fog = new THREE.Fog(0xe3e4de, 30, 84);
+
+  /* 光：太阳（投影）+ 半球 + 三盏罩灯 */
+  ambient = new THREE.AmbientLight(0xffffff, .08); scene.add(ambient);
+  hemi = new THREE.HemisphereLight(0xdfe8ea, 0x9fb0b5, .55); scene.add(hemi);
+  sunLight = new THREE.DirectionalLight(0xf2e3c2, 1.0);
+  sunLight.castShadow = true;
+  const sh = MOB ? 1024 : 2048;
+  sunLight.shadow.mapSize.set(sh, sh);
+  sunLight.shadow.camera.left = -26; sunLight.shadow.camera.right = 26;
+  sunLight.shadow.camera.top = 26;  sunLight.shadow.camera.bottom = -26;
+  sunLight.shadow.camera.near = 8;  sunLight.shadow.camera.far = 130;
+  sunLight.shadow.bias = -0.0004;
+  sunLight.shadow.normalBias = 0.6;
+  scene.add(sunLight); scene.add(sunLight.target);
+
+  /* 雾原基底 */
+  baseMat = new THREE.MeshStandardMaterial({ color: 0xaebcb9, roughness: 1 });
+  const base = new THREE.Mesh(new THREE.PlaneGeometry(420, 420), baseMat);
+  base.rotation.x = -Math.PI/2; base.position.y = -0.02; base.receiveShadow = true;
+  scene.add(base);
+
+  /* ---- 印刷园图巨纸（世界地面本身是一张印好的总平面图） ---- */
+  const sheetGeo = new THREE.BoxGeometry(SHEET.w, 0.12, SHEET.d);
+  const sideMat = new THREE.MeshStandardMaterial({ color: 0xf0e9da, roughness: 1 });
+  sheetTopMat = new THREE.MeshStandardMaterial({
+    map: makePlanTexture(), roughness: .96,
+    emissive: new THREE.Color(0xffc98c), emissiveMap: makeEmisTexture(), emissiveIntensity: 0,
+  });
+  const sheet = new THREE.Mesh(sheetGeo, [sideMat, sideMat, sheetTopMat, sideMat, sideMat, sideMat]);
+  sheet.position.y = 0; sheet.receiveShadow = true; sheet.castShadow = true;
+  scene.add(sheet);
+
+  /* ---- 巨环 + 晷针（日晷本体） ---- */
+  ringMesh = new THREE.Mesh(new THREE.TorusGeometry(3.3, .42, 22, 96), frostMat('#e3ddd2', '#8f948f'));
+  ringMesh.position.set(0, 3.5, 0);
+  ringMesh.rotation.y = -0.055;
+  ringMesh.castShadow = true;
+  scene.add(ringMesh);
+
+  needleMesh = new THREE.Mesh(new THREE.CylinderGeometry(.032, .075, NEEDLE.len, 10), frostMat('#dfd9cd', '#84887f'));
+  needleMesh.position.set(0, Math.cos(NEEDLE.tilt)*NEEDLE.len/2, -Math.sin(NEEDLE.tilt)*NEEDLE.len/2);
+  needleMesh.rotation.x = NEEDLE.tilt;   /* 顶端朝 -z 倾 */
+  needleMesh.castShadow = true;
+  scene.add(needleMesh);
+
+  /* ---- 天空海报（连天空都是印的） ---- */
+  posterMat = new THREE.ShaderMaterial({
+    uniforms: {
+      uMap:{value:null}, uSunUv:{value:new THREE.Vector2(.4,.3)}, uDiscCol:{value:new THREE.Color('#f2c98e')},
+      uNight:U.uNight, uFogColor:U.uFogColor, uDim:{value:0}, uAsp:{value:1.6},
+    },
+    vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+    fragmentShader: `
+      uniform sampler2D uMap; uniform vec2 uSunUv; uniform vec3 uDiscCol, uFogColor;
+      uniform float uNight, uDim, uAsp;
+      varying vec2 vUv;
+      float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453123); }
+      void main(){
+        vec3 col = texture2D(uMap, vUv).rgb;
+        /* 印的太阳：平版圆（带印边）+ 套版错位环 + 网点，无光晕 */
+        vec2 d2 = vec2((vUv.x-uSunUv.x)*uAsp*0.62, vUv.y-uSunUv.y);
+        float d = length(d2);
+        float disc = smoothstep(0.0132, 0.0112, d);
+        float dots = step(.45, h21(floor(vUv*vec2(680.,680.))));
+        col = mix(col, uDiscCol*(0.82+0.18*dots), disc);
+        float edge = smoothstep(0.0100, 0.0108, d) * (1.0 - smoothstep(0.0126, 0.0136, d));
+        col = mix(col, mix(uDiscCol, vec3(0.30, 0.31, 0.33), 0.45), edge*0.85);
+        vec2 d2o = vec2((vUv.x-uSunUv.x-0.0022)*uAsp*0.62, vUv.y-uSunUv.y+0.0016);
+        float ring = smoothstep(0.0185, 0.0172, length(d2o)) - smoothstep(0.0152, 0.0141, length(d2o));
+        col = mix(col, uDiscCol*0.9, clamp(ring,0.,1.)*0.32);
+        /* 印的星（夜里显影） */
+        vec2 g = floor(vUv*vec2(210.*uAsp, 60.));
+        float st = step(0.995, h21(g)) * uNight * smoothstep(0.35, 0.62, vUv.y);
+        col += vec3(0.92, 0.88, 0.78) * st * 0.85;
+        /* 底缘融入雾色（0.096 ≈ 地面线所在 v，海报在此与雾化地面无缝相接） */
+        col = mix(uFogColor, col, smoothstep(0.0, 0.096, vUv.y));
+        col *= (1.0 - uDim*0.82);
+        gl_FragColor = vec4(col, 1.0);
+      }`,
+    fog: false, depthWrite: true,
+  });
+  posterMesh = new THREE.Mesh(new THREE.PlaneGeometry(240, 28), posterMat);
+  posterMesh.position.set(0, 11, -56);
+  scene.add(posterMesh);   /* 世界锚定的「天空海报」，不跟随相机（v1 的缩放锚定把 uv 挪错了） */
+
+  /* ---- 三只玻璃花罩（入口） ---- */
+  for (let i=0;i<JARS.length;i++) buildJar(JARS[i], i);
+
+  /* ---- 竖排宣言碑 ---- */
+  steleMesh = new THREE.Group();
+  const slab = new THREE.Mesh(new THREE.BoxGeometry(1.7, 6.6, 0.16),
+    new THREE.MeshStandardMaterial({ color: 0xf3eee2, roughness: .95 }));
+  slab.castShadow = true; slab.receiveShadow = true;
+  steleMesh.add(slab);
+  const stTex = makeVerticalText('它是人在即将醒来时，', 256, 1024, 148, 'rgba(52,56,63,.94)');
+  const stPl = new THREE.Mesh(new THREE.PlaneGeometry(1.42, 5.9),
+    new THREE.MeshBasicMaterial({ map: stTex, transparent: true }));
+  stPl.position.z = 0.089;
+  steleMesh.add(stPl);
+  steleMesh.position.set(-4.8, 3.3, -5.4);
+  steleMesh.userData.pl = stPl;
+  scene.add(steleMesh);
+
+  /* ---- 末句（夜里显影的金字，躺在末句坛里） ---- */
+  const finTex = makeHText('它可能马上消失。', 1024, 128, 82, 'rgba(224,178,92,.98)');
+  finalMesh = new THREE.Mesh(new THREE.PlaneGeometry(12.5, 1.56),
+    new THREE.MeshBasicMaterial({ map: finTex, transparent: true, opacity: 0, depthWrite: false }));
+  finalMesh.rotation.x = -Math.PI/2;
+  finalMesh.position.set(-4.5, 0.14, -11);
+  finalMesh.renderOrder = 3;
+  scene.add(finalMesh);
+
+  /* ---- 浮尘 / 夜萤 ---- */
+  buildDust();
+}
+
+function buildJar(def, i){
+  const g = new THREE.Group();
+  g.position.set(def.x, 0, def.z);
+  /* 罩体 lathe */
+  const prof = [
+    [0.00, 1.62],[0.10, 1.60],[0.15, 1.52],[0.34, 1.34],[0.60, 1.06],[0.82, .74],
+    [0.96, .44],[1.03, .22],[1.045, .08],[1.02, .015],[0.98, 0.0],
+  ].map(p => new THREE.Vector2(p[0]*def.s, p[1]*def.s));
+  const glassGeo = new THREE.LatheGeometry(prof, 42);
+  const glass = new THREE.Mesh(glassGeo, jarGlassMat());
+  glass.renderOrder = 6;
+  g.add(glass);
+  /* 口沿 + 底沿细环（玻璃的可读性靠棱） */
+  const lipMat = frostMat('#efe9dd', '#9a9e96');
+  const lip = new THREE.Mesh(new THREE.TorusGeometry(0.155*def.s, 0.028*def.s, 10, 28), lipMat);
+  lip.position.y = 1.585*def.s; lip.rotation.x = Math.PI/2; g.add(lip);
+  const foot = new THREE.Mesh(new THREE.TorusGeometry(1.0*def.s, 0.032*def.s, 10, 40), lipMat);
+  foot.position.y = 0.02; foot.rotation.x = Math.PI/2; g.add(foot);
+
+  /* 罩内小物（各封一物） */
+  const mini = new THREE.Group();
+  const mm = frostMat('#e9d9cd', '#96867c', { warm:'#ffcf96' });
+  if (def.kind === 'lily'){
+    const stem = new THREE.Mesh(new THREE.CylinderGeometry(.016, .024, .58, 8), mm);
+    stem.position.y = .29; mini.add(stem);
+    for (let k=0;k<6;k++){
+      const pg = new THREE.PlaneGeometry(.30, .11, 4, 1);
+      const pos = pg.attributes.position;
+      for (let vi=0; vi<pos.count; vi++){
+        const u = pos.getX(vi)/.30 + .5;
+        pos.setZ(vi, -Math.sin(u*Math.PI)*.05);
+      }
+      pg.computeVertexNormals();
+      const pet = new THREE.Mesh(pg, mm);
+      const a = k/6*Math.PI*2 + def.seed;
+      pet.position.set(Math.cos(a)*.09, .62, Math.sin(a)*.09);
+      pet.rotation.y = -a; pet.rotation.z = .72;
+      mini.add(pet);
+    }
+    const core = new THREE.Mesh(new THREE.SphereGeometry(.035, 10, 8),
+      new THREE.MeshBasicMaterial({ color: 0xd8a752 }));
+    core.position.y = .66; mini.add(core);
+  } else if (def.kind === 'ring'){
+    const mr = new THREE.Mesh(new THREE.TorusGeometry(.30, .045, 12, 40), mm);
+    mr.position.y = .62; mr.rotation.y = .5; mr.castShadow = true; mini.add(mr);
+    for (let k=0;k<3;k++){
+      const shard = new THREE.Mesh(new THREE.OctahedronGeometry(.075 + k*.02), mm);
+      shard.position.set(Math.cos(def.seed+k*2.4)*.42, .07, Math.sin(def.seed+k*2.4)*.42);
+      shard.rotation.set(k, k*1.7, 0); mini.add(shard);
+    }
+  } else {
+    const bow = new THREE.Mesh(new THREE.TorusGeometry(.10, .032, 10, 26), mm);
+    bow.position.set(-.16, .14, 0); mini.add(bow);
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(.028, .028, .42, 10), mm);
+    shaft.rotation.z = Math.PI/2; shaft.position.set(.06, .14, 0); mini.add(shaft);
+    for (let k=0;k<2;k++){
+      const tooth = new THREE.Mesh(new THREE.BoxGeometry(.035, .09, .03), mm);
+      tooth.position.set(.22 - k*.09, .07, 0); mini.add(tooth);
+    }
+  }
+  mini.position.y = 0.02;
+  mini.scale.setScalar(def.s);
+  g.add(mini);
+
+  /* 罩下光泊（hover/夜里亮） */
+  const glow = new THREE.Mesh(new THREE.CircleGeometry(2.1*def.s, 40),
+    new THREE.MeshBasicMaterial({ color: 0xffb36b, transparent: true, opacity: 0, depthWrite: false }));
+  glow.rotation.x = -Math.PI/2; glow.position.y = 0.085; glow.renderOrder = 2;
+  g.add(glow);
+
+  /* 印刷铭牌 */
+  const plq = new THREE.Mesh(new THREE.PlaneGeometry(1.5, .72),
+    new THREE.MeshBasicMaterial({ map: makePlaque(def), transparent: true }));
+  plq.position.set(1.55*def.s, .40, .55);
+  plq.rotation.y = -.34; plq.rotation.x = -.10;
+  g.add(plq);
+  /* 罩灯 */
+  const light = new THREE.PointLight(0xffd9a8, 0, 11, 2);
+  light.position.y = 1.2*def.s;
+  g.add(light);
+
+  /* 命中区 */
+  const hit = new THREE.Mesh(new THREE.CylinderGeometry(1.5*def.s, 1.5*def.s, 2.2, 10),
+    new THREE.MeshBasicMaterial({ visible: false }));
+  hit.position.y = 1.0; hit.userData.jar = i;
+  g.add(hit);
+
+  scene.add(g);
+  jarObjs.push({ def, group: g, glass, glow, light, mini, hit, plq });
+}
+
+/* ============ 浮尘 ============ */
+function buildDust(){
+  const N = MOB ? 130 : 240;
+  const geo = new THREE.BufferGeometry();
+  const pos = new Float32Array(N*3);
+  dustData = [];
+  let rs = 9.31;
+  const rnd = () => { rs = (rs*16807) % 2147483647; return rs/2147483647; };
+  for (let i=0;i<N;i++){
+    const bx = (rnd()-.5)*56, by = .3 + rnd()*8.5, bz = 16 - rnd()*40;
+    pos[i*3] = bx; pos[i*3+1] = by; pos[i*3+2] = bz;
+    dustData.push({ bx, by, bz, s1: rnd()*6.28, s2: rnd()*6.28, sp: .4+rnd()*.8 });
+  }
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const cv = document.createElement('canvas'); cv.width = cv.height = 64;
+  const c = cv.getContext('2d');
+  const gr = c.createRadialGradient(32,32,2,32,32,30);
+  gr.addColorStop(0,'rgba(255,255,255,1)'); gr.addColorStop(.5,'rgba(255,255,255,.4)'); gr.addColorStop(1,'rgba(255,255,255,0)');
+  c.fillStyle = gr; c.fillRect(0,0,64,64);
+  const tex = new THREE.CanvasTexture(cv);
+  dust = new THREE.Points(geo, new THREE.PointsMaterial({
+    size: .16, map: tex, transparent: true, opacity: .5, depthWrite: false, sizeAttenuation: true,
+  }));
+  dust.renderOrder = 4;
+  scene.add(dust);
+}
+function updateDust(t, night){
+  const pos = dust.geometry.attributes.position;
+  const amp = .6 + night*1.1;
+  for (let i=0;i<dustData.length;i++){
+    const d = dustData[i];
+    let x = d.bx + Math.sin(t*.13*d.sp + d.s1)*amp;
+    let y = d.by + Math.sin(t*.09*d.sp + d.s2)*(.4 + night*.7) + night*(.4+Math.sin(t*.2+d.s1)*.35);
+    const z = d.bz + Math.cos(t*.11*d.sp + d.s1)*amp*.6;
+    /* 近镜头压到地下（J⑦：sizeAttenuation 近景巨斑） */
+    const dx = x - U.uCamPos.value.x, dz = z - U.uCamPos.value.z;
+    if (dx*dx + dz*dz < 30) y = -100;
+    pos.setXYZ(i, x, y, z);
+  }
+  pos.needsUpdate = true;
+  dust.material.opacity = .42 + night*.3;
+  dust.material.color.setRGB(CUR.dust[0]/255, CUR.dust[1]/255, CUR.dust[2]/255);
+}
+
+/* ============ 园图绘制（平面基底的心脏） ============ */
+function sheetXY(x, z){ const S2P = 2048/SHEET.w; return [(x+SHEET.w/2)*S2P, (z+SHEET.d/2)*S2P]; }
+function blob(ctx, cx, cz, rx, rz, seed, S2P){
+  let rs = seed*1000+7;
+  const rnd = () => { rs = (rs*16807) % 2147483647; return rs/2147483647; };
+  const n = 9, pts = [];
+  for (let i=0;i<n;i++){
+    const a = i/n*Math.PI*2;
+    const rr = .72 + rnd()*.5;
+    pts.push(sheetXY(cx + Math.cos(a)*rx*rr, cz + Math.sin(a)*rz*rr));
+  }
+  ctx.beginPath();
+  ctx.moveTo((pts[0][0]+pts[n-1][0])/2, (pts[0][1]+pts[n-1][1])/2);
+  for (let i=0;i<n;i++){
+    const p = pts[i], q = pts[(i+1)%n];
+    ctx.quadraticCurveTo(p[0], p[1], (p[0]+q[0])/2, (p[1]+q[1])/2);
+  }
+  ctx.closePath();
+}
+function drawPlan(mob){
+  const cv = planCanvas, ctx = cv.getContext('2d'), CW = cv.width, CH = cv.height;
+  const S2P = CW/SHEET.w;
+  const ink = 'rgba(74,79,87,', ink2 = 'rgba(74,79,87,';
+  ctx.clearRect(0,0,CW,CH);
+  /* 纸 */
+  ctx.fillStyle = '#ebe3d2';
+  ctx.fillRect(0,0,CW,CH);
+  /* 纸纤维噪 */
+  let rs = 3.13;
+  const rnd = () => { rs = (rs*16807)%2147483647; return rs/2147483647; };
+  for (let i=0;i<2600;i++){
+    ctx.fillStyle = 'rgba(120,110,90,'+(rnd()*.05)+')';
+    ctx.fillRect(rnd()*CW, rnd()*CH, 1+rnd()*2.2, 1);
+  }
+  /* 双线图框（draft 供体） */
+  const b1 = 1.6*S2P, b2 = 2.2*S2P;
+  ctx.strokeStyle = ink+'.8)'; ctx.lineWidth = 3;
+  ctx.strokeRect(b1, b1, CW-b1*2, CH-b1*2);
+  ctx.strokeStyle = ink+'.55)'; ctx.lineWidth = 1.2;
+  ctx.strokeRect(b2, b2, CW-b2*2, CH-b2*2);
+  /* 装订刻度 */
+  ctx.strokeStyle = ink+'.5)'; ctx.lineWidth = 1;
+  for (let x=8; x<SHEET.w; x+=4){
+    const [px] = sheetXY(x, 0);
+    ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, b2*.5); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(px, CH); ctx.lineTo(px, CH-b2*.5); ctx.stroke();
+  }
+  /* 方格网 */
+  ctx.strokeStyle = ink+'.07)'; ctx.lineWidth = 1;
+  for (let x=-40; x<=40; x+=8){ const [px] = sheetXY(x,0);
+    ctx.beginPath(); ctx.moveTo(px, b2); ctx.lineTo(px, CH-b2); ctx.stroke(); }
+  for (let z=-24; z<=24; z+=8){ const [,py] = sheetXY(0,z);
+    ctx.beginPath(); ctx.moveTo(b2, py); ctx.lineTo(CW-b2, py); ctx.stroke(); }
+  /* 花坛（双线 blob + 淡填色） */
+  const beds = [
+    { cx:0, cz:8.0, rx:9.6, rz:2.2, seed:1.1, fill:'rgba(216,183,168,.14)' },   /* 宣言坛 */
+    { cx:-6.4, cz:4.6, rx:2.6, rz:1.9, seed:2.3, fill:'rgba(168,184,160,.13)' },/* 随笔圃 */
+    { cx:7.2, cz:3.2, rx:2.9, rz:2.1, seed:3.7, fill:'rgba(190,178,196,.13)' }, /* 项目圃 */
+    { cx:5.6, cz:-8.8, rx:2.7, rz:2.0, seed:5.1, fill:'rgba(216,196,168,.15)' },/* 关于角 */
+    { cx:-4.5, cz:-11, rx:6.8, rz:2.6, seed:6.6, fill:'rgba(216,183,168,.10)' },/* 末句坛（收尾机位的可读区） */
+    { cx:-16, cz:-9, rx:5.5, rz:3.4, seed:8.2, fill:'rgba(168,184,160,.09)' },
+    { cx:15.5, cz:-13, rx:4.6, rz:3.0, seed:9.4, fill:'rgba(190,178,196,.09)' },
+  ];
+  for (const b of beds){
+    blob(ctx, b.cx, b.cz, b.rx, b.rz, b.seed, S2P);
+    ctx.fillStyle = b.fill; ctx.fill();
+    ctx.strokeStyle = ink+'.62)'; ctx.lineWidth = 2.4; ctx.stroke();
+    ctx.strokeStyle = ink+'.30)'; ctx.lineWidth = 1;
+    blob(ctx, b.cx, b.cz, b.rx*1.09, b.rz*1.14, b.seed+.31, S2P); ctx.stroke();
+  }
+  /* 小径（虚线，从三圃通向日晷） */
+  ctx.strokeStyle = ink+'.34)'; ctx.lineWidth = 1.4; ctx.setLineDash([7,7]);
+  for (const j of JARS){
+    const [x1,y1] = sheetXY(j.x, j.z), [x2,y2] = sheetXY(j.x*.25, j.z*.25);
+    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.quadraticCurveTo((x1+x2)/2+40, (y1+y2)/2-30, x2, y2); ctx.stroke();
+  }
+  ctx.setLineDash([]);
+  /* 日晷表盘 */
+  const [dx, dy] = sheetXY(0, 0);
+  ctx.strokeStyle = ink+'.85)'; ctx.lineWidth = 2.6;
+  ctx.beginPath(); ctx.arc(dx, dy, DIAL_R*S2P, 0, Math.PI*2); ctx.stroke();
+  ctx.strokeStyle = ink+'.4)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(dx, dy, (DIAL_R+.5)*S2P, 0, Math.PI*2); ctx.stroke();
+  ctx.beginPath(); ctx.arc(dx, dy, .5*S2P, 0, Math.PI*2); ctx.stroke();
+  /* 时刻刻度：用与真实影子同一函数系定位（印的表盘与真的影子对齐） */
+  ctx.font = '600 '+(0.62*S2P)+'px "Noto Serif SC","Songti SC",serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (let h=6; h<=19; h++){
+    const st = clamp01((h-6.1)/12.9);
+    const pgh = st*0.8;
+    const az = shadowAz(pgh);
+    const tx = dx + Math.sin(az)*(DIAL_R-.72)*S2P, ty = dy + Math.cos(az)*(DIAL_R-.72)*S2P;
+    const ox = dx + Math.sin(az)*(DIAL_R+.02)*S2P, oy = dy + Math.cos(az)*(DIAL_R+.02)*S2P;
+    const ix = dx + Math.sin(az)*(DIAL_R-.28)*S2P, iy = dy + Math.cos(az)*(DIAL_R-.28)*S2P;
+    ctx.strokeStyle = ink+'.75)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(ox,oy); ctx.lineTo(ix,iy); ctx.stroke();
+    ctx.fillStyle = ink+'.9)';
+    ctx.fillText(String(h), tx + Math.sin(az)*.86*S2P, ty + Math.cos(az)*.86*S2P);
+  }
+  /* 表盘中心小字 */
+  ctx.fillStyle = ink+'.5)'; ctx.font = '500 '+(.62*S2P)+'px "Noto Serif SC",serif';
+  ctx.fillText('晷', dx + .0*S2P, dy - 1.15*S2P);
+  /* 宣言 · 甲（印在坛中，会被真实影子扫过） */
+  const aSize = mob ? 0.95 : 1.35;
+  ctx.font = '600 '+(aSize*S2P)+'px "Noto Serif SC","Songti SC",serif';
+  ctx.fillStyle = 'rgba(60,64,70,.93)';
+  ctx.fillText('这里不是梦，也不是现实。', dx, sheetXY(0, 8.0)[1] + aSize*S2P*.36);
+  /* 宣言 · 丙（右中小幅） */
+  ctx.font = '500 '+(0.82*S2P)+'px "Noto Serif SC",serif';
+  ctx.fillStyle = 'rgba(60,64,70,.62)';
+  ctx.fillText('看见的最后一层世界。', sheetXY(12.6, -3.4)[0], sheetXY(12.6, -3.4)[1]);
+  /* 圃名 */
+  ctx.font = '500 '+(.78*S2P)+'px "Noto Serif SC",serif';
+  ctx.fillStyle = ink+'.66)';
+  const labels = [
+    ['随笔 · 三篇', -6.4, 4.6, 0, -2.6], ['项目 · 两件', 7.2, 3.2, 0, -2.8],
+    ['关于 · 一页', 5.6, -8.8, 0, -2.6], ['旧宿百合 · 待开', -16, -9, 0, -3.9],
+    ['未名', 15.5, -13, 0, -3.5],
+  ];
+  for (const L of labels){
+    const [px, py] = sheetXY(L[1], L[2] + L[4]);
+    ctx.fillText(L[0], px, py);
+  }
+  /* 账目行（左侧中带，移入画面可达区——v1 放在 z+28 在相机身后永不入画） */
+  const [lx, ly] = sheetXY(-16.5, -18.5);
+  ctx.font = '500 '+(.66*S2P)+'px "Noto Serif SC",serif';
+  ctx.textAlign = 'left';
+  const ledger = [
+    '晷园总图 · 第壹版', '比例 1:1 · 印次 一', '日晷一座 · 未校正',
+    '玻璃罩三只 · 各封一物', '末行 · 夜显',
+  ];
+  ctx.strokeStyle = ink+'.4)'; ctx.lineWidth = 1;
+  for (let i=0;i<ledger.length;i++){
+    ctx.fillStyle = ink+(i===0?'.8)':'.6)');
+    ctx.fillText(ledger[i], lx, ly + i*.92*S2P);
+    ctx.beginPath(); ctx.moveTo(lx, ly + i*.92*S2P + .34*S2P);
+    ctx.lineTo(lx + 12.4*S2P, ly + i*.92*S2P + .34*S2P); ctx.stroke();
+  }
+  /* 比例尺（右下） */
+  const [sx, sy] = sheetXY(8, -19.8);
+  ctx.textAlign = 'left';
+  ctx.strokeStyle = ink+'.7)'; ctx.lineWidth = 1.6;
+  ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx+8*S2P, sy); ctx.stroke();
+  for (let i=0;i<=4;i++){
+    ctx.beginPath(); ctx.moveTo(sx+i*2*S2P, sy-.22*S2P); ctx.lineTo(sx+i*2*S2P, sy+.22*S2P); ctx.stroke();
+  }
+  ctx.fillStyle = ink+'.6)'; ctx.font = '500 '+(.55*S2P)+'px "Noto Serif SC",serif';
+  ctx.fillText('0        4        8 丈', sx, sy+.9*S2P);
+  /* 指北（上「醒」下「梦」——atlas 供体） */
+  const [nx, ny] = sheetXY(-9.5, -8.5);
+  ctx.strokeStyle = ink+'.75)'; ctx.lineWidth = 1.6;
+  ctx.beginPath(); ctx.arc(nx, ny, 1.6*S2P, 0, Math.PI*2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(nx, ny+1.05*S2P); ctx.lineTo(nx, ny-1.05*S2P); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(nx-.28*S2P, ny-.45*S2P); ctx.lineTo(nx, ny-1.05*S2P); ctx.lineTo(nx+.28*S2P, ny-.45*S2P); ctx.stroke();
+  ctx.textAlign = 'center'; ctx.fillStyle = ink+'.8)'; ctx.font = '500 '+(.7*S2P)+'px "Noto Serif SC",serif';
+  ctx.fillText('醒', nx, ny-2.35*S2P); ctx.fillText('梦', nx, ny+2.55*S2P);
+  /* 角线 */
+  ctx.strokeStyle = ink+'.35)'; ctx.lineWidth = 1;
+  const cs = [[b2,b2,1,1],[CW-b2,b2,-1,1],[b2,CH-b2,1,-1],[CW-b2,CH-b2,-1,-1]];
+  for (const c of cs){
+    ctx.beginPath(); ctx.moveTo(c[0], c[1]+c[3]*.9*S2P); ctx.lineTo(c[0], c[1]);
+    ctx.lineTo(c[0]+c[2]*.9*S2P, c[1]); ctx.stroke();
+  }
+}
+/* 发光层（夜里印刷层自显影）：线稿+字全数以暖金重述一遍 */
+function drawEmis(){
+  const cv = emisCanvas, ctx = cv.getContext('2d');
+  const S2P = cv.width/SHEET.w;
+  ctx.clearRect(0,0,cv.width,cv.height);
+  const gold = (a) => 'rgba(255,201,140,'+a+')';
+  const b2 = 2.2*S2P;
+  ctx.strokeStyle = gold(.5); ctx.lineWidth = 2;
+  ctx.strokeRect(1.6*S2P, 1.6*S2P, cv.width-3.2*S2P, cv.height-3.2*S2P);
+  ctx.strokeStyle = gold(.22); ctx.lineWidth = 1;
+  ctx.strokeRect(b2, b2, cv.width-b2*2, cv.height-b2*2);
+  ctx.strokeStyle = gold(.035);
+  for (let x=-40; x<=40; x+=8){ const [px] = sheetXY(x,0);
+    ctx.beginPath(); ctx.moveTo(px, b2); ctx.lineTo(px, cv.height-b2); ctx.stroke(); }
+  for (let z=-24; z<=24; z+=8){ const [,py] = sheetXY(0,z);
+    ctx.beginPath(); ctx.moveTo(b2, py); ctx.lineTo(cv.width-b2, py); ctx.stroke(); }
+  /* 花坛轮廓 */
+  const beds = [
+    [0,8.0,9.6,2.2,1.1],[-6.4,4.6,2.6,1.9,2.3],[7.2,3.2,2.9,2.1,3.7],[5.6,-8.8,2.7,2.0,5.1],
+    [-4.5,-11,6.8,2.6,6.6],[-16,-9,5.5,3.4,8.2],[15.5,-13,4.6,3.0,9.4],
+  ];
+  for (const b of beds){
+    blob(ctx, b[0], b[1], b[2], b[3], b[4], S2P);
+    ctx.strokeStyle = gold(.36); ctx.lineWidth = 2; ctx.stroke();
+  }
+  /* 小径 */
+  ctx.strokeStyle = gold(.2); ctx.setLineDash([7,7]); ctx.lineWidth = 1.4;
+  for (const j of JARS){
+    const [x1,y1] = sheetXY(j.x, j.z), [x2,y2] = sheetXY(j.x*.25, j.z*.25);
+    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.quadraticCurveTo((x1+x2)/2+40, (y1+y2)/2-30, x2, y2); ctx.stroke();
+  }
+  ctx.setLineDash([]);
+  /* 表盘 */
+  const [dx, dy] = sheetXY(0, 0);
+  ctx.strokeStyle = gold(.6); ctx.lineWidth = 2.4;
+  ctx.beginPath(); ctx.arc(dx, dy, DIAL_R*S2P, 0, Math.PI*2); ctx.stroke();
+  ctx.strokeStyle = gold(.25); ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(dx, dy, (DIAL_R+.5)*S2P, 0, Math.PI*2); ctx.stroke();
+  ctx.font = '600 '+(0.62*S2P)+'px "Noto Serif SC","Songti SC",serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (let h=6; h<=19; h++){
+    const pgh = clamp01((h-6.1)/12.9)*0.8;
+    const az = shadowAz(pgh);
+    const tx = dx + Math.sin(az)*(DIAL_R-.72)*S2P, ty = dy + Math.cos(az)*(DIAL_R-.72)*S2P;
+    ctx.strokeStyle = gold(.6); ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.moveTo(dx+Math.sin(az)*(DIAL_R+.02)*S2P, dy+Math.cos(az)*(DIAL_R+.02)*S2P);
+    ctx.lineTo(dx+Math.sin(az)*(DIAL_R-.28)*S2P, dy+Math.cos(az)*(DIAL_R-.28)*S2P);
+    ctx.stroke();
+    ctx.fillStyle = gold(.75);
+    ctx.fillText(String(h), tx + Math.sin(az)*.86*S2P, ty + Math.cos(az)*.86*S2P);
+  }
+  /* 宣言坛的字夜里微亮 */
+  ctx.font = '600 '+(1.35*S2P)+'px "Noto Serif SC","Songti SC",serif';
+  ctx.fillStyle = gold(.4);
+  ctx.fillText('这里不是梦，也不是现实。', dx, sheetXY(0, 8.0)[1] + 1.35*S2P*.36);
+  /* 账目行 */
+  const [lx, ly] = sheetXY(-16.5, -18.5);
+  ctx.font = '500 '+(.66*S2P)+'px "Noto Serif SC",serif';
+  ctx.textAlign = 'left'; ctx.fillStyle = gold(.4);
+  ctx.fillText('晷园总图 · 第壹版', lx, ly);
+  /* 末句坛里预印一枚空的凹位框（夜里金字升起来） */
+  const [fx, fy] = sheetXY(-4.5, -11);
+  ctx.strokeStyle = gold(.3); ctx.lineWidth = 1.4;
+  ctx.strokeRect(fx-6.25*S2P, fy-.78*S2P, 12.5*S2P, 1.56*S2P);
+}
+
+/* ---- 天空海报画布：渐变（随色板离散重绘）+ 印的日行弧 + 印刷网点 + 云 ---- */
+function drawPoster(palIdx){
+  const cv = posterCanvas, ctx = cv.getContext('2d');
+  const CW = cv.width, CH = cv.height;
+  const P = PAL[palIdx];
+  const g = ctx.createLinearGradient(0,0,0,CH);
+  g.addColorStop(0, P.top); g.addColorStop(.55, P.mid); g.addColorStop(1, P.bot);
+  ctx.fillStyle = g; ctx.fillRect(0,0,CW,CH);
+  /* 网点（印刷质感） */
+  ctx.fillStyle = 'rgba(255,255,255,.05)';
+  const gap = 7;
+  for (let y=0; y<CH; y+=gap) for (let x=(y/gap%2)*gap/2; x<CW; x+=gap){
+    ctx.fillRect(x, y, 1.6, 1.6);
+  }
+  /* 日行弧（印的）：与 shader 里印的太阳同一映射 */
+  const asp = Math.max(W/Math.max(H,1), .4);
+  const uamp = 0.19 * clamp(asp/1.6, .3, 1);
+  const nightF = P.night;
+  ctx.strokeStyle = 'rgba(90,95,104,'+(.5*(1-nightF*.7))+')'; ctx.lineWidth = 1.6; ctx.setLineDash([10,8]);
+  ctx.beginPath();
+  for (let i=0;i<=40;i++){
+    const st = i/40;
+    const a = (st*2-1)*58*Math.PI/180;
+    const el = (14 + 46*Math.sin(st*Math.PI)) * Math.PI/180;
+    const u = .5 + Math.sin(a)*uamp;
+    const v = .264 + .065*(Math.sin(el)/Math.sin(60*Math.PI/180));
+    const px = u*CW, py = (1-v)*CH;
+    if (i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+  }
+  ctx.stroke(); ctx.setLineDash([]);
+  /* 弧上的三枚时刻小字 */
+  ctx.font = '500 9px "Noto Serif SC",serif'; ctx.fillStyle = 'rgba(90,95,104,'+(.5*(1-nightF*.7))+')';
+  ctx.textAlign = 'center';
+  for (const h of [6,12,18]){
+    const st = clamp01((h-6.1)/12.9);
+    const a = (st*2-1)*58*Math.PI/180;
+    const el = (14 + 46*Math.sin(st*Math.PI)) * Math.PI/180;
+    const u = .5 + Math.sin(a)*uamp;
+    const v = .264 + .065*(Math.sin(el)/Math.sin(60*Math.PI/180));
+    ctx.fillText(String(h), u*CW, (1-v)*CH + 13);
+  }
+  /* 两抹印的云（双色套印微错位；夜里隐去） */
+  const cloud = (cx, cy, w, h, a) => {
+    const aa = a * (1-nightF*.8);
+    ctx.fillStyle = 'rgba(120,128,138,'+(aa*.5)+')';
+    ctx.beginPath(); ctx.ellipse(cx+w*.012, cy+h*.05, w, h, 0, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = 'rgba(250,248,242,'+aa+')';
+    ctx.beginPath(); ctx.ellipse(cx, cy, w, h, 0, 0, Math.PI*2); ctx.fill();
+  };
+  cloud(CW*.40, CH*.30, 90, 12, .5);
+  cloud(CW*.66, CH*.16, 70, 9, .38);
+  posterMat.uniforms.uMap.value.needsUpdate = true;
+  posterDrawnFor = palIdx + '|' + (MOB?1:0);
+}
+
+/* ============ CanvasTexture 工具 ============ */
+let planCanvas, planTex, emisCanvas, emisTex, posterCanvas;
+let posterDrawnFor = '';
+function makePlanTexture(){
+  planCanvas = document.createElement('canvas'); planCanvas.width = 2048; planCanvas.height = 1366;
+  drawPlan(MOB);
+  planTex = new THREE.CanvasTexture(planCanvas);
+  planTex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  return planTex;
+}
+function makeEmisTexture(){
+  emisCanvas = document.createElement('canvas'); emisCanvas.width = 2048; emisCanvas.height = 1366;
+  drawEmis();
+  emisTex = new THREE.CanvasTexture(emisCanvas);
+  emisTex.anisotropy = planTex ? planTex.anisotropy : 4;
+  return emisTex;
+}
+function makePosterTexture(){
+  posterCanvas = document.createElement('canvas'); posterCanvas.width = 2048; posterCanvas.height = 240;
+  const tex = new THREE.CanvasTexture(posterCanvas);
+  posterMat.uniforms.uMap.value = tex;
+  return tex;
+}
+function makeVerticalText(text, w, h, size, color){
+  const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+  const c = cv.getContext('2d');
+  c.clearRect(0,0,w,h);
+  c.fillStyle = color;
+  c.font = '600 '+size+'px "Noto Serif SC","Songti SC",serif';
+  c.textAlign = 'center'; c.textBaseline = 'middle';
+  const step = size*1.16, y0 = h/2 - (text.length-1)*step/2;
+  for (let i=0;i<text.length;i++) c.fillText(text[i], w/2, y0+i*step);
+  const tex = new THREE.CanvasTexture(cv);
+  tex.generateMipmaps = false; tex.minFilter = THREE.LinearFilter;   /* L②：字平面防 mip 稀释 */
+  return tex;
+}
+function makeHText(text, w, h, size, color){
+  const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+  const c = cv.getContext('2d');
+  c.clearRect(0,0,w,h);
+  c.fillStyle = color;
+  c.font = '600 '+size+'px "Noto Serif SC","Songti SC",serif';
+  c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.fillText(text, w/2, h/2);
+  const tex = new THREE.CanvasTexture(cv);
+  tex.generateMipmaps = false; tex.minFilter = THREE.LinearFilter;
+  return tex;
+}
+function makePlaque(def){
+  const cv = document.createElement('canvas'); cv.width = 512; cv.height = 256;
+  const c = cv.getContext('2d');
+  c.fillStyle = '#f6f1e6'; c.fillRect(0,0,512,256);
+  c.strokeStyle = 'rgba(74,79,87,.75)'; c.lineWidth = 5; c.strokeRect(12,12,488,232);
+  c.strokeStyle = 'rgba(74,79,87,.35)'; c.lineWidth = 2; c.strokeRect(24,24,464,208);
+  c.fillStyle = 'rgba(60,64,70,.94)';
+  c.font = '600 108px "Noto Serif SC","Songti SC",serif';
+  c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.fillText(def.name, 256, 108);
+  c.font = '500 40px "Noto Serif SC",serif';
+  c.fillStyle = 'rgba(74,79,87,.62)';
+  c.fillText(def.en.replace(' · ', '  ·  '), 256, 192);
+  const tex = new THREE.CanvasTexture(cv);
+  tex.generateMipmaps = false; tex.minFilter = THREE.LinearFilter;
+  return tex;
+}
+
+/* ============ 相机（滚动位的纯函数——静帧路径复用，E④教训） ============ */
+const lookV = new THREE.Vector3();
+function composeCamera(p){
+  const e = easeInOut(p);
+  if (MOB){
+    camera.position.set(lerp(3.0,-2.4,e), lerp(15.5,13.6,e), lerp(30,25,e));
+    lookV.set(lerp(.2,-.4,e), lerp(0,.6,e), lerp(-4,-7,e));
+  } else {
+    camera.position.set(lerp(3.4,-2.2,e), lerp(11.6,10.2,e), lerp(21.5,17.5,e));
+    lookV.set(lerp(.6,-.6,e), lerp(.2,.7,e), lerp(-5,-7,e));
+  }
+  camera.lookAt(lookV);
+}
+
+/* ============ 时刻读数（悬窗供体） ============ */
+function updateClock(p){
+  const elT = $('ckT'), elP = $('ckP');
+  const lost = p > .93;
+  document.body.classList.toggle('lost', lost);
+  if (lost){ elT.textContent = '时刻'; elP.textContent = '不明'; return; }
+  let m;
+  if (p <= .8) m = lerp(368, 1140, easeInOut(clamp01(p/.8)));
+  else m = lerp(1140, 1427, (p-.8)/.13);
+  m = Math.round(m);
+  const h = Math.floor(m/60);
+  elT.textContent = String(h).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
+  elP.textContent = h<11 ? '晨' : (h<15 ? '昼' : (h<18 ? '暮' : '夜'));
+}
+
+/* ============ 总合成（p, t, L 的纯函数） ============ */
+const _bg = new THREE.Color(), _sun = new THREE.Color(), _hs = new THREE.Color(), _hg = new THREE.Color(), _gd = new THREE.Color();
+function compose(p, t, L){
+  palAt(p, CUR);
+  document.body.classList.toggle('scrolled', p > .03);
+  const s = sunAt(p);
+  const night = CUR.night;
+  const dim = 1 - L*0.86;                 /* 日出加载：世界从暗里显影 */
+  const li = L*L*(3-2*L);
+
+  /* 雾/背景 */
+  _bg.setRGB(CUR.fog[0]/255, CUR.fog[1]/255, CUR.fog[2]/255).multiplyScalar(1-dim*.55);
+  scene.background = _bg;
+  scene.fog.color.copy(_bg);
+  U.uFogColor.value.copy(_bg);
+
+  /* 印的太阳：位置与亮暗 */
+  posterMat.uniforms.uSunUv.value.set(s.u, s.v);
+  posterMat.uniforms.uDim.value = dim;
+  posterMat.uniforms.uDiscCol.value.setRGB(CUR.sunCol[0]/255, CUR.sunCol[1]/255, CUR.sunCol[2]/255);
+  U.uNight.value = night;
+  /* 海报底色离散重绘（缓存键） */
+  const key = CUR.effIdx + '|' + (MOB?1:0);
+  if (posterDrawnFor !== key) drawPoster(CUR.effIdx);
+
+  /* 真的光：方向/颜色/强度听印的太阳指挥 */
+  const el = Math.max(s.el, 0.24);
+  U.uLightDir.value.copy(s.dir).normalize();
+  sunLight.position.copy(s.dir).normalize().multiplyScalar(58);
+  sunLight.target.position.set(0,0,0);
+  sunLight.color.setRGB(CUR.sunCol[0]/255, CUR.sunCol[1]/255, CUR.sunCol[2]/255);
+  sunLight.intensity = (CUR.sunI * li) * (1-night*.94) * smooth(.10, .30, s.el);
+  hemi.color.setRGB(CUR.hemiS[0]/255, CUR.hemiS[1]/255, CUR.hemiS[2]/255);
+  hemi.groundColor.setRGB(CUR.hemiG[0]/255, CUR.hemiG[1]/255, CUR.hemiG[2]/255);
+  hemi.intensity = (.28 + .18*li) * (1-night*.40);
+  ambient.intensity = .12 + night*.05;
+
+  /* 地面 */
+  baseMat.color.setRGB(CUR.gnd[0]/255, CUR.gnd[1]/255, CUR.gnd[2]/255).multiplyScalar(1-dim*.3);
+  sheetTopMat.emissiveIntensity = night * .72;
+
+  /* 花罩：夜里亮起 + hover */
+  for (let i=0;i<jarObjs.length;i++){
+    const J = jarObjs[i], def = J.def;
+    const want = (S.hover === i) ? 1 : 0;
+    S.hoverT[i] = IS_STILL || IS_RM ? want : lerp(S.hoverT[i], want, .14);
+    const hov = S.hoverT[i];
+    const base = .10 + night*.42 + hov*.6;
+    J.glow.material.opacity = clamp(base*(.5+li*.5), 0, .85);
+    J.light.intensity = (0.12 + night*1.25 + hov*1.1) * li;
+    J.glass.material.uniforms.uHover.value = hov;
+    /* 铭牌夜里随光暗下（Basic 不受光，用乘色模拟） */
+    const dk = 1 - night*.4;
+    J.plq.material.color.setRGB(dk, dk*.99, dk*.96);
+  }
+  steleMesh.userData.pl.material.color.setRGB(1-night*.34, 1-night*.33, 1-night*.3);
+
+  /* 末句夜里显影 */
+  finalMesh.material.opacity = smooth(.86, .96, p) * (0.65 + night*.35);
+
+  /* 尘/萤 */
+  if (!IS_STILL && !IS_RM) updateDust(t, night);
+  else updateDust(t, night);
+
+  /* 相机与读数 */
+  composeCamera(p);
+  updateClock(p);
+  U.uCamPos.value.copy(camera.position);
+  U.uTime.value = t;
+
+  /* hover 卡片跟随 */
+  placeJarcard();
+}
+
+/* ============ 渲染（尺寸看门狗进主循环——R①/K②） ============ */
+function renderOnce(){
+  if (innerWidth !== W || innerHeight !== H) onResize();
+  if (!renderer) return;
+  compose(S.p, S.t, S.L);
+  renderer.render(scene, camera);
+  if (IS_STILL) document.title = (__swarmErr === 'none' ? '晷园 · ok' : '✗ ' + __swarmErr);
+}
+
+/* ============ hover 卡片 ============ */
+const _pv = new THREE.Vector3();
+function placeJarcard(){
+  const el = $('jarcard');
+  if (S.hover < 0 || S.hover > 2 || MOB){ el.style.opacity = 0; return; }
+  const J = jarObjs[S.hover];
+  _pv.set(J.def.x, 1.9*J.def.s, J.def.z).project(camera);
+  if (_pv.z > 1){ el.style.opacity = 0; return; }
+  el.style.left = clamp((_pv.x*.5+.5)*W, 100, W-100) + 'px';
+  el.style.top = clamp((-_pv.y*.5+.5)*H, 130, H-40) + 'px';
+  el.style.opacity = 1;
+  $('jcN').textContent = J.def.name;
+  $('jcE').textContent = J.def.en;
+  el.querySelector('.go').textContent = J.def.go;
+}
+
+/* ============ resize ============ */
+function onResize(){
+  W = innerWidth; H = innerHeight;
+  if (W < 100 || H < 100) return;
+  if (!renderer) return;
+  const mob = W < 761 || (W/Math.max(H,1)) < .75;
+  if (mob !== MOB){ MOB = mob; redrawAll(); }
+  camera.aspect = W/H;
+  camera.fov = MOB ? 54 : 42;
+  camera.updateProjectionMatrix();
+  renderer.setPixelRatio(DPR);
+  renderer.setSize(W, H);
+}
+function redrawAll(){
+  if (planTex){ drawPlan(MOB); planTex.needsUpdate = true; }
+  if (emisTex){ drawEmis(); emisTex.needsUpdate = true; }
+  posterDrawnFor = '';
+}
+
+/* ============ 指针：注视花罩（raycast 在 pointermove——N⑤） ============ */
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+function pickAt(cx, cy){
+  ndc.set(cx/W*2-1, -(cy/H)*2+1);
+  ray.setFromCamera(ndc, camera);
+  const hits = ray.intersectObjects(jarObjs.map(J => J.hit));
+  return hits.length ? hits[0].object.userData.jar : -1;
+}
+window.addEventListener('pointermove', e => {
+  if (MOB) return;
+  S.hoverWant = pickAt(e.clientX, e.clientY);
+  syncNav();
+});
+window.addEventListener('pointerdown', e => {
+  const j = pickAt(e.clientX, e.clientY);
+  if (j >= 0){ goJar(j); }
+  skipIntro();
+}, { passive: true });
+function goJar(i){
+  if (IS_STILL || IS_RM) return;
+  const target = JARS[i].jp * (document.documentElement.scrollHeight - innerHeight);
+  window.scrollTo({ top: target, behavior: 'smooth' });
+}
+function syncNav(){
+  document.querySelectorAll('#nav a').forEach(a => {
+    a.classList.toggle('on', +a.dataset.i === S.hoverWant);
+  });
+}
+document.querySelectorAll('#nav a').forEach(a => {
+  a.addEventListener('mouseenter', () => { S.hoverWant = +a.dataset.i; });
+  a.addEventListener('mouseleave', () => { S.hoverWant = -1; });
+  a.addEventListener('click', e => { e.preventDefault(); goJar(+a.dataset.i); });
+});
+window.addEventListener('keydown', e => {
+  skipIntro();
+  if (e.key === '1') goJar(0);
+  if (e.key === '2') goJar(1);
+  if (e.key === '3') goJar(2);
+});
+
+/* ============ 日出加载（可跳过） ============ */
+const INTRO_DUR = 3400;
+function updateVeil(){
+  const v = $('veil');
+  if (S.booted){ document.body.classList.add('booted'); return; }
+  v.style.opacity = String(clamp01(1 - S.L*S.L*1.15));
+  v.style.pointerEvents = 'none';
+  $('veilSub').textContent = S.L < .4 ? '雾还未散' : (S.L < .8 ? '太阳正沿印好的弧线升起' : '第一行字正在显影');
+}
+function skipIntro(){
+  if (!S.booted && !IS_STILL && !IS_RM && !IS_AUTO){ S.L = 1; boot(); }
+}
+function boot(){
+  if (S.booted) return;
+  S.booted = true; S.L = 1;
+  updateVeil();
+}
+
+/* ============ auto 驱动（setInterval——M 结论：rAF 在无头环境不 tick） ============ */
+let lastNow = 0, rafId = 0, autoT0 = 0, autoIv = 0, autoTick = 0;
+function autoPath(u){
+  const seg = [
+    [0,.09,0,.06],[.09,.20,.06,.18],[.20,.30,.18,.18],[.30,.46,.18,.45],
+    [.46,.55,.45,.45],[.55,.68,.45,.66],[.68,.76,.66,.66],[.76,.92,.66,.95],[.92,1,.95,1],
+  ];
+  u = clamp01(u);
+  for (const sg of seg){
+    if (u <= sg[1] || sg[1] === 1){
+      const t = clamp01((u-sg[0])/(sg[1]-sg[0]));
+      return lerp(sg[2], sg[3], easeInOut(t));
+    }
+  }
+  return 1;
+}
+function autoStep(){
+  const mul = IS_FAST ? 5 : 1;
+  const now = performance.now();
+  const at = (now - autoT0)/1000 * mul;
+  S.t += .05*mul;
+  if (at < INTRO_DUR/1000){ S.L = clamp01(at/(INTRO_DUR/1000)); }
+  else {
+    if (!S.booted) boot();
+    S.p = autoPath((at - INTRO_DUR/1000)/26);
+    if (S.p >= 1 && autoIv){ clearInterval(autoIv); autoIv = 0; }
+  }
+  if (LOAD_L !== null) S.L = LOAD_L;
+  updateVeil();
+  if ((autoTick++ % 2) === 0) renderOnce();   /* 虚拟时间下降渲染密度防丢上下文 */
+  if ((autoTick % 30) === 0) document.title = 'auto p=' + S.p.toFixed(2) + ' L=' + S.L.toFixed(2) + ' err=' + __swarmErr;
+  if (S.p >= 1 && autoIv){ clearInterval(autoIv); autoIv = 0; document.title = 'auto done err=' + __swarmErr; }
+}
+function startLoop(){
+  lastNow = performance.now();
+  if (IS_AUTO){
+    autoT0 = lastNow;
+    autoIv = setInterval(autoStep, 33);
+    return;
+  }
+  const tick = (now) => {
+    rafId = requestAnimationFrame(tick);
+    let dt = (now - lastNow)/1000; lastNow = now;
+    if (dt > .1) dt = .1;
+    S.t += dt;
+    if (!S.booted){
+      S.L = clamp01((performance.now() - S.t0)/INTRO_DUR);
+      if (LOAD_L !== null) S.L = LOAD_L;
+      updateVeil();
+      if (S.L >= 1) boot();
+    } else {
+      const doc = document.documentElement;
+      const max = Math.max(1, doc.scrollHeight - innerHeight);
+      S.pRaw = clamp01((window.scrollY || doc.scrollTop || 0)/max);
+      S.p = PIN !== null ? PIN : S.pRaw;
+      document.body.classList.toggle('scrolled', S.p > .03);
+    }
+    renderOnce();
+  };
+  rafId = requestAnimationFrame(tick);
+}
+
+/* ============ RM：滚动时按需重渲（静帧但可跟随滚动） ============ */
+function armRM(){
+  const rerender = () => {
+    const doc = document.documentElement;
+    const max = Math.max(1, doc.scrollHeight - innerHeight);
+    S.pRaw = clamp01((window.scrollY || doc.scrollTop || 0)/max);
+    S.p = PIN !== null ? PIN : S.pRaw;
+    document.body.classList.toggle('scrolled', S.p > .03);
+    renderOnce();
+  };
+  window.addEventListener('scroll', rerender, { passive: true });
+  rerender();
+}
+
+/* ============ init ============ */
+function loadFontsThen(){
+  if (!document.fonts) return Promise.resolve();
+  return Promise.all([
+    document.fonts.load('600 148px "Noto Serif SC"'),
+    document.fonts.load('500 64px "Noto Serif SC"'),
+  ]).catch(()=>{});
+}
+function redrawTexts(){
+  drawPlan(MOB); planTex.needsUpdate = true;
+  drawEmis(); emisTex.needsUpdate = true;
+  posterDrawnFor = '';
+}
+function init(){
+  if (innerWidth < 100 || innerHeight < 100){ setTimeout(init, 120); return; }
+  MOB = innerWidth < 761 || (innerWidth/Math.max(innerHeight,1)) < .75;
+  try {
+    renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    renderer.setPixelRatio(DPR);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  } catch(e){ has3D = false; }
+  if (!renderer || !window.THREE){ document.body.classList.add('nogl'); has3D = false; return; }
+  buildScene();
+  makePosterTexture();
+  onResize();
+  if (IS_STILL || IS_RM){
+    S.L = LOAD_L !== null ? LOAD_L : 1;
+    if (LOAD_L === null) boot(); else updateVeil();
+    S.p = PIN !== null ? PIN : 0;
+    renderOnce();
+    if (IS_RM && !IS_STILL) armRM();
+    return;
+  }
+  S.t0 = performance.now();
+  startLoop();
+  ['wheel','touchstart','keydown'].forEach(ev => window.addEventListener(ev, skipIntro, { passive: true }));
+  loadFontsThen().then(() => { if (has3D && renderer){ redrawTexts(); renderOnce(); } });
+}
+canvas.addEventListener('webglcontextlost', e => { e.preventDefault(); __swarmErr = 'ctxlost (prevented)'; document.title = '✗ ' + __swarmErr; });
+canvas.addEventListener('webglcontextrestored', () => { __swarmErr = 'none (ctx restored)'; });
+
+/* 调试入口 */
+window.__renderOnce = (p, L) => {
+  if (p !== undefined) S.p = clamp01(+p || 0);
+  if (L !== undefined) S.L = clamp01(+L || 0);
+  if (innerWidth !== W || innerHeight !== H) onResize();
+  compose(S.p, S.t, S.L);
+  renderer.render(scene, camera);
+  return __swarmErr;
+};
+window.__mockSnap = () => {
+  if (innerWidth !== W || innerHeight !== H) onResize();
+  compose(S.p, S.t, S.L);
+  renderer.render(scene, camera);
+  return { err: __swarmErr, w: W, h: H, mob: MOB, p: +S.p.toFixed(3), L: +S.L.toFixed(3), night: +CUR.night.toFixed(2), booted: S.booted };
+};
+init();
+</script>
+</body>
+</html>

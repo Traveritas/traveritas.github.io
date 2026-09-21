@@ -1,20 +1,39 @@
 ---
+import '../styles/tokens.css';
 import '../styles/global.css';
+import '@fontsource/noto-serif-sc/300.css';
 import '@fontsource/noto-serif-sc/500.css';
 import '@fontsource/noto-serif-sc/600.css';
+import '@fontsource/noto-serif-sc/900.css';
+import '@fontsource/ibm-plex-mono/400.css';
 import SiteHeader from '../components/SiteHeader.astro';
 import SiteFooter from '../components/SiteFooter.astro';
+import Seam from '../components/chrome/Seam.astro';
+import Eeg from '../components/chrome/Eeg.astro';
+import Rail from '../components/chrome/Rail.astro';
+import Hairline from '../components/chrome/Hairline.astro';
+import BootVeil from '../components/chrome/BootVeil.astro';
+import Grain from '../components/chrome/Grain.astro';
 
 interface Props {
   title: string;
   description?: string;
   type?: 'website' | 'article';
+  seam?: 'default' | 'faint' | 'broken';
+  rail?: {
+    mode: 'night' | 'depth' | 'station';
+    station: string;
+    en?: string;
+    depthTarget?: string;
+  };
 }
 
 const {
   title,
   description = 'Traveritas 的个人网站——随笔、项目，与一些尚在成形的东西。',
   type = 'website',
+  seam = 'faint',
+  rail,
 } = Astro.props;
 
 const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site).href : undefined;
@@ -42,8 +61,25 @@ const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site).href : un
     <meta property="og:url" content={canonical} />
     <meta name="twitter:card" content="summary" />
     <meta name="generator" content={Astro.generator} />
+    <noscript>
+      <style>
+        #bootveil {
+          display: none;
+        }
+        [data-boot] {
+          opacity: 1 !important;
+          transform: none !important;
+        }
+      </style>
+    </noscript>
   </head>
   <body>
+    <BootVeil />
+    <Hairline />
+    <Grain />
+    <Seam variant={seam} />
+    <Eeg />
+    {rail && <Rail {...rail} />}
     <div class="page">
       <SiteHeader />
       <main>
@@ -51,5 +87,15 @@ const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site).href : un
       </main>
       <SiteFooter />
     </div>
+    <script>
+      import { initBoot } from '../scripts/boot';
+      import { initChrome } from '../scripts/chrome';
+      import { initMorph } from '../scripts/morph';
+      import { initNight } from '../scripts/night';
+      initBoot();
+      initChrome();
+      initNight();
+      initMorph();
+    </script>
   </body>
 </html>

@@ -1,0 +1,510 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>方案 B · 帷幕之后</title>
+<style>
+  /* ═══ 概念 ═══
+     世界隔着几层纱。宣言的四个碎片处在帷幕的不同深度：
+     最前一句清晰，越深越被纱稀释——最后一层世界是被稀释的字。
+     暖光从右上渗入；深处有一扇虚掩的门，光从门缝里漏出来。
+     层三明治：暖纸底 → 门与光（最远） → 纱三重（各夹一层文字）
+     → 前景巨褶（切出画面左缘） → 编辑层。 */
+
+  @font-face {
+    font-family: 'Noto Serif SC Web';
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url('https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/files/noto-serif-sc-chinese-simplified-500-normal.woff2') format('woff2');
+  }
+  @font-face {
+    font-family: 'Noto Serif SC Web';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url('https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/files/noto-serif-sc-chinese-simplified-600-normal.woff2') format('woff2');
+  }
+
+  :root {
+    --paper: #f7f4f2;
+    --veil-1: rgba(233, 216, 220, 0.30);   /* 最近的纱 */
+    --veil-2: rgba(226, 209, 214, 0.38);
+    --veil-3: rgba(219, 202, 208, 0.46);   /* 最深的纱 */
+    --fold-deep: #d6c2c9;
+    --light: #fbf4ec;
+    --gold: #c9b48a;
+    --ink: #2c2930;
+    --ink-soft: #5c5560;
+    --ink-faint: #6d6672;
+    --blush-ink: #8d6f77;
+    --font-display: 'Noto Serif SC Web', 'Noto Serif SC', 'Palatino Linotype', Georgia, 'Songti SC', SimSun, serif;
+    --font-body: system-ui, -apple-system, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    font-family: var(--font-body);
+    color: var(--ink);
+    background: var(--paper);
+    overflow: hidden;
+  }
+
+  .stage {
+    position: relative;
+    height: 100dvh;
+    overflow: clip;
+    background:
+      radial-gradient(52vw 60vh at 96% 2%, rgba(251, 244, 236, 0.85), rgba(251, 244, 236, 0) 62%),
+      linear-gradient(158deg, #f5efec 0%, #f2e9e7 58%, #ecdfdd 100%);
+  }
+
+  /* 呼吸的暖光 */
+  .glow {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    background: radial-gradient(38vw 46vh at 88% 8%, rgba(253, 247, 238, 0.5), transparent 68%);
+    animation: glow-breathe 11s ease-in-out infinite alternate;
+    pointer-events: none;
+  }
+  @keyframes glow-breathe {
+    from { opacity: 0.55; }
+    to   { opacity: 1; }
+  }
+
+  /* ── 最深处：虚掩的门与漏出的光 ── */
+  .deep-door {
+    position: absolute;
+    left: 50%;
+    top: 18vh;
+    width: 30vw;
+    height: 64vh;
+    transform: translateX(-38%) rotate(-1.5deg);
+    z-index: 2;
+    filter: blur(7px);
+    opacity: 0.85;
+    pointer-events: none;
+  }
+  .deep-door svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+  /* 门光锥：向观者洒开（宽而软，无硬边界） */
+  .door-light {
+    position: absolute;
+    left: 46vw;
+    top: 16vh;
+    width: 46vw;
+    height: 72vh;
+    z-index: 2;
+    pointer-events: none;
+    background: linear-gradient(174deg, rgba(253, 244, 226, 0.34), rgba(253, 244, 226, 0.05) 62%, transparent 86%);
+    -webkit-mask-image: radial-gradient(85% 95% at 56% 24%, #000 24%, rgba(0,0,0,0.5) 58%, transparent 84%);
+            mask-image: radial-gradient(85% 95% at 56% 24%, #000 24%, rgba(0,0,0,0.5) 58%, transparent 84%);
+  }
+
+  /* ── 纱：三重，各夹一层文字 ── */
+  /* 机制：文字自带 blur/opacity 按深度稀释（不依赖 backdrop-filter，
+     它对含 SVG 的兄弟层并不可靠）；纱层只负责逐层加染 */
+  .veil {
+    position: absolute;
+    inset: -6% -4%;
+    pointer-events: none;
+  }
+  .veil svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+  .veil-3 { z-index: 3; }
+  .veil-2 { z-index: 5; }
+  .veil-1 { z-index: 7; }
+  .veil-1 svg  { animation: veil-sway 17s ease-in-out infinite alternate; }
+  .veil-2 svg  { animation: veil-sway 23s ease-in-out infinite alternate-reverse; }
+  .veil-3 svg  { animation: veil-sway 29s ease-in-out infinite alternate; }
+  @keyframes veil-sway {
+    from { transform: translateX(-7px) skewX(-0.3deg); }
+    to   { transform: translateX(9px)  skewX(0.35deg); }
+  }
+
+  /* 文字碎片：z 决定被几层纱加染，blur 决定被稀释的程度 */
+  .frag {
+    position: absolute;
+    margin: 0;
+    font-family: var(--font-display);
+    color: var(--ink);
+  }
+  .f1 {
+    z-index: 8; /* 最前：任何纱之外 */
+    top: 14vh;
+    left: 14vw;
+    font-size: clamp(2rem, 4.1vw, 3.9rem);
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    line-height: 1.5;
+  }
+  .f2 {
+    z-index: 6; /* 一重纱之后 */
+    top: 34vh;
+    left: 22vw;
+    font-size: clamp(1.05rem, 1.7vw, 1.5rem);
+    font-weight: 500;
+    letter-spacing: 0.3em;
+    color: var(--ink-soft);
+    filter: blur(1.1px);
+    opacity: 0.92;
+  }
+  .f3 {
+    z-index: 4; /* 两重纱之后 */
+    top: 52vh;
+    left: 12vw;
+    font-size: clamp(1rem, 1.55vw, 1.4rem);
+    font-weight: 500;
+    letter-spacing: 0.22em;
+    color: var(--ink-faint);
+    filter: blur(2.4px);
+    opacity: 0.78;
+  }
+  .f4 {
+    z-index: 2; /* 三重纱之后：最后一层世界 */
+    top: 47vh;
+    left: 44vw;
+    font-size: clamp(1.7rem, 3.2vw, 3rem);
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    color: #574d58;
+    filter: blur(4.6px);
+    opacity: 0.62;
+  }
+
+  /* 前景巨褶：切出画面左缘的近纱，比一切都近 */
+  .near-fold {
+    position: absolute;
+    left: -4vw;
+    top: -6vh;
+    width: 30vw;
+    height: 112vh;
+    z-index: 9;
+    pointer-events: none;
+    animation: fold-sway 21s ease-in-out infinite alternate;
+  }
+  .near-fold svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  @keyframes fold-sway {
+    from { transform: translateX(-8px); }
+    to   { transform: translateX(10px); }
+  }
+
+  /* 下摆：近纱的底缘横过画面（压低、变淡，不抢账目行） */
+  .hem {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 11vh;
+    z-index: 8;
+    pointer-events: none;
+  }
+  .hem svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+  /* 悬垂细线：深处几根静止的线，强化纵深 */
+  .threads {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    pointer-events: none;
+  }
+  .threads svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+  /* ── 编辑层 ── */
+  .brand {
+    position: absolute;
+    top: 4.5vh;
+    left: 4vw;
+    z-index: 12;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 1.02rem;
+    letter-spacing: 0.06em;
+    color: var(--ink);
+    text-decoration: none;
+  }
+  .brand .ring {
+    width: 11px; height: 11px;
+    border: 1.5px solid var(--blush-ink);
+    border-radius: 50%;
+    opacity: 0.9;
+  }
+
+  .nav {
+    position: absolute;
+    right: 3.4vw;
+    top: 24vh;
+    z-index: 12;
+    display: flex;
+    flex-direction: column;
+    gap: 2.3rem;
+  }
+  .nav a {
+    position: relative;
+    writing-mode: vertical-rl;
+    letter-spacing: 0.5em;
+    padding: 0.4rem 0.7rem;
+    color: var(--ink-soft);
+    text-decoration: none;
+    font-size: 0.95rem;
+    transition: color 0.18s ease;
+  }
+  .nav a::after {
+    content: '';
+    position: absolute;
+    top: 46%;
+    right: calc(100% + 0.35rem);
+    width: 1.3rem;
+    height: 1px;
+    background: rgba(141, 111, 119, 0.4);
+    transition: width 0.18s ease, background 0.18s ease;
+  }
+  .nav a:hover { color: var(--ink); }
+  .nav a:hover::after { width: 2rem; background: var(--blush-ink); }
+
+  .side-note {
+    position: absolute;
+    left: 3.2vw;
+    top: 34vh;
+    z-index: 12;
+    writing-mode: vertical-rl;
+    font-size: 0.8rem;
+    letter-spacing: 0.52em;
+    color: var(--ink-faint);
+  }
+
+  /* 最近的随笔：贴在下摆上的三行小账 */
+  .ledger {
+    position: absolute;
+    left: 14vw;
+    right: 22vw;
+    bottom: 5.5vh;
+    z-index: 11;
+  }
+  .ledger h2 {
+    margin: 0 0 0.9rem;
+    font-family: var(--font-body);
+    font-weight: 500;
+    font-size: 0.82rem;
+    letter-spacing: 0.3em;
+    color: var(--ink-faint);
+  }
+  .ledger-row {
+    display: grid;
+    grid-template-columns: 7em 1fr;
+    gap: 0 1.6rem;
+    align-items: baseline;
+    padding-block: 0.5rem;
+    border-top: 1px solid rgba(141, 111, 119, 0.22);
+    text-decoration: none;
+  }
+  .ledger-row:last-of-type { border-bottom: 1px solid rgba(141, 111, 119, 0.22); }
+  .ledger-row .d {
+    font-size: 0.74rem;
+    color: var(--ink-faint);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.08em;
+  }
+  .ledger-row .t {
+    font-family: var(--font-display);
+    font-size: 1rem;
+    color: var(--ink);
+    transition: color 0.18s ease;
+  }
+  .ledger-row:hover .t { color: var(--blush-ink); }
+
+  /* ── 回退 ── */
+  @media (prefers-reduced-motion: reduce) {
+    .veil-1 svg, .veil-2 svg, .veil-3 svg, .near-fold, .glow { animation: none; }
+  }
+
+  @media (max-height: 700px) {
+    .f1 { top: 10vh; font-size: clamp(1.7rem, 3.4vw, 3rem); }
+    .f2 { top: 30vh; }
+    .f3 { top: 46vh; }
+    .f4 { top: 38vh; font-size: clamp(1.4rem, 2.7vw, 2.4rem); }
+    .ledger { bottom: 4vh; }
+  }
+
+  @media (max-width: 760px) {
+    .veil-3, .threads, .hem, .side-note { display: none; }
+    /* 移动端末句不叠纱的模糊：自身 blur 已表达稀释 */
+    .f3 { filter: blur(1.6px); }
+    .f4 { filter: blur(3px); }
+    .deep-door { left: 18vw; width: 52vw; top: 10vh; height: 44vh; }
+    .door-light { display: none; }
+    .f1 { top: 12vh; left: 9vw; right: 9vw; font-size: clamp(1.5rem, 6.6vw, 2.1rem); }
+    .f2 { top: 32vh; left: 9vw; }
+    .f3 { top: 47vh; left: 9vw; }
+    .f4 { top: 58vh; left: 9vw; opacity: 0.55; font-size: clamp(1.25rem, 5.4vw, 1.8rem); }
+    .near-fold { width: 44vw; }
+    .nav {
+      position: static;
+      margin: 2.2rem 9vw 0;
+      flex-direction: row;
+      gap: 1.8rem;
+    }
+    .nav a { writing-mode: horizontal-tb; letter-spacing: 0.24em; font-size: 0.9rem; }
+    .nav a::after { display: none; }
+    .ledger { position: static; margin: 2.6rem 9vw 7vh; }
+    .ledger-row { grid-template-columns: 1fr auto; }
+    .ledger-row .d { display: none; }
+    .stage { overflow-y: auto; }
+  }
+</style>
+</head>
+<body>
+<div class="stage">
+
+  <!-- 呼吸暖光 -->
+  <div class="glow" aria-hidden="true"></div>
+
+  <!-- 最深处：虚掩的门（世界深处唯一的硬几何） -->
+  <div class="deep-door" aria-hidden="true">
+    <svg viewBox="0 0 300 640" preserveAspectRatio="none">
+      <!-- 门框 -->
+      <rect x="86" y="14" width="132" height="612" fill="none" stroke="#9c8b90" stroke-width="5" opacity="0.75"/>
+      <!-- 门扇（微开）与漏光的缝 -->
+      <rect x="94" y="22" width="60" height="596" fill="#e8dcd6" opacity="0.6"/>
+      <rect x="94" y="22" width="60" height="596" fill="none" stroke="#9c8b90" stroke-width="2.5" opacity="0.55"/>
+      <!-- 漏光：门缝一道竖直的暖光 -->
+      <rect x="156" y="24" width="16" height="592" fill="#f6e7c8" opacity="0.85"/>
+      <rect x="150" y="24" width="28" height="592" fill="#f6e7c8" opacity="0.28"/>
+      <!-- 门内更深处的模糊暖色 -->
+      <rect x="172" y="26" width="42" height="588" fill="#f3e3c6" opacity="0.4"/>
+      <!-- 圆形门把手：一个模糊的小点 -->
+      <circle cx="146" cy="330" r="4.5" fill="#8d7a80" opacity="0.7"/>
+    </svg>
+  </div>
+  <div class="door-light" aria-hidden="true"></div>
+
+  <!-- 宣言碎片四块（由深到浅） -->
+  <h1 style="display:contents" aria-label="这里不是梦，也不是现实。它是人在即将醒来时，看见的最后一层世界。">
+    <p class="frag f4" aria-hidden="true">看见的最后一层世界。</p>
+    <p class="frag f3" aria-hidden="true">它是人在即将醒来时，</p>
+    <p class="frag f2" aria-hidden="true">也不是现实。</p>
+    <p class="frag f1" aria-hidden="true">这里不是梦，</p>
+  </h1>
+
+  <!-- 纱三重（文字之上、渐次覆盖） -->
+  <div class="veil veil-3" aria-hidden="true">
+    <svg viewBox="0 0 1440 900" preserveAspectRatio="none">
+      <g fill="#ded0d4">
+        <rect x="60"   y="0" width="150" height="900" opacity="0.30"/>
+        <rect x="255"  y="0" width="90"  height="900" opacity="0.22"/>
+        <rect x="430"  y="0" width="170" height="900" opacity="0.32"/>
+        <rect x="680"  y="0" width="80"  height="900" opacity="0.20"/>
+        <rect x="850"  y="0" width="150" height="900" opacity="0.28"/>
+        <rect x="1090" y="0" width="110" height="900" opacity="0.24"/>
+        <rect x="1290" y="0" width="150" height="900" opacity="0.30"/>
+      </g>
+      <path d="M0 0 L1440 60 L1440 0 Z" fill="#e9dcdf" opacity="0.5"/>
+    </svg>
+  </div>
+
+  <div class="veil veil-2" aria-hidden="true">
+    <svg viewBox="0 0 1440 900" preserveAspectRatio="none">
+      <g fill="#e2d2d6">
+        <rect x="120"  y="0" width="120" height="900" opacity="0.30"/>
+        <rect x="360"  y="0" width="200" height="900" opacity="0.34"/>
+        <rect x="700"  y="0" width="90"  height="900" opacity="0.24"/>
+        <rect x="920"  y="0" width="170" height="900" opacity="0.32"/>
+        <rect x="1230" y="0" width="130" height="900" opacity="0.28"/>
+      </g>
+    </svg>
+  </div>
+
+  <div class="veil veil-1" aria-hidden="true">
+    <svg viewBox="0 0 1440 900" preserveAspectRatio="none">
+      <g fill="#ecdde0">
+        <rect x="210"  y="0" width="180" height="900" opacity="0.30"/>
+        <rect x="560"  y="0" width="110" height="900" opacity="0.24"/>
+        <rect x="780"  y="0" width="190" height="900" opacity="0.30"/>
+        <rect x="1150" y="0" width="140" height="900" opacity="0.26"/>
+      </g>
+    </svg>
+  </div>
+
+  <!-- 悬垂细线（深处，静止） -->
+  <div class="threads" aria-hidden="true">
+    <svg viewBox="0 0 1440 900" preserveAspectRatio="none">
+      <g stroke="#a78e96" stroke-width="1" opacity="0.5">
+        <line x1="600" y1="0" x2="596" y2="560"/>
+        <line x1="642" y1="0" x2="640" y2="640"/>
+        <line x1="1010" y1="0" x2="1015" y2="470"/>
+        <line x1="1188" y1="0" x2="1182" y2="700"/>
+        <line x1="86" y1="0" x2="90" y2="380"/>
+      </g>
+      <!-- 线端小结 -->
+      <g fill="#a78e96" opacity="0.55">
+        <circle cx="596" cy="562" r="2.4"/>
+        <circle cx="640" cy="642" r="2.4"/>
+        <circle cx="1015" cy="472" r="2.2"/>
+        <circle cx="1182" cy="702" r="2.4"/>
+        <circle cx="90" cy="382" r="2.2"/>
+      </g>
+    </svg>
+  </div>
+
+  <!-- 近纱的底缘（下摆） -->
+  <div class="hem" aria-hidden="true">
+    <svg viewBox="0 0 1440 170" preserveAspectRatio="none">
+      <path d="M0 60 C 240 24, 470 96, 720 66 C 980 36, 1200 90, 1440 52 L1440 170 L0 170 Z"
+            fill="#e3d3d7" opacity="0.55"/>
+      <path d="M0 96 C 260 62, 520 122, 780 92 C 1030 64, 1240 112, 1440 84 L1440 170 L0 170 Z"
+            fill="#dbc8cd" opacity="0.5"/>
+      <path d="M0 96 C 260 62, 520 122, 780 92 C 1030 64, 1240 112, 1440 84"
+            fill="none" stroke="#c9b2b9" stroke-width="1.4" opacity="0.6"/>
+    </svg>
+  </div>
+
+  <!-- 前景巨褶（最近的纱，切出画面左缘） -->
+  <div class="near-fold" aria-hidden="true">
+    <svg viewBox="0 0 420 1000" preserveAspectRatio="none">
+      <path d="M0 0 L318 0 C 268 210, 316 430, 246 660 C 208 800, 236 900, 206 1000 L0 1000 Z"
+            fill="#ddc9cf" opacity="0.72"/>
+      <path d="M318 0 C 268 210, 316 430, 246 660 C 208 800, 236 900, 206 1000"
+            fill="none" stroke="#c4aab2" stroke-width="2" opacity="0.55"/>
+      <path d="M150 0 C 120 260, 168 520, 122 780 C 100 900, 116 960, 104 1000"
+            fill="none" stroke="#cdb5bc" stroke-width="1.6" opacity="0.45"/>
+      <path d="M0 0 L318 0 C 292 90, 282 150, 262 240 L0 210 Z" fill="#e6d6da" opacity="0.5"/>
+    </svg>
+  </div>
+
+  <!-- 站名 -->
+  <a class="brand" href="/"><span class="ring" aria-hidden="true"></span>Traveritas</a>
+
+  <!-- 竖排旁注 -->
+  <p class="side-note" aria-hidden="true">掀起一角　就醒来</p>
+
+  <!-- 竖排导航 -->
+  <nav class="nav" aria-label="站内入口">
+    <a href="/articles/">随笔</a>
+    <a href="/projects/">项目</a>
+    <a href="/about/">关于</a>
+  </nav>
+
+  <!-- 最近的随笔 -->
+  <section class="ledger" aria-label="最近的随笔">
+    <h2>最近的随笔</h2>
+    <a class="ledger-row" href="#">
+      <span class="d">2026.09.12</span>
+      <span class="t">母题探索记录</span>
+    </a>
+    <a class="ledger-row" href="#">
+      <span class="d">2026.08.30</span>
+      <span class="t">关于“醒梦”的第一份笔记</span>
+    </a>
+    <a class="ledger-row" href="#">
+      <span class="d">2026.08.11</span>
+      <span class="t">把网站做成一个房间</span>
+    </a>
+  </section>
+</div>
+</body>
+</html>

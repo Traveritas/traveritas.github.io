@@ -1,0 +1,703 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>方案 N · 群浪（活体）</title>
+<style>
+  /* ═══ 概念：群浪 Murmuration ═══
+     世界上没有任何被摆放的物体——没有环、没有碑、没有水。
+     唯一的"建筑"是数千只活体个体组成的群：它们定期试图聚成
+     一个环、聚成宣言的字，又在成形瞬间散开。
+     局部规则：醒（页顶）群能聚成可读的环与字；越往深处滚（入梦），
+     群越不听话——聚形越来越短、越来越散，天色由暮入夜。
+     穿插反用：宣言大字留在 DOM，群点 canvas 叠在其上，
+     活物飞过时短暂遮住字——「世界可能马上消失」。 */
+
+  @font-face {
+    font-family: 'Noto Serif SC Web';
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url('https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/files/noto-serif-sc-chinese-simplified-500-normal.woff2') format('woff2');
+  }
+  @font-face {
+    font-family: 'Noto Serif SC Web';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url('https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/files/noto-serif-sc-chinese-simplified-600-normal.woff2') format('woff2');
+  }
+
+  :root {
+    --ink: #45403a;
+    --ink-soft: #5a544c;
+    --ink-faint: #6e685f;
+    --mist-ink: #6d6157;
+    --halo: rgba(248, 240, 228, 0.9);
+    --slip-bg: rgba(252, 250, 244, 0.9);
+    --slip-line: rgba(255, 255, 255, 0.62);
+    --slip-shade: rgba(84, 72, 60, 0.3);
+    --font-display: 'Noto Serif SC Web', 'Noto Serif SC', 'Palatino Linotype', Georgia, 'Songti SC', SimSun, serif;
+    --font-body: system-ui, -apple-system, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: var(--font-body); color: var(--ink); background: #ece7e1; }
+
+  .stage {
+    position: fixed;
+    inset: 0;
+    overflow: clip;
+  }
+  /* 天色：暮（醒）→ 夜（梦）两层渐变，滚动切换由 JS 驱动第二层 opacity */
+  .sky {
+    position: absolute; inset: 0; z-index: 0;
+    background: linear-gradient(to bottom,
+      #ede8e1 0%, #e9dfd2 32%, #ead7bc 56%, #e3c8a4 70%,
+      #b9ab9e 79%, #a9a5a1 88%, #9c9997 100%);
+  }
+  .sky.night {
+    background: linear-gradient(to bottom,
+      #39434b 0%, #45525b 32%, #57656c 56%, #6e777c 70%,
+      #565a5e 80%, #46484b 90%, #3c3e41 100%);
+    opacity: 0;
+  }
+  /* 地平线雾带：极低对比，只负责收底 */
+  .horizon {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 30vh; z-index: 0;
+    background: linear-gradient(to bottom, transparent, rgba(60, 58, 58, 0.10) 78%, rgba(52, 52, 54, 0.16));
+    pointer-events: none;
+  }
+
+  .scroll-length { height: 220vh; }   /* 首屏之外留 120vh 滚动余量 = 入梦行程 */
+  canvas#gl {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    display: block; z-index: 2; pointer-events: none;
+  }
+
+  .vignette {
+    position: absolute; inset: 0; z-index: 3; pointer-events: none;
+    background: radial-gradient(125% 92% at 50% 44%, transparent 58%, rgba(74, 66, 62, 0.14) 100%);
+  }
+
+  .rise { opacity: 0; transform: translateY(10px); animation: rise-in 1.3s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+  .rise.d1 { animation-delay: 0.15s; }
+  .rise.d2 { animation-delay: 0.45s; }
+  .rise.d3 { animation-delay: 0.7s; }
+  @keyframes rise-in { to { opacity: 1; transform: translateY(0); } }
+
+  /* 宣言第一行：左上，DOM 层（群点从其上飞过时短暂遮挡） */
+  .manifesto {
+    position: absolute;
+    left: 8vw;
+    top: 9vh;
+    z-index: 1;
+    margin: 0;
+    font-family: var(--font-display);
+    line-height: 1.6;
+    color: var(--ink);
+    text-shadow: 0 2px 26px var(--halo), 0 0 8px var(--halo);
+  }
+  .manifesto .l1 { display: block; font-size: clamp(1.35rem, 2.8vw, 2.6rem); font-weight: 500; letter-spacing: 0.04em; }
+
+  /* 大字：右下淡色，群的主要遮挡对象 */
+  .big-word {
+    position: absolute;
+    right: 7vw; bottom: 24vh;
+    z-index: 1;
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: clamp(2.2rem, 5.6vw, 5.2rem);
+    letter-spacing: 0.06em;
+    line-height: 1.25;
+    color: var(--ink);
+    opacity: 0.42;
+    text-shadow: 0 2px 30px var(--halo);
+    text-align: right;
+  }
+  .big-word small {
+    display: block;
+    font-size: 0.32em;
+    letter-spacing: 0.3em;
+    opacity: 0.75;
+    margin-top: 0.7em;
+  }
+
+  .brand {
+    position: absolute; top: 4.5vh; left: 4vw; z-index: 4;
+    display: inline-flex; align-items: center; gap: 0.6rem;
+    font-family: var(--font-display); font-weight: 500; font-size: 1.02rem;
+    letter-spacing: 0.06em; color: var(--ink); text-decoration: none;
+    text-shadow: 0 1px 18px var(--halo);
+  }
+  .brand .ring { width: 11px; height: 11px; border: 1.5px solid var(--mist-ink); border-radius: 50%; opacity: 0.85; }
+
+  .nav {
+    position: absolute; right: 3.4vw; top: 20vh; z-index: 4;
+    display: flex; flex-direction: column; gap: 2.3rem;
+  }
+  .nav a {
+    position: relative; writing-mode: vertical-rl; letter-spacing: 0.5em;
+    padding: 0.4rem 0.7rem; color: var(--ink-soft); text-decoration: none;
+    font-size: 0.95rem; transition: color 0.18s ease;
+    text-shadow: 0 1px 16px var(--halo);
+  }
+  .nav a::after {
+    content: ''; position: absolute; top: 46%; right: calc(100% + 0.35rem);
+    width: 1.3rem; height: 1px; background: rgba(109, 97, 87, 0.45);
+    transition: width 0.18s ease, background 0.18s ease;
+  }
+  .nav a:hover { color: var(--ink); }
+  .nav a:hover::after { width: 2rem; background: var(--mist-ink); }
+
+  .side-note {
+    position: absolute; left: 3.2vw; top: 13vh; z-index: 4;
+    writing-mode: vertical-rl; font-size: 0.8rem; letter-spacing: 0.52em;
+    color: var(--ink-faint);
+    text-shadow: 0 0 10px var(--halo), 0 0 4px var(--halo);
+  }
+
+  .floating-ledger { position: absolute; left: 26vw; right: 16vw; bottom: 5.5vh; z-index: 4; }
+  .floating-ledger h2 {
+    margin: 0 0 1rem; font-weight: 500; font-size: 0.82rem;
+    letter-spacing: 0.3em; color: var(--ink-faint);
+    text-shadow: 0 1px 14px var(--halo);
+  }
+  .slips { display: flex; gap: 1.2rem 1.8rem; align-items: flex-start; }
+  .slip {
+    position: relative; display: block; padding: 0.85rem 1rem 0.95rem;
+    background: var(--slip-bg); border: 1px solid var(--slip-line);
+    box-shadow: 5px 4px 10px -6px var(--slip-shade);
+    text-decoration: none; overflow: clip;
+  }
+  .slip::after {
+    content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 38%;
+    background: linear-gradient(to bottom, transparent, rgba(200, 169, 134, 0.22));
+  }
+  .slip:nth-child(1) { width: 13rem; transform: rotate(-1.2deg); }
+  .slip:nth-child(2) { width: 15.5rem; transform: rotate(0.7deg) translateY(10px); }
+  .slip:nth-child(3) { width: 12.5rem; transform: rotate(-0.5deg) translateY(3px); }
+  .slip .d { display: block; font-size: 0.72rem; letter-spacing: 0.12em; color: var(--ink-faint); font-variant-numeric: tabular-nums; margin-bottom: 0.35rem; }
+  .slip .t { display: block; font-family: var(--font-display); font-size: 0.98rem; color: var(--ink); line-height: 1.55; }
+  .slip:hover .t { color: var(--mist-ink); }
+
+  .stage.no3d canvas#gl { display: none; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .rise { animation: none; opacity: 1; transform: none; }
+  }
+  @media (max-width: 760px) {
+    .side-note { display: none; }
+    .nav { position: static; margin: 0.6rem 9vw 0; flex-direction: row; gap: 1.8rem; }
+    .nav a { writing-mode: horizontal-tb; letter-spacing: 0.24em; font-size: 0.9rem; }
+    .nav a::after { display: none; }
+    .floating-ledger { position: static; margin: 2.8rem 9vw 8vh; }
+    .slips { flex-direction: column; gap: 0.9rem; }
+    .slip { width: 100%; transform: none; }
+    .stage { position: relative; min-height: 100dvh; }
+    .scroll-length { display: none; }
+    .manifesto { position: relative; top: 0; left: 0; margin: 10vh 9vw 0; }
+    .big-word { position: relative; right: auto; bottom: auto; margin: 46vh 9vw 0; text-align: left; }
+  }
+</style>
+</head>
+<body>
+<div class="stage" id="stage">
+  <div class="sky" aria-hidden="true"></div>
+  <div class="sky night" id="skyNight" aria-hidden="true"></div>
+  <div class="horizon" aria-hidden="true"></div>
+
+  <h1 class="manifesto rise" aria-label="这里不是梦，也不是现实。它是人在即将醒来时，看见的最后一层世界。">
+    <span class="l1">这里不是梦，也不是现实。</span>
+  </h1>
+
+  <p class="big-word rise d2" aria-hidden="true">最后一层世界<small>即将醒来时看见的</small></p>
+
+  <a class="brand rise d1" href="/"><span class="ring" aria-hidden="true"></span>Traveritas</a>
+  <p class="side-note rise d2" aria-hidden="true">醒时成字　梦散作群</p>
+
+  <nav class="nav rise d2" aria-label="站内入口">
+    <a href="/articles/">随笔</a>
+    <a href="/projects/">项目</a>
+    <a href="/about/">关于</a>
+  </nav>
+
+  <section class="floating-ledger rise d3" aria-label="最近的随笔">
+    <h2>最近的随笔</h2>
+    <div class="slips">
+      <a class="slip" href="#"><span class="d">2026.09.12</span><span class="t">母题探索记录</span></a>
+      <a class="slip" href="#"><span class="d">2026.08.30</span><span class="t">关于“醒梦”的第一份笔记</span></a>
+      <a class="slip" href="#"><span class="d">2026.08.11</span><span class="t">把网站做成一个房间</span></a>
+    </div>
+  </section>
+
+  <canvas id="gl" aria-hidden="true"></canvas>
+  <div class="vignette" aria-hidden="true"></div>
+</div>
+<div class="scroll-length" aria-hidden="true"></div>
+
+<script src="vendor/three.min.js"></script>
+<script>
+/* ═══ 群浪 · 点群模拟 ═══
+   N 只个体，CPU 积分（固定 dt），单 draw call THREE.Points 渲染。
+   状态机：drift（流场盘旋）→ gather（聚形：环 / 宣言的字）
+   → hold（成形态呼吸）→ burst（波次溃散）→ 循环。
+   目标点从离屏 canvas 绘制的字形像素采样而来。
+   滚动 = 入梦：hold 缩短、目标散乱化、天色暮→夜、DOM 墨色翻转。 */
+(function () {
+  if (!window.THREE) return;
+  try {
+  var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ── 确定性随机 ── */
+  var seed = 20260919;
+  function rnd() { seed = (seed * 1664525 + 1013904223) % 4294967296; return seed / 4294967296; }
+
+  var canvas = document.getElementById('gl');
+  var stage = document.getElementById('stage');
+  var renderer;
+  try { renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true }); }
+  catch (e) { stage.classList.add('no3d'); return; }
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+  renderer.setClearColor(0x000000, 0);
+
+  var scene = new THREE.Scene();
+  var camera = new THREE.PerspectiveCamera(42, 1, 0.1, 220);
+  var camPos = { x: 0, y: 2.1, z: 8.5 };
+  var look = { x: 0.6, y: 3.3, z: -16 };
+
+  /* ── 群的常量 ── */
+  var N = 3200;
+  var CX = 0, CY = 4.4, CZ = -16;          /* 群中心（聚形发生处，高于 DOM 大字一层） */
+  var BOUND = { x: 10.5, yLo: 0.8, yHi: 8.6, zLo: -23, zHi: -9 };
+  var TEXT_W = 17, TEXT_H = 4;              /* 字形目标的世界尺寸 */
+
+  /* ── 个体状态 ── */
+  var pos = new Float32Array(N * 3);
+  var vel = new Float32Array(N * 3);
+  var sSeed = new Float32Array(N);          /* 每个体 [0,1) 种子 */
+  var sTgt = new Float32Array(N * 3);       /* 当前目标点 */
+  var sBurst = new Float32Array(N);         /* 溃散是否已爆发 */
+  var sDelay = new Float32Array(N);         /* 溃散波次延迟 */
+  var sDir = new Float32Array(N * 3);       /* 溃散方向 */
+
+  /* 初始：三段远近带的高斯分布云 */
+  for (var i = 0; i < N; i++) {
+    sSeed[i] = rnd();
+    var band = i % 3;
+    var zB = band === 0 ? -11.5 : band === 1 ? -16 : -20.5;
+    pos[i * 3] = CX + (rnd() + rnd() - 1) * 4.6;
+    pos[i * 3 + 1] = CY + (rnd() + rnd() - 1) * 2.2;
+    pos[i * 3 + 2] = zB + (rnd() + rnd() - 1) * 1.6;
+    vel[i * 3] = (rnd() - 0.5) * 0.4;
+    vel[i * 3 + 1] = (rnd() - 0.5) * 0.2;
+    vel[i * 3 + 2] = (rnd() - 0.5) * 0.2;
+  }
+
+  /* ── 字形采样：离屏 canvas 画字 → 像素点集 ── */
+  function sampleText(text, key) {
+    var cw = 2048, ch = 380;
+    var c = document.createElement('canvas');
+    c.width = cw; c.height = ch;
+    var x = c.getContext('2d', { willReadFrequently: true });
+    function grab() {
+      x.clearRect(0, 0, cw, ch);
+      x.fillStyle = '#000';
+      x.font = '600 262px "Noto Serif SC Web", "Songti SC", SimSun, serif';
+      x.textAlign = 'center';
+      x.textBaseline = 'middle';
+      x.fillText(text, cw / 2, ch / 2 + 10);
+      var im = x.getImageData(0, 0, cw, ch).data;
+      var pts = [];
+      /* 步长 5px：采样点数与个体数同量级——个体近乎全覆盖笔画位置，字才可读 */
+      for (var py = 0; py < ch; py += 5) {
+        for (var px = 0; px < cw; px += 5) {
+          if (im[(py * cw + px) * 4 + 3] > 130) {
+            pts.push([
+              (px / cw - 0.5) * TEXT_W + (rnd() - 0.5) * 0.04,
+              (0.5 - py / ch) * TEXT_H + (rnd() - 0.5) * 0.04,
+              (rnd() - 0.5) * 0.16
+            ]);
+          }
+        }
+      }
+      if (pts.length) targetCache[text] = pts;
+    }
+    grab();
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(grab);
+    return targetCache[text] || [];
+  }
+  var targetCache = {};
+
+  /* 环目标：母题回声——群偶尔记起的形状 */
+  function makeRing(R, tiltX, tiltY) {
+    var pts = [];
+    var M = N;
+    for (var i = 0; i < M; i++) {
+      var a = (i / M) * Math.PI * 2 + rnd() * 0.02;
+      var r = R + (rnd() + rnd() - 1) * 0.24;
+      var px = Math.cos(a) * r, py = Math.sin(a) * r, pz = (rnd() - 0.5) * 0.5;
+      /* 倾斜 */
+      var y1 = py * Math.cos(tiltX) - pz * Math.sin(tiltX);
+      var z1 = py * Math.sin(tiltX) + pz * Math.cos(tiltX);
+      var x2 = px * Math.cos(tiltY) + z1 * Math.sin(tiltY);
+      var z2 = -px * Math.sin(tiltY) + z1 * Math.cos(tiltY);
+      pts.push([x2, y1, z2]);
+    }
+    return pts;
+  }
+
+  var SHAPES = {
+    ring: makeRing(3.5, -0.3, 0.25),
+    t1: sampleText('不是梦'),
+    t2: sampleText('也不是现实'),
+    t3: sampleText('即将醒来')
+  };
+  /* webfont 就绪重采样后，把 SHAPES 的引用刷到最新字形点集 */
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () {
+    if (targetCache['不是梦']) SHAPES.t1 = targetCache['不是梦'];
+    if (targetCache['也不是现实']) SHAPES.t2 = targetCache['也不是现实'];
+    if (targetCache['即将醒来']) SHAPES.t3 = targetCache['即将醒来'];
+  });
+  var SEQ = ['ring', 't1', 'ring', 't2', 't3'];
+  /* 测试辅助（不影响正常路径）：?shape=t1 锁定单一聚形；&fast 压缩周期 */
+  (function () {
+    var qs = location.search;
+    if (qs.indexOf('shape=ring') >= 0) SEQ = ['ring'];
+    else if (qs.indexOf('shape=t1') >= 0) SEQ = ['t1'];    else if (qs.indexOf('shape=t2') >= 0) SEQ = ['t2'];
+    else if (qs.indexOf('shape=t3') >= 0) SEQ = ['t3'];
+  })();
+
+  function assignShape(name) {
+    var pts = SHAPES[name];
+    if (!pts || !pts.length) return;
+    var L = pts.length;
+    for (var i = 0; i < N; i++) {
+      var p = pts[Math.floor(rnd() * L)];   /* 乱序分配：汇聚路径交叉，出群舞感 */
+      sTgt[i * 3] = CX + p[0];
+      sTgt[i * 3 + 1] = CY + p[1];
+      sTgt[i * 3 + 2] = CZ + p[2];
+    }
+  }
+
+  /* ── 点渲染：单 draw call，软盘点，暮/夜两态调色 ── */
+  var uniforms = {
+    uDream: { value: 0 },
+    uPx: { value: 600 }
+  };
+  var mat = new THREE.ShaderMaterial({
+    uniforms: uniforms,
+    transparent: true,
+    depthWrite: false,
+    depthTest: false,
+    vertexShader: [
+      'attribute float aSeed;',
+      'uniform float uPx;',
+      'varying float vSeed;',
+      'void main() {',
+      '  vSeed = aSeed;',
+      '  vec4 mv = modelViewMatrix * vec4(position, 1.0);',
+      '  float emberBoost = 1.0 + step(0.93, aSeed) * 0.5;',
+      '  float size = 0.088 * (0.72 + 0.55 * aSeed) * emberBoost;',
+      '  gl_PointSize = size * uPx / -mv.z;',
+      '  gl_Position = projectionMatrix * mv;',
+      '}'
+    ].join('\n'),
+    fragmentShader: [
+      'uniform float uDream;',
+      'varying float vSeed;',
+      'void main() {',
+      '  float d = length(gl_PointCoord - 0.5);',
+      '  float a = smoothstep(0.5, 0.16, d);',
+      '  /* 暮：暖墨两档；夜：青灰剪影，极少数个体带淡金余烬 */',
+      '  vec3 duskA = vec3(0.345, 0.322, 0.290);',
+      '  vec3 duskB = vec3(0.545, 0.505, 0.442);',
+      '  vec3 nightA = vec3(0.262, 0.294, 0.316);',
+      '  vec3 nightB = vec3(0.404, 0.443, 0.471);',
+      '  vec3 ember = vec3(0.886, 0.753, 0.533);',
+      '  vec3 dusk = mix(duskA, duskB, vSeed);',
+      '  vec3 night = mix(nightA, nightB, vSeed);',
+      '  if (vSeed > 0.93) {',
+      '    dusk = mix(dusk, ember * 0.9, 0.8);',
+      '    night = ember;',
+      '  }',
+      '  vec3 col = mix(dusk, night, uDream);',
+      '  gl_FragColor = vec4(col, a * mix(0.62, 0.78, vSeed));',
+      '}'
+    ].join('\n')
+  });
+  var geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3).setUsage(THREE.DynamicDrawUsage));
+  geo.setAttribute('aSeed', new THREE.BufferAttribute(sSeed, 1));
+  var points = new THREE.Points(geo, mat);
+  points.frustumCulled = false;
+  scene.add(points);
+
+  /* ── 状态机 ── */
+  var seqIdx = 0;
+  var state = 'drift';
+  var curShape = null;
+  var stateT0 = 2.2;              /* 开场先盘旋一小段 */
+  var driftDur = 13, gatherDur = 3.4, holdDur = 6.2, burstDur = 2.4;
+  var driftDurBase = 13, holdDurBase = 6.2;
+  if (location.search.indexOf('fast') >= 0) {
+    driftDur = 4; gatherDur = 2.2; holdDur = 5; burstDur = 1.6;
+    driftDurBase = 4; holdDurBase = 5;
+  }
+
+  function setState(s, now) {
+    state = s; stateT0 = now;
+    if (s === 'gather') {
+      curShape = SEQ[seqIdx % SEQ.length];
+      assignShape(curShape);
+      seqIdx++;
+    }
+    if (s === 'burst') {
+      for (var i = 0; i < N; i++) {
+        sBurst[i] = 0;
+        sDelay[i] = rnd() * 1.3;
+        var a = rnd() * Math.PI * 2, b = (rnd() - 0.5) * Math.PI;
+        var sp = 3.2 + rnd() * 3.4;
+        sDir[i * 3] = Math.cos(a) * Math.cos(b) * sp;
+        sDir[i * 3 + 1] = Math.sin(b) * sp * 0.75;
+        sDir[i * 3 + 2] = Math.sin(a) * Math.cos(b) * sp * 0.5;
+      }
+    }
+  }
+  function stateElapsed(now) { return now - stateT0; }
+
+  /* ── 滚动 = 入梦 ── */
+  var scrollP = 0, dreamP = 0;
+  function readScroll() {
+    var max = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+    scrollP = Math.min(1, Math.max(0, window.scrollY / max || 0));
+  }
+
+  /* DOM 侧的梦色：CSS 变量翻转（节流：变化够大才写） */
+  var lastApplied = -1;
+  var rootStyle = document.documentElement.style;
+  function applyDreamToDom(dp) {
+    if (Math.abs(dp - lastApplied) < 0.012) return;
+    lastApplied = dp;
+    document.getElementById('skyNight').style.opacity = dp.toFixed(3);
+    /* 墨色：暖深 → 浅灰白；光晕：暖 → 暗 */
+    var ink = mixHex('#45403a', '#d9dedb', dp);
+    var soft = mixHex('#6b645c', '#aeb6b3', dp);
+    var faint = mixHex('#7d766d', '#8b9595', dp);
+    var halo = dp < 0.5
+      ? rgbaMix([248, 240, 228, 0.9], [22, 28, 33, 0.72], dp)
+      : rgbaMix([248, 240, 228, 0.9], [22, 28, 33, 0.72], dp);
+    rootStyle.setProperty('--ink', ink);
+    rootStyle.setProperty('--ink-soft', soft);
+    rootStyle.setProperty('--ink-faint', faint);
+    rootStyle.setProperty('--mist-ink', mixHex('#6d6157', '#9fa8a5', dp));
+    rootStyle.setProperty('--halo', halo);
+    rootStyle.setProperty('--slip-bg', 'rgba(' + Math.round(252 - 210 * dp) + ',' + Math.round(250 - 208 * dp) + ',' + Math.round(244 - 202 * dp) + ',' + (0.9 - 0.12 * dp).toFixed(2) + ')');
+    rootStyle.setProperty('--slip-line', 'rgba(' + Math.round(255 - 190 * dp) + ',' + Math.round(255 - 190 * dp) + ',' + Math.round(255 - 190 * dp) + ',' + (0.62 - 0.3 * dp).toFixed(2) + ')');
+    rootStyle.setProperty('--slip-shade', 'rgba(' + Math.round(84 - 30 * dp) + ',' + Math.round(72 - 26 * dp) + ',' + Math.round(60 - 20 * dp) + ',' + (0.3 + 0.2 * dp).toFixed(2) + ')');
+  }
+  function hexToRgb(h) {
+    return [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+  }
+  function mixHex(a, b, f) {
+    var A = hexToRgb(a), B = hexToRgb(b);
+    return 'rgb(' + Math.round(A[0] + (B[0] - A[0]) * f) + ',' + Math.round(A[1] + (B[1] - A[1]) * f) + ',' + Math.round(A[2] + (B[2] - A[2]) * f) + ')';
+  }
+  function rgbaMix(A, B, f) {
+    return 'rgba(' + Math.round(A[0] + (B[0] - A[0]) * f) + ',' + Math.round(A[1] + (B[1] - A[1]) * f) + ',' + Math.round(A[2] + (B[2] - A[2]) * f) + ',' + (A[3] + (B[3] - A[3]) * f).toFixed(3) + ')';
+  }
+
+  /* ── 积分：真实时间多子步（每步 ≤33ms），丢帧/节流时物理不慢放 ── */
+  var DT = 0.033;
+  function integrate(t, dt, dream) {
+    var n = Math.max(1, Math.min(10, Math.round(dt / DT)));
+    var h = dt / n;
+    for (var k = 0; k < n; k++) stepAll(t - dt + (k + 1) * h, h, dream);
+  }
+  function stepAll(t, h, dream) {
+    var st = stateElapsed(t);
+    /* 本状态的目标参数 */
+    var mode = state;
+    if (state === 'gather' && st >= gatherDur) setState('hold', t);
+    else if (state === 'hold' && st >= holdDur) setState('burst', t);
+    else if (state === 'burst' && st >= burstDur) setState('drift', t);
+    else if (state === 'drift' && st >= driftDur) setState('gather', t);
+    st = stateElapsed(t);
+
+    /* 入梦调制：hold 缩短、目标散乱 */
+    var scatter = Math.max(0, (dream - 0.55) / 0.45);   /* 0→1：字形失读 */
+    var pull = 2.6, damp = 0.90, vmax = 2.6;
+    if (state === 'gather') {
+      pull = 2.6 * Math.min(1, st / 1.4);
+      damp = 0.885; vmax = 4.2;
+    } else if (state === 'hold') {
+      vmax = 60;   /* hold 走位置强收敛，速度只是位移导数，不限速 */
+    }
+
+    for (var i = 0; i < N; i++) {
+      var i3 = i * 3;
+      var px = pos[i3], py = pos[i3 + 1], pz = pos[i3 + 2];
+      var vx = vel[i3], vy = vel[i3 + 1], vz = vel[i3 + 2];
+      var s = sSeed[i];
+
+      if (state === 'burst') {
+        if (st > sDelay[i] && !sBurst[i]) {
+          sBurst[i] = 1;
+          vx += sDir[i3]; vy += sDir[i3 + 1]; vz += sDir[i3 + 2];
+        }
+        /* 爆后微阻尼漂移 */
+        vx *= 0.985; vy *= 0.985; vz *= 0.985;
+      } else if (state === 'hold') {
+        /* 成形态：位置强收敛（过阻尼）——点贴上目标，字才可读；
+           呼吸感由目标偏移提供，速度设为位移导数便于 burst 继承 */
+        var tx = sTgt[i3], ty = sTgt[i3 + 1], tz = sTgt[i3 + 2];
+        tx += Math.sin(t * 0.85 + s * 6.283) * 0.085;
+        ty += Math.cos(t * 0.7 + s * 5.1) * 0.07;
+        /* 环成形态整体缓旋：星系般的慢转 */
+        if (curShape === 'ring') {
+          var ang = t * 0.05;
+          var ca = Math.cos(ang), sa = Math.sin(ang);
+          var rx = tx - CX, rz = tz - CZ;
+          tx = CX + rx * ca - rz * sa;
+          tz = CZ + rx * sa + rz * ca;
+        }
+        if (scatter > 0) {
+          tx += Math.sin(s * 41.7 + t * 0.5) * scatter * 2.6;
+          ty += Math.cos(s * 23.3 + t * 0.43) * scatter * 1.5;
+        }
+        var e = 0.16;
+        vx = (tx - px) * e / h;
+        vy = (ty - py) * e / h;
+        vz = (tz - pz) * e / h;
+      } else if (state === 'gather') {
+        var tx = sTgt[i3], ty = sTgt[i3 + 1], tz = sTgt[i3 + 2];
+        if (scatter > 0) {
+          tx += Math.sin(s * 41.7 + t * 0.5) * scatter * 2.6;
+          ty += Math.cos(s * 23.3 + t * 0.43) * scatter * 1.5;
+        }
+        vx += (tx - px) * pull * h;
+        vy += (ty - py) * pull * h;
+        vz += (tz - pz) * pull * h;
+        vx *= 0.988; vy *= 0.988; vz *= 0.988;
+        /* 近目标切向绕行：汇聚路径有群舞感 */
+        var dx = px - tx, dy = py - ty, dz = pz - tz;
+        var dd = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (dd < 0.9 && dd > 0.001) {
+          var prox = (0.9 - dd) / 0.9;
+          var swirl = curShape === 'ring' ? 0.9 : 0.28;
+          vx += (-dz / dd) * prox * swirl;
+          vz += (dx / dd) * prox * swirl;
+          vy += Math.sin(t * 1.1 + s * 6.283) * prox * 0.2;
+        }
+      } else { /* drift */
+        /* 流场 + 个体 wander + 全局微风 */
+        var fx = Math.sin(py * 0.35 + t * 0.4 + s * 6.283) + 0.5 * Math.sin(pz * 0.5 - t * 0.23);
+        var fy = Math.sin(px * 0.3 - t * 0.31 + s * 3.14) * 0.6 + 0.4 * Math.cos(pz * 0.42 + t * 0.17);
+        var fz = Math.sin(px * 0.27 + t * 0.21) * 0.5;
+        vx += fx * 1.15 * h + Math.sin(t * (0.5 + s) + s * 12.5) * 0.5 * h + 0.06 * h;
+        vy += fy * 0.95 * h + Math.cos(t * (0.4 + s * 0.8) + s * 7.7) * 0.4 * h;
+        vz += fz * 0.6 * h;
+        /* 软边界向心 */
+        if (px < CX - BOUND.x) vx += (CX - BOUND.x - px) * 0.5 * h;
+        if (px > CX + BOUND.x) vx += (CX + BOUND.x - px) * 0.5 * h;
+        if (py < BOUND.yLo) vy += (BOUND.yLo - py) * 0.6 * h;
+        if (py > BOUND.yHi) vy += (BOUND.yHi - py) * 0.6 * h;
+        if (pz < BOUND.zLo) vz += (BOUND.zLo - pz) * 0.5 * h;
+        if (pz > BOUND.zHi) vz += (BOUND.zHi - pz) * 0.5 * h;
+        vx *= 0.992; vy *= 0.992; vz *= 0.992;
+      }
+
+      /* 限速 */
+      var sp2 = vx * vx + vy * vy + vz * vz;
+      if (sp2 > vmax * vmax) {
+        var k = vmax / Math.sqrt(sp2);
+        vx *= k; vy *= k; vz *= k;
+      }
+
+      px += vx * h; py += vy * h; pz += vz * h;
+      pos[i3] = px; pos[i3 + 1] = py; pos[i3 + 2] = pz;
+      vel[i3] = vx; vel[i3 + 1] = vy; vel[i3 + 2] = vz;
+    }
+    geo.attributes.position.needsUpdate = true;
+  }
+
+  /* ── 镜头 ── */
+  function placeCamera() {
+    camera.position.set(camPos.x, camPos.y, camPos.z - 1.7 * scrollP);
+    camera.lookAt(look.x, look.y - 0.4 * scrollP, look.z);
+  }
+
+  function renderOnce() {
+    placeCamera();
+    renderer.render(scene, camera);
+  }
+
+  function onResize() {
+    var w = window.innerWidth, h = window.innerHeight;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+    uniforms.uPx.value = renderer.domElement.height / (2 * Math.tan(camera.fov * Math.PI / 360));
+    renderOnce();
+  }
+
+  /* ── 主循环（30fps 节流，沿用底盘纪律） ── */
+  var lastT = 0, running = false, rafId = null;
+  window.__swarmState = '?';
+  function loop(now) {
+    requestAnimationFrame(loop);
+    if (now - lastT < 33) return;
+    var dtReal = Math.min(0.25, (now - lastT) / 1000);
+    lastT = now;
+    var t = now / 1000;
+    window.__swarmState = state + ' ' + (t - stateT0).toFixed(1) + 's t=' + t.toFixed(1);
+
+    /* 每帧兜底读滚动位置（不依赖 scroll 事件时序；事件监听仅供 reduceMotion 静帧） */
+    readScroll();
+    dreamP += (scrollP - dreamP) * 0.09;
+    uniforms.uDream.value = dreamP;
+    applyDreamToDom(dreamP);
+
+    /* 入梦压缩 hold 与 drift */
+    holdDur = holdDurBase - (holdDurBase - 1.4) * dreamP;
+    driftDur = driftDurBase - 5 * dreamP;
+
+    integrate(t, dtReal, dreamP);
+    renderOnce();
+  }
+  function start() { if (running || reduceMotion) return; running = true; lastT = performance.now(); rafId = requestAnimationFrame(loop); }
+  function stop() { running = false; if (rafId !== null) cancelAnimationFrame(rafId); rafId = null; }
+  document.addEventListener('visibilitychange', function () { if (document.hidden) stop(); else start(); });
+
+  window.addEventListener('scroll', function () {
+    readScroll();
+    if (reduceMotion) { dreamP = scrollP; applyDreamToDom(dreamP); renderOnce(); }
+  }, { passive: true });
+  window.addEventListener('resize', onResize);
+
+  /* ── 启动 ── */
+  setState('drift', 0);
+  onResize();
+  readScroll();
+  if (reduceMotion) {
+    /* 静帧：群直接摆成宣言第一短句 */
+    assignShape('t1');
+    for (var j = 0; j < N * 3; j++) pos[j] = pos[j] * 0.2 + sTgt[j] * 0.8;
+    geo.attributes.position.needsUpdate = true;
+    applyDreamToDom(scrollP);
+    renderOnce();
+  } else {
+    start();
+    /* 测试模式（?auto）：rAF 被渲染器节流时（如无头/遮挡环境）用定时器驱动，
+       状态机与积分逻辑不变；正常浏览不受影响。 */
+    if (location.search.indexOf('auto') >= 0 && !start.__auto) {
+      start.__auto = true;
+      setInterval(function () { if (!document.hidden) loop(performance.now()); }, 33);
+    }
+  }
+  } catch (e) { window.__swarmErr = (e && e.message) + ' @ ' + (e && e.stack ? String(e.stack).split('\n')[1] : '?'); }
+})();
+</script>
+</body>
+</html>

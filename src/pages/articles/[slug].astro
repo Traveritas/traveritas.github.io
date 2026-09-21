@@ -11,13 +11,13 @@ export async function getStaticPaths() {
     props: {
       article: a,
       // 列表为倒序：较早的一篇在后面，较晚的一篇在前面
-      newer: i > 0 ? articles[i - 1] : undefined,
       older: i < articles.length - 1 ? articles[i + 1] : undefined,
+      newer: i > 0 ? articles[i - 1] : undefined,
     },
   }));
 }
 
-const { article, newer, older } = Astro.props;
+const { article, older, newer } = Astro.props;
 const { Content } = await render(article);
 const { title, description, date, tags } = article.data;
 
@@ -25,11 +25,17 @@ const fmt = (d: Date) =>
   `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
 ---
 
-<BaseLayout title={`${title} — Traveritas`} description={description} type="article">
+<BaseLayout
+  title={`${title} — Traveritas`}
+  description={description}
+  type="article"
+  rail={{ mode: 'depth', station: '入梦 · 阅读', en: 'READING DEPTH', depthTarget: 'article.prose' }}
+>
+  <div class="dawn-glow" aria-hidden="true"></div>
   <div class="container page-body">
     <article class="prose">
       <header class="prose-head">
-        <h1>{title}</h1>
+        <h1 data-morph data-entrance data-true={title} aria-label={title}>{title}</h1>
         <p class="prose-meta">
           <time datetime={date.toISOString()}>{fmt(date)}</time>
         </p>
@@ -45,7 +51,8 @@ const fmt = (d: Date) =>
           </nav>
         )
       }
-      <nav class="adjacent" aria-label="相邻文章">
+      <nav class="adjacent" aria-label="醒来后">
+        <p class="wake-label mono" aria-hidden="true">—— 读到这里，快醒了 ——</p>
         {
           older && (
             <a href={`/articles/${older.id}/`} class="adj-item">
@@ -68,6 +75,27 @@ const fmt = (d: Date) =>
 </BaseLayout>
 
 <style>
+  /* 晓线：暖光随阅读进度从底部升起，读到末尾天亮 */
+  .dawn-glow {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 34vh;
+    z-index: 4;
+    pointer-events: none;
+    opacity: 0.12;
+    background: linear-gradient(to top, rgba(217, 160, 91, 0.3), rgba(217, 160, 91, 0.08) 55%, transparent);
+    transition: opacity 0.3s linear;
+  }
+
+  /* 引文是梦侧：轻轻浮动 */
+  article.prose blockquote {
+    animation: drift 9.5s ease-in-out infinite;
+    --d-amp: 2.6px;
+    --d-rot: 0.15deg;
+  }
+
   .tag-row {
     margin-top: 3rem;
     padding-top: 1.3rem;
@@ -79,12 +107,20 @@ const fmt = (d: Date) =>
   }
 
   .adjacent {
-    margin-top: 2.2rem;
+    margin-top: 2.6rem;
     padding-top: 1.5rem;
     border-top: 1px solid var(--line);
     display: flex;
     flex-direction: column;
     gap: 1rem;
+  }
+
+  .wake-label {
+    margin: 0 0 0.4rem;
+    text-align: center;
+    font-size: 0.6rem;
+    letter-spacing: 0.32em;
+    color: var(--fg-faint);
   }
 
   .adj-item {
@@ -102,18 +138,24 @@ const fmt = (d: Date) =>
 
   .adj-label {
     font-size: 0.78rem;
-    color: var(--ink-faint);
+    color: var(--fg-faint);
     letter-spacing: 0.12em;
   }
 
   .adj-title {
     font-family: var(--font-display);
     font-size: 0.98rem;
-    color: var(--ink-soft);
+    color: var(--fg-soft);
     transition: color 0.18s ease;
   }
 
   .adj-item:hover .adj-title {
-    color: var(--mist-ink);
+    color: var(--umber);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .dawn-glow {
+      transition: none;
+    }
   }
 </style>

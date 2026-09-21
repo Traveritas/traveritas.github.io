@@ -1,0 +1,83 @@
+---
+/* 缝线：fixed 14° 醒梦缝，170vmax 长；html.booted 后从中心划出。
+   琥珀锚点由 chrome.ts 巡行到当前阅读带的「结」。 */
+interface Props {
+  variant?: 'default' | 'faint' | 'broken';
+}
+const { variant = 'default' } = Astro.props;
+---
+
+<div class:list={['seam', { 'seam--faint': variant === 'faint', 'seam--broken': variant === 'broken' }]} aria-hidden="true">
+  <span class="seam-anchor"></span>
+</div>
+
+<style>
+  .seam {
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    width: 170vmax;
+    height: 1px;
+    background: linear-gradient(90deg, var(--wake), var(--dream));
+    transform: translate(-50%, -50%) rotate(var(--seam-angle)) scaleX(var(--draw, 0.02));
+    transform-origin: center;
+    transition: transform 2.6s cubic-bezier(0.22, 0.61, 0.36, 1);
+    z-index: 8;
+    pointer-events: none;
+    opacity: 0.62;
+  }
+
+  /* 内页减配 */
+  .seam--faint {
+    opacity: 0.3;
+  }
+
+  /* 404：线在这里断了 */
+  .seam--broken {
+    -webkit-mask: linear-gradient(90deg, #000 0 37%, transparent 41% 47%, #000 51% 100%);
+    mask: linear-gradient(90deg, #000 0 37%, transparent 41% 47%, #000 51% 100%);
+  }
+
+  :global(html.booted) .seam {
+    --draw: 1;
+  }
+
+  .seam-anchor {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 8px;
+    height: 8px;
+    margin: -4px 0 0 -4px;
+    border-radius: 50%;
+    background: var(--amber);
+    box-shadow:
+      0 0 10px 2px rgba(217, 160, 91, 0.55),
+      0 0 26px 6px rgba(217, 160, 91, 0.2);
+    animation: anchor-breathe 5.5s ease-in-out infinite;
+  }
+
+  @keyframes anchor-breathe {
+    0%,
+    100% {
+      box-shadow:
+        0 0 8px 1px rgba(217, 160, 91, 0.45),
+        0 0 20px 4px rgba(217, 160, 91, 0.16);
+    }
+    50% {
+      box-shadow:
+        0 0 13px 3px rgba(217, 160, 91, 0.72),
+        0 0 34px 9px rgba(217, 160, 91, 0.3);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .seam {
+      transition: none;
+      --draw: 1;
+    }
+
+    .seam-anchor {
+      animation: none;
+    }
+  }</style>

@@ -1,0 +1,514 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>醒梦缝 · 标签与四〇四</title>
+<meta name="description" content="标签 = 把内容缝在站上的针脚；404 = 缝断掉的地方。个人网站内页探索稿。">
+<script>
+/* 入场初始态只在有 JS 时生效，避免无 JS 白屏 */
+document.documentElement.classList.add('js');
+if (!matchMedia('(prefers-reduced-motion: reduce)').matches) document.documentElement.classList.add('boot');
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<style>
+/* ============ 基座 ============ */
+:root{
+  --paper:#E9ECEF;
+  --ink:#262C33;
+  --ink-soft:#59626C;
+  --wake:#A7B1BA;      /* 醒侧线色（冷灰） */
+  --dream:#C2A382;     /* 梦侧线色（暖沙） */
+  --umber:#8A6A4F;     /* 深处暖墨 */
+  --amber:#D9A05B;     /* 锚点光，全站唯一的异质色，用在极少处 */
+  --seam-angle:14deg;
+  --read:0;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:auto}
+body{
+  background:var(--paper);
+  color:var(--ink);
+  font-family:'Noto Serif SC','Songti SC','SimSun',serif;
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+  overflow-x:hidden;
+}
+::selection{background:rgba(217,160,91,.28)}
+a{color:inherit}
+:focus-visible{outline:1px solid var(--amber);outline-offset:4px}
+
+/* 底层：冷角气色 + 随滚动加深的暖侧光晕（都极淡） */
+.ambient{
+  position:fixed;inset:-10%;z-index:0;pointer-events:none;
+  background:
+    linear-gradient(284deg, rgba(185,198,210,calc(.10 - var(--read)*.04)) 0%, transparent 34%),
+    linear-gradient(104deg, transparent 46%, rgba(227,201,168,var(--warmA,.05)) 76%, rgba(227,201,168,calc(var(--warmA,.05)*.7)) 100%);
+}
+body[data-view="tags"]{--warmA:calc(.055 + var(--read)*.085)}
+body[data-view="lost"]{--warmA:.05}
+
+/* 纸面颗粒 */
+.noise{
+  position:fixed;inset:0;z-index:30;pointer-events:none;opacity:.05;mix-blend-mode:multiply;
+  background:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='160' height='160' filter='url(%23n)' opacity='0.55'/></svg>");
+}
+
+/* ============ 醒梦缝：站级常量 ============ */
+.seam{
+  position:fixed;left:50%;top:36vh;width:170vmax;height:1px;z-index:1;
+  transform:translate(-50%,0) rotate(var(--seam-angle)) scaleX(var(--draw,1));
+  transform-origin:0 50%;
+  background:linear-gradient(90deg, rgba(167,177,186,.0) 0%, var(--wake) 10%, #AFA898 55%, var(--dream) 100%);
+  opacity:.8;
+  transition:transform 1.15s cubic-bezier(.22,.8,.25,1), opacity .6s ease,
+             width .75s cubic-bezier(.6,0,.3,1), left .75s cubic-bezier(.6,0,.3,1),
+             top .75s cubic-bezier(.6,0,.3,1), background .6s ease;
+}
+/* 梦侧透出的极淡光带 */
+.seam .glow{
+  position:absolute;left:52%;right:0;top:-55px;height:110px;
+  background:linear-gradient(90deg, transparent, rgba(217,160,91,calc(.10 + var(--read)*.10)) 55%, rgba(217,160,91,calc(.13 + var(--read)*.10)) 82%, transparent);
+  filter:blur(16px);
+  opacity:calc(.5 + var(--read)*.5);
+}
+/* 锚点光：随滚动沿缝行走 */
+.seam .anchor{
+  position:absolute;top:50%;left:16%;
+  width:8px;height:8px;border-radius:50%;
+  background:var(--amber);
+  box-shadow:0 0 0 4px rgba(217,160,91,.16), 0 0 16px 2px rgba(217,160,91,.38);
+  transform:translate(-50%,-50%);
+  transition:left .45s cubic-bezier(.25,.7,.3,1);
+}
+
+/* 404 时：缝缩短、止于断口、散成游丝 */
+body[data-view="lost"] .seam{
+  width:62vmin;left:31vw;top:46vh;opacity:.95;
+  background:linear-gradient(90deg, rgba(167,177,186,0) 0%, var(--wake) 16%, #AFA898 55%, var(--dream) 100%);
+}
+body[data-view="lost"] .anchor{left:100%;opacity:.85;animation:breathe 4.6s ease-in-out infinite}
+@keyframes breathe{
+  0%,100%{box-shadow:0 0 0 0 rgba(217,160,91,.20), 0 0 14px 2px rgba(217,160,91,.26)}
+  50%{box-shadow:0 0 0 9px rgba(217,160,91,0), 0 0 22px 4px rgba(217,160,91,.44)}
+}
+.fray{
+  position:absolute;right:-2px;top:0;width:170px;height:1px;
+  opacity:0;transition:opacity .6s ease .35s;
+}
+body[data-view="lost"] .fray{opacity:1}
+.fray i{
+  position:absolute;left:0;top:0;height:1px;width:var(--l);
+  transform-origin:0 50%;
+  transform:rotate(var(--a));
+  background:linear-gradient(90deg, rgba(178,146,111,var(--o)), rgba(194,163,130,calc(var(--o)*.35)) 60%, rgba(194,163,130,0));
+  animation:sway var(--dur,7s) ease-in-out infinite alternate;
+}
+@keyframes sway{
+  from{transform:rotate(calc(var(--a) - 1.3deg))}
+  to{transform:rotate(calc(var(--a) + 1.3deg))}
+}
+
+/* ============ 左侧书脊（竖排） ============ */
+.spine{
+  position:fixed;left:clamp(20px,4.6vw,74px);top:13vh;z-index:12;
+  writing-mode:vertical-rl;display:flex;gap:20px;
+  transition:opacity .8s ease .25s;
+}
+.spine b{
+  font-size:clamp(42px,6vw,82px);font-weight:900;letter-spacing:.36em;
+  color:var(--ink);line-height:1;
+}
+.spine i{
+  font-style:normal;font-size:13px;font-weight:300;letter-spacing:.5em;
+  color:var(--ink-soft);padding-top:10px;
+}
+body[data-view="lost"] .spine{display:none}
+
+/* ============ 视图切换器（磨砂小签） ============ */
+.switcher{
+  position:fixed;top:22px;right:24px;z-index:40;
+  display:flex;gap:2px;padding:4px;border-radius:999px;
+  background:rgba(236,238,241,.55);
+  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+  border:1px solid rgba(38,44,51,.08);
+  transition:opacity .8s ease .35s;
+}
+.switcher button{
+  appearance:none;border:0;background:transparent;cursor:pointer;
+  font-family:inherit;font-size:12.5px;letter-spacing:.14em;color:var(--ink-soft);
+  padding:6px 14px;border-radius:999px;transition:color .3s, background .3s;
+}
+.switcher button:hover{color:var(--ink)}
+.switcher button[aria-pressed="true"]{color:var(--ink);background:rgba(255,255,255,.6)}
+
+/* ============ 视图容器 ============ */
+.view{position:relative;z-index:10;animation:viewIn .32s ease}
+.view[hidden]{display:none}
+@keyframes viewIn{from{opacity:0}}
+
+/* ============ 标签页：针脚索引 ============ */
+.tags-main{
+  margin-left:clamp(150px,20vw,320px);
+  margin-right:clamp(20px,6vw,90px);
+  padding:22vh 0 4vh;
+}
+.intro{
+  max-width:34em;font-size:15px;font-weight:300;letter-spacing:.06em;
+  color:var(--ink-soft);line-height:2.1;
+  margin:0 0 10vh;
+  transition:opacity .8s ease .45s;
+}
+.intro b{font-weight:500;color:var(--ink)}
+
+/* 每个标签 = 一道针脚：斜向短线沿醒梦缝的角度，结落在末端 */
+.station{
+  position:relative;
+  margin:0 0 12vh var(--shift,0vw);
+  transition:opacity .7s ease;
+}
+.stitchwrap{position:relative;height:calc(var(--tfs,32px) * 1.5 + 34px);width:220px}
+.tagname{
+  position:absolute;left:0;top:0;
+  font-size:var(--tfs,32px);font-weight:var(--tfw,700);
+  letter-spacing:.06em;line-height:1.5;color:var(--ink);
+  white-space:nowrap;
+}
+.tagname small{
+  font-size:12px;font-weight:300;letter-spacing:.24em;
+  color:var(--ink-soft);margin-left:.9em;
+}
+.stitch{
+  position:absolute;left:0;width:186px;height:1px;
+  top:calc(var(--tfs,32px) * 1.5 + 14px);
+  transform-origin:0 50%;
+  transform:rotate(var(--seam-angle)) scaleX(var(--draw,1));
+  background:linear-gradient(90deg, var(--wake), #AFA898 55%, var(--dream));
+  opacity:.75;
+  transition:transform .9s cubic-bezier(.22,.8,.25,1), opacity .35s ease;
+}
+.knot{
+  position:absolute;left:181px;top:calc(var(--tfs,32px) * 1.5 + 59px);
+  width:10px;height:10px;
+  transform:translate(-50%,-50%) rotate(45deg);
+  background:var(--paper);border:1px solid var(--ink-soft);
+  transition:background .35s, border-color .35s, box-shadow .35s;
+}
+/* 针脚挑起的线：文章从结的正下方垂下 */
+.arts{
+  position:relative;list-style:none;
+  margin:2.6em 0 0 186px;
+}
+.arts::before{
+  content:"";position:absolute;left:5px;top:-2.6em;width:1px;height:2.6em;
+  background:linear-gradient(rgba(38,44,51,.42), rgba(38,44,51,.10));
+}
+.arts li{margin-bottom:1.15em}
+.arts a{
+  display:inline-block;text-decoration:none;
+  font-size:16.5px;font-weight:500;letter-spacing:.02em;color:var(--ink);
+  border-bottom:1px solid transparent;padding-bottom:2px;
+  transition:border-color .3s, color .3s;
+}
+.arts a:hover{border-bottom-color:rgba(217,160,91,.6)}
+.arts time{
+  font-size:12.5px;font-weight:300;letter-spacing:.12em;
+  color:var(--ink-soft);margin-left:1.2em;
+}
+.station:hover .stitch{opacity:1}
+.station:hover .knot{
+  background:var(--amber);border-color:var(--amber);
+  box-shadow:0 0 0 5px rgba(217,160,91,.14), 0 0 14px rgba(217,160,91,.35);
+}
+
+.tags-end{
+  margin:16vh 0 0 calc(var(--shift-end,24vw));padding-bottom:16vh;
+  font-size:13px;font-weight:300;letter-spacing:.3em;color:var(--ink-soft);
+}
+
+/* ============ 四〇四：缝断之处 ============ */
+.lost-main{padding:24vh 8vw 0 clamp(24px,12vw,190px);min-height:100vh}
+.lost-main h1{
+  font-size:clamp(34px,6vw,74px);font-weight:900;
+  letter-spacing:.05em;line-height:1.42;
+  max-width:12em;
+}
+.lost-sub{
+  margin-top:2.4em;font-size:15px;font-weight:300;letter-spacing:.08em;
+  color:var(--ink-soft);line-height:2;
+}
+.way{display:flex;flex-wrap:wrap;gap:2.8em;margin-top:4.5em}
+.way a{
+  display:inline-flex;align-items:center;gap:.9em;
+  font-size:15px;letter-spacing:.16em;text-decoration:none;color:var(--ink);
+  border-bottom:1px solid rgba(38,44,51,.22);padding-bottom:.4em;
+  transition:border-color .3s, color .3s;
+}
+.way a::before{
+  content:"";width:20px;height:1px;background:var(--amber);opacity:.55;
+  transform:rotate(calc(var(--seam-angle) * -1));
+}
+.way a:hover{border-color:var(--amber)}
+.stamp{
+  position:fixed;top:24vh;right:8vw;z-index:10;
+  writing-mode:vertical-rl;
+  border:1px solid rgba(89,98,108,.5);border-radius:2px;
+  color:var(--ink-soft);
+  font-size:13px;letter-spacing:.44em;line-height:1;
+  padding:12px 10px;
+  transform:rotate(2.5deg);
+  opacity:.75;
+}
+body[data-view="tags"] .stamp{display:none}
+/* 404 内文入场（每次切入重放） */
+.lost-main > *{opacity:0;animation:riseIn .8s cubic-bezier(.22,.8,.3,1) forwards}
+.lost-main > *:nth-child(1){animation-delay:.25s}
+.lost-main > *:nth-child(2){animation-delay:.5s}
+.lost-main > *:nth-child(3){animation-delay:.7s}
+@keyframes riseIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+
+/* ============ 入场编排 ============ */
+html.boot{--draw:.02}
+html.boot .seam,html.boot .stitch{opacity:0}
+html.boot .spine,html.boot .intro,html.boot .switcher{opacity:0}
+html.boot .station{opacity:0}
+html.boot .lost-main > *{animation:none}
+.station:nth-of-type(1){transition-delay:.55s}
+.station:nth-of-type(1) .stitch{transition-delay:.55s}
+.station:nth-of-type(2){transition-delay:.8s}
+.station:nth-of-type(2) .stitch{transition-delay:.8s}
+.station:nth-of-type(3){transition-delay:1.05s}
+.station:nth-of-type(3) .stitch{transition-delay:1.05s}
+.station:nth-of-type(4){transition-delay:1.3s}
+.station:nth-of-type(4) .stitch{transition-delay:1.3s}
+
+/* ============ 响应式 ============ */
+@media (max-width:760px){
+  .spine{left:16px;top:9vh}
+  .spine b{font-size:38px;letter-spacing:.3em}
+  .spine i{display:none}
+  .seam{top:30vh}
+  body[data-view="lost"] .seam{left:18vw;top:42vh;width:74vmin}
+  .tags-main{margin-left:86px;margin-right:18px;padding-top:26vh}
+  .station{margin-left:calc(var(--shift,0vw) * .12)}
+  .stitchwrap{width:170px}
+  .tagname{font-size:min(var(--tfs,32px), 30px)}
+  .stitch{width:132px}
+  .knot{left:127px}
+  .arts{margin-left:132px}
+  .lost-main{padding-left:22px;padding-right:22px}
+  .stamp{top:16vh;right:6vw;font-size:11.5px}
+  .switcher{top:14px;right:14px}
+}
+/* ============ 动效克制 ============ */
+@media (prefers-reduced-motion: reduce){
+  .seam,.anchor,.stitch,.knot,.arts a,.way a{transition:none}
+  .fray i{animation:none}
+  body[data-view="lost"] .anchor{animation:none}
+  .lost-main > *{animation:none;opacity:1}
+}
+html.rm .seam,html.rm .anchor,html.rm .stitch,html.rm .knot{transition:none}
+html.rm .fray i,html.rm body[data-view="lost"] .anchor,html.rm .lost-main > *,html.rm .view{animation:none}
+html.rm .lost-main > *{opacity:1}
+</style>
+</head>
+<body data-view="tags">
+
+<div class="ambient"></div>
+<div class="noise"></div>
+
+<!-- 醒梦缝：站级常量，两个视图共用；404 时缩短并在断口散成游丝 -->
+<div class="seam" id="seam">
+  <i class="glow"></i>
+  <div class="fray" aria-hidden="true">
+    <i style="--a:-7deg;--l:104px;--o:.55;--dur:7.5s"></i>
+    <i style="--a:-3deg;--l:158px;--o:.8;--dur:6.2s"></i>
+    <i style="--a:0deg;--l:186px;--o:.95;--dur:8.4s"></i>
+    <i style="--a:4deg;--l:132px;--o:.7;--dur:7s"></i>
+    <i style="--a:9deg;--l:78px;--o:.45;--dur:9s"></i>
+  </div>
+  <i class="anchor" id="anchor"></i>
+</div>
+
+<aside class="spine" aria-label="页面题名">
+  <b>标签</b>
+  <i>针脚与线索</i>
+</aside>
+
+<nav class="switcher" aria-label="示例稿视图切换">
+  <button type="button" data-view="tags" aria-pressed="true">标签页</button>
+  <button type="button" data-view="lost" aria-pressed="false">四〇四</button>
+</nav>
+
+<!-- ================= 视图一：标签 · 针脚索引 ================= -->
+<main class="view tags-main" id="view-tags">
+  <p class="intro">
+    四条线索，缝住三篇随笔。针脚沿着那条缝的角度下行——
+    结是标签，线的粗细不重要，<b>字的大小就是它缝住的东西的多少</b>。
+    顺着针脚走，任何一篇都翻得回去。
+  </p>
+
+  <section class="station" style="--shift:0vw;--tfs:40px;--tfw:900">
+    <div class="stitchwrap">
+      <div class="stitch"></div><i class="knot"></i>
+      <h2 class="tagname">建站<small>3 篇</small></h2>
+    </div>
+    <ul class="arts">
+      <li><a href="#" title="示例稿不接路由">与智能体一起造一个网站<time>2026 年 9 月 19 日</time></a></li>
+      <li><a href="#" title="示例稿不接路由">开站：在醒与梦之间<time>2026 年 9 月 19 日</time></a></li>
+      <li><a href="#" title="示例稿不接路由">母题探索记录：从碎块到花<time>2026 年 9 月 19 日</time></a></li>
+    </ul>
+  </section>
+
+  <section class="station" style="--shift:8vw;--tfs:33px;--tfw:700">
+    <div class="stitchwrap">
+      <div class="stitch"></div><i class="knot"></i>
+      <h2 class="tagname">醒梦<small>2 篇</small></h2>
+    </div>
+    <ul class="arts">
+      <li><a href="#" title="示例稿不接路由">开站：在醒与梦之间<time>2026 年 9 月 19 日</time></a></li>
+      <li><a href="#" title="示例稿不接路由">母题探索记录：从碎块到花<time>2026 年 9 月 19 日</time></a></li>
+    </ul>
+  </section>
+
+  <section class="station" style="--shift:16vw;--tfs:25px;--tfw:500">
+    <div class="stitchwrap">
+      <div class="stitch"></div><i class="knot"></i>
+      <h2 class="tagname">设计<small>1 篇</small></h2>
+    </div>
+    <ul class="arts">
+      <li><a href="#" title="示例稿不接路由">母题探索记录：从碎块到花<time>2026 年 9 月 19 日</time></a></li>
+    </ul>
+  </section>
+
+  <section class="station" style="--shift:24vw;--tfs:25px;--tfw:500">
+    <div class="stitchwrap">
+      <div class="stitch"></div><i class="knot"></i>
+      <h2 class="tagname">智能体<small>1 篇</small></h2>
+    </div>
+    <ul class="arts">
+      <li><a href="#" title="示例稿不接路由">与智能体一起造一个网站<time>2026 年 9 月 19 日</time></a></li>
+    </ul>
+  </section>
+
+  <p class="tags-end">针脚到这里暂歇；新的线索会从梦的那一侧缝进来。</p>
+</main>
+
+<!-- ================= 视图二：404 · 缝断之处 ================= -->
+<main class="view lost-main" id="view-lost" hidden>
+  <h1>这一页还没有被梦见。</h1>
+  <p class="lost-sub">世界应当始终保留一种感觉：它可能马上消失。<br>这一页只是先走了一步——缝到这里断了，线的另一头还散在梦侧。</p>
+  <nav class="way" aria-label="去别处">
+    <a href="/">回首页</a>
+    <a href="/articles">随笔</a>
+    <a href="/projects">项目</a>
+  </nav>
+</main>
+
+<div class="stamp" aria-hidden="true">四〇四</div>
+
+<script>
+(function(){
+  var doc = document.documentElement;
+  var body = document.body;
+  var seam = document.getElementById('seam');
+  var anchor = document.getElementById('anchor');
+  var ANG = 14 * Math.PI / 180;
+  var hoverKnot = null;
+
+  function geom(){
+    var r = seam.getBoundingClientRect();
+    var L = seam.offsetWidth;
+    return {
+      cx:(r.left + r.right)/2,
+      cy:(r.top + r.bottom)/2,
+      L:L,
+      ux:Math.cos(ANG),
+      uy:Math.sin(ANG)
+    };
+  }
+  /* 点在缝上的投影位置（0..1） */
+  function project(g, px, py){
+    return (((px - g.cx) * g.ux + (py - g.cy) * g.uy) / g.L + 0.5);
+  }
+  function setAnchor(p){
+    anchor.style.left = (Math.max(0, Math.min(1, p)) * 100) + '%';
+  }
+
+  function update(){
+    var g = geom();
+    if(body.dataset.view === 'tags'){
+      var main = document.getElementById('view-tags');
+      var r = main.getBoundingClientRect();
+      var p = Math.max(0, Math.min(1, -r.top / Math.max(1, r.height - innerHeight)));
+      doc.style.setProperty('--read', p.toFixed(3));
+      if(hoverKnot == null) setAnchor(0.24 + p * 0.48);
+    }else{
+      doc.style.setProperty('--read', '0.30');
+      setAnchor(1); /* 断口 */
+    }
+  }
+
+  /* 悬停针脚：锚点光滑到那个结上 */
+  Array.prototype.forEach.call(document.querySelectorAll('.station'), function(st){
+    st.addEventListener('mouseenter', function(){
+      var k = st.querySelector('.knot');
+      var kr = k.getBoundingClientRect();
+      hoverKnot = project(geom(), kr.left + kr.width/2, kr.top + kr.height/2);
+      setAnchor(hoverKnot);
+    });
+    st.addEventListener('mouseleave', function(){
+      hoverKnot = null;
+      update();
+    });
+  });
+
+  /* 视图切换 */
+  function setView(v){
+    body.dataset.view = v;
+    var isTags = v === 'tags';
+    document.getElementById('view-tags').hidden = !isTags;
+    document.getElementById('view-lost').hidden = isTags;
+    Array.prototype.forEach.call(document.querySelectorAll('.switcher button'), function(b){
+      b.setAttribute('aria-pressed', b.dataset.view === v ? 'true' : 'false');
+    });
+    try{ history.replaceState(null, '', isTags ? '#tags' : '#lost'); }catch(e){}
+    window.scrollTo(0, 0);
+    hoverKnot = null;
+    requestAnimationFrame(function(){ requestAnimationFrame(update); });
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('.switcher button'), function(b){
+    b.addEventListener('click', function(){ setView(b.dataset.view); });
+  });
+
+  /* 滚动 / 尺寸：rAF 节流 */
+  var ticking = false;
+  function onTick(){
+    if(ticking) return;
+    ticking = true;
+    requestAnimationFrame(function(){ ticking = false; update(); });
+  }
+  window.addEventListener('scroll', onTick, {passive:true});
+  window.addEventListener('resize', onTick);
+
+  /* 示例稿：文章链接不真的跳转 */
+  Array.prototype.forEach.call(document.querySelectorAll('.arts a'), function(a){
+    a.addEventListener('click', function(e){ e.preventDefault(); });
+  });
+
+  /* 初始视图 + 揭幕 */
+  if(location.hash === '#lost') setView('lost');
+  window.addEventListener('load', function(){
+    setTimeout(function(){ doc.classList.remove('boot'); }, 80);
+    /* 看门狗：渲染被冻结的环境里过渡可能停在起点，直接落定终值 */
+    setTimeout(function(){ doc.style.setProperty('--draw', '1'); }, 2600);
+    update();
+  });
+  if(document.fonts && document.fonts.ready) document.fonts.ready.then(update);
+  update();
+})();
+</script>
+</body>
+</html>

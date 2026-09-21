@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0c0f14">
+<title>关于 · 醒梦 — Traveritas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;900&display=swap" rel="stylesheet">
+<style>
+/* ---------- tokens ---------- */
+:root{
+  --bg0:#0c0f14; --bg1:#0f1218; --bg2:#141118; --bg3:#191310; --bg4:#1b1310;
+  --ink:#e7e2d8;
+  --dim:#928d83;
+  --faint:#5a564f;
+  --cool:#a7bccd;          /* 醒 · 可核验 */
+  --warm:#d8c3a4;          /* 梦 · 不由分说 */
+  --ember:#d9a05f;         /* 唯一强调色，克制使用 */
+  --line:rgba(231,226,216,.13);
+  --serif:'Noto Serif SC','Source Han Serif SC','Songti SC','STSong',SimSun,serif;
+  --mono:ui-monospace,'Cascadia Mono',Consolas,'JetBrains Mono',Menlo,monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:auto}
+body{
+  font-family:var(--serif);
+  color:var(--ink);
+  background:var(--bg0);
+  line-height:1.9;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+  touch-action:manipulation;
+}
+.bg{position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:linear-gradient(178deg,var(--bg0) 0%,var(--bg1) 28%,var(--bg2) 52%,var(--bg3) 76%,var(--bg4) 100%)}
+::selection{background:rgba(217,160,95,.28);color:var(--ink)}
+a{color:inherit;text-decoration:none}
+:focus-visible{outline:1px dashed rgba(231,226,216,.55);outline-offset:4px}
+::-webkit-scrollbar{width:10px}
+::-webkit-scrollbar-thumb{background:rgba(231,226,216,.14);border-radius:5px}
+::-webkit-scrollbar-track{background:transparent}
+
+/* ---------- ambient layers ---------- */
+.glow{position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:
+    radial-gradient(52vmax 52vmax at 78% 68%, rgba(214,166,120,.10), transparent 68%),
+    radial-gradient(40vmax 40vmax at 12% 14%, rgba(150,175,200,.07), transparent 70%);
+  transition:opacity .8s ease;
+}
+body.checked .glow{opacity:.45}
+.grain{position:fixed;inset:0;pointer-events:none;z-index:3;opacity:.05;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='180' height='180' filter='url(%23n)' opacity='0.6'/></svg>");
+}
+.veil{position:fixed;inset:0;pointer-events:none;z-index:1;opacity:0;transition:opacity .7s ease;
+  background:radial-gradient(120% 90% at 72% 6%, rgba(235,230,220,.075), transparent 60%);
+}
+body.checked .veil{opacity:1}
+
+/* ---------- rail (desktop instrument) ---------- */
+.rail{position:fixed;left:38px;top:50%;transform:translateY(-50%);z-index:4;
+  display:flex;flex-direction:column;align-items:flex-start;gap:34px;
+}
+.rail-name{writing-mode:vertical-rl;font-size:12px;letter-spacing:.42em;color:var(--dim);
+  padding-left:10px;border-left:1px solid var(--line)}
+.rail-meter{display:flex;gap:12px;align-items:stretch}
+.meter-track{position:relative;width:1px;height:150px;background:var(--line)}
+.meter-dot{position:absolute;left:-2.5px;top:8%;width:6px;height:6px;border-radius:50%;
+  background:var(--cool);box-shadow:0 0 8px rgba(167,188,205,.8);
+  transition:top .45s cubic-bezier(.5,0,.2,1),background .45s,box-shadow .45s}
+body.checked .meter-dot{top:4%;background:var(--ember);box-shadow:0 0 10px rgba(217,160,95,.9)}
+.meter-words{display:flex;flex-direction:column;justify-content:space-between;
+  font-family:var(--mono);font-size:9px;letter-spacing:.2em;color:var(--faint);padding:0 0}
+.meter-words .on{color:var(--dim)}
+.rail-clock{font-family:var(--mono);font-size:13px;letter-spacing:.14em;color:var(--dim);
+  transition:color .5s,text-shadow .5s}
+.rail-clock .lab{display:block;font-size:9px;letter-spacing:.3em;color:var(--faint);margin-bottom:4px}
+.rail-clock.drift{color:var(--warm);text-shadow:0 0 14px rgba(216,195,164,.35)}
+body.checked .rail-clock{color:var(--cool);text-shadow:none}
+
+/* ---------- topbar (mobile) ---------- */
+.topbar{display:none;position:fixed;top:0;left:0;right:0;z-index:5;
+  padding:12px 20px calc(10px);align-items:center;justify-content:space-between;
+  background:rgba(12,15,20,.55);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--line)}
+.topbar .tb-name{font-size:12px;letter-spacing:.34em;color:var(--dim)}
+.topbar .tb-clock{font-family:var(--mono);font-size:12px;letter-spacing:.14em;color:var(--dim);transition:color .5s}
+.topbar .tb-clock.drift{color:var(--warm)}
+.hairline{position:fixed;top:0;left:0;height:2px;width:0;z-index:6;display:none;
+  background:linear-gradient(90deg,var(--cool),var(--warm));opacity:.85}
+
+/* ---------- layout ---------- */
+main{position:relative;z-index:2;max-width:780px;margin:0 auto;padding:0 28px 200px}
+section{margin-top:clamp(110px,17vh,190px)}
+.tag{display:inline-block;font-family:var(--mono);font-size:10px;letter-spacing:.24em;
+  padding:5px 10px 4px;border:1px solid var(--line);color:var(--dim);margin-bottom:18px}
+.tag.cool{color:var(--cool);border-color:rgba(167,188,205,.3)}
+.tag.warm{color:var(--warm);border-color:rgba(216,195,164,.3)}
+.tag.ember{color:var(--ember);border-color:rgba(217,160,95,.35)}
+h2{font-size:22px;font-weight:600;letter-spacing:.08em;margin-bottom:10px}
+.sub{font-size:13.5px;color:var(--dim);letter-spacing:.04em;margin-bottom:34px}
+
+/* ---------- reveal ---------- */
+.rv{opacity:0;transform:translateY(26px);
+  transition:opacity .9s ease,transform .9s cubic-bezier(.2,.7,.2,1);
+  transition-delay:calc(var(--i,0)*80ms)}
+.rv.in{opacity:1;transform:none}
+
+/* ---------- hero ---------- */
+.hero{min-height:94vh;display:flex;flex-direction:column;justify-content:center;position:relative;padding:60px 0 40px}
+.hero .kicker{font-family:var(--mono);font-size:11px;letter-spacing:.34em;color:var(--dim);margin-bottom:26px}
+.hero .kicker em{font-style:normal;color:var(--ember)}
+h1{font-size:clamp(74px,13vw,158px);font-weight:900;letter-spacing:.06em;line-height:1.08;
+  margin-left:-6px}
+.hero-lead{margin-top:30px;font-size:clamp(16px,2.2vw,19px);color:var(--ink);letter-spacing:.05em}
+.hero-lead b{font-weight:600;color:var(--warm)}
+.hero-note{margin-top:14px;font-size:clamp(16px,2.2vw,19px);color:var(--dim);letter-spacing:.05em}
+.hero-note b{font-weight:600;color:var(--cool)}
+.hero-how{margin-top:44px;max-width:560px;padding:20px 24px;
+  border:1px solid var(--line);border-left:2px solid rgba(217,160,95,.55);
+  background:rgba(231,226,216,.03);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+  font-size:13.5px;line-height:2.1;color:var(--dim);letter-spacing:.03em}
+.hero-how b{color:var(--ink);font-weight:600}
+.hero-side{position:absolute;right:-56px;top:16%;writing-mode:vertical-rl;
+  font-size:12px;letter-spacing:.5em;color:var(--faint);border-right:1px solid var(--line);padding-right:12px}
+.ghost{position:absolute;left:-4%;top:6%;z-index:-1;font-size:clamp(300px,44vw,560px);font-weight:900;line-height:1;
+  color:transparent;-webkit-text-stroke:1px rgba(231,226,216,.045);user-select:none;pointer-events:none}
+
+/* ---------- fact rows ---------- */
+.rows{border-top:1px solid var(--line)}
+.row{display:grid;grid-template-columns:96px 1fr auto;gap:18px;align-items:baseline;
+  padding:19px 2px;border-bottom:1px solid var(--line)}
+.row .k{font-family:var(--mono);font-size:11px;letter-spacing:.24em;color:var(--faint)}
+.row .v{font-size:16.5px;letter-spacing:.03em;color:var(--cool);transition:color .5s}
+.row .v a{border-bottom:1px solid rgba(167,188,205,.3);transition:border-color .3s}
+.row .v a:hover{border-color:var(--cool)}
+.row .v small{font-size:12.5px;color:var(--dim);letter-spacing:.02em}
+.tick{font-family:var(--mono);font-size:10px;letter-spacing:.18em;color:rgba(167,188,205,.75);white-space:nowrap}
+
+/* ---------- axis ---------- */
+.axis{position:relative;height:190px;margin-top:clamp(130px,20vh,230px)}
+.axis-line{position:absolute;left:-10%;right:-10%;top:52%;height:1px;
+  background:linear-gradient(90deg,rgba(167,188,205,0),rgba(167,188,205,.5) 16%,rgba(216,195,164,.5) 80%,rgba(216,195,164,0));
+  transform:rotate(-5deg) scaleX(0);transform-origin:left center;
+  transition:transform 1.6s cubic-bezier(.6,0,.2,1) .15s}
+.axis.in .axis-line{transform:rotate(-5deg) scaleX(1)}
+.axis .a-wake{position:absolute;left:0;top:14%;font-family:var(--mono);font-size:10.5px;letter-spacing:.26em;color:var(--cool)}
+.axis .a-mid{position:absolute;left:46%;top:38%;font-family:var(--mono);font-size:9.5px;letter-spacing:.4em;color:var(--faint)}
+.axis .a-dream{position:absolute;right:0;bottom:10%;font-family:var(--mono);font-size:10.5px;letter-spacing:.26em;color:var(--warm)}
+
+/* ---------- dream quotes ---------- */
+.dq{margin-left:auto;max-width:560px;margin-top:54px;transition:filter .65s ease,opacity .65s ease,transform .65s ease}
+.dq:nth-of-type(1){margin-right:26%}
+.dq:nth-of-type(2){margin-right:19%}
+.dq:nth-of-type(3){margin-right:12%}
+.dq:nth-of-type(4){margin-right:5%}
+.dq-inner{border-left:1px solid rgba(216,195,164,.28);padding-left:24px;
+  animation:bob var(--d,8s) ease-in-out infinite;animation-delay:var(--dl,0s)}
+.dq .idx{font-family:var(--mono);font-size:10px;letter-spacing:.22em;color:rgba(216,195,164,.55);display:block;margin-bottom:10px}
+.dq p{font-size:clamp(17px,2.3vw,20px);line-height:2.15;color:var(--warm);letter-spacing:.04em;
+  transition:color .4s}
+.dq:hover .dq-inner{border-color:rgba(216,195,164,.6)}
+.dq:hover p{color:#e9dcc4}
+body.checked .dq{filter:blur(3px);opacity:.26;transform:translateX(12px)}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+
+/* ---------- echo archive (second reading) ---------- */
+.echo-wrap{position:relative}
+.seal{position:absolute;right:-10px;top:-46px;width:92px;height:92px;z-index:2;
+  border:1.5px solid rgba(240,232,217,.85);display:grid;place-items:center;
+  color:#f0e8d9;font-size:46px;font-weight:900;letter-spacing:0;
+  background:rgba(20,16,12,.4);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+  box-shadow:0 0 30px rgba(240,232,217,.12),inset 0 0 18px rgba(240,232,217,.05);
+  opacity:0;transform:scale(1.55) rotate(-14deg);filter:blur(8px);
+  transition:opacity .4s ease,transform .5s cubic-bezier(.2,1.5,.35,1),filter .4s ease}
+.seal::after{content:'现实 · 已确认';position:absolute;left:50%;bottom:-24px;transform:translateX(-50%);
+  font-family:var(--mono);font-size:9px;letter-spacing:.3em;color:var(--dim);white-space:nowrap}
+body.checked .seal{opacity:.96;transform:scale(1) rotate(-6deg);filter:blur(0);transition-delay:.3s}
+.echo .row{grid-template-columns:96px 1fr auto}
+.echo .row .v{color:var(--warm);font-family:var(--mono);font-size:15px;letter-spacing:.06em;transition:color .5s}
+.echo .row .v .fix{color:inherit}
+body.checked .echo .row .v{color:var(--ink)}
+.echo .tick{color:rgba(217,160,95,0);transition:color .4s .1s}
+.echo .row.settled .tick{color:rgba(217,160,95,.85)}
+.echo-note{margin-top:26px;font-size:13.5px;line-height:2.2;color:var(--dim);max-width:560px}
+.echo-note b{color:var(--ink);font-weight:600}
+
+/* ---------- now (dreaming) ---------- */
+.chips{display:flex;flex-wrap:wrap;gap:14px;margin-top:8px}
+.chip{padding:10px 22px;font-size:15px;letter-spacing:.14em;color:var(--warm);
+  border:1px solid rgba(216,195,164,.3);border-radius:999px;
+  background:rgba(231,226,216,.03);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+  animation:bob var(--d,7s) ease-in-out infinite;animation-delay:var(--dl,0s)}
+.chip.dead{color:var(--faint);border-style:dashed;border-color:rgba(231,226,216,.16);
+  text-decoration:line-through;animation:none;opacity:.7}
+.chips-cap{margin-top:26px;font-size:13px;color:var(--dim);max-width:540px;line-height:2.1}
+
+/* ---------- colophon ---------- */
+.manifest{border-top:1px solid var(--line)}
+.mrow{display:grid;grid-template-columns:110px 1fr;gap:18px;padding:17px 2px;border-bottom:1px solid var(--line);
+  font-size:14.5px}
+.mrow .k{font-family:var(--mono);font-size:10.5px;letter-spacing:.26em;color:var(--faint);padding-top:4px}
+.mrow .v{color:var(--dim);letter-spacing:.03em;line-height:2}
+.mrow .v b{color:var(--ink);font-weight:600}
+
+/* ---------- wake (contact) ---------- */
+.wake-list a{display:flex;align-items:baseline;gap:18px;padding:23px 2px;border-bottom:1px solid var(--line);
+  transition:background .3s}
+.wake-list a:hover{background:rgba(231,226,216,.025)}
+.wake-list .w-name{font-size:19px;font-weight:600;letter-spacing:.1em;color:var(--ink);white-space:nowrap}
+.wake-list .w-href{font-family:var(--mono);font-size:12.5px;letter-spacing:.06em;color:var(--dim)}
+.wake-list .w-why{margin-left:auto;font-size:12px;color:var(--faint);letter-spacing:.08em;white-space:nowrap}
+.wake-list .w-arrow{font-family:var(--mono);color:var(--faint);transition:transform .3s,color .3s;white-space:nowrap}
+.wake-list a:hover .w-arrow{transform:translateX(6px);color:var(--ember)}
+.wake-list a.dead-row .w-name,.wake-list a.dead-row .w-href{color:var(--faint);font-weight:400}
+.wake-note{margin-top:24px;font-size:13px;color:var(--dim);line-height:2.1}
+
+/* ---------- footer ---------- */
+footer{margin-top:clamp(130px,20vh,220px);text-align:center;color:var(--faint)}
+footer .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:rgba(216,195,164,.5);
+  margin-bottom:20px;animation:breath 4.4s ease-in-out infinite}
+footer p{font-size:12px;letter-spacing:.2em;line-height:2.4}
+footer .f-mono{font-family:var(--mono);font-size:9.5px;letter-spacing:.34em;margin-top:8px}
+
+/* ---------- anchor (the instrument) ---------- */
+.anchor{position:fixed;right:30px;bottom:30px;z-index:8;
+  width:116px;display:flex;flex-direction:column;align-items:center;gap:0;
+  background:none;border:none;cursor:pointer;-webkit-user-select:none;user-select:none;
+  -webkit-touch-callout:none;font-family:var(--mono);color:var(--dim)}
+.anchor .ring-svg{position:absolute;top:0;left:50%;transform:translateX(-50%);width:92px;height:92px;pointer-events:none}
+.ring-track{fill:none;stroke:rgba(231,226,216,.13);stroke-width:1.5}
+.ring-fill{fill:none;stroke:var(--ember);stroke-width:2;stroke-linecap:round;
+  stroke-dasharray:276.46;stroke-dashoffset:276.46;transform:rotate(-90deg);transform-origin:center}
+.anchor .disc{position:relative;width:72px;height:72px;margin-top:10px;border-radius:50%;
+  border:1px solid rgba(231,226,216,.26);
+  background:rgba(231,226,216,.05);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+  display:grid;place-items:center;
+  box-shadow:0 0 26px rgba(231,226,216,.06),inset 0 0 16px rgba(231,226,216,.04);
+  animation:breath 4.4s ease-in-out infinite;
+  transition:border-color .4s,box-shadow .4s}
+.anchor:hover .disc{border-color:rgba(231,226,216,.5);box-shadow:0 0 34px rgba(216,195,164,.14),inset 0 0 16px rgba(231,226,216,.06)}
+.anchor .eye{width:22px;height:22px;border-radius:50%;border:1px solid rgba(231,226,216,.5);
+  display:grid;place-items:center;transition:border-color .4s}
+.anchor .eye i{display:block;width:6px;height:6px;border-radius:50%;background:rgba(231,226,216,.55);
+  transition:background .4s,box-shadow .4s}
+body.checked .anchor .disc{animation-play-state:paused;border-color:rgba(217,160,95,.65);
+  box-shadow:0 0 40px rgba(217,160,95,.22),inset 0 0 18px rgba(217,160,95,.08)}
+body.checked .anchor .eye{border-color:rgba(217,160,95,.8)}
+body.checked .anchor .eye i{background:var(--ember);box-shadow:0 0 10px rgba(217,160,95,.9)}
+.anchor .a-label{margin-top:12px;font-size:10px;letter-spacing:.22em;color:var(--dim);
+  transition:color .4s;text-align:center}
+.anchor.holding .a-label{color:var(--ember)}
+@keyframes breath{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+
+/* ---------- reduced motion ---------- */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+}
+body.no-motion *,body.no-motion *::before,body.no-motion *::after{animation:none!important;transition:none!important}
+
+/* ---------- responsive ---------- */
+@media (max-width:1180px){.hero-side{display:none}}
+@media (max-width:1000px){
+  .rail{display:none}
+  .topbar{display:flex}
+  .hairline{display:block}
+  main{padding-top:70px}
+  .hero{min-height:88vh}
+}@media (max-width:640px){
+  main{padding:70px 22px 190px}
+  section{margin-top:96px}
+  .row{grid-template-columns:76px 1fr;gap:12px}
+  .row .tick{grid-column:2;justify-self:start;padding-top:2px}
+  .mrow{grid-template-columns:84px 1fr}
+  .dq:nth-of-type(n){margin-right:0}
+  .dq{max-width:100%;margin-top:44px}
+  .dq-inner{padding-left:18px}
+  .axis-line{left:-4%;right:-4%}
+  .seal{right:0;top:-10px;width:76px;height:76px;font-size:38px;
+    transform:scale(1.15) rotate(-8deg)}
+  body.checked .seal{transform:scale(1) rotate(-6deg)}
+  .anchor{right:14px;bottom:calc(16px + env(safe-area-inset-bottom));transform:scale(.88);transform-origin:bottom right}
+  .anchor .disc{-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+  .wake-list .w-why{display:none}
+  .ghost{left:-16%}
+}
+</style>
+</head>
+<body>
+<div class="bg" aria-hidden="true"></div>
+
+<div class="glow" aria-hidden="true"></div>
+<div class="veil" aria-hidden="true"></div>
+<div class="grain" aria-hidden="true"></div>
+<div class="hairline" id="hairline" aria-hidden="true"></div>
+
+<!-- 仪表轨：深度 · 钟 -->
+<aside class="rail" aria-hidden="true">
+  <div class="rail-name">关于 · TRAVERITAS</div>
+  <div class="rail-meter">
+    <div class="meter-track"><div class="meter-dot" id="meterDot"></div></div>
+    <div class="meter-words"><span class="on">醒</span><span>浅梦</span><span>深梦</span></div>
+  </div>
+  <div class="rail-clock" id="railClock"><span class="lab">此刻</span><span id="clockText">--:--</span></div>
+</aside>
+
+<!-- 移动端顶栏 -->
+<div class="topbar">
+  <span class="tb-name">关于 · 醒梦</span>
+  <span class="tb-clock" id="tbClock">--:--</span>
+</div>
+
+<main>
+
+  <!-- ============ 醒 · 开场 ============ -->
+  <header class="hero">
+    <div class="ghost" aria-hidden="true">梦</div>
+    <p class="kicker rv">醒梦 · ABOUT — <em>REALITY CHECK</em></p>
+    <h1 class="rv" style="--i:1">关于</h1>
+    <p class="hero-lead rv" style="--i:2">我是 <b>Traveritas</b>。这一页上的话分两种：<b>梦话</b>，与<b>锚点</b>。</p>
+    <p class="hero-note rv" style="--i:3">梦话没法证明，锚点可以核验——麻烦的地方在于，它们说的常常是同一件事。</p>
+    <div class="hero-how rv" style="--i:4">
+      这一页要像检验清醒梦一样读：同一份档案在下面被抄了<b>第二遍</b>，逐字对照，看有什么变了；
+      然后按住右下角的玻璃锚点——梦话会退后，事实会归位，漂走的钟会校准。
+      松手，就回到梦里。
+    </div>
+    <span class="hero-side" aria-hidden="true">介于醒与梦之间 · 一份自我介绍</span>
+  </header>
+
+  <!-- ============ 锚点 · 第一份档案 ============ -->
+  <section class="rv">
+    <span class="tag cool">锚点 · 已核验</span>
+    <h2>可以核验的部分</h2>
+    <p class="sub">醒着写下的行，写完检查过两遍。</p>
+    <div class="rows">
+      <div class="row rv" style="--i:0">
+        <span class="k">名字</span>
+        <span class="v">Traveritas</span>
+        <span class="tick">✓ 核验</span>
+      </div>
+      <div class="row rv" style="--i:1">
+        <span class="k">身份</span>
+        <span class="v">出方向的人 <small>—— 描述想要什么，判断什么是对的；代码由智能体出手</small></span>
+        <span class="tick">✓ 核验</span>
+      </div>
+      <div class="row rv" style="--i:2">
+        <span class="k">驻地</span>
+        <span class="v">东八区 · UTC+8 <small>—— 醒着的时间，多半在深夜</small></span>
+        <span class="tick">✓ 核验</span>
+      </div>
+      <div class="row rv" style="--i:3">
+        <span class="k">开站</span>
+        <span class="v">2026-09-19</span>
+        <span class="tick">✓ 核验</span>
+      </div>
+      <div class="row rv" style="--i:4">
+        <span class="k">联络</span>
+        <span class="v"><a href="https://github.com/Traveritas" target="_blank" rel="noopener">github.com/Traveritas</a></span>
+        <span class="tick">✓ 核验</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 轴 ============ -->
+  <div class="axis rv" aria-hidden="true">
+    <div class="axis-line"></div>
+    <span class="a-wake">醒 · 能核验的事</span>
+    <span class="a-mid">浅 梦</span>
+    <span class="a-dream">梦 · 不由分说的话</span>
+  </div>
+
+  <!-- ============ 梦话 ============ -->
+  <section>
+    <span class="tag warm rv">梦话 · 无法核验</span>
+    <h2 class="rv" style="--i:1">无法核验的部分</h2>
+    <p class="sub rv" style="--i:2">下面这些话，我醒着的时候也这么说——但没法向你证明。</p>
+
+    <blockquote class="dq rv"><div class="dq-inner" style="--d:8.5s">
+      <span class="idx">梦话 · 01</span>
+      <p>我想要一个完全属于自己的地方：不是社交平台的 timeline，不是由算法决定谁被看见，而是一块按自己的审美慢慢经营的空地。</p>
+    </div></blockquote>
+
+    <blockquote class="dq rv"><div class="dq-inner" style="--d:7.2s;--dl:-2s">
+      <span class="idx">梦话 · 02</span>
+      <p>这个地方本身就应该是一件作品——它的气质、它的留白、它的安静，都应该是我喜欢的样子。</p>
+    </div></blockquote>
+
+    <blockquote class="dq rv"><div class="dq-inner" style="--d:9.4s;--dl:-4s">
+      <span class="idx">梦话 · 03</span>
+      <p>把网站当作可以反复梦见的物体，而不是一次成型的交付物。也许某天醒来觉得首页整个不对，就让它重来一遍。</p>
+    </div></blockquote>
+
+    <blockquote class="dq rv"><div class="dq-inner" style="--d:7.8s;--dl:-1s">
+      <span class="idx">梦话 · 04 — 写给自己的风格笔记</span>
+      <p>世界应当始终保留一种感觉：它可能马上消失。</p>
+    </div></blockquote>
+
+    <blockquote class="dq rv"><div class="dq-inner" style="--d:8.8s;--dl:-3s">
+      <span class="idx">梦话 · 05</span>
+      <p>慢慢来。</p>
+    </div></blockquote>
+  </section>
+
+  <!-- ============ 复读 · 第二份档案 ============ -->
+  <section class="echo">
+    <div class="echo-wrap">
+      <div class="seal" aria-hidden="true">醒</div>
+      <span class="tag ember rv">复读 · 第二次阅读</span>
+      <h2 class="rv" style="--i:1">同一份档案，请再读一遍</h2>
+      <p class="sub rv" style="--i:2">刚才那些锚点，在梦里又抄了一遍。逐字对照。</p>
+    </div>
+    <div class="rows">
+      <div class="row rv" style="--i:0">
+        <span class="k">名字</span>
+        <span class="v" data-drift="Traveritas" data-true="Traveritas">Traveritas</span>
+        <span class="tick">✓ 已校准 · 没变——最结实的锚</span>
+      </div>
+      <div class="row rv" style="--i:1">
+        <span class="k">驻地</span>
+        <span class="v" data-drift="东廿五区 · 无时区" data-true="东八区 · UTC+8">东廿五区 · 无时区</span>
+        <span class="tick">✓ 已校准</span>
+      </div>
+      <div class="row rv" style="--i:2">
+        <span class="k">开站</span>
+        <span class="v" data-drift="2026-09-32" data-true="2026-09-19">2026-09-32</span>
+        <span class="tick">✓ 已校准</span>
+      </div>
+      <div class="row rv" style="--i:3">
+        <span class="k">联络</span>
+        <span class="v" data-drift="guthub.com/Traverltas" data-true="github.com/Traveritas">guthub.com/Traverltas</span>
+        <span class="tick">✓ 已校准</span>
+      </div>
+      <div class="row rv" style="--i:4">
+        <span class="k">抄于</span>
+        <span class="v" data-drift="25:61 · 梦里" data-true="23:47 · 深夜">25:61 · 梦里</span>
+        <span class="tick">✓ 已校准</span>
+      </div>
+    </div>
+    <p class="echo-note rv">名字没有变——<b>名字是最结实的锚</b>。其余的都漂了：读出不对劲，就说明还在梦里。
+    按住右下角的锚点，让它们逐字归位；松手，它们会继续漂。</p>
+  </section>
+
+  <!-- ============ 正在梦见 ============ -->
+  <section>
+    <span class="tag warm rv">深梦 · 正在梦见</span>
+    <h2 class="rv" style="--i:1">最近反复出现的东西</h2>
+    <p class="sub rv" style="--i:2">据说，反复梦见的东西会长成这个站的母题。</p>
+    <div class="chips rv" style="--i:3">
+      <span class="chip" style="--d:6.8s">水面</span>
+      <span class="chip" style="--d:7.6s;--dl:-2s">细线</span>
+      <span class="chip" style="--d:6.2s;--dl:-4s">帷幕</span>
+      <span class="chip" style="--d:8.2s;--dl:-1s">巨型空洞</span>
+      <span class="chip dead">碎块</span>
+      <span class="chip dead">花</span>
+    </div>
+    <p class="chips-cap rv" style="--i:4">划掉的两个已经醒来了——碎块因过于规整被否决，花做了三稿仍不是答案。
+    完整的否决记录在随笔《母题探索记录：从碎块到花》里。</p>
+  </section>
+
+  <!-- ============ 造梦方式 ============ -->
+  <section>
+    <span class="tag rv">造梦 · COLOPHON</span>
+    <h2 class="rv" style="--i:1">这一页是怎么来的</h2>
+    <p class="sub rv" style="--i:2">不是履历，是建造记录。</p>
+    <div class="manifest rv" style="--i:3">
+      <div class="mrow"><span class="k">框架</span><span class="v"><b>Astro</b> · 纯静态 · 内容页零 JavaScript</span></div>
+      <div class="mrow"><span class="k">形态</span><span class="v">内容与样式分离，每一页自包含——选型标准不是「对人类新手友好」，而是<b>经得起智能体反复修改</b></span></div>
+      <div class="mrow"><span class="k">分工</span><span class="v">我出方向，智能体出手。你看到的这个站，<b>一行代码都不是我写的</b></span></div>
+      <div class="mrow"><span class="k">改版</span><span class="v">主页已经换了三副面孔，每一次都被否决；这一页不打算摸索——<b>它打算一次睡成</b></span></div>
+    </div>
+  </section>
+
+  <!-- ============ 唤醒方式 ============ -->
+  <section>
+    <span class="tag cool rv">出口 · 唤醒方式</span>
+    <h2 class="rv" style="--i:1">需要把我叫醒的话</h2>
+    <p class="sub rv" style="--i:2">这些是锚点中的锚点——在梦里点，也会通。</p>
+    <div class="wake-list">
+      <a class="rv" style="--i:0" href="https://github.com/Traveritas" target="_blank" rel="noopener">
+        <span class="w-name">GitHub</span>
+        <span class="w-href">github.com/Traveritas</span>
+        <span class="w-why">仓库 · 醒着的证据</span>
+        <span class="w-arrow">→</span>
+      </a>
+      <a class="rv" style="--i:1" href="mailto:hello@traveritas.page">
+        <span class="w-name">Email</span>
+        <span class="w-href">hello@traveritas.page</span>
+        <span class="w-why">来信 · 会醒着回</span>
+        <span class="w-arrow">→</span>
+      </a>
+      <a class="dead-row rv" style="--i:2" href="javascript:void(0)" aria-disabled="true">
+        <span class="w-name">RSS</span>
+        <span class="w-href">/rss.xml</span>
+        <span class="w-why">还没醒 · 即将接通</span>
+        <span class="w-arrow">→</span>
+      </a>
+    </div>
+  </section>
+
+  <footer class="rv">
+    <span class="dot" aria-hidden="true"></span>
+    <p>本页在梦中建成 · 写于东八区的一次深夜<br>Traveritas</p>
+    <p class="f-mono">醒梦 · 二〇二六</p>
+  </footer>
+
+</main>
+
+<!-- 玻璃锚点 · 现实检验仪 -->
+<button class="anchor" id="anchor" aria-label="按住以检验现实" aria-pressed="false">
+  <svg class="ring-svg" viewBox="0 0 92 92" aria-hidden="true">
+    <circle class="ring-track" cx="46" cy="46" r="44"></circle>
+    <circle class="ring-fill" id="ringFill" cx="46" cy="46" r="44"></circle>
+  </svg>
+  <span class="disc"><span class="eye"><i></i></span></span>
+  <span class="a-label" id="anchorLabel">按住 · 检验现实</span>
+</button>
+
+<div id="errbox" hidden></div>
+
+<script>
+(function(){
+  'use strict';
+  var body=document.body;
+  var anchor=document.getElementById('anchor');
+  var anchorLabel=document.getElementById('anchorLabel');
+  var ring=document.getElementById('ringFill');
+  var meterDot=document.getElementById('meterDot');
+  var glow=document.querySelector('.glow');
+  var hairline=document.getElementById('hairline');
+  var clockEls=[document.getElementById('clockText'),document.getElementById('tbClock')];
+  var clockWrap=document.getElementById('railClock');
+  var RING=2*Math.PI*44;
+  var reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var qs=new URLSearchParams(location.search);
+  if(qs.get('reduced')==='1') body.classList.add('no-motion'),reduce=true;
+
+  window.addEventListener('error',function(e){
+    var b=document.getElementById('errbox');
+    window.__swarmErr=e.message||e.type;
+    b.hidden=false;b.textContent='ERR: '+(e.message||e.type);
+  });
+
+  /* ---------- 深度（滚动） ---------- */
+  var depth=0,ticking=false;
+  function onScroll(){
+    if(ticking)return;ticking=true;
+    requestAnimationFrame(function(){
+      ticking=false;
+      var max=document.documentElement.scrollHeight-innerHeight;
+      depth=max>0?Math.min(1,Math.max(0,scrollY/max)):0;
+      render();
+    });
+  }
+  function render(){
+    if(!body.classList.contains('checked')){
+      meterDot.style.top=(8+depth*78)+'%';
+    }
+    if(glow)glow.style.transform='translateY('+(depth*24)+'vh)';
+    if(hairline)hairline.style.width=(depth*100)+'%';
+  }
+  addEventListener('scroll',onScroll,{passive:true});
+
+  /* ---------- 钟：梦里漂移，检验时校准 ---------- */
+  var driftMin=0;
+  function pad(n){return (n<10?'0':'')+n}
+  function tickClock(){
+    var checked=body.classList.contains('checked');
+    if(checked){ driftMin*=0.45; if(driftMin<0.4)driftMin=0; }
+    else{ driftMin+=(0.5+depth*8)*(0.5+Math.random()); }
+    var r=new Date();
+    var mins=r.getHours()*60+r.getMinutes()+driftMin;
+    var h=Math.floor(mins/60), m=Math.floor(mins%60);
+    var txt=pad(h)+':'+pad(m);
+    var drifting=!checked&&driftMin>3;
+    clockEls.forEach(function(el){ if(!el)return; el.textContent=txt; el.classList.toggle('drift',drifting); });
+    if(clockWrap)clockWrap.classList.toggle('drift',drifting);
+  }
+  setInterval(tickClock,1000);tickClock();
+
+  /* ---------- 逐字归位 / 逐字漂移 ---------- */
+  var POOL='醒梦之间0123456789abcdefghijklmnopqrstuvwxyz·—';
+  function morph(el,target,dur,done){
+    if(!el)return;
+    if(el._job)cancelAnimationFrame(el._job);
+    if(reduce||dur<=0){ el.textContent=target; done&&done(); return; }
+    var from=el.textContent;
+    var max=Math.max(from.length,target.length);
+    var t0=performance.now();
+    (function step(t){
+      var p=Math.min(1,(t-t0)/dur);
+      var n=Math.floor(p*target.length);
+      var out=target.slice(0,n);
+      for(var i=n;i<max;i++){
+        var c=i<from.length?from.charAt(i):' ';
+        out+=(Math.random()<0.45)?c:POOL.charAt(Math.floor(Math.random()*POOL.length));
+      }
+      el.textContent=out;
+      if(p<1){ el._job=requestAnimationFrame(step); }
+      else{ el.textContent=target; el._job=null; done&&done(); }
+    })(t0);
+  }
+  var echoRows=[].slice.call(document.querySelectorAll('.echo .row'));
+  function driftEcho(){
+    echoRows.forEach(function(row){
+      row.classList.remove('settled');
+      var v=row.querySelector('.v');
+      if(v)morph(v,v.getAttribute('data-drift'),reduce?0:520);
+    });
+  }
+  function settleEcho(){
+    echoRows.forEach(function(row){
+      var v=row.querySelector('.v');
+      if(v)morph(v,v.getAttribute('data-true'),reduce?0:640,function(){row.classList.add('settled')});
+    });
+  }
+
+  /* ---------- 检验（按住） ---------- */
+  var RING_MS=760;
+  var holding=false,holdT0=0,autoTimer=null;
+  function ringFill(){
+    ring.style.transition=reduce?'none':'stroke-dashoffset '+RING_MS+'ms linear';
+    ring.style.strokeDashoffset='0';
+  }
+  function ringReset(){
+    ring.style.transition=reduce?'none':'stroke-dashoffset .45s ease';
+    ring.style.strokeDashoffset=RING;
+  }
+  function startCheck(){
+    if(holding)return;
+    holding=true;holdT0=performance.now();
+    body.classList.add('checked');
+    anchor.classList.add('holding');
+    anchor.setAttribute('aria-pressed','true');
+    anchorLabel.textContent='检验中 · 现实';
+    meterDot.style.top='4%';
+    ringFill();
+    settleEcho();
+  }
+  function endCheck(){
+    if(!holding)return;
+    holding=false;
+    body.classList.remove('checked');
+    anchor.classList.remove('holding');
+    anchor.setAttribute('aria-pressed','false');
+    anchorLabel.textContent='按住 · 检验现实';
+    ringReset();
+    driftEcho();
+    render();
+  }
+  anchor.addEventListener('contextmenu',function(e){e.preventDefault()});
+  anchor.addEventListener('pointerdown',function(e){
+    e.preventDefault();
+    if(anchor.setPointerCapture){try{anchor.setPointerCapture(e.pointerId)}catch(_){}}
+    clearTimeout(autoTimer);
+    startCheck();
+  });
+  function release(){
+    if(!holding)return;
+    if(performance.now()-holdT0<350){ /* 快点：自动检验一小会儿 */
+      clearTimeout(autoTimer);
+      autoTimer=setTimeout(endCheck,1500);
+    }else{
+      endCheck();
+    }
+  }
+  anchor.addEventListener('pointerup',release);
+  anchor.addEventListener('pointercancel',function(){clearTimeout(autoTimer);endCheck()});
+  anchor.addEventListener('keydown',function(e){
+    if(e.code==='Space'||e.code==='Enter'){e.preventDefault();if(!e.repeat)startCheck();}
+  });
+  anchor.addEventListener('keyup',function(e){
+    if(e.code==='Space'||e.code==='Enter'){release();}
+  });
+
+  /* ---------- 出现 ---------- */
+  if('IntersectionObserver' in window){
+    var io=new IntersectionObserver(function(es){
+      es.forEach(function(en){ if(en.isIntersecting){en.target.classList.add('in');io.unobserve(en.target);} });
+    },{threshold:.12});
+    document.querySelectorAll('.rv').forEach(function(el){io.observe(el)});
+  }else{
+    document.querySelectorAll('.rv').forEach(function(el){el.classList.add('in')});
+  }
+
+  /* ---------- 调试参数（供截图验收） ---------- */
+  function applyScroll(){
+    var f=parseFloat(qs.get('scroll'));
+    if(!isNaN(f)){
+      var max=document.documentElement.scrollHeight-innerHeight;
+      scrollTo(0,Math.max(0,max*Math.min(1,Math.max(0,f))));
+    }
+    onScroll();
+  }
+  addEventListener('load',function(){
+    applyScroll();
+    if(qs.get('check')==='1'){
+      holding=true;holdT0=-1e6; /* 锁定，永不松手 */
+      startCheck();
+    }
+  });
+  applyScroll();
+})();
+</script>
+</body>
+</html>

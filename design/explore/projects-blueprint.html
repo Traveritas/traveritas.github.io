@@ -1,0 +1,722 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>图纸间 · 项目 — 醒梦</title>
+<meta name="description" content="醒梦 · 项目图纸间：把每个项目当作一张晒制中的工程图纸。">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%23254a70'/%3E%3Ctext x='32' y='44' font-size='36' text-anchor='middle' fill='%23e9e5d6' font-family='serif'%3E醒%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ————— 图纸间 · 蓝晒底色系 ————— */
+:root{
+  --bp:#254a70;            /* 蓝晒底 */
+  --bp-hi:#2c5680;         /* 图样高光 */
+  --bp-deep:#1c3a5a;
+  --line:#e9e5d6;          /* 纸色线 */
+  --line-2:rgba(233,229,214,.55);
+  --line-3:rgba(233,229,214,.26);
+  --ink-dim:rgba(233,229,214,.78);
+  --ink-mute:rgba(233,229,214,.55);
+  --steel:#a9bed8;         /* 钢青注记 */
+  --seal:#d15c3d;          /* 朱砂 */
+  --serif:'Noto Serif SC','Songti SC',serif;
+  --fang:'FangSong','仿宋','STFangsong','Noto Serif SC',serif;
+  --mono:'IBM Plex Mono','Consolas',monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  background:var(--bp);
+  color:var(--line);
+  font-family:var(--serif);
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+body[data-view=sheet]{overflow:hidden}
+::selection{background:rgba(209,92,61,.45);color:#fff}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;text-align:inherit}
+a{color:inherit}
+:focus-visible{outline:1px solid var(--steel);outline-offset:4px}
+
+/* ————— 底纹：毫米网格 / 颗粒 / 暗角 ————— */
+.grid-bg{position:fixed;inset:0;z-index:1;pointer-events:none;
+  background:
+    repeating-linear-gradient(0deg,rgba(233,229,214,.05) 0 1px,transparent 1px 96px),
+    repeating-linear-gradient(90deg,rgba(233,229,214,.05) 0 1px,transparent 1px 96px),
+    repeating-linear-gradient(0deg,rgba(233,229,214,.018) 0 1px,transparent 1px 24px),
+    repeating-linear-gradient(90deg,rgba(233,229,214,.018) 0 1px,transparent 1px 24px);
+}
+.grain{position:fixed;inset:0;z-index:98;pointer-events:none;opacity:.4;mix-blend-mode:soft-light;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+}
+.vignette{position:fixed;inset:0;z-index:97;pointer-events:none;
+  background:radial-gradient(130% 105% at 50% 40%,transparent 52%,rgba(9,20,36,.38) 100%);
+}
+
+/* ————— 站点铬件 ————— */
+.topnav{position:fixed;top:1.6rem;right:clamp(1.2rem,3vw,2.6rem);z-index:100;
+  display:flex;gap:clamp(1em,2.4vw,2em);font-size:12px;letter-spacing:.32em;}
+.topnav a{color:var(--ink-mute);text-decoration:none;transition:color .3s;position:relative;padding-bottom:4px}
+.topnav a:hover{color:var(--line)}
+.topnav a[aria-current]{color:var(--line)}
+.topnav a[aria-current]::after{content:"";position:absolute;left:50%;bottom:-3px;width:3px;height:3px;
+  border-radius:50%;background:var(--seal);transform:translateX(-50%)}
+
+.rail{position:fixed;left:clamp(1.2rem,2.6vw,2.4rem);top:0;bottom:0;z-index:100;
+  display:none;flex-direction:column;justify-content:space-between;align-items:center;
+  padding:15vh 0 13vh;}
+@media(min-width:1100px){.rail{display:flex}}
+.rail-mark{writing-mode:vertical-rl;font-size:15px;letter-spacing:.6em;color:var(--line);
+  text-decoration:none;font-weight:500}
+.rail-mark i{font-style:normal;color:var(--seal)}
+.rail-back{writing-mode:vertical-rl;font-size:11px;letter-spacing:.4em;color:var(--ink-dim);
+  border:1px solid var(--line-3);padding:1.1em .55em;border-radius:2px;
+  background:rgba(28,58,90,.4);backdrop-filter:blur(4px);transition:.3s;display:none}
+.rail-back:hover{border-color:var(--line-2);color:var(--line)}
+body[data-view=sheet] .rail-back{display:block}
+
+.m-mark{position:fixed;top:1.5rem;left:1.3rem;z-index:100;font-size:15px;font-weight:500;
+  letter-spacing:.3em;color:var(--line);text-decoration:none;display:none}
+.m-back{position:fixed;top:1.4rem;left:1.2rem;z-index:100;font-size:11px;letter-spacing:.3em;
+  color:var(--ink-dim);border:1px solid var(--line-3);padding:.55em .9em;border-radius:2px;
+  background:rgba(28,58,90,.4);display:none}
+@media(max-width:1099px){
+  body[data-view=board] .m-mark{display:block}
+  body[data-view=sheet] .m-back{display:block}
+}
+@media(min-width:1100px){.m-mark{display:none}}
+
+/* ————— 图柜（列表） ————— */
+#board{position:relative;z-index:2;opacity:1;transition:opacity .6s,filter .6s,transform .6s}
+body[data-view=sheet] #board{opacity:0;filter:blur(10px);transform:translateY(-3vh) scale(.99);pointer-events:none}
+.board-in{max-width:1240px;margin:0 auto;padding:15vh clamp(1.4rem,5vw,4.5rem) 10vh}
+
+.overline{display:flex;align-items:center;gap:1em;font-size:12px;letter-spacing:.5em;color:var(--steel)}
+.overline .lat{font-family:var(--mono);letter-spacing:.42em}
+.overline i{font-style:normal;color:var(--line-3)}
+.b-head h1{font-size:clamp(56px,9vw,108px);font-weight:300;letter-spacing:.1em;line-height:1.15;
+  margin-top:.35em;animation:rise 1s .1s both}
+.epigraph{margin-top:2.4em;font-size:15px;color:var(--ink-dim);letter-spacing:.04em;max-width:38em}
+.epigraph .cite{display:block;margin-top:.8em;font-size:12px;color:var(--ink-mute);letter-spacing:.2em}
+.ledger{margin-top:3em;font-family:var(--fang);font-size:13px;letter-spacing:.35em;color:var(--steel);
+  display:flex;align-items:center;gap:1.2em;animation:rise 1s .25s both}
+.ledger::before{content:"";width:3.4em;height:1px;background:var(--line-3)}
+.ledger b{font-weight:400;color:var(--ink-dim)}
+.ledger .n{font-family:var(--mono);letter-spacing:.1em}
+
+.sheets{margin-top:9vh;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:clamp(1.4rem,3vw,2.6rem)}
+.sheet{position:relative;background:linear-gradient(158deg,var(--bp-hi),#224565 72%);
+  border:1px solid var(--line-3);padding:9px;
+  box-shadow:0 12px 34px rgba(8,18,32,.4);
+  transform:rotate(var(--rot,0deg)) translateY(var(--ty,0px));
+  transition:transform .55s cubic-bezier(.22,.61,.21,1),box-shadow .55s,opacity .4s,filter .4s;
+  animation:expose 1.1s cubic-bezier(.2,.6,.2,1) both;
+  animation-delay:calc(.3s + var(--i,0)*.12s)}
+.sheet:nth-child(odd){--rot:-.5deg}
+.sheet:nth-child(even){--rot:.45deg;--ty:2.6rem}
+@media(hover:hover){
+  .sheet:hover{transform:rotate(0deg) translateY(calc(var(--ty,0px) - 7px));
+    box-shadow:0 26px 54px rgba(8,18,32,.5);z-index:3}
+  .sheets:hover .sheet:not(:hover){opacity:.58;filter:saturate(.8)}
+}
+@keyframes expose{from{opacity:0;filter:brightness(1.9) contrast(.65)}to{opacity:1;filter:none}}
+@keyframes rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+
+.sh-frame{border:1px solid var(--line-2);padding:0 0 1.15rem;display:flex;flex-direction:column}
+.sh-pin{position:absolute;top:-4px;left:50%;transform:translateX(-50%);width:9px;height:9px;border-radius:50%;
+  background:radial-gradient(circle at 32% 28%,#f4efe0,#93a9c4 55%,#33526f 100%);
+  box-shadow:0 2px 4px rgba(0,0,0,.45);z-index:2}
+.sh-photo{position:relative;height:158px;overflow:hidden;background:#2e5580;margin:10px 10px 0;
+  border:1px solid var(--line-3)}
+.sh-photo img{width:100%;height:100%;object-fit:cover;filter:grayscale(1) contrast(1.08) brightness(.94);
+  mix-blend-mode:luminosity;opacity:.92;display:block}
+.dim-w{position:relative;margin:.7rem 1.3rem .1rem}
+.sh-dim{display:block;width:100%;height:12px}
+.sh-dim line{stroke:var(--line-2);stroke-width:1;vector-effect:non-scaling-stroke;
+  stroke-dasharray:1;stroke-dashoffset:1;transition:stroke-dashoffset .8s .05s ease}
+.sheet:hover .sh-dim line{stroke-dashoffset:0}
+.sh-dim-t{position:absolute;left:50%;bottom:-2px;transform:translateX(-50%);font-family:var(--mono);
+  font-size:9px;letter-spacing:.18em;color:var(--steel);background:var(--bp-hi);padding:0 .6em;
+  opacity:0;transition:opacity .5s .3s}
+.sheet:hover .sh-dim-t{opacity:1}
+@media(hover:none){
+  .sh-dim line{stroke-dashoffset:0}
+  .sh-dim-t{opacity:.8}
+}
+.sh-body{padding:1.05rem 1.3rem 0}
+.sh-top{display:flex;justify-content:space-between;align-items:center;gap:1em}
+.sh-no{font-family:var(--mono);font-size:11px;letter-spacing:.22em;color:var(--steel)}
+.sh-title{font-size:clamp(19px,2vw,22px);font-weight:500;letter-spacing:.05em;
+  margin:.55em 0 .5em;transition:letter-spacing .4s}
+.sheet:hover .sh-title{letter-spacing:.08em}
+.sh-desc{font-family:var(--fang);font-size:13px;line-height:1.95;color:var(--ink-dim);
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.sh-tb{margin:1.15rem 1.3rem 0;border:1px solid var(--line-3);display:grid;
+  grid-template-columns:1.1fr 1fr .8fr;font-family:var(--mono);font-size:10px;letter-spacing:.14em}
+.sh-tb span{padding:.5em .8em;color:var(--ink-mute);white-space:nowrap;overflow:hidden}
+.sh-tb span + span{border-left:1px solid var(--line-3)}
+.sh-tb .s-work{color:var(--seal)}
+.sh-tb .s-idea{color:var(--steel)}
+.sh-tb .s-sealed{color:var(--ink-mute);text-decoration:line-through 1px rgba(233,229,214,.35)}
+
+.st{font-family:var(--fang);font-size:11px;letter-spacing:.32em;padding:.32em .35em .32em .67em;
+  border:1.5px solid var(--seal);color:var(--seal);transform:rotate(-4deg);display:inline-block;
+  white-space:nowrap;flex:none}
+.st.idea{border-color:var(--line-2);color:var(--steel)}
+.st.sealed{border-style:dashed;border-color:rgba(233,229,214,.5);color:var(--ink-mute)}
+
+.board-foot{margin-top:14vh;border-top:1px solid var(--line-3);padding-top:1.6rem;
+  display:flex;justify-content:space-between;align-items:center;gap:1em;flex-wrap:wrap;
+  font-size:11px;letter-spacing:.3em;color:var(--ink-mute)}
+.board-foot .lat{font-family:var(--mono);letter-spacing:.24em}
+.board-foot .foot-seal{width:16px;height:16px;border:1px solid var(--seal);color:var(--seal);
+  font-size:9px;display:inline-grid;place-items:center;transform:rotate(-6deg);margin-right:.8em}
+
+/* ————— 展开图（详情） ————— */
+#sheet-view{position:fixed;inset:0;z-index:60;background:var(--bp);
+  opacity:0;visibility:hidden;transform:scale(1.012);filter:blur(9px);
+  transition:opacity .65s cubic-bezier(.22,.61,.21,1),transform .65s cubic-bezier(.22,.61,.21,1),
+    filter .65s cubic-bezier(.22,.61,.21,1),visibility 0s .65s}
+#sheet-view::before{content:"";position:absolute;inset:0;pointer-events:none;
+  background:
+    repeating-linear-gradient(0deg,rgba(233,229,214,.05) 0 1px,transparent 1px 96px),
+    repeating-linear-gradient(90deg,rgba(233,229,214,.05) 0 1px,transparent 1px 96px),
+    repeating-linear-gradient(0deg,rgba(233,229,214,.018) 0 1px,transparent 1px 24px),
+    repeating-linear-gradient(90deg,rgba(233,229,214,.018) 0 1px,transparent 1px 24px)}
+body[data-view=sheet] #sheet-view{opacity:1;visibility:visible;transform:none;filter:none;
+  transition-delay:0s}
+.sheet-scroll{position:relative;height:100%;overflow-y:auto;overscroll-behavior:contain}
+.scan{position:absolute;left:0;right:0;top:0;height:130px;z-index:5;pointer-events:none;opacity:0;
+  background:linear-gradient(180deg,transparent,rgba(233,229,214,.06) 42%,rgba(233,229,214,.2) 50%,rgba(233,229,214,.06) 58%,transparent)}
+body[data-view=sheet] .scan{animation:scan 1.15s .2s ease-out}
+@keyframes scan{0%{transform:translateY(-150px);opacity:0}12%{opacity:1}
+  88%{opacity:1}100%{transform:translateY(108vh);opacity:0}}
+
+.drawing{max-width:880px;margin:0 auto;padding:13vh clamp(1.2rem,4.5vw,3rem) 15vh;position:relative}
+.d-frame{position:absolute;inset:4px;border:1px solid var(--line-3);pointer-events:none}
+.d-frame::after{content:"";position:absolute;inset:5px;border:1px solid rgba(233,229,214,.13)}
+.d-corner{position:absolute;width:11px;height:11px;border:0 solid var(--line-2);pointer-events:none}
+.d-corner.tl{top:10px;left:10px;border-top-width:1px;border-left-width:1px}
+.d-corner.tr{top:10px;right:10px;border-top-width:1px;border-right-width:1px}
+.d-corner.bl{bottom:10px;left:10px;border-bottom-width:1px;border-left-width:1px}
+.d-corner.br{bottom:10px;right:10px;border-bottom-width:1px;border-right-width:1px}
+.d-page{position:absolute;bottom:14px;left:20px;font-family:var(--mono);font-size:10px;
+  letter-spacing:.3em;color:var(--ink-mute)}
+.d-wm{position:absolute;right:-2%;top:34%;font-size:clamp(120px,22vw,240px);font-weight:300;
+  line-height:1;color:transparent;-webkit-text-stroke:1px rgba(233,229,214,.06);
+  pointer-events:none;user-select:none;z-index:0}
+.drawing>*:not(.d-frame):not(.d-corner):not(.d-page):not(.d-wm){position:relative;z-index:1}
+
+.d-head>*{animation:rise .8s cubic-bezier(.2,.6,.2,1) both}
+body[data-view=sheet] .d-head>*:nth-child(1){animation-delay:.25s}
+body[data-view=sheet] .d-head>*:nth-child(2){animation-delay:.37s}
+body[data-view=sheet] .d-head>*:nth-child(3){animation-delay:.49s}
+.d-meta{display:flex;align-items:center;gap:1.4em;flex-wrap:wrap;
+  font-family:var(--mono);font-size:11.5px;letter-spacing:.22em;color:var(--steel)}
+.d-meta .dot{color:var(--line-3)}
+.d-title{font-size:clamp(30px,5.2vw,52px);font-weight:600;letter-spacing:.06em;
+  line-height:1.5;margin-top:.9em}
+.d-title .hl{color:var(--steel)}
+.d-lede{margin-top:1.4em;font-family:var(--fang);font-size:15px;line-height:2.1;
+  color:var(--ink-dim);max-width:36em;letter-spacing:.05em}
+
+.d-photo{margin:6.5vh 0 0;max-width:720px}
+.ph{position:relative;background:#2e5580;padding:13px}
+.ph img{display:block;width:100%;filter:grayscale(1) contrast(1.1) brightness(.95);
+  mix-blend-mode:luminosity;opacity:.95}
+.corner{position:absolute;width:0;height:0;border:15px solid transparent}
+.corner.tl{top:-1px;left:-1px;border-top-color:var(--line);border-left-color:var(--line)}
+.corner.tr{top:-1px;right:-1px;border-top-color:var(--line);border-right-color:var(--line)}
+.corner.bl{bottom:-1px;left:-1px;border-bottom-color:var(--line);border-left-color:var(--line)}
+.corner.br{bottom:-1px;right:-1px;border-bottom-color:var(--line);border-right-color:var(--line)}
+.d-photo figcaption{margin-top:1em;font-family:var(--mono);font-size:10px;
+  letter-spacing:.3em;color:var(--ink-mute)}
+
+.d-body{margin-top:4vh}
+.d-h2{display:flex;gap:1.1em;align-items:baseline;margin:3.6em 0 1.5em}
+.d-h2 .n{font-family:var(--mono);font-size:12px;letter-spacing:.2em;color:var(--seal)}
+.d-h2 .t{font-family:var(--fang);font-size:16px;letter-spacing:.42em;color:var(--line)}
+.d-h2::after{content:"";flex:1;height:1px;background:var(--line-3);transform:translateY(-2px)}
+.d-body p{font-size:16.5px;line-height:2.1;letter-spacing:.02em;color:rgba(233,229,214,.92);
+  max-width:37em;margin:1em 0}
+.d-body strong{font-weight:600;color:var(--line);border-bottom:1px solid rgba(209,92,61,.55);padding-bottom:1px}
+.d-body ul{list-style:none;margin:1.2em 0;max-width:37em}
+.d-body li{position:relative;padding-left:1.7em;margin:.75em 0;font-size:16px;line-height:2;
+  color:rgba(233,229,214,.92)}
+.d-body li::before{content:"";position:absolute;left:.15em;top:.85em;width:6px;height:6px;
+  border:1px solid var(--line-2)}
+.d-body .neg{color:var(--ink-mute)}
+
+.d-plan{margin-top:9vh;border:1px solid var(--line-2);padding:1.7rem 1.7rem 1.3rem;max-width:720px}
+.plan-head{display:flex;justify-content:space-between;align-items:baseline;gap:1em;flex-wrap:wrap}
+.plan-head .t{font-family:var(--fang);font-size:14px;letter-spacing:.45em;color:var(--line)}
+.plan-head .n{font-family:var(--mono);font-size:11px;letter-spacing:.2em;color:var(--steel)}
+.dim{position:relative;margin:1.5rem 0 1.9rem;height:16px}
+.dim::before,.dim::after{content:"";position:absolute;top:1px;bottom:1px;width:1px;background:var(--line-2)}
+.dim::before{left:0}.dim::after{right:0}
+.dim-base{position:absolute;left:0;right:0;top:50%;height:1px;background:var(--line-3)}
+.dim-fill{position:absolute;left:0;top:50%;height:1px;background:var(--line);width:0;
+  transition:width 1.1s .5s cubic-bezier(.22,.61,.21,1)}
+body[data-view=sheet] .dim-fill{width:var(--p,0%)}
+.dim-fill::after{content:"";position:absolute;right:-3px;top:-3px;width:7px;height:7px;
+  background:var(--seal);transform:rotate(45deg)}
+.dim-lab{position:absolute;right:0;top:-1.5em;font-family:var(--mono);font-size:10.5px;
+  letter-spacing:.24em;color:var(--steel)}
+.dim-lab b{color:var(--line);font-weight:500}
+.ck{display:grid;grid-template-columns:1.4em 1fr auto;gap:1em;align-items:center;
+  padding:.78em 0;border-top:1px dashed rgba(233,229,214,.16)}
+.ck-b{width:13px;height:13px;border:1.5px solid var(--line-2);position:relative;flex:none}
+.ck.done .ck-b{background:var(--line);border-color:var(--line)}
+.ck.done .ck-b::after{content:"✓";position:absolute;inset:0;display:grid;place-items:center;
+  font-family:var(--mono);font-size:10px;color:var(--bp)}
+.ck.now .ck-b{border-color:var(--seal);border-style:dashed}
+.ck.now .ck-b::after{content:"";position:absolute;inset:2.5px;background:var(--seal);
+  animation:pulse 2.2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:.25}50%{opacity:1}}
+.ck-t{font-family:var(--fang);font-size:15px;letter-spacing:.06em;color:rgba(233,229,214,.92)}
+.ck.done .ck-t{color:var(--ink-mute)}
+.ck-m{font-family:var(--fang);font-size:10px;letter-spacing:.35em;color:var(--ink-mute);white-space:nowrap}
+.ck.done .ck-m{color:var(--seal)}
+.ck.now .ck-m{color:var(--seal)}
+
+.d-links{margin-top:6vh;font-family:var(--mono);font-size:12px;letter-spacing:.18em;color:var(--steel)}
+.d-links .k{color:var(--ink-mute);margin-right:1.2em}
+.d-links a{color:var(--steel);text-decoration:none;border-bottom:1px solid rgba(169,190,216,.45);
+  padding-bottom:2px;transition:.3s}
+.d-links a:hover{color:var(--line);border-color:var(--line)}
+
+.d-tb{margin:11vh 0 0 auto;width:min(500px,100%);border:1px solid var(--line-2);
+  display:grid;grid-template-columns:1.5fr 1fr 1fr;
+  animation:rise .8s .5s both}
+.tb-c{border:0 solid var(--line-3);border-right-width:1px;border-bottom-width:1px;
+  padding:.75em .95em;min-width:0}
+.tb-c:nth-child(3n){border-right-width:0}
+.tb-c.span3{grid-column:1/-1}
+.tb-l{display:block;font-family:var(--fang);font-size:9.5px;letter-spacing:.42em;
+  color:var(--steel);margin-bottom:.4em}
+.tb-v{font-size:13px;letter-spacing:.08em;color:var(--line);font-weight:500}
+.tb-v.mono{font-family:var(--mono);font-size:11.5px;letter-spacing:.14em;font-weight:400}
+.tb-seal{display:inline-block;width:15px;height:15px;border:1px solid var(--seal);color:var(--seal);
+  font-size:9px;line-height:1;display:inline-grid;place-items:center;transform:rotate(-6deg);
+  margin-left:.7em;vertical-align:-2px}
+.tb-v.st-work{color:var(--seal)}
+.tb-v.st-idea{color:var(--steel)}
+.tb-v.st-sealed{color:var(--ink-mute)}
+
+.d-adj{margin-top:12vh;display:grid;grid-template-columns:1fr 1fr;gap:1.6rem}
+.adj{border:1px solid var(--line-3);padding:1.15rem 1.3rem;transition:.35s;
+  animation:rise .8s .6s both}
+.adj:hover{border-color:var(--line-2);background:rgba(44,86,128,.35)}
+.adj .l{font-family:var(--mono);font-size:10px;letter-spacing:.28em;color:var(--steel)}
+.adj .t{display:block;margin-top:.7em;font-size:16px;font-weight:500;letter-spacing:.05em;color:var(--line)}
+.adj .s{display:block;margin-top:.5em;font-family:var(--fang);font-size:12px;color:var(--ink-mute);letter-spacing:.15em}
+.adj[hidden]{display:none}
+@media(max-width:640px){.d-adj{grid-template-columns:1fr}}
+.d-end{margin-top:11vh;text-align:center;font-family:var(--mono);font-size:10.5px;
+  letter-spacing:.5em;color:var(--ink-mute);animation:rise .8s .7s both}
+
+@media(max-width:899px){
+  .sheets{grid-template-columns:1fr}
+  .sheet:nth-child(even){--ty:0rem}
+}
+@media(max-width:640px){
+  .topnav{font-size:10.5px;gap:.9em;letter-spacing:.2em}
+  .board-in{padding-top:18vh}
+  .sh-photo{height:190px}
+  .d-plan{padding:1.2rem 1.1rem .9rem}
+  .d-body p,.d-body li{font-size:15.5px}
+  .d-photo .corner{border-width:11px}
+}
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+  .dim-fill{width:var(--p,0%)!important}
+}
+</style>
+</head>
+<body data-view="board">
+
+<div class="grid-bg" aria-hidden="true"></div>
+<div class="vignette" aria-hidden="true"></div>
+<div class="grain" aria-hidden="true"></div>
+
+<nav class="topnav" aria-label="站点导航">
+  <a href="#">首页</a><a href="#">随笔</a><a href="#" aria-current="page">项目</a><a href="#">关于</a>
+</nav>
+
+<aside class="rail" aria-hidden="false">
+  <a class="rail-mark" href="#">醒<i>梦</i></a>
+  <button class="rail-back" id="railBack" type="button">返回图纸柜</button>
+</aside>
+
+<a class="m-mark" href="#">醒梦</a>
+<button class="m-back" id="mBack" type="button">◀ 图纸柜</button>
+
+<!-- ———— 图柜：项目列表 ———— -->
+<main id="board">
+  <div class="board-in">
+    <header class="b-head">
+      <p class="overline" style="animation:rise 1s both"><span class="lat">PROJECTS</span><i>·</i><span>图纸间</span></p>
+      <h1>项目</h1>
+      <p class="epigraph" style="animation:rise 1s .18s both">「把网站当作可以反复梦见的物体，而不是一次成型的交付物。」
+        <span class="cite">── 《与智能体一起造一个网站》</span></p>
+      <p class="ledger">凡 <span class="n">05</span> 件 · <b>两件在工</b> · <b>两件在构</b> · <b>一件封存</b> · 二〇二六年八月至九月</p>
+    </header>
+
+    <section class="sheets" aria-label="项目图纸">
+
+      <button class="sheet" data-i="0" style="--i:0" type="button" aria-haspopup="dialog">
+        <span class="sh-pin" aria-hidden="true"></span>
+        <span class="sh-frame">
+          <span class="sh-photo"><img src="https://picsum.photos/seed/xingmeng-site/800/500.jpg" alt="这个网站本身 · 示意封面" loading="lazy"></span>
+          <span class="dim-w" aria-hidden="true">
+            <svg class="sh-dim" viewBox="0 0 100 12" preserveAspectRatio="none"><line x1="1" y1="6" x2="99" y2="6" pathLength="1"/><line x1="1" y1="1" x2="1" y2="11" pathLength="1"/><line x1="99" y1="1" x2="99" y2="11" pathLength="1"/></svg>
+            <span class="sh-dim-t">800 × 500</span>
+          </span>
+          <span class="sh-body">
+            <span class="sh-top"><span class="sh-no">PRJ-01</span><span class="st">施工中</span></span>
+            <span class="sh-title" style="display:block">这个网站本身</span>
+            <span class="sh-desc" style="display:block">由 Astro 与智能体共建的个人网站，遵循「醒梦」审美——一个可以反复梦见、反复重来的地方。</span>
+          </span>
+          <span class="sh-tb"><span class="s-work">施工中</span><span>2026-09-19</span><span>PRJ-01</span></span>
+        </span>
+      </button>
+
+      <button class="sheet" data-i="1" style="--i:1" type="button" aria-haspopup="dialog">
+        <span class="sh-pin" aria-hidden="true"></span>
+        <span class="sh-frame">
+          <span class="sh-photo"><img src="https://picsum.photos/seed/xingmeng-motif/800/500.jpg" alt="醒梦 · 视觉母题探索 · 示意封面" loading="lazy"></span>
+          <span class="dim-w" aria-hidden="true">
+            <svg class="sh-dim" viewBox="0 0 100 12" preserveAspectRatio="none"><line x1="1" y1="6" x2="99" y2="6" pathLength="1"/><line x1="1" y1="1" x2="1" y2="11" pathLength="1"/><line x1="99" y1="1" x2="99" y2="11" pathLength="1"/></svg>
+            <span class="sh-dim-t">800 × 500</span>
+          </span>
+          <span class="sh-body">
+            <span class="sh-top"><span class="sh-no">PRJ-02</span><span class="st idea">构想中</span></span>
+            <span class="sh-title" style="display:block">醒梦 · 视觉母题探索</span>
+            <span class="sh-desc" style="display:block">为「醒梦」寻找 2—4 个可以反复出现、最终成为识别符号的核心视觉意象。</span>
+          </span>
+          <span class="sh-tb"><span class="s-idea">构想中</span><span>2026-09-19</span><span>PRJ-02</span></span>
+        </span>
+      </button>
+
+      <button class="sheet" data-i="2" style="--i:2" type="button" aria-haspopup="dialog">
+        <span class="sh-pin" aria-hidden="true"></span>
+        <span class="sh-frame">
+          <span class="sh-photo"><img src="https://picsum.photos/seed/og-cards/800/500.jpg" alt="分享卡生成器 · 示意封面" loading="lazy"></span>
+          <span class="dim-w" aria-hidden="true">
+            <svg class="sh-dim" viewBox="0 0 100 12" preserveAspectRatio="none"><line x1="1" y1="6" x2="99" y2="6" pathLength="1"/><line x1="1" y1="1" x2="1" y2="11" pathLength="1"/><line x1="99" y1="1" x2="99" y2="11" pathLength="1"/></svg>
+            <span class="sh-dim-t">1200 × 630</span>
+          </span>
+          <span class="sh-body">
+            <span class="sh-top"><span class="sh-no">PRJ-03</span><span class="st">施工中</span></span>
+            <span class="sh-title" style="display:block">分享卡生成器</span>
+            <span class="sh-desc" style="display:block">为每篇文章与项目晒一张「醒梦」气质的 OG 分享卡，让人在信息流里一眼认出它。</span>
+          </span>
+          <span class="sh-tb"><span class="s-work">施工中</span><span>2026-09-15</span><span>PRJ-03</span></span>
+        </span>
+      </button>
+
+      <button class="sheet" data-i="3" style="--i:3" type="button" aria-haspopup="dialog">
+        <span class="sh-pin" aria-hidden="true"></span>
+        <span class="sh-frame">
+          <span class="sh-photo"><img src="https://picsum.photos/seed/blank-page/800/500.jpg" alt="留白练习页 · 示意封面" loading="lazy"></span>
+          <span class="dim-w" aria-hidden="true">
+            <svg class="sh-dim" viewBox="0 0 100 12" preserveAspectRatio="none"><line x1="1" y1="6" x2="99" y2="6" pathLength="1"/><line x1="1" y1="1" x2="1" y2="11" pathLength="1"/><line x1="99" y1="1" x2="99" y2="11" pathLength="1"/></svg>
+            <span class="sh-dim-t">800 × 500</span>
+          </span>
+          <span class="sh-body">
+            <span class="sh-top"><span class="sh-no">PRJ-04</span><span class="st sealed">已封存</span></span>
+            <span class="sh-title" style="display:block">留白练习页</span>
+            <span class="sh-desc" style="display:block">一页近乎空白的练习：规则只有一条，后来被自己亲手打破。失败留档。</span>
+          </span>
+          <span class="sh-tb"><span class="s-sealed">已封存</span><span>2026-09-08</span><span>PRJ-04</span></span>
+        </span>
+      </button>
+
+      <button class="sheet" data-i="4" style="--i:4" type="button" aria-haspopup="dialog">
+        <span class="sh-pin" aria-hidden="true"></span>
+        <span class="sh-frame">
+          <span class="sh-photo"><img src="https://picsum.photos/seed/dream-picker/800/500.jpg" alt="醒梦取色器 · 示意封面" loading="lazy"></span>
+          <span class="dim-w" aria-hidden="true">
+            <svg class="sh-dim" viewBox="0 0 100 12" preserveAspectRatio="none"><line x1="1" y1="6" x2="99" y2="6" pathLength="1"/><line x1="1" y1="1" x2="1" y2="11" pathLength="1"/><line x1="99" y1="1" x2="99" y2="11" pathLength="1"/></svg>
+            <span class="sh-dim-t">800 × 500</span>
+          </span>
+          <span class="sh-body">
+            <span class="sh-top"><span class="sh-no">PRJ-05</span><span class="st idea">构想中</span></span>
+            <span class="sh-title" style="display:block">醒梦取色器</span>
+            <span class="sh-desc" style="display:block">从一张雾蒙蒙的照片里，吸出一整套低饱和色板——小到一个下午就该写完的东西。</span>
+          </span>
+          <span class="sh-tb"><span class="s-idea">构想中</span><span>2026-08-30</span><span>PRJ-05</span></span>
+        </span>
+      </button>
+
+    </section>
+
+    <footer class="board-foot">
+      <span><span class="foot-seal" aria-hidden="true">醒</span>醒梦 <span class="lat">XINGMENG</span></span>
+      <span>图纸间 · 凡五件 · 晒制中</span>
+    </footer>
+  </div>
+</main>
+
+<!-- ———— 展开图：项目详情 ———— -->
+<section id="sheet-view" aria-hidden="true" role="dialog" aria-modal="true" aria-label="项目详情">
+  <div class="scan" aria-hidden="true"></div>
+  <div class="sheet-scroll" id="sheetScroll">
+    <article class="drawing">
+      <div class="d-frame" aria-hidden="true"></div>
+      <span class="d-corner tl" aria-hidden="true"></span><span class="d-corner tr" aria-hidden="true"></span>
+      <span class="d-corner bl" aria-hidden="true"></span><span class="d-corner br" aria-hidden="true"></span>
+      <span class="d-page" id="dPage">图 01 / 05</span>
+      <span class="d-wm" id="dWm" aria-hidden="true">图</span>
+
+      <header class="d-head">
+        <p class="d-meta">
+          <span id="dNo">PRJ-01</span><span class="dot">·</span>
+          <span id="dDate">2026-09-19</span><span class="dot">·</span>
+          <span>比例 1:1</span>
+          <span id="dStamp" class="st">施工中</span>
+        </p>
+        <h2 class="d-title" id="dTitle" tabindex="-1">这个网站本身</h2>
+        <p class="d-lede" id="dLede"></p>
+      </header>
+
+      <figure class="d-photo" id="dPhotoFig">
+        <div class="ph">
+          <span class="corner tl" aria-hidden="true"></span><span class="corner tr" aria-hidden="true"></span>
+          <span class="corner bl" aria-hidden="true"></span><span class="corner br" aria-hidden="true"></span>
+          <img id="dImg" src="https://picsum.photos/seed/xingmeng-site/1200/700.jpg" alt="">
+        </div>
+        <figcaption>COVER · SPECIMEN ── 示意图，非实况</figcaption>
+      </figure>
+
+      <div class="d-body" id="dBody"></div>
+
+      <div class="d-plan" id="dPlan">
+        <div class="plan-head">
+          <span class="t">施工进度</span>
+          <span class="n" id="planN">3 / 5</span>
+        </div>
+        <div class="dim" id="dimBox" style="--p:60%">
+          <span class="dim-lab">总进度 <b id="dimPct">60%</b></span>
+          <i class="dim-base" aria-hidden="true"></i>
+          <i class="dim-fill" aria-hidden="true"></i>
+        </div>
+        <div id="planRows"></div>
+      </div>
+
+      <p class="d-links" id="dLinks"></p>
+
+      <div class="d-tb" role="table" aria-label="图签">
+        <div class="tb-c span3" role="cell"><span class="tb-l">图名</span><span class="tb-v" id="tbName">这个网站本身</span></div>
+        <div class="tb-c" role="cell"><span class="tb-l">图号</span><span class="tb-v mono" id="tbNo">PRJ-01</span></div>
+        <div class="tb-c" role="cell"><span class="tb-l">日期</span><span class="tb-v mono" id="tbDate">2026-09-19</span></div>
+        <div class="tb-c" role="cell"><span class="tb-l">比例</span><span class="tb-v mono">1 : 1</span></div>
+        <div class="tb-c" role="cell"><span class="tb-l">制图</span><span class="tb-v">智能体</span></div>
+        <div class="tb-c" role="cell"><span class="tb-l">审定</span><span class="tb-v">Traveritas<span class="tb-seal" aria-hidden="true">醒</span></span></div>
+        <div class="tb-c" role="cell"><span class="tb-l">状态</span><span class="tb-v" id="tbStatus">施工中</span></div>
+      </div>
+
+      <nav class="d-adj" aria-label="相邻项目">
+        <button class="adj" id="adjPrev" type="button">
+          <span class="l">上一张 · <span id="adjPrevNo">PRJ-01</span></span>
+          <span class="t" id="adjPrevT"></span>
+          <span class="s" id="adjPrevS"></span>
+        </button>
+        <button class="adj" id="adjNext" type="button">
+          <span class="l">下一张 · <span id="adjNextNo">PRJ-02</span></span>
+          <span class="t" id="adjNextT"></span>
+          <span class="s" id="adjNextS"></span>
+        </button>
+      </nav>
+
+      <p class="d-end">── 图纸完 ──</p>
+    </article>
+  </div>
+</section>
+
+<script>
+/* ———— 数据（静态演示用，未接内容管线） ———— */
+const PRJS = [
+  {
+    no:'PRJ-01', title:'这个网站本身', status:'施工中', stClass:'',
+    date:'2026-09-19', seed:'xingmeng-site',
+    lede:'由 Astro 与智能体共建的个人网站，遵循「醒梦」审美——低饱和、磨砂质感、大面积留白。',
+    body:`
+      <h3 class="d-h2"><span class="n">01</span><span class="t">概述</span></h3>
+      <p>这个网站本身就是我的一个持续进行的项目：一个可以<strong>反复梦见、反复重来</strong>的地方，而不是一次成型的交付物。</p>
+      <h3 class="d-h2"><span class="n">02</span><span class="t">技术形态</span></h3>
+      <ul>
+        <li>站点框架 <strong>Astro</strong>，纯静态、内容页零 JS</li>
+        <li>动效 <strong>GSAP + Lenis</strong>，3D 用 Three.js 以「平面中穿插 3D 元素」的方式呈现</li>
+        <li>审美方向：<strong>醒梦</strong>——低饱和、磨砂质感、大面积留白</li>
+      </ul>`,
+    plan:[
+      {t:'Phase 1 骨架与内容管线', done:true},
+      {t:'Phase 2 首页视觉（三轮探索被否决，母题记录见随笔；主页将另行重做）', done:false, now:true},
+      {t:'全站补全：标签系统、归档分组、相邻文章、关于页、项目封面、思源宋体', done:true},
+      {t:'Phase 3 滚动动效与穿插式 3D', done:false},
+      {t:'Phase 4 在线小工具与试验场', done:false},
+    ],
+    links:[{label:'GitHub 仓库 ↗', href:'https://github.com/Traveritas/traveritas.github.io'}],
+  },
+  {
+    no:'PRJ-02', title:'醒梦 · 视觉母题探索', status:'构想中', stClass:' idea',
+    date:'2026-09-19', seed:'xingmeng-motif',
+    lede:'为「醒梦」寻找 2—4 个可以反复出现、最终成为识别符号的核心视觉意象。',
+    body:`
+      <h3 class="d-h2"><span class="n">01</span><span class="t">概述</span></h3>
+      <p>「醒梦」需要 2—4 个能够反复出现、最终成为识别符号的核心意象。它们应该能同时进入世界的每个角落：版式、界面、3D、动效，甚至文字的气味。</p>
+      <h3 class="d-h2"><span class="n">02</span><span class="t">母题清单</span></h3>
+      <ul>
+        <li><strong>花</strong>（抽象百合）── 已有三稿，待定</li>
+        <li><strong>水面 · 细线 · 帷幕 · 巨型空洞</strong> ── 候选</li>
+        <li class="neg">碎块 ── 已探索并否决：过于规整，记录见随笔《母题探索记录》</li>
+      </ul>
+      <p>这个项目以 sketches 的形式推进：每个母题做几版 2D 与 3D 的小样，放在这个网站上，直到某个意象自己站出来。</p>`,
+    plan:[
+      {t:'碎块：探索并否决', done:true},
+      {t:'花：三稿（巨花与雾 / 花田层次 / 花与几何）', done:true},
+      {t:'水面：首批小样', done:false, now:true},
+      {t:'帷幕 · 巨型空洞', done:false},
+      {t:'定稿 2—4 个母题，全站铺开', done:false},
+    ],
+    links:[{label:'详见《母题探索记录：从碎块到花》', href:null}],
+  },
+  {
+    no:'PRJ-03', title:'分享卡生成器', status:'施工中', stClass:'',
+    date:'2026-09-15', seed:'og-cards',
+    lede:'为每篇文章与项目晒一张「醒梦」气质的 OG 分享卡。',
+    body:`
+      <h3 class="d-h2"><span class="n">01</span><span class="t">概述</span></h3>
+      <p>低饱和底色、竖排标题、一处朱砂印——目标是让人在信息流里一眼认出：这是醒梦的东西。</p>
+      <h3 class="d-h2"><span class="n">02</span><span class="t">形态</span></h3>
+      <ul>
+        <li>手写 HTML 模板 + 无头浏览器截图，构建时批量输出</li>
+        <li>尺寸遵循各平台 OG 规范，以 <strong>1200 × 630</strong> 为主</li>
+      </ul>`,
+    plan:[
+      {t:'手工模板定稿', done:true},
+      {t:'截图脚本与批量生成', done:false, now:true},
+      {t:'接入构建管线', done:false},
+    ],
+    links:[{label:'本站全部文章与项目页', href:null}],
+  },
+  {
+    no:'PRJ-04', title:'留白练习页', status:'已封存', stClass:' sealed',
+    date:'2026-09-08', seed:'blank-page',
+    lede:'一页近乎空白的练习：规则只有一条，后来被自己亲手打破。',
+    body:`
+      <h3 class="d-h2"><span class="n">01</span><span class="t">始末</span></h3>
+      <p>给自己布置了一个练习：做一页几乎空白的页面。规则只有一条——除了一个锚点，什么都不许放。</p>
+      <p>第一个小时很顺利。第三个小时，这页「什么都没有」上已经有了四样东西，而我确信明天会长出第五样。</p>
+      <h3 class="d-h2"><span class="n">02</span><span class="t">封存原因</span></h3>
+      <p>留白不是一次清空，而是持续顶住「再放一点」的冲动。练习宣告失败，页面封存留档，完整过程记在随笔里。</p>`,
+    plan:[
+      {t:'第一小时：只有一枚锚点', done:true},
+      {t:'第三小时：长出第四样东西', done:true},
+      {t:'判定失败，封存留档', done:true},
+    ],
+    links:[{label:'详见随笔《留白练习》', href:null}],
+  },
+  {
+    no:'PRJ-05', title:'醒梦取色器', status:'构想中', stClass:' idea',
+    date:'2026-08-30', seed:'dream-picker',
+    lede:'从一张雾蒙蒙的照片里，吸出一整套低饱和色板。',
+    body:`
+      <h3 class="d-h2"><span class="n">01</span><span class="t">概述</span></h3>
+      <p>计划中的第一件在线小工具：给它一张雾蒙蒙的照片，它吸出一整套「醒梦」色板——低饱和、偏冷偏暖各半，并给出可直接复制的色值。</p>
+      <p>它应该小到一个下午就能写完，又好看到舍不得关掉。工具间不需要宏大，需要的是一盏一直亮着的灯。</p>`,
+    plan:[
+      {t:'吸色与色板生成', done:false},
+      {t:'低饱和约束与手动微调', done:false},
+      {t:'嵌入随笔与母题页', done:false},
+    ],
+    links:[{label:'计划记于随笔《试验场的头一块砖》', href:null}],
+  },
+];
+
+/* ———— 视图切换 ———— */
+const $ = s => document.querySelector(s);
+const board = $('#board'), sheetView = $('#sheet-view'), sheetScroll = $('#sheetScroll');
+const stClassMap = {'施工中':'st-work','构想中':'st-idea','已封存':'st-sealed'};
+let lastFocus = null;
+
+function fill(i){
+  const d = PRJS[i];
+  $('#dNo').textContent = d.no;
+  $('#dDate').textContent = d.date;
+  const st = $('#dStamp'); st.textContent = d.status; st.className = 'st' + d.stClass;
+  $('#dTitle').textContent = d.title;
+  $('#dLede').textContent = d.lede;
+  const img = $('#dImg');
+  img.src = `https://picsum.photos/seed/${d.seed}/1200/700.jpg`;
+  img.alt = d.title + ' · 示意封面';
+  $('#dBody').innerHTML = d.body;
+
+  const done = d.plan.filter(p => p.done).length;
+  const pct = Math.round(done / d.plan.length * 100);
+  $('#planN').textContent = `${done} / ${d.plan.length}`;
+  $('#dimPct').textContent = pct + '%';
+  $('#dimBox').style.setProperty('--p', pct + '%');
+  $('#planRows').innerHTML = d.plan.map(p => `
+    <div class="ck${p.done ? ' done' : ''}${p.now ? ' now' : ''}">
+      <span class="ck-b" aria-hidden="true"></span>
+      <span class="ck-t">${p.t}</span>
+      <span class="ck-m">${p.done ? '完' : (p.now ? '在工' : '待')}</span>
+    </div>`).join('');
+
+  $('#dLinks').innerHTML = '<span class="k">关联 ──</span>' + d.links.map(l =>
+    l.href ? `<a href="${l.href}" target="_blank" rel="noopener">${l.label}</a>` : `<span>${l.label}</span>`
+  ).join(' <span class="k">·</span> ');
+
+  $('#tbName').textContent = d.title;
+  $('#tbNo').textContent = d.no;
+  $('#tbDate').textContent = d.date;
+  const tbs = $('#tbStatus'); tbs.textContent = d.status; tbs.className = 'tb-v ' + stClassMap[d.status];
+  $('#dPage').textContent = `图 ${String(i+1).padStart(2,'0')} / ${String(PRJS.length).padStart(2,'0')}`;
+
+  const prev = PRJS[i-1], next = PRJS[i+1];
+  const ap = $('#adjPrev'), an = $('#adjNext');
+  ap.hidden = !prev; an.hidden = !next;
+  if(prev){
+    $('#adjPrevNo').textContent = prev.no; $('#adjPrevT').textContent = prev.title;
+    $('#adjPrevS').textContent = prev.status + ' · ' + prev.date;
+    ap.onclick = () => { openSheet(i-1, ap); };
+  }
+  if(next){
+    $('#adjNextNo').textContent = next.no; $('#adjNextT').textContent = next.title;
+    $('#adjNextS').textContent = next.status + ' · ' + next.date;
+    an.onclick = () => { openSheet(i+1, an); };
+  }
+}
+
+function openSheet(i, from){
+  fill(i);
+  lastFocus = from || null;
+  document.body.dataset.view = 'sheet';
+  board.inert = true;
+  sheetView.setAttribute('aria-hidden','false');
+  sheetScroll.scrollTop = 0;
+  requestAnimationFrame(() => requestAnimationFrame(() => $('#dTitle').focus({preventScroll:true})));
+}
+function closeSheet(){
+  document.body.dataset.view = 'board';
+  board.inert = false;
+  sheetView.setAttribute('aria-hidden','true');
+  if(lastFocus) lastFocus.focus({preventScroll:true});
+}
+
+document.querySelectorAll('.sheet').forEach(el =>
+  el.addEventListener('click', () => openSheet(+el.dataset.i, el)));
+$('#railBack').addEventListener('click', closeSheet);
+$('#mBack').addEventListener('click', closeSheet);
+document.addEventListener('keydown', e => {
+  if(e.key === 'Escape' && document.body.dataset.view === 'sheet') closeSheet();
+});
+</script>
+</body>
+</html>

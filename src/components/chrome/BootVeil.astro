@@ -1,0 +1,211 @@
+---
+/* 开屏 · 校准·穿针（boot.ts 驱动；无 JS 时 6s CSS 兜底自动揭幕） */
+---
+
+<div class="bootveil" id="bootveil" aria-hidden="true">
+  <div class="boot-stage">
+    <div class="boot-wave-wrap">
+      <svg class="boot-wave" viewBox="0 0 220 26">
+        <path class="bq" d="M4 20 H40 V6 H78 V20 H116 V6 H154 V20 H192 V6 H216" />
+        <line class="bthread" x1="4" y1="13" x2="216" y2="13" />
+      </svg>
+      <div class="boot-needle"></div>
+      <div class="boot-stitch"></div>
+    </div>
+    <div class="boot-meta mono">
+      <span id="bootpct">000</span>
+      <span class="boot-cal">CAL 50 μV · 15 mm/s</span>
+    </div>
+    <div class="boot-first">第一针 · STITCH 001</div>
+  </div>
+</div>
+
+<style>
+  .bootveil {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    background: #14171e;
+    display: grid;
+    place-items: center;
+    pointer-events: none;
+    color: #b9c2cd;
+    transition: opacity 0.5s ease;
+  }
+
+  /* 无 JS 兜底：6 秒后自动揭幕（有 JS 时相位类会接管并移除此动画） */
+  .bootveil:not([class*='ph-']) {
+    animation: boot-auto 6s ease forwards;
+  }
+
+  @keyframes boot-auto {
+    0%,
+    80% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+      visibility: hidden;
+    }
+  }
+
+  .bootveil.ph-out {
+    opacity: 0;
+    visibility: hidden;
+  }
+
+  .boot-stage {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.3rem;
+  }
+
+  .boot-wave-wrap {
+    position: relative;
+    width: 220px;
+    height: 56px;
+  }
+
+  .boot-wave {
+    position: absolute;
+    inset: 15px 0 auto;
+    width: 100%;
+    height: 26px;
+    overflow: visible;
+  }
+
+  /* 方波校准：1s 描出 */
+  .bq {
+    fill: none;
+    stroke: rgba(203, 212, 222, 0.85);
+    stroke-width: 1.5;
+    stroke-dasharray: 246;
+    stroke-dashoffset: 246;
+    animation: bq-draw 1s cubic-bezier(0.3, 0.6, 0.4, 1) forwards;
+    transition: opacity 0.45s ease;
+  }
+
+  @keyframes bq-draw {
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+
+  /* 收成一根线 */
+  .bthread {
+    stroke: var(--amber, #d9a05b);
+    stroke-width: 1;
+    stroke-dasharray: 212;
+    stroke-dashoffset: 212;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  .ph-thread .bq {
+    opacity: 0.14;
+  }
+
+  .ph-thread .bthread {
+    opacity: 1;
+    animation: thread-draw 0.55s ease forwards;
+  }
+
+  @keyframes thread-draw {
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+
+  /* 一枚针落下穿线 */
+  .boot-needle {
+    position: absolute;
+    left: 50%;
+    top: -26px;
+    width: 1px;
+    height: 40px;
+    margin-left: -0.5px;
+    background: linear-gradient(to bottom, rgba(203, 212, 222, 0), rgba(203, 212, 222, 0.9));
+    transform: translateY(-56px);
+    opacity: 0;
+  }
+
+  .boot-needle::after {
+    content: '';
+    position: absolute;
+    bottom: -3px;
+    left: 50%;
+    width: 5px;
+    height: 5px;
+    margin-left: -2.5px;
+    background: var(--amber, #d9a05b);
+    transform: rotate(45deg);
+  }
+
+  .ph-needle .boot-needle {
+    opacity: 1;
+    animation: needle-fall 0.42s cubic-bezier(0.35, 0.7, 0.35, 1) forwards;
+  }
+
+  @keyframes needle-fall {
+    from {
+      transform: translateY(-56px);
+    }
+    to {
+      transform: translateY(34px);
+    }
+  }
+
+  /* 第一针落在刚穿好的线上 */
+  .boot-stitch {
+    position: absolute;
+    left: 50%;
+    top: 27px;
+    width: 26px;
+    height: 1px;
+    margin-left: -13px;
+    background: var(--amber, #d9a05b);
+    transform: rotate(14deg) scaleX(0);
+  }
+
+  .ph-stitch .boot-stitch {
+    animation: stitch-pop 0.4s cubic-bezier(0.2, 0.9, 0.3, 1.3) forwards;
+  }
+
+  @keyframes stitch-pop {
+    to {
+      transform: rotate(14deg) scaleX(1);
+    }
+  }
+
+  .boot-meta {
+    display: flex;
+    gap: 1.4rem;
+    font-size: 0.68rem;
+    letter-spacing: 0.14em;
+    color: #77818d;
+  }
+
+  .boot-meta #bootpct {
+    color: #c2cbd5;
+  }
+
+  .boot-first {
+    font-family: var(--font-display, serif);
+    font-size: 0.8rem;
+    letter-spacing: 0.4em;
+    color: rgba(217, 160, 91, 0.9);
+    opacity: 0;
+    transition: opacity 0.4s ease;
+  }
+
+  .ph-stitch .boot-first {
+    opacity: 1;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .bootveil {
+      display: none;
+    }
+  }
+</style>

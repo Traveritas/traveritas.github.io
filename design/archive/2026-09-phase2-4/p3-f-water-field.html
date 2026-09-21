@@ -1,0 +1,767 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>方案 F · 沉水花田</title>
+<style>
+  /* ═══ 概念 ═══（A 水面剧场 × C 花是旷野 的合成世界）
+     一片被浅水淹没的花田。世界只有一条局部规则：
+     水下的比水上的更盛——
+     水上花开零星，水下花田繁茂；
+     柱列上只有一扇微亮的窗，水下的柱影里亮着三四扇暖窗。
+     现实是花田的残影，梦才是完整的花田。
+     层三明治：雾空 → 立于水中的柱列（切出上缘） → 水线
+     → 水上：稀疏出水花 + 涟漪 + 栈道与椅子
+     → 水下：更盛的花田 + 柱影多窗 + 暖色镜像宣言（被花穿插）
+     → 浮水纸签与编辑层。 */
+
+  @font-face {
+    font-family: 'Noto Serif SC Web';
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url('https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/files/noto-serif-sc-chinese-simplified-500-normal.woff2') format('woff2');
+  }
+  @font-face {
+    font-family: 'Noto Serif SC Web';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url('https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/files/noto-serif-sc-chinese-simplified-600-normal.woff2') format('woff2');
+  }
+
+  :root {
+    --paper: #f2f4f0;
+    --air: #f0f3ee;
+    --air-low: #e3e9e2;
+    --water-far: #d7e0da;
+    --water-mid: #b7c8c2;
+    --water-deep: #9cb2b0;
+    --water-bottom: #8aa3a4;
+    --ink: #2c3431;
+    --ink-soft: #55605c;
+    --ink-faint: #5f6a66;
+    --mist-ink: #46686a;
+    --gold: #c2ad82;
+    --gold-deep: #d3ba8a;
+    --rose: #c9a8b4;
+    --font-display: 'Noto Serif SC Web', 'Noto Serif SC', 'Palatino Linotype', Georgia, 'Songti SC', SimSun, serif;
+    --font-body: system-ui, -apple-system, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+    --horizon: 30vh;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    font-family: var(--font-body);
+    color: var(--ink);
+    background: var(--paper);
+    overflow: hidden;
+  }
+
+  .stage {
+    position: relative;
+    height: 100dvh;
+    overflow: clip;
+    /* 雾空比水亮：水线因此可读 */
+    background: linear-gradient(to bottom,
+      #f4f6f1 0%,
+      #eef1e9 calc(var(--horizon) - 9vh),
+      #e6ebe2 calc(var(--horizon) - 1vh),
+      #d3ded5 var(--horizon));
+  }
+
+  /* ── 水体 ── */
+  .water {
+    position: absolute;
+    left: 0; right: 0;
+    top: var(--horizon);
+    bottom: 0;
+    background:
+      radial-gradient(44vw 26vh at 86% 100%, rgba(201, 168, 180, 0.12), transparent 70%),
+      linear-gradient(to bottom, #d3ded5, #b9c9c1 30%, #9cb2ae 62%, #86a09e);
+  }
+
+  /* 水线：一条深线 + 一条贴线高光，宣告“面”的存在 */
+  .horizon {
+    position: absolute;
+    left: 0; right: 0;
+    top: var(--horizon);
+    height: 1px;
+    background: rgba(70, 104, 106, 0.45);
+    box-shadow: 0 1px 0 rgba(250, 252, 248, 0.6);
+    z-index: 8;
+  }
+
+  /* ── 柱列：立于水中，切出上缘 ── */
+  .colonnade {
+    position: absolute;
+    right: 2vw;
+    top: -4vh;
+    width: 44vw;
+    height: calc(var(--horizon) + 4vh);
+    z-index: 2;
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 32%);
+            mask-image: linear-gradient(to right, transparent, #000 32%);
+  }
+  .colonnade svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+  /* 柱影：水下的柱列亮着更多暖窗（局部规则） */
+  .colonnade-reflection {
+    position: absolute;
+    right: 2vw;
+    top: calc(var(--horizon) + 1px);
+    width: 44vw;
+    height: 24vh;
+    z-index: 2;
+    filter: blur(3px);
+    opacity: 0.5;
+    -webkit-mask-image: linear-gradient(to bottom, #000 0%, rgba(0, 0, 0, 0.5) 40%, transparent 86%);
+            mask-image: linear-gradient(to bottom, #000 0%, rgba(0, 0, 0, 0.5) 40%, transparent 86%);
+  }
+  .colonnade-reflection svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+  /* ── 水上花带与水下花田（JS 生成，按实际像素） ──
+     水下分两层：后层在镜像宣言之后、前层穿插其上——字沉进花里，花浮在字前 */
+  .band { position: absolute; inset: 0; pointer-events: none; }
+  .band svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .band-above { z-index: 5; }
+  .band-above .sway-root { animation: field-sway 16s ease-in-out infinite alternate; transform-origin: 50% 100%; }
+  .band-below-back { z-index: 2; filter: blur(1.3px); }
+  .band-below-front { z-index: 4; filter: blur(1px); }
+  @keyframes field-sway {
+    from { transform: skewX(-0.2deg); }
+    to   { transform: skewX(0.26deg); }
+  }
+
+  /* ── 涟漪 ── */
+  .ripples {
+    position: absolute;
+    left: 0; right: 0;
+    top: var(--horizon);
+    bottom: 0;
+    z-index: 4;
+    pointer-events: none;
+  }
+  .ripples svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .ripples .drift { animation: ripple-drift 54s linear infinite alternate; }
+  @keyframes ripple-drift {
+    from { transform: translateX(-12px); }
+    to   { transform: translateX(16px); }
+  }
+
+  /* ── 栈道与椅子（现实锚点） ── */
+  .walkway {
+    position: absolute;
+    inset: 0;
+    z-index: 6;
+    pointer-events: none;
+  }
+  .walkway svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+  /* ── 漂浮花瓣（落在水面上的，带自己的小涟漪） ── */
+  .petal { position: absolute; z-index: 7; pointer-events: none; animation: petal-float 11s ease-in-out infinite alternate; }
+  .petal svg { display: block; }
+  .petal.p1 { right: 13vw; top: 63vh; }
+  .petal.p2 { right: 9vw;  top: 74vh; animation-delay: -4s; }
+  .petal.p3 { right: 18vw; top: 84vh; animation-delay: -8s; }
+  @keyframes petal-float {
+    from { transform: translateY(0) rotate(-8deg); }
+    to   { transform: translateY(-6px) rotate(9deg); }
+  }
+
+  /* ── 宣言：水上是醒，水下是更暖的镜像 ── */
+  .manifesto {
+    position: absolute;
+    left: 8vw;
+    top: 9vh;
+    z-index: 6;
+    margin: 0;
+    font-family: var(--font-display);
+    line-height: 1.68;
+    letter-spacing: 0.02em;
+    color: var(--ink);
+  }  .manifesto .l1 { display: block; font-size: clamp(1.6rem, 3.3vw, 3.1rem); font-weight: 600; }
+  .manifesto .l2 {
+    display: block;
+    font-size: clamp(0.9rem, 1.4vw, 1.25rem);
+    font-weight: 500;
+    letter-spacing: 0.28em;
+    color: var(--ink-faint);
+    margin-block: 0.55em 0.5em;
+  }
+  .manifesto .l3 { display: block; font-size: clamp(1.35rem, 2.8vw, 2.6rem); font-weight: 600; }
+
+  .manifesto-mirror {
+    position: absolute;
+    left: 8vw;
+    top: calc(var(--horizon) + 12px);
+    z-index: 3;
+    margin: 0;
+    font-family: var(--font-display);
+    line-height: 1.68;
+    letter-spacing: 0.02em;
+    color: #8f7080;
+    transform: scaleY(-1);
+    filter: blur(2px);
+    opacity: 0.66;
+    -webkit-mask-image: linear-gradient(to top, #000 0%, rgba(0, 0, 0, 0.55) 40%, transparent 76%);
+            mask-image: linear-gradient(to top, #000 0%, rgba(0, 0, 0, 0.55) 40%, transparent 76%);
+    pointer-events: none;
+  }
+  .manifesto-mirror .l1 { display: block; font-size: clamp(1.6rem, 3.3vw, 3.1rem); font-weight: 600; transform: rotate(-0.5deg) translateX(3px); }
+  .manifesto-mirror .l2 {
+    display: block;
+    font-size: clamp(0.9rem, 1.4vw, 1.25rem);
+    font-weight: 500;
+    letter-spacing: 0.28em;
+    margin-block: 0.55em 0.5em;
+    transform: rotate(0.35deg);
+  }
+  .manifesto-mirror .l3 { display: block; font-size: clamp(1.35rem, 2.8vw, 2.6rem); font-weight: 600; transform: rotate(-0.25deg) translateX(-2px); }
+
+  /* ── 编辑层 ── */
+  .brand {
+    position: absolute;
+    top: 4.5vh;
+    left: 4vw;
+    z-index: 9;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 1.02rem;
+    letter-spacing: 0.06em;
+    color: var(--ink);
+    text-decoration: none;
+  }
+  .brand .ring {
+    width: 11px; height: 11px;
+    border: 1.5px solid var(--mist-ink);
+    border-radius: 50%;
+    opacity: 0.85;
+  }
+
+  .nav {
+    position: absolute;
+    right: 3.4vw;
+    top: 24vh;
+    z-index: 9;
+    display: flex;
+    flex-direction: column;
+    gap: 2.3rem;
+  }
+  .nav a {
+    position: relative;
+    writing-mode: vertical-rl;
+    letter-spacing: 0.5em;
+    padding: 0.4rem 0.7rem;
+    color: var(--ink-soft);
+    text-decoration: none;
+    font-size: 0.95rem;
+    transition: color 0.18s ease;
+  }
+  .nav a::after {
+    content: '';
+    position: absolute;
+    top: 46%;
+    right: calc(100% + 0.35rem);
+    width: 1.3rem;
+    height: 1px;
+    background: rgba(70, 104, 106, 0.4);
+    transition: width 0.18s ease, background 0.18s ease;
+  }
+  .nav a:hover { color: var(--ink); }
+  .nav a:hover::after { width: 2rem; background: var(--mist-ink); }
+
+  .side-note {
+    position: absolute;
+    left: 3.2vw;
+    top: 13vh;
+    z-index: 9;
+    writing-mode: vertical-rl;
+    font-size: 0.8rem;
+    letter-spacing: 0.52em;
+    color: var(--ink-faint);
+    /* 雾衬：让旁注浮在雾里，不与花点粘连 */
+    text-shadow: 0 0 10px rgba(244, 246, 241, 0.95), 0 0 4px rgba(244, 246, 241, 0.9);
+  }
+
+  /* 最近的随笔：浮在水面的纸签 */
+  .floating-ledger {
+    position: absolute;
+    left: 26vw;
+    right: 16vw;
+    bottom: 6vh;
+    z-index: 8;
+  }
+  .floating-ledger h2 {
+    margin: 0 0 1rem;
+    font-family: var(--font-body);
+    font-weight: 500;
+    font-size: 0.82rem;
+    letter-spacing: 0.3em;
+    color: var(--ink-faint);
+  }
+  .slips { display: flex; gap: 1.2rem 1.8rem; align-items: flex-start; }
+  .slip {
+    position: relative;
+    display: block;
+    padding: 0.85rem 1rem 0.95rem;
+    background: rgba(250, 252, 249, 0.82);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    box-shadow: 0 8px 18px -14px rgba(70, 104, 106, 0.4), 0 2px 5px -3px rgba(70, 104, 106, 0.2);
+    text-decoration: none;
+    animation: slip-bob 9s ease-in-out infinite alternate;
+    overflow: clip;
+  }
+  /* 纸签的浸水边：下缘像贴着水面 */
+  .slip::after {
+    content: '';
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 38%;
+    background: linear-gradient(to bottom, transparent, rgba(154, 178, 172, 0.22));
+    pointer-events: none;
+  }
+  .slip:nth-child(1) { width: 13rem; transform: rotate(-1.2deg); }
+  .slip:nth-child(2) { width: 15.5rem; transform: rotate(0.7deg) translateY(10px); animation-delay: -3s; }
+  .slip:nth-child(3) { width: 12.5rem; transform: rotate(-0.5deg) translateY(3px); animation-delay: -6s; }
+  .slip .d {
+    display: block;
+    font-size: 0.72rem;
+    letter-spacing: 0.12em;
+    color: var(--ink-faint);
+    font-variant-numeric: tabular-nums;
+    margin-bottom: 0.35rem;
+  }
+  .slip .t {
+    display: block;
+    font-family: var(--font-display);
+    font-size: 0.98rem;
+    color: var(--ink);
+    line-height: 1.55;
+  }
+  .slip:hover .t { color: var(--mist-ink); }
+  @keyframes slip-bob {
+    from { translate: 0 0; }
+    to   { translate: 0 -4px; }
+  }
+
+  /* ── 回退 ── */
+  @media (prefers-reduced-motion: reduce) {
+    .ripples .drift, .band-above .sway-root, .petal, .slip { animation: none; }
+  }
+
+  @media (max-height: 700px) {
+    :root { --horizon: 34vh; }
+    .manifesto { top: 7vh; }
+    .manifesto .l1 { font-size: clamp(1.4rem, 2.9vw, 2.5rem); }
+    .manifesto .l3 { font-size: clamp(1.2rem, 2.4vw, 2rem); }
+    .floating-ledger { bottom: 4.5vh; }
+  }
+
+  @media (max-width: 760px) {
+    :root { --horizon: 28vh; }
+    .colonnade { right: -14vw; width: 74vw; }
+    .colonnade-reflection { right: -14vw; width: 74vw; height: 16vh; }
+    .manifesto { top: 10vh; left: 9vw; right: 16vw; }
+    /* 小屏不叠镜像宣言（会糊），水下的花田继续讲“水里更盛” */
+    .manifesto-mirror { display: none; }
+    .side-note { display: none; }
+    .nav {
+      position: static;
+      margin: 0.6rem 9vw 0;
+      flex-direction: row;
+      gap: 1.8rem;
+    }
+    .nav a { writing-mode: horizontal-tb; letter-spacing: 0.24em; font-size: 0.9rem; }
+    .nav a::after { display: none; }
+    .floating-ledger { position: static; margin: 2.8rem 9vw 8vh; }
+    .slips { flex-direction: column; gap: 0.9rem; }
+    .slip { width: 100%; animation: none; transform: none; }
+    .stage { overflow-y: auto; }
+  }
+</style>
+</head>
+<body>
+<div class="stage">
+
+  <!-- 远巨构：立于水中的柱列（水上只有一扇微亮的窗） -->
+  <div class="colonnade" aria-hidden="true">
+    <svg viewBox="0 0 640 420" preserveAspectRatio="xMidYMax slice">
+      <defs>
+        <linearGradient id="fog-l" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#8fa3a6" stop-opacity="0"/>
+          <stop offset="1" stop-color="#8fa3a6" stop-opacity="0.55"/>
+        </linearGradient>
+      </defs>
+      <g fill="url(#fog-l)">
+        <rect x="60"  y="96" width="15" height="324"/>
+        <rect x="118" y="64" width="12" height="356"/>
+        <rect x="205" y="110" width="16" height="310"/>
+        <rect x="291" y="52" width="13" height="368"/>
+        <rect x="398" y="88" width="17" height="332"/>
+        <rect x="504" y="118" width="12" height="302"/>
+        <rect x="576" y="70" width="15" height="350"/>
+      </g>
+      <g fill="#7d9295" opacity="0.5">
+        <rect x="55"  y="96"  width="25" height="4"/>
+        <rect x="113" y="64"  width="22" height="4"/>
+        <rect x="200" y="110" width="26" height="4"/>
+        <rect x="286" y="52"  width="23" height="4"/>
+        <rect x="393" y="88"  width="27" height="4"/>
+        <rect x="499" y="118" width="22" height="4"/>
+        <rect x="571" y="70"  width="25" height="4"/>
+      </g>
+      <rect x="200" y="104" width="60" height="7" fill="#7d9295" opacity="0.45"/>
+      <rect x="386" y="82"  width="78" height="7" fill="#7d9295" opacity="0.5"/>
+      <rect x="558" y="64"  width="52" height="7" fill="#7d9295" opacity="0.42"/>
+      <!-- 水线处的半淹没残拱 -->
+      <path d="M 224 420 A 92 66 0 0 1 392 420" fill="none"
+            stroke="#7d9295" stroke-opacity="0.55" stroke-width="6"/>
+      <path d="M 240 384 A 92 66 0 0 1 376 384" fill="none"
+            stroke="#8fa3a6" stroke-opacity="0.4" stroke-width="4"
+            stroke-dasharray="10 12"/>
+      <!-- 唯一微亮的窗 -->
+      <rect x="402" y="200" width="7" height="10" fill="#c2ad82" opacity="0.92"/>
+    </svg>
+  </div>
+
+  <!-- 水体 -->
+  <div class="water" aria-hidden="true"></div>
+
+  <!-- 柱影：水下的柱列，亮着更多暖窗 -->
+  <div class="colonnade-reflection" aria-hidden="true">
+    <svg viewBox="0 0 640 420" preserveAspectRatio="xMidYMin slice">
+      <g fill="#8fa3a6" opacity="0.6">
+        <rect x="60"  y="0" width="15" height="130"/>
+        <rect x="118" y="0" width="12" height="160"/>
+        <rect x="205" y="0" width="16" height="120"/>
+        <rect x="291" y="0" width="13" height="170"/>
+        <rect x="398" y="0" width="17" height="140"/>
+        <rect x="504" y="0" width="12" height="110"/>
+        <rect x="576" y="0" width="15" height="155"/>
+      </g>
+      <!-- 水下比水上多几扇亮着的暖窗（带微光晕） -->
+      <g>
+        <circle cx="406" cy="32"  r="9" fill="#e8cd9d" opacity="0.16"/>
+        <circle cx="126" cy="63"  r="8" fill="#e8cd9d" opacity="0.12"/>
+        <circle cx="300" cy="101" r="8" fill="#e8cd9d" opacity="0.10"/>
+        <circle cx="584" cy="76"  r="9" fill="#e8cd9d" opacity="0.11"/>
+      </g>
+      <g fill="#e3c795">
+        <rect x="402" y="26"  width="9" height="12" opacity="0.78"/>
+        <rect x="122" y="58"  width="8" height="11" opacity="0.55"/>
+        <rect x="296" y="96"  width="8" height="11" opacity="0.45"/>
+        <rect x="580" y="70"  width="9" height="12" opacity="0.5"/>
+      </g>
+    </svg>
+  </div>
+
+  <!-- 水上花带（JS 生成） -->
+  <div class="band band-above" aria-hidden="true">
+    <svg viewBox="0 0 1440 900" preserveAspectRatio="none">
+      <g class="sway-root"></g>
+    </svg>
+  </div>
+
+  <!-- 涟漪 -->
+  <div class="ripples" aria-hidden="true">
+    <svg viewBox="0 0 1440 630" preserveAspectRatio="none">
+      <g class="drift" stroke-linecap="round">
+        <!-- 水线附近的波光：短而亮的碎光 -->
+        <g stroke="#fbfdfa">
+          <line x1="180" y1="5"  x2="252" y2="5"  stroke-width="1.4" opacity="0.75"/>
+          <line x1="620" y1="9"  x2="688" y2="9"  stroke-width="1.2" opacity="0.6"/>
+          <line x1="960" y1="4"  x2="1010" y2="4" stroke-width="1.2" opacity="0.65"/>
+          <line x1="1220" y1="12" x2="1266" y2="12" stroke-width="1.2" opacity="0.55"/>
+          <line x1="420" y1="18" x2="474" y2="18" stroke-width="1.4" opacity="0.6"/>
+        </g>
+        <g stroke="#e9f0ea">
+          <line x1="120" y1="12"  x2="300" y2="12"  stroke-width="1" opacity="0.5"/>
+          <line x1="820" y1="18"  x2="1010" y2="18" stroke-width="1" opacity="0.45"/>
+          <line x1="420" y1="28"  x2="540" y2="28"  stroke-width="1.2" opacity="0.55"/>
+          <line x1="1080" y1="36" x2="1240" y2="36" stroke-width="1" opacity="0.4"/>
+          <line x1="240" y1="48"  x2="470" y2="48"  stroke-width="1.4" opacity="0.55"/>
+          <line x1="700" y1="54"  x2="860" y2="54"  stroke-width="1.2" opacity="0.45"/>
+          <line x1="1150" y1="66" x2="1340" y2="66" stroke-width="1.2" opacity="0.5"/>
+          <line x1="90"  y1="78"  x2="330" y2="78"  stroke-width="1.6" opacity="0.6"/>
+          <line x1="540" y1="90"  x2="760" y2="90"  stroke-width="1.4" opacity="0.5"/>
+          <line x1="980" y1="102" x2="1200" y2="102" stroke-width="1.6" opacity="0.55"/>
+        </g>
+        <g stroke="#e9f0ea">
+          <line x1="200" y1="140" x2="620" y2="140" stroke-width="2" opacity="0.6"/>
+          <line x1="860" y1="158" x2="1240" y2="158" stroke-width="2" opacity="0.55"/>
+          <line x1="60"  y1="184" x2="420" y2="184" stroke-width="2.2" opacity="0.6"/>
+          <line x1="1060" y1="212" x2="1400" y2="212" stroke-width="2" opacity="0.5"/>
+        </g>
+        <g stroke="#93aaa7">
+          <line x1="480" y1="134" x2="700" y2="134" stroke-width="1.6" opacity="0.4"/>
+          <line x1="120" y1="202" x2="380" y2="202" stroke-width="1.8" opacity="0.35"/>
+          <line x1="760" y1="236" x2="1080" y2="236" stroke-width="1.8" opacity="0.32"/>
+        </g>
+        <g stroke="#e9f0ea">
+          <line x1="160" y1="286" x2="900" y2="286" stroke-width="2.6" opacity="0.5"/>
+          <line x1="1020" y1="322" x2="1440" y2="322" stroke-width="2.8" opacity="0.45"/>
+          <line x1="40"  y1="368" x2="760" y2="368" stroke-width="3" opacity="0.4"/>
+          <line x1="840" y1="432" x2="1380" y2="432" stroke-width="3.2" opacity="0.34"/>
+          <line x1="20"  y1="500" x2="680" y2="500" stroke-width="3.4" opacity="0.3"/>
+          <line x1="720" y1="556" x2="1300" y2="556" stroke-width="3.6" opacity="0.26"/>
+        </g>
+      </g>
+    </svg>
+  </div>
+
+  <!-- 水线 -->
+  <div class="horizon" aria-hidden="true"></div>
+
+  <!-- 栈道与椅子：穿过花间，伸向柱列脚下的雾 -->
+  <div class="walkway" aria-hidden="true">
+    <svg viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        <mask id="to-mist-f">
+          <linearGradient x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0"    stop-color="#fff" stop-opacity="0"/>
+            <stop offset="0.42" stop-color="#fff" stop-opacity="0.65"/>
+            <stop offset="0.7"  stop-color="#fff"/>
+          </linearGradient>
+        </mask>
+      </defs>
+      <g mask="url(#to-mist-f)">
+        <!-- 栈道在水上的软影 -->
+        <polygon points="2,904 192,904 948,306 935,306" fill="rgba(70,104,106,0.2)" transform="translate(0,4)"/>
+        <polygon points="0,900 190,900 946,302 933,302" fill="#a8a394"/>
+        <g stroke="#c3bfae" stroke-width="2">
+          <line x1="46"  y1="900" x2="940" y2="306"/>
+          <line x1="84"  y1="812" x2="940" y2="306"/>
+          <line x1="128" y1="736" x2="940" y2="306"/>
+          <line x1="188" y1="672" x2="940" y2="306"/>
+          <line x1="286" y1="580" x2="940" y2="306"/>
+          <line x1="414" y1="498" x2="940" y2="306"/>
+        </g>
+        <line x1="0"   y1="900" x2="933" y2="302.5" stroke="#8b877a" stroke-width="2.5" opacity="0.8"/>
+        <line x1="190" y1="900" x2="946" y2="302.5" stroke="#8b877a" stroke-width="2"   opacity="0.6"/>
+        <line x1="30"  y1="764" x2="936" y2="304" stroke="#5f6b68" stroke-width="1.6" opacity="0.55"/>
+        <g stroke="#5f6b68" stroke-width="1.6" opacity="0.55">
+          <line x1="118" y1="700" x2="118" y2="742"/>
+          <line x1="292" y1="576" x2="292" y2="606"/>
+          <line x1="486" y1="478" x2="486" y2="500"/>
+        </g>
+      </g>
+      <g transform="translate(756,368) scale(1.5)" stroke="#39474a" stroke-width="2.2" stroke-linecap="round" opacity="0.82" fill="none">
+        <path d="M4 0 v26"/>
+        <path d="M4 14 h18"/>
+        <path d="M22 14 v16"/>
+        <path d="M4 30 l-3 8 M4 30 l3 8 M22 30 l-3 8 M22 30 l3 8"/>
+        <path d="M4 6 h14" opacity="0.55"/>
+      </g>
+      <g transform="translate(760,436) scale(1.1, -0.7)" stroke="#5d7375" stroke-width="2" stroke-linecap="round" opacity="0.3" fill="none">
+        <path d="M4 14 h18"/>
+        <path d="M22 14 v16"/>
+        <path d="M4 30 l-3 8 M4 30 l3 8"/>
+      </g>
+    </svg>
+  </div>
+
+  <!-- 水下花田·后层（在镜像宣言之后；JS 生成） -->
+  <div class="band band-below-back" aria-hidden="true"><svg viewBox="0 0 1440 900" preserveAspectRatio="none"></svg></div>
+
+  <!-- 宣言（水下的暖色镜像，花的前后两层夹住它） -->
+  <div class="manifesto-mirror" aria-hidden="true">
+    <span class="l1">这里不是梦，也不是现实。</span>
+    <span class="l2">它是人在即将醒来时</span>
+    <span class="l3">看见的最后一层世界。</span>
+  </div>
+
+  <!-- 水下花田·前层（浮在镜像字之上；JS 生成） -->
+  <div class="band band-below-front" aria-hidden="true"><svg viewBox="0 0 1440 900" preserveAspectRatio="none"></svg></div>
+
+  <!-- 漂浮花瓣 -->
+  <div class="petal p1" aria-hidden="true">
+    <svg width="26" height="16" viewBox="0 0 26 16">
+      <ellipse cx="12" cy="6" rx="7" ry="3" fill="#d8c4c9" opacity="0.75" transform="rotate(-10 12 6)"/>
+      <ellipse cx="13" cy="8" rx="11" ry="3.4" fill="none" stroke="#e9f0ea" stroke-width="1" opacity="0.7"/>
+    </svg>
+  </div>
+  <div class="petal p2" aria-hidden="true">
+    <svg width="20" height="13" viewBox="0 0 20 13">
+      <ellipse cx="9" cy="5" rx="5.4" ry="2.4" fill="#d8c4c9" opacity="0.6" transform="rotate(18 9 5)"/>
+      <ellipse cx="10" cy="6.5" rx="9" ry="2.8" fill="none" stroke="#e9f0ea" stroke-width="1" opacity="0.6"/>
+    </svg>
+  </div>
+  <div class="petal p3" aria-hidden="true">
+    <svg width="30" height="18" viewBox="0 0 30 18">
+      <ellipse cx="14" cy="7" rx="8" ry="3.2" fill="#d8c4c9" opacity="0.5" transform="rotate(-5 14 7)"/>
+      <ellipse cx="15" cy="9" rx="13" ry="3.8" fill="none" stroke="#e9f0ea" stroke-width="1" opacity="0.6"/>
+    </svg>
+  </div>
+
+  <!-- 宣言（水上） -->
+  <h1 class="manifesto" aria-label="这里不是梦，也不是现实。它是人在即将醒来时，看见的最后一层世界。">
+    <span class="l1" aria-hidden="true">这里不是梦，也不是现实。</span>
+    <span class="l2" aria-hidden="true">它是人在即将醒来时</span>
+    <span class="l3" aria-hidden="true">看见的最后一层世界。</span>
+  </h1>
+
+  <!-- 站名 -->
+  <a class="brand" href="/"><span class="ring" aria-hidden="true"></span>Traveritas</a>
+
+  <!-- 竖排旁注：这个世界的局部规则 -->
+  <p class="side-note" aria-hidden="true">花开两遍　水里更盛</p>
+
+  <!-- 竖排导航 -->
+  <nav class="nav" aria-label="站内入口">
+    <a href="/articles/">随笔</a>
+    <a href="/projects/">项目</a>
+    <a href="/about/">关于</a>
+  </nav>
+
+  <!-- 最近的随笔 -->
+  <section class="floating-ledger" aria-label="最近的随笔">
+    <h2>最近的随笔</h2>
+    <div class="slips">
+      <a class="slip" href="#">
+        <span class="d">2026.09.12</span>
+        <span class="t">母题探索记录</span>
+      </a>
+      <a class="slip" href="#">
+        <span class="d">2026.08.30</span>
+        <span class="t">关于“醒梦”的第一份笔记</span>
+      </a>
+      <a class="slip" href="#">
+        <span class="d">2026.08.11</span>
+        <span class="t">把网站做成一个房间</span>
+      </a>
+    </div>
+  </section>
+</div>
+
+<script>
+/* 花田散布：确定性伪随机，按舞台实际像素生成，resize 重建。
+   局部规则做实：水下（约 520 朵，杏金暖色，最深处的花偏暖紫）
+   比水上（约 90 朵，冷调骨白/雾粉）明显更盛。 */
+(function () {
+  var NS = 'http://www.w3.org/2000/svg';
+  var aboveColors = ['#d8c4c9', '#e6e9df', '#eef0ea', '#c9c6b8'];
+  var belowColors = ['#d8a892', '#dbb47f', '#d49cab', '#cfa76b', '#e0bfa8'];
+  var belowDeepColors = ['#c9a0b0', '#bfa0ae', '#d8a892', '#dbb47f'];
+  var seed = 42;
+  function reset() { seed = 42; }
+  function rnd() { seed = (seed * 1664525 + 1013904223) % 4294967296; return seed / 4294967296; }
+  function pick(a) { return a[Math.floor(rnd() * a.length)]; }
+
+  function dot(x, y, r, fill, op) {
+    var c = document.createElementNS(NS, 'circle');
+    c.setAttribute('cx', x); c.setAttribute('cy', y); c.setAttribute('r', r);
+    c.setAttribute('fill', fill); c.setAttribute('opacity', op);
+    return c;
+  }
+  /* 不规律的小花：4-6 枚椭圆花瓣 + 花心 */
+  function bloom(x, y, s, fill, op) {
+    var g = document.createElementNS(NS, 'g');
+    var petals = 4 + Math.floor(rnd() * 3);
+    var rot = rnd() * 360;
+    for (var i = 0; i < petals; i++) {
+      var e = document.createElementNS(NS, 'ellipse');
+      var a = rot + (360 / petals) * i + (rnd() - 0.5) * 26;
+      var rr = rnd();
+      e.setAttribute('cx', x + Math.cos(a * Math.PI / 180) * s * (0.7 + rr * 0.5));
+      e.setAttribute('cy', y + Math.sin(a * Math.PI / 180) * s * (0.7 + rr * 0.5));
+      e.setAttribute('rx', s * (0.38 + rnd() * 0.22));
+      e.setAttribute('ry', s * (0.24 + rnd() * 0.18));
+      e.setAttribute('transform', 'rotate(' + (a + 90) + ' ' + x + ' ' + y + ')');
+      e.setAttribute('fill', fill); e.setAttribute('opacity', op);
+      g.appendChild(e);
+    }
+    g.appendChild(dot(x, y, s * 0.16, '#dbb47f', Math.min(1, op + 0.1)));
+    return g;
+  }
+  /* 花的涟漪环：花站在自己的涟漪里 */
+  function ring(x, y, s, op) {
+    var e = document.createElementNS(NS, 'ellipse');
+    e.setAttribute('cx', x); e.setAttribute('cy', y + s * 0.35);
+    e.setAttribute('rx', s * (1.7 + rnd() * 0.8));
+    e.setAttribute('ry', s * (0.4 + rnd() * 0.16));
+    e.setAttribute('fill', 'none');
+    e.setAttribute('stroke', '#eef4ec');
+    e.setAttribute('stroke-width', 1);
+    e.setAttribute('opacity', op);
+    return e;
+  }
+  /* 茎：花与水的连接（细线母题） */
+  function stem(x, y, len, op, color) {
+    var p = document.createElementNS(NS, 'path');
+    var dx = (rnd() - 0.5) * len * 0.3;
+    p.setAttribute('d', 'M' + x + ' ' + y + ' Q ' + (x + dx * 0.4) + ' ' + (y + len * 0.55) + ' ' + (x + dx) + ' ' + (y + len));
+    p.setAttribute('stroke', color);
+    p.setAttribute('stroke-width', 1);
+    p.setAttribute('fill', 'none');
+    p.setAttribute('opacity', op);
+    p.setAttribute('stroke-linecap', 'round');
+    return p;
+  }
+
+  var aboveRoot, belowBack, belowFront;
+
+  function layout() {
+    var stage = document.querySelector('.stage');
+    var w = stage.clientWidth, h = stage.clientHeight;
+    var horizon = 0.30 * h;
+    var i, t, x, y, s, deep;
+
+    [aboveRoot.ownerSVGElement, belowBack, belowFront].forEach(function (svg) {
+      svg.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
+    });
+    aboveRoot.textContent = '';
+    belowBack.textContent = '';
+    belowFront.textContent = '';
+    reset();
+
+    /* 水上：稀疏冷调，约 90 朵（30vh-57vh） */
+    for (i = 0; i < 90; i++) {
+      t = rnd();
+      y = horizon + 0.004 * h + Math.pow(t, 1.7) * 0.27 * h;
+      x = rnd() * w;
+      s = 1.6 + rnd() * 4.4;
+      aboveRoot.appendChild(bloom(x, y, s, pick(aboveColors), 0.5 + rnd() * 0.4));
+      if (y > horizon + 0.09 * h && rnd() < 0.55) aboveRoot.appendChild(ring(x, y, s, 0.5 + rnd() * 0.35));
+      if (y > horizon + 0.05 * h && rnd() < 0.7) aboveRoot.appendChild(stem(x, y + s * 0.4, s * (1.6 + rnd()), 0.35, '#8ba39c'));
+      if (rnd() < 0.5) aboveRoot.appendChild(dot(x + (rnd() - 0.5) * 40, y + (rnd() - 0.5) * 16, 1.2 + rnd() * 1.2, pick(aboveColors), 0.4 + rnd() * 0.3));
+    }
+
+    /* 水下：更盛暖调，约 520 朵，分前后两层夹住镜像宣言 */
+    for (i = 0; i < 520; i++) {
+      t = rnd();
+      y = horizon + 0.012 * h + Math.pow(t, 1.3) * 0.82 * h;
+      x = rnd() * w;
+      s = 1.8 + rnd() * 6.4;
+      deep = y > horizon + 0.55 * h;
+      var color = deep ? pick(belowDeepColors) : pick(belowColors);
+      /* 镜像宣言区（左上水下带）让疏一半：字要能被认出来 */
+      if (x < w * 0.58 && y > horizon + 0.02 * h && y < horizon + 0.36 * h && rnd() < 0.55) continue;
+      var target = rnd() < 0.45 ? belowFront : belowBack;
+      target.appendChild(bloom(x, y, s, color, 0.36 + rnd() * 0.42));
+      if (rnd() < 0.6) target.appendChild(stem(x, y + s * 0.4, s * (2.4 + rnd() * 2), 0.3, '#7e979b'));
+      if (rnd() < 0.6) target.appendChild(dot(x + (rnd() - 0.5) * 60, y + (rnd() - 0.5) * 26, 1.2 + rnd() * 1.8, color, 0.3 + rnd() * 0.3));
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    aboveRoot = document.querySelector('.band-above .sway-root');
+    belowBack = document.querySelector('.band-below-back svg');
+    belowFront = document.querySelector('.band-below-front svg');
+    layout();
+    var pending = null;
+    window.addEventListener('resize', function () {
+      if (pending) cancelAnimationFrame(pending);
+      pending = requestAnimationFrame(layout);
+    });
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,819 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>方案 P5 · 呵雾（活体）</title>
+<style>
+  /* ═══ 概念 ═══
+     整个主页隔在一层「呵气玻璃」之后——世界的表面凝着一层会呼吸的雾。
+     入口方式 = 擦：指针即呵气，擦开局部雾，看见悬浮的磨砂玻璃板群与深处的暖芯；
+     擦开的地方留着你呵气的形状，久久不再完全起雾（看过的部分留一层薄雾的记忆）。
+     滚动 = 走近并穿过玻璃层：滚过中段，雾在你周身散开——你已进入世界内部，
+     深处的暖光越来越近（醒侧纸雾 → 梦侧暖芯）。
+     局部规则：雾会缓慢呼吸，但被擦过的玻璃留有痕迹；雾不困人，只等一口气。
+     母题：玻璃 × 磨砂（简报推荐材质）做「入口机构」——把主页待办里
+     「哈气擦霜」的种子活体化。参考语法：Codrops 指针轨迹显影蒙版（改持久）、
+     die Komplizinnen 交互雾；呵气擦窗在 web 上无主页入口先例（多见于 App 玩具）。
+     性能纪律：DPR≤1.5、~30fps、无后处理、reduced-motion 静帧、隐藏页暂停。 */
+
+  @font-face {
+    font-family: 'Noto Serif SC Web';
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url('https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/files/noto-serif-sc-chinese-simplified-500-normal.woff2') format('woff2');
+  }
+  @font-face {
+    font-family: 'Noto Serif SC Web';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url('https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/files/noto-serif-sc-chinese-simplified-600-normal.woff2') format('woff2');
+  }
+
+  :root {
+    --ink: #3a3c40;
+    --ink-soft: #63686e;
+    --ink-faint: #71767c;
+    --mist-ink: #5d6d80;
+    --warm-ink: #8a6a52;
+    --font-display: 'Noto Serif SC Web', 'Noto Serif SC', 'Palatino Linotype', Georgia, 'Songti SC', SimSun, serif;
+    --font-body: system-ui, -apple-system, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: var(--font-body); color: var(--ink); background: #e7e8e4; }
+
+  .stage {
+    position: fixed;
+    inset: 0;
+    overflow: clip;
+    background: linear-gradient(to bottom, #e6e9e7 0%, #e9e7e2 55%, #ddd8d3 100%);
+  }
+  .scroll-length { height: 260vh; }  /* 首屏之外留 160vh 滚动余量 = 走近并穿过玻璃 */
+  canvas#gl { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+  .vignette {
+    position: absolute; inset: 0; z-index: 2; pointer-events: none;
+    background: radial-gradient(130% 95% at 50% 44%, transparent 58%, rgba(88, 84, 84, 0.14) 100%);
+  }
+
+  .rise { opacity: 0; transform: translateY(10px); animation: rise-in 1.3s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+  .rise.d1 { animation-delay: 0.15s; }
+  .rise.d2 { animation-delay: 0.45s; }
+  .rise.d3 { animation-delay: 0.7s; }
+  @keyframes rise-in { to { opacity: 1; transform: translateY(0); } }
+
+  /* 宣言第一行留在 DOM（可读 + 无障碍）；其余两行进入 3D，写在玻璃板上 */
+  .manifesto {
+    position: absolute;
+    left: 8vw;
+    top: 9vh;
+    z-index: 10;
+    margin: 0;
+    font-family: var(--font-display);
+    line-height: 1.6;
+    color: var(--ink);
+    text-shadow: 0 2px 26px rgba(246, 244, 238, 0.9), 0 0 8px rgba(246, 244, 238, 0.7);
+  }
+  .manifesto .l1 { display: block; font-size: clamp(1.35rem, 2.8vw, 2.6rem); font-weight: 500; letter-spacing: 0.04em; }
+
+  .brand {
+    position: absolute; top: 4.5vh; left: 4vw; z-index: 10;
+    display: inline-flex; align-items: center; gap: 0.6rem;
+    font-family: var(--font-display); font-weight: 500; font-size: 1.02rem;
+    letter-spacing: 0.06em; color: var(--ink); text-decoration: none;
+    text-shadow: 0 1px 18px rgba(246, 244, 238, 0.9);
+  }
+  .brand .ring { width: 11px; height: 11px; border: 1.5px solid var(--mist-ink); border-radius: 50%; opacity: 0.85; }
+
+  .nav {
+    position: absolute; right: 3.4vw; top: 24vh; z-index: 10;
+    display: flex; flex-direction: column; gap: 2.3rem;
+  }
+  .nav a {
+    position: relative; writing-mode: vertical-rl; letter-spacing: 0.5em;
+    padding: 0.4rem 0.7rem; color: var(--ink-soft); text-decoration: none;
+    font-size: 0.95rem; transition: color 0.18s ease;
+    text-shadow: 0 1px 16px rgba(246, 244, 238, 0.9);
+  }
+  .nav a::after {
+    content: ''; position: absolute; top: 46%; right: calc(100% + 0.35rem);
+    width: 1.3rem; height: 1px; background: rgba(93, 109, 128, 0.45);
+    transition: width 0.18s ease, background 0.18s ease;
+  }
+  .nav a:hover { color: var(--ink); }
+  .nav a:hover::after { width: 2rem; background: var(--mist-ink); }
+
+  .side-note {
+    position: absolute; left: 3.2vw; top: 13vh; z-index: 10;
+    writing-mode: vertical-rl; font-size: 0.8rem; letter-spacing: 0.52em;
+    color: var(--ink-faint);
+    text-shadow: 0 0 10px rgba(246, 244, 238, 0.95), 0 0 4px rgba(246, 244, 238, 0.9);
+  }
+
+  /* 呵气提示：底缘居中，第一次真正的擦拭后淡出（入场只做透明度，保住 translateX） */
+  .hint {
+    position: absolute; left: 50%; bottom: 7.5vh; z-index: 10;
+    transform: translateX(-50%);
+    display: inline-flex; align-items: center; gap: 0.7rem;
+    font-size: 0.86rem; letter-spacing: 0.34em; color: var(--ink-faint);
+    text-shadow: 0 1px 14px rgba(246, 244, 238, 0.95);
+    transition: opacity 0.9s ease; pointer-events: none;
+    animation: hint-in 1.8s ease 1.2s backwards;
+  }
+  @keyframes hint-in { from { opacity: 0; } to { opacity: 1; } }
+  .hint .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    border: 1px solid rgba(138, 106, 82, 0.75);
+    animation: hint-breathe 3.6s ease-in-out infinite;
+  }
+  @keyframes hint-breathe {
+    0%, 100% { transform: scale(0.75); opacity: 0.5; }
+    50% { transform: scale(1.15); opacity: 1; }
+  }
+  .hint.gone { opacity: 0; }
+
+  /* 穿过玻璃后（滚过中段）浮现的随笔账目 */
+  .floating-ledger {
+    position: absolute; left: 26vw; right: 16vw; bottom: 6vh; z-index: 10;
+    opacity: 0; transform: translateY(14px);
+    transition: opacity 1.4s ease, transform 1.4s ease;
+    pointer-events: none;
+  }
+  .floating-ledger.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
+  .floating-ledger h2 {
+    margin: 0 0 1rem; font-weight: 500; font-size: 0.82rem;
+    letter-spacing: 0.3em; color: var(--ink-faint);
+    text-shadow: 0 1px 14px rgba(246, 244, 238, 0.9);
+  }
+  .slips { display: flex; gap: 1.2rem 1.8rem; align-items: flex-start; }
+  .slip {
+    position: relative; display: block; padding: 0.85rem 1rem 0.95rem;
+    background: rgba(252, 250, 246, 0.9); border: 1px solid rgba(255, 255, 255, 0.62);
+    box-shadow: 5px 4px 10px -6px rgba(88, 84, 84, 0.3);
+    text-decoration: none; overflow: clip;
+  }
+  .slip::after {
+    content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 38%;
+    background: linear-gradient(to bottom, transparent, rgba(206, 178, 156, 0.24));
+  }
+  .slip:nth-child(1) { width: 13rem; transform: rotate(-1.2deg); }
+  .slip:nth-child(2) { width: 15.5rem; transform: rotate(0.7deg) translateY(10px); }
+  .slip:nth-child(3) { width: 12.5rem; transform: rotate(-0.5deg) translateY(3px); }
+  .slip .d { display: block; font-size: 0.72rem; letter-spacing: 0.12em; color: var(--ink-faint); font-variant-numeric: tabular-nums; margin-bottom: 0.35rem; }
+  .slip .t { display: block; font-family: var(--font-display); font-size: 0.98rem; color: var(--ink); line-height: 1.55; }
+  .slip:hover .t { color: var(--warm-ink); }
+
+  .stage.no3d canvas#gl { display: none; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .rise { animation: none; opacity: 1; transform: none; }
+    .hint .dot { animation: none; }
+  }
+  @media (max-width: 760px) {
+    .side-note { display: none; }
+    .manifesto { position: relative; z-index: 10; top: 0; left: 0; margin: 11vh 9vw 0; }
+    .brand { position: relative; z-index: 10; margin: 1.5rem 9vw 0; top: auto; left: auto; }
+    .nav { position: relative; z-index: 10; right: auto; top: auto; margin: 1.1rem 9vw 0; flex-direction: row; gap: 1.8rem; }
+    .nav a { writing-mode: horizontal-tb; letter-spacing: 0.24em; font-size: 0.9rem; }
+    .nav a::after { display: none; }
+    .floating-ledger { position: relative; z-index: 10; left: auto; right: auto; bottom: auto; margin: 2.6rem 9vw 7vh; opacity: 1; transform: none; pointer-events: auto; }
+    .slips { flex-direction: column; gap: 0.9rem; }
+    .slip { width: 100%; transform: none; }
+    .stage { position: relative; min-height: 100dvh; }
+    .scroll-length { display: none; }
+    .hint { bottom: 4.5vh; letter-spacing: 0.22em; }
+  }
+</style>
+</head>
+<body>
+<div class="stage" id="stage">
+  <canvas id="gl" aria-hidden="true"></canvas>
+  <div class="vignette" aria-hidden="true"></div>
+
+  <h1 class="manifesto rise" aria-label="这里不是梦，也不是现实。它是人在即将醒来时，看见的最后一层世界。">
+    <span class="l1">这里不是梦，也不是现实。</span>
+  </h1>
+
+  <a class="brand rise d1" href="/"><span class="ring" aria-hidden="true"></span>Traveritas</a>
+  <p class="side-note rise d2" aria-hidden="true">擦开的地方　久久不再起雾</p>
+
+  <nav class="nav rise d2" aria-label="站内入口">
+    <a href="/articles/" data-wipe>随笔</a>
+    <a href="/projects/" data-wipe>项目</a>
+    <a href="/about/" data-wipe>关于</a>
+  </nav>
+
+  <p class="hint" id="hint" aria-hidden="true"><span class="dot"></span>呵一口气　把雾擦开</p>
+
+  <section class="floating-ledger" id="ledger" aria-label="最近的随笔">
+    <h2>穿过玻璃之后</h2>
+    <div class="slips">
+      <a class="slip" href="#"><span class="d">2026.09.12</span><span class="t">母题探索记录</span></a>
+      <a class="slip" href="#"><span class="d">2026.08.30</span><span class="t">关于“醒梦”的第一份笔记</span></a>
+      <a class="slip" href="#"><span class="d">2026.08.11</span><span class="t">把网站做成一个房间</span></a>
+    </div>
+  </section>
+</div>
+<div class="scroll-length" aria-hidden="true"></div>
+
+<script src="vendor/three.min.js"></script>
+<script>
+/* ═══ 呵雾 ═══
+   玻璃 = 全屏雾层（底雾纹理 × 持久擦拭蒙版 × 呼吸调制），跟随相机固定距离；
+   世界 = 悬浮磨砂玻璃板群（半兰伯特 + 逆光透光 + 菲涅尔边缘的磨砂树脂壳）
+   与深处暖芯；滚动 = 走近并穿过玻璃（uGlobal 在滚动 30%→60% 间散开）。 */
+(function () {
+  if (!window.THREE) return;
+  var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var qs = {};
+  /* 支持 ?flag 裸旗标与 ?key=value 两种写法 */
+  location.search.replace(/[?&]([^=&]+)(?:=([^&]*))?/g, function (_, k, v) { qs[k] = v === undefined ? '' : decodeURIComponent(v); });
+  var fastMode = 'fast' in qs;
+  var stillMode = 'still' in qs;   /* 测试辅助：强制走 reduced-motion 静帧路径 */
+  if (stillMode) reduceMotion = true;
+  var pinScroll = 'pin' in qs ? Math.max(0, Math.min(1, parseFloat(qs.pin) || 0)) : null;
+  var fogLock = 'fog' in qs ? Math.max(0, Math.min(1, parseFloat(qs.fog))) : null;  /* 锁定全局雾量 */
+  var speed = fastMode ? 6 : 1;
+  var isMobile = Math.min(window.innerWidth, window.innerHeight) < 620;
+
+  var seed = 20260920;
+  function rnd() { seed = (seed * 1664525 + 1013904223) % 4294967296; return seed / 4294967296; }
+  function range(a, b) { return a + rnd() * (b - a); }
+  function smooth01(x) { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); }
+  function ease(t) { return t * t * (3 - 2 * t); }
+
+  var canvas = document.getElementById('gl');
+  var renderer;
+  try { renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: false }); }
+  catch (e) { document.getElementById('stage').classList.add('no3d'); return; }
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+
+  var scene = new THREE.Scene();
+  /* 雾后世界更冷更深（雾灰鼠尾草），玻璃是更亮的暖纸色——擦开才有「窗」的对比 */
+  var FOG_COOL = new THREE.Color(0xc3cdca);
+  var FOG_DEEP = new THREE.Color(0xccc0ad);
+  scene.background = FOG_COOL.clone();
+  scene.fog = new THREE.Fog(FOG_COOL.clone(), 12, 60);
+
+  /* ── 雾层纹理 ─────────────────────────────
+     baseTex：一次性生成的有机底雾（灰度 = 密度，底重上轻，含细颗粒）；
+     wipeTex：持久擦拭蒙版（指针呵气往里画白，擦过留痕、不重生）。 */
+  var FOG_RES = 512;
+  function makeBaseFog() {
+    var c = document.createElement('canvas'); c.width = c.height = FOG_RES;
+    var x = c.getContext('2d');
+    /* 呵气凝雾：整体致密（0.75 起步），只有少量薄处透露世界 */
+    x.fillStyle = 'rgb(192,192,192)'; x.fillRect(0, 0, FOG_RES, FOG_RES);
+    /* 大块薄斑：destination-out 擦出会「引诱」观看的稀薄处 */
+    for (var t = 0; t < 10; t++) {
+      var tx = rnd() * FOG_RES, ty = rnd() * FOG_RES * 0.8;
+      var tr = 60 + rnd() * 90;
+      var tg = x.createRadialGradient(tx, ty, 0, tx, ty, tr);
+      tg.addColorStop(0, 'rgba(0,0,0,' + (0.1 + rnd() * 0.16).toFixed(3) + ')');
+      tg.addColorStop(1, 'rgba(0,0,0,0)');
+      x.globalCompositeOperation = 'destination-out';
+      x.fillStyle = tg; x.beginPath(); x.arc(tx, ty, tr, 0, 6.2832); x.fill();
+    }
+    x.globalCompositeOperation = 'source-over';
+    /* 中团浓雾：把大部分区域推到 0.85-1.0 */
+    for (var i = 0; i < 70; i++) {
+      var px = rnd() * FOG_RES, py = FOG_RES * (0.1 + Math.pow(rnd(), 0.62) * 0.9);
+      var r = 30 + rnd() * 90;
+      var g = x.createRadialGradient(px, py, 0, px, py, r);
+      var dens = 0.5 + 0.5 * (py / FOG_RES);
+      g.addColorStop(0, 'rgba(255,255,255,' + (0.1 + 0.2 * dens).toFixed(3) + ')');
+      g.addColorStop(1, 'rgba(255,255,255,0)');
+      x.fillStyle = g; x.beginPath(); x.arc(px, py, r, 0, 6.2832); x.fill();
+    }
+    /* 细颗粒：磨砂玻璃的晶粒感 */
+    var img = x.getImageData(0, 0, FOG_RES, FOG_RES), d = img.data;
+    for (var p = 0; p < d.length; p += 4) {
+      var n = (Math.random() - 0.5) * 24;
+      d[p] = Math.max(0, Math.min(255, d[p] + n));
+      d[p + 1] = d[p]; d[p + 2] = d[p];
+    }
+    x.putImageData(img, 0, 0);
+    var tex = new THREE.CanvasTexture(c);
+    return tex;
+  }
+  var baseTex = makeBaseFog();
+
+  var wipeCanvas = document.createElement('canvas'); wipeCanvas.width = wipeCanvas.height = FOG_RES;
+  var wipeCtx = wipeCanvas.getContext('2d');
+  wipeCtx.fillStyle = '#000'; wipeCtx.fillRect(0, 0, FOG_RES, FOG_RES);
+  var wipeTex = new THREE.CanvasTexture(wipeCanvas);
+  var wipeDirty = true;
+
+  function stampPx(cx, cy, r, alpha) {
+    /* 果断的擦拭：核心实心，仅边缘一圈柔化 */
+    var g = wipeCtx.createRadialGradient(cx, cy, 0, cx, cy, r);
+    g.addColorStop(0, 'rgba(255,255,255,' + alpha + ')');
+    g.addColorStop(0.72, 'rgba(255,255,255,' + (alpha * 0.96).toFixed(3) + ')');
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    wipeCtx.fillStyle = g;
+    wipeCtx.beginPath(); wipeCtx.arc(cx, cy, r, 0, 6.2832); wipeCtx.fill();
+    wipeDirty = true;
+  }
+  function strokePx(x0, y0, x1, y1, r, alpha) {
+    var dx = x1 - x0, dy = y1 - y0;
+    var len = Math.sqrt(dx * dx + dy * dy);
+    var steps = Math.max(1, Math.ceil(len / (r * 0.34)));
+    for (var i = 0; i <= steps; i++) {
+      var t = i / steps;
+      /* 每枚印章带一点呵气的湍流偏移 */
+      var wob = Math.sin(t * 9.4 + len) * r * 0.16;
+      stampPx(x0 + dx * t + wob, y0 + dy * t - wob * 0.6, r, alpha);
+    }
+  }
+  function bloomPx(cx, cy, r) { strokePx(cx - r * 0.4, cy, cx + r * 0.4, cy, r, 0.34); }
+
+  /* 开场：雾上先有一小块被呵开的窗（宣言与第一块玻璃板所在） */
+  (function initialBreath() {
+    var s = FOG_RES;
+    if (isMobile) {
+      bloomPx(s * 0.46, s * 0.4, s * 0.17);
+      strokePx(s * 0.34, s * 0.5, s * 0.6, s * 0.36, s * 0.06, 0.45);
+    } else {
+      bloomPx(s * 0.40, s * 0.52, s * 0.15);
+      strokePx(s * 0.28, s * 0.62, s * 0.56, s * 0.40, s * 0.062, 0.5);
+    }
+    wipeDirty = true;
+  })();
+
+  /* ── 玻璃雾层：挂在相机前方固定距离，覆盖全视口 ── */
+  var fogUniforms = {
+    uBase: { value: baseTex },
+    uWipe: { value: wipeTex },
+    uTime: { value: 0 },
+    uGlobal: { value: 1 },
+    uWarm: { value: 0.12 },
+    uCool: { value: new THREE.Color(0xf0ece2) },
+    uWarmCol: { value: new THREE.Color(0xf5e6cc) }
+  };
+  var fogMat = new THREE.ShaderMaterial({
+    uniforms: fogUniforms,
+    vertexShader:
+      'varying vec2 vUv;' +
+      'void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader:
+      'varying vec2 vUv;' +
+      'uniform sampler2D uBase; uniform sampler2D uWipe;' +
+      'uniform float uTime; uniform float uGlobal; uniform float uWarm;' +
+      'uniform vec3 uCool; uniform vec3 uWarmCol;' +
+      'void main(){' +
+      '  float base = texture2D(uBase, vUv).r;' +
+      '  float wipe = texture2D(uWipe, vUv).r;' +
+      '  /* 呼吸：大尺度缓慢起伏；被擦过的地方呼吸也弱 */' +
+      '  float br = sin(vUv.y * 3.1 + uTime * 0.05) * sin(vUv.x * 2.3 - uTime * 0.037);' +
+      '  float keep = 1.0 - wipe * 0.92;' +          /* 擦过留 8% 薄雾 = 记忆的痕迹 */
+      '  float d = base * keep + br * 0.05 * keep;' +
+      '  d = clamp(d, 0.0, 1.0) * uGlobal;' +
+      '  /* 玻璃被深处的炉火从背后照亮：暖心在画面中下，收敛而柔 */' +
+      '  vec2 hd = (vUv - vec2(0.5, 0.42)) * vec2(1.7, 1.1);' +
+      '  float hearth = exp(-dot(hd, hd) * 7.5);' +
+      '  float wmix = clamp(uWarm * 0.28 + hearth * (0.2 + uWarm * 0.4), 0.0, 0.7);' +
+      '  vec3 col = mix(uCool, uWarmCol, wmix);' +
+      '  gl_FragColor = vec4(col, d * 0.985);' +
+      '}',
+    transparent: true, depthTest: false, depthWrite: false
+  });
+  var fogQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), fogMat);
+  fogQuad.frustumCulled = false;
+  fogQuad.renderOrder = 30;
+  /* 挂到相机：玻璃层永远贴着视口（相机创建后加入） */
+  function fitFogQuad() {
+    var dist = 1.0;
+    var vh = 2 * Math.tan((camera.fov * Math.PI) / 360) * dist;
+    fogQuad.scale.set(vh * camera.aspect, vh, 1);
+    fogQuad.position.set(0, 0, -dist);
+  }
+
+  /* ── 磨砂玻璃板材质：半兰伯特 + 逆光透光 + 菲涅尔边缘（继承穹骨肋壳语言） ── */
+  var slabUniforms = [];
+  function makeSlabMat(opts) {
+    var u = {
+      uBase: { value: new THREE.Color(opts.base !== undefined ? opts.base : 0xedf0ec) },
+      uSunCol: { value: new THREE.Color(0xfff3e0) },
+      uSkyCol: { value: new THREE.Color(0xdfe6e3) },
+      uTransCol: { value: new THREE.Color(0xf2cf9f) },
+      uFogColor: { value: FOG_COOL.clone() },
+      uFogNear: { value: 12 }, uFogFar: { value: 60 },
+      uTrans: { value: opts.trans !== undefined ? opts.trans : 0.34 },
+      uCore: { value: opts.core || 0 },
+      uFade: { value: 1 },
+      uAlpha: { value: opts.alpha !== undefined ? opts.alpha : 0.88 },
+      uHash: { value: rnd() * 10 }
+    };
+    slabUniforms.push(u);
+    return new THREE.ShaderMaterial({
+      uniforms: u,
+      vertexShader:
+        'varying vec3 vWN; varying vec3 vWP;' +
+        'void main(){' +
+        '  vWN = normalize(mat3(modelMatrix) * normal);' +
+        '  vec4 wp = modelMatrix * vec4(position, 1.0); vWP = wp.xyz;' +
+        '  gl_Position = projectionMatrix * viewMatrix * wp;' +
+        '}',
+      fragmentShader:
+        'varying vec3 vWN; varying vec3 vWP;' +
+        'uniform vec3 uBase; uniform vec3 uSunCol; uniform vec3 uSkyCol; uniform vec3 uTransCol;' +
+        'uniform vec3 uFogColor; uniform float uFogNear; uniform float uFogFar;' +
+    'uniform float uTrans; uniform float uCore; uniform float uFade; uniform float uAlpha; uniform float uHash;' +
+    'void main(){' +
+    '  vec3 V = normalize(cameraPosition - vWP);' +
+    '  vec3 N = normalize(vWN);' +
+    '  vec3 L = normalize(vec3(0.35, 0.78, 0.5));' +
+    '  float dif = dot(N, L) * 0.5 + 0.5; dif *= dif;' +                    /* 半兰伯特 */
+    '  float back = pow(max(dot(V, -L), 0.0), 2.0);' +                      /* 逆光透光 */
+    '  float fre = pow(1.0 - max(dot(N, V), 0.0), 2.4);' +                  /* 菲涅尔边缘 */
+    '  /* 竖向磨砂丝缕：极轻的世界坐标条纹 */' +
+    '  float streak = 0.035 * sin(vWP.y * 6.5 + uHash * 7.0) * sin(vWP.x * 3.1 + uHash);' +
+    '  /* 真实明暗面：背光面明显更暗（偏冷），亮面接近本体色 */' +
+    '  vec3 shade = uBase * (0.42 + 0.58 * dif);' +
+    '  shade = mix(shade * vec3(0.86, 0.92, 0.95), shade, dif);' +
+    '  vec3 col = shade;' +
+    '  col += uSkyCol * fre * 0.5;' +
+    '  col += uTransCol * (back * uTrans + fre * 0.16);' +
+    '  col += streak;' +
+    '  col += uTransCol * uCore * (0.55 + 0.2 * sin(uHash + vWP.y * 0.4));' +  /* 暖芯板自发光 */
+    '  col = mix(col, uFogColor, uFade * 0.5);' +
+    '  float fd = smoothstep(uFogNear, uFogFar, length(cameraPosition - vWP));' +
+    '  fd *= (1.0 - uCore * 0.78);' +   /* 暖芯板抗雾：像灯一样从深处透出来 */
+    '  col = mix(col, uFogColor, fd);' +
+    '  float a = uAlpha * (1.0 - fd * 0.75);' +
+    '  gl_FragColor = vec4(col, clamp(a, 0.0, 1.0));' +
+    '}',
+      transparent: true, depthWrite: true
+    });
+  }
+
+  /* ── 远景天幕：世界内部的「房间感」——上暗下暗、深处一炉暖光 ── */
+  var backdropU = {
+    uTop: { value: new THREE.Color(0x8b9c99) },
+    uBot: { value: new THREE.Color(0x5c6e6d) },
+    uWarmCol: { value: new THREE.Color(0xe8c091) },
+    uGlowI: { value: 1.15 }
+  };
+  var backdrop = new THREE.Mesh(
+    new THREE.PlaneGeometry(220, 110),
+    new THREE.ShaderMaterial({
+      uniforms: backdropU,
+      vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+      fragmentShader:
+        'varying vec2 vUv;' +
+        'uniform vec3 uTop; uniform vec3 uBot; uniform vec3 uWarmCol; uniform float uGlowI;' +
+        'void main(){' +
+        '  vec3 col = mix(uBot, uTop, smoothstep(0.0, 1.0, vUv.y));' +
+        '  /* 暖芯：深处的一炉光 */' +
+        '  vec2 d = (vUv - vec2(0.5, 0.5)) * vec2(1.8, 1.0);' +
+        '  float g = exp(-dot(d, d) * 7.0);' +
+        '  col = mix(col, uWarmCol, g * 0.55 * uGlowI);' +
+        '  gl_FragColor = vec4(col, 1.0);' +
+        '}',
+      fog: false
+    })
+  );
+  backdrop.position.set(0, 9, -72);
+  scene.add(backdrop);
+
+  /* ── 悬浮玻璃板群：一条留出「走廊」的林道，深处渐暖 ── */
+  var slabs = [];
+  function addSlab(x, y, z, w, h, rotY, rotZ, opts) {
+    var geo = new THREE.BoxGeometry(w, h, 0.14 + (opts && opts.deep ? 0.1 : 0));
+    var mat = makeSlabMat(opts || {});
+    var m = new THREE.Mesh(geo, mat);
+    m.position.set(x, y, z);
+    m.rotation.set(0, rotY, rotZ);
+    if (opts && opts.sway) {
+      m.userData.sway = { ph: rnd() * 6.28, amp: opts.sway, y0: y, r0: rotZ };
+      m.rotation.z = rotZ;
+    }
+    scene.add(m);
+    slabs.push(m);
+    return m;
+  }
+  (function buildField() {
+    var Bases = [0xe8ece8, 0xd8dfda, 0xc8d2cd];
+    /* 前景两块「画框」板：宣言板（左）与右缘斜板 */
+    addSlab(-5.2, 2.9, 4.6, 2.4, 11.5, 0.34, 0.03, { alpha: 0.92 });
+    addSlab(5.6, 1.9, 5.8, 1.7, 8.6, -0.42, -0.05, { alpha: 0.9 });
+    /* 中景林道：|x|≥2.3 留出镜头走廊 */
+    for (var i = 0; i < 17; i++) {
+      var z = -1.5 - i * 1.9 - range(0, 1.4);
+      var side = i % 2 === 0 ? -1 : 1;
+      var x = side * range(2.3, 10.5);
+      var w = range(0.9, 2.7), h = range(5, 15);
+      var y = range(0.6, 3.6);
+      addSlab(x, y, z, w, h, range(-0.38, 0.38), range(-0.07, 0.07),
+        { alpha: range(0.78, 0.92), trans: range(0.26, 0.42), base: Bases[i % 3], sway: i % 3 === 0 ? range(0.012, 0.03) : 0 });
+    }
+    /* 尺度锚：两根高板、两片宽墙、一块高处横斜板 */
+    addSlab(-8.8, 5.5, -11.5, 1.6, 19.5, 0.2, 0.02, { alpha: 0.85, base: 0xccd5d1 });
+    addSlab(9.4, 6.2, -18.5, 1.3, 17.0, -0.3, -0.02, { alpha: 0.8, base: 0xdde3df });
+    addSlab(-6.5, 4.2, -24.5, 4.4, 9.5, 0.26, 0.03, { alpha: 0.78, base: 0xccd5d1 });
+    addSlab(7.6, 4.6, -27.5, 3.9, 8.0, -0.22, 0.02, { alpha: 0.76, base: 0xdde3df });
+    addSlab(3.4, 9.2, -13.5, 2.6, 1.1, 0.12, -0.06, { alpha: 0.8 });
+    /* 三道横梁打破竖向单调 */
+    addSlab(-6.5, 5.8, -9.5, 5.5, 0.75, 0.18, 0.02, { alpha: 0.82 });
+    addSlab(7.2, 6.8, -14.5, 4.6, 0.62, -0.24, -0.03, { alpha: 0.8 });
+    addSlab(-7.8, 7.6, -21.5, 6.2, 0.7, 0.3, 0.02, { alpha: 0.74 });
+    /* 远景：暖芯附近数块暖板（梦的立面） */
+    for (var k = 0; k < 4; k++) {
+      addSlab(range(-4.5, 5.5), range(0.5, 4.5), -33 - k * 2.6,
+        range(1.1, 2.2), range(7, 12), range(-0.3, 0.3), range(-0.05, 0.05),
+        { base: 0xefd3b2, core: 0.9 + k * 0.12, alpha: 0.88, deep: true });
+    }
+    /* 远景剪影板：沉入暗部的层 */
+    for (var j = 0; j < 6; j++) {
+      addSlab(range(-14, 14), range(0.5, 4.5), -28 - j * 3.4,
+        range(1.4, 3.2), range(6, 14), range(-0.4, 0.4), 0,
+        { alpha: 0.55, trans: 0.5, base: 0x8b9a97 });
+    }
+  })();
+
+  /* ── 暖芯：深处的光（雾散之后才能看见的那盏） ── */
+  function makeGlowTex(inner, outer) {
+    var c = document.createElement('canvas'); c.width = c.height = 128;
+    var x = c.getContext('2d');
+    var g = x.createRadialGradient(64, 64, 0, 64, 64, 62);
+    g.addColorStop(0, inner);
+    g.addColorStop(0.5, outer);
+    g.addColorStop(1, 'rgba(255,236,210,0)');
+    x.fillStyle = g; x.fillRect(0, 0, 128, 128);
+    return new THREE.CanvasTexture(c);
+  }
+  var glowGroup = new THREE.Group();
+  var glowBig = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: makeGlowTex('rgba(255,242,222,0.9)', 'rgba(244,201,150,0.5)'),
+    transparent: true, opacity: 0.55, depthWrite: false, fog: false
+  }));
+  glowBig.scale.set(36, 36, 1); glowBig.position.set(1.4, 3.4, -45);
+  var glowSmall = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: makeGlowTex('rgba(255,248,232,0.98)', 'rgba(248,206,150,0.55)'),
+    transparent: true, opacity: 0.6, depthWrite: false, fog: false
+  }));
+  glowSmall.scale.set(14, 14, 1); glowSmall.position.set(1.2, 3.0, -40);
+  glowGroup.add(glowBig); glowGroup.add(glowSmall);
+  glowGroup.renderOrder = 8;
+  scene.add(glowGroup);
+
+  /* ── 尘光：稀疏暖尘（环境，非群体） ── */
+  var MOTES = isMobile ? 26 : 44;
+  var moteGeo = new THREE.BufferGeometry();
+  var motePos = new Float32Array(MOTES * 3);
+  var moteBase = [];
+  for (var m = 0; m < MOTES; m++) {
+    moteBase.push({ x: range(-10, 10), y: range(-2, 9), z: range(-30, 4), ph: rnd() * 6.28, v: range(0.04, 0.13) });
+  }
+  moteGeo.setAttribute('position', new THREE.BufferAttribute(motePos, 3));
+  var moteTex = makeGlowTex('rgba(255,244,226,1)', 'rgba(255,238,214,0.55)');
+  var moteMat = new THREE.PointsMaterial({
+    map: moteTex, color: 0xf0d6b6, size: 0.28, sizeAttenuation: true,
+    transparent: true, opacity: 0.45, depthWrite: false
+  });
+  var motes = new THREE.Points(moteGeo, moteMat);
+  motes.renderOrder = 7;
+  scene.add(motes);
+
+  /* ── 宣言其余两行：写在玻璃板上（CanvasTexture 字平面，继承遮挡配方） ── */
+  function makeTextPlane(text, vertical, color, worldW) {
+    var fs = 96, pad = 34, step = 112;
+    var c = document.createElement('canvas');
+    var ctx = c.getContext('2d');
+    var font = '500 ' + fs + 'px "Noto Serif SC Web","Noto Serif SC",serif';
+    var draw = function () {
+      ctx.clearRect(0, 0, c.width, c.height);
+      ctx.font = font; ctx.fillStyle = color;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      if (vertical) {
+        for (var i = 0; i < text.length; i++) ctx.fillText(text[i], c.width / 2, pad + fs / 2 + i * step);
+      } else {
+        ctx.fillText(text, c.width / 2, c.height / 2);
+      }
+      if (mesh) { mesh.material.map.needsUpdate = true; }
+    };
+    if (vertical) { c.width = fs + pad * 2; c.height = text.length * step + pad * 2; }
+    else {
+      ctx.font = font;
+      var tw = Math.ceil(ctx.measureText(text).width);
+      c.width = tw + pad * 2; c.height = fs + pad * 2;
+    }
+    draw();
+    var tex = new THREE.CanvasTexture(c);
+    tex.anisotropy = 4;
+    var mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: true, alphaTest: 0.12, side: THREE.DoubleSide });
+    var ratio = [c.width, c.height];
+    var h = worldW * (ratio[1] / ratio[0]);
+    var mesh = new THREE.Mesh(new THREE.PlaneGeometry(worldW, h), mat);
+    mesh.renderOrder = 6;
+    scene.add(mesh);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(draw);
+    return mesh;
+  }
+  /* 竖排第二行：贴在左前景画框板的正面（擦开即见） */
+  var tp1 = makeTextPlane('它是人在即将醒来时', true, 'rgba(56,54,50,0.88)', 1.05);
+  var slabL = slabs[0];
+  slabL.add(tp1);
+  tp1.position.set(0.1, 0.2, 0.14);
+  /* 竖排第三行：贴在一块镜头途经的专用板上（擦开即见，途经全程可读） */
+  var slabT2 = addSlab(2.9, 2.6, -7.5, 1.4, 9.0, -0.3, 0.02, { alpha: 0.88 });
+  var tp2 = makeTextPlane('看见的最后一层世界', true, 'rgba(52,50,46,0.85)', 0.5);
+  slabT2.add(tp2);
+  tp2.position.set(-0.02, 0.6, 0.14);
+  /* 远景横排：悬在暖芯前，端部没入暖光 */
+  var tp3 = makeTextPlane('最后一层世界', false, 'rgba(108,72,44,0.82)', 3.2);
+  tp3.position.set(0.6, 6.6, -26.0);
+
+  /* ── 镜头与滚动 ── */
+  var camera = new THREE.PerspectiveCamera(44, 1, 0.1, 120);
+  camera.position.set(0, 2.3, 10.5);
+  scene.add(camera);
+  camera.add(fogQuad);
+  fitFogQuad();
+
+  var pointer = { x: 0, y: 0 };
+  var pointerSm = { x: 0, y: 0 };
+  var scrollP = 0;
+  var look = new THREE.Vector3(0.4, 3.2, -18);
+
+  function readScroll() {
+    if (pinScroll !== null) { scrollP = pinScroll; }
+    else {
+      var max = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+      scrollP = Math.min(1, Math.max(0, (window.scrollY || 0) / max));
+    }
+  }
+
+  /* ── 指针 = 呵气：擦开雾 ── */
+  var hintEl = document.getElementById('hint');
+  var userWiped = false;
+  var lastWipe = null;
+  function wipeAt(clientX, clientY, strength) {
+    var u = clientX / window.innerWidth, v = clientY / window.innerHeight;
+    var px = u * FOG_RES, py = v * FOG_RES;
+    var r = FOG_RES * (isMobile ? 0.095 : 0.066);
+    if (lastWipe) {
+      strokePx(lastWipe.x, lastWipe.y, px, py, r, strength || 0.5);
+    } else {
+      stampPx(px, py, r * 1.25, 0.34);
+    }
+    lastWipe = { x: px, y: py };
+    if (!userWiped) {
+      userWiped = true;
+      if (hintEl) hintEl.classList.add('gone');
+    }
+    if (reduceMotion) { wipeTex.needsUpdate = true; renderOnce(); }
+  }
+  window.addEventListener('pointermove', function (e) {
+    pointer.x = (e.clientX / window.innerWidth - 0.5) * 2;
+    pointer.y = (e.clientY / window.innerHeight - 0.5) * 2;
+    if (e.pointerType === 'mouse' || e.buttons > 0) wipeAt(e.clientX, e.clientY, 0.5);
+  }, { passive: true });
+  window.addEventListener('pointerleave', function () { lastWipe = null; });
+  /* 指向某个入口时，呵气自动为它开一小片窗 */
+  var wipeLinks = document.querySelectorAll('[data-wipe]');
+  for (var w = 0; w < wipeLinks.length; w++) {
+    wipeLinks[w].addEventListener('pointerenter', function (e) {
+      var r = e.currentTarget.getBoundingClientRect();
+      stampPx((r.left + r.width / 2) / window.innerWidth * FOG_RES,
+        (r.top + r.height / 2) / window.innerHeight * FOG_RES,
+        FOG_RES * 0.075, 0.4);
+      if (reduceMotion) { wipeTex.needsUpdate = true; renderOnce(); }
+    }, { passive: true });
+  }
+
+  /* ?auto：定时器驱动的呵气脚本（无头截图自验用） */
+  function scriptedWipes(t) {
+    var s = FOG_RES;
+    if (t > 1.0 && t < 1.05) bloomPx(s * 0.5, s * 0.46, s * 0.16);
+    if (t > 2.0 && t < 2.05) strokePx(s * 0.28, s * 0.6, s * 0.58, s * 0.34, s * 0.07, 0.5);
+    if (t > 3.0 && t < 3.05) strokePx(s * 0.52, s * 0.28, s * 0.72, s * 0.56, s * 0.062, 0.5);
+    if (t > 4.0 && t < 4.05) bloomPx(s * 0.86, s * 0.38, s * 0.085);
+  }
+
+  /* ── 逐帧 ── */
+  var lastT = 0, running = false, rafId = null;
+  var ledgerEl = document.getElementById('ledger');
+  var ledgerShown = false;
+
+  function updateWorld(t, dt) {
+    var sp = scrollP;
+    var cross = smooth01((sp - 0.3) / 0.3);       /* 穿过玻璃层 */
+    var deep = smooth01((sp - 0.55) / 0.45);      /* 进入内部后走向暖芯 */
+
+    /* 雾量：穿过时散开；uGlobal 由滚动驱动（?fog 可锁） */
+    var g = 1 - cross;
+    if (fogLock !== null) g = fogLock;
+    fogUniforms.uGlobal.value = g;
+    fogUniforms.uWarm.value = 0.1 + 0.45 * deep + 0.12 * cross;
+    fogUniforms.uTime.value = t * speed;
+
+    /* 雾色随深度暖化 */
+    var fogNow = FOG_COOL.clone().lerp(FOG_DEEP, 0.25 + 0.5 * deep);
+    scene.fog.color.copy(fogNow);
+    scene.background.copy(fogNow);
+    for (var i = 0; i < slabUniforms.length; i++) {
+      var u = slabUniforms[i];
+      u.uFogColor.value.copy(fogNow);
+      u.uFogNear.value = 12 - 4 * deep; u.uFogFar.value = 60 - 14 * deep;
+      u.uTransCol.value.setHex(0xf2cf9f).lerp(new THREE.Color(0xffe9c8), deep);
+    }
+
+    /* 镜头：雾外 → 穿过玻璃 → 林道深处 */
+    var zc = 10.5 - 8.6 * cross - 1.9 * deep;
+    var yc = 2.3 + 0.7 * cross + 0.4 * deep;
+    pointerSm.x += (pointer.x - pointerSm.x) * 0.06;
+    pointerSm.y += (pointer.y - pointerSm.y) * 0.06;
+    camera.position.set(pointerSm.x * 0.32, yc - pointerSm.y * 0.14 + Math.sin(t * 0.24 * speed) * 0.05, zc);
+    camera.lookAt(look.x + pointerSm.x * 0.5, look.y + 0.5 * deep, look.z);
+
+    /* 玻璃板：极缓的悬浮呼吸 */
+    for (var s = 0; s < slabs.length; s++) {
+      var sl = slabs[s];
+      if (sl.userData.sway) {
+        var sw = sl.userData.sway;
+        sl.position.y = sw.y0 + Math.sin(t * speed * 0.21 + sw.ph) * sw.amp * 12;
+        sl.rotation.z = sw.r0 + Math.sin(t * speed * 0.16 + sw.ph * 1.7) * sw.amp * 0.5;
+      }
+    }
+    /* 暖芯呼吸 */
+    var pulse = 0.9 + 0.1 * Math.sin(t * speed * 0.3);
+    glowBig.material.opacity = (0.34 + 0.3 * deep) * pulse;
+    glowSmall.material.opacity = (0.4 + 0.34 * deep) * pulse;
+    moteMat.opacity = 0.3 + 0.3 * deep;
+
+    /* 尘光缓升 */
+    var mp = moteGeo.attributes.position;
+    for (var q = 0; q < MOTES; q++) {
+      var mb = moteBase[q];
+      mp.setXYZ(q,
+        mb.x + Math.sin(t * speed * 0.3 + mb.ph) * 0.5,
+        -2 + ((mb.y + 2 + t * speed * mb.v) % 11),
+        mb.z + Math.cos(t * speed * 0.22 + mb.ph) * 0.4);
+    }
+    mp.needsUpdate = true;
+
+    /* 穿过玻璃后浮现账目；开始穿越即收起呵气提示 */
+    if (sp > 0.3 && hintEl && !hintEl.classList.contains('gone')) hintEl.classList.add('gone');
+    if (sp > 0.58 && !ledgerShown) { ledgerShown = true; ledgerEl.classList.add('show'); }
+    else if (sp <= 0.5 && ledgerShown) { ledgerShown = false; ledgerEl.classList.remove('show'); }
+  }
+
+  function renderOnce() {
+    renderer.render(scene, camera);
+  }
+
+  function loop(now) {
+    if (running) requestAnimationFrame(loop);
+    if (now - lastT < 33) return;
+    var t = now / 1000;
+    lastT = now;
+
+    readScroll();
+    if ('auto' in qs) scriptedWipes(t);
+    updateWorld(t, 0.033);
+
+    if (wipeDirty) { wipeTex.needsUpdate = true; wipeDirty = false; }
+    renderOnce();
+  }
+
+  function onResize() {
+    var wd = window.innerWidth, h = window.innerHeight;
+    renderer.setSize(wd, h, false);
+    camera.aspect = wd / h;
+    camera.fov = (wd / h < 0.75) ? 58 : 44;
+    camera.updateProjectionMatrix();
+    fitFogQuad();
+    renderOnce();
+  }
+
+  function start() {
+    if (running || reduceMotion) return;
+    running = true; lastT = performance.now() - 40;
+    rafId = requestAnimationFrame(loop);
+    /* 测试辅助（?auto）：rAF 被节流的环境用定时器驱动 */
+    if ('auto' in qs && !start.__auto) {
+      start.__auto = true;
+      setInterval(function () { if (!document.hidden) loop(performance.now()); }, 33);
+    }
+  }
+  function stop() { running = false; if (rafId !== null) cancelAnimationFrame(rafId); rafId = null; }
+  document.addEventListener('visibilitychange', function () { if (document.hidden) stop(); else start(); });
+
+  if (!reduceMotion) start();
+  window.addEventListener('scroll', function () { readScroll(); if (reduceMotion) { updateWorld(performance.now() / 1000, 0); renderOnce(); } }, { passive: true });
+  window.addEventListener('resize', onResize);
+
+  /* 初始静态帧（RM / still 也给有内容的构图） */
+  readScroll();
+  onResize();
+  updateWorld(0, 0);
+  if (wipeDirty) { wipeTex.needsUpdate = true; wipeDirty = false; }
+  renderOnce();
+})();
+</script>
+</body>
+</html>
