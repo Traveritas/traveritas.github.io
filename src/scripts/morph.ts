@@ -30,6 +30,7 @@ const RM = () =>
   typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 let realityFace: MorphReality = 'wake';
+let holdPause = false; // 入梦检验按住/定格期间暂停走神（reality.ts 控制）
 const duals: Dual[] = [];
 
 interface MEl {
@@ -104,6 +105,11 @@ export function setMorphReality(face: MorphReality) {
   realityFace = face;
 }
 
+/** 按住/定格期间暂停走神（避免与线的逐个换面打架） */
+export function setMorphPause(v: boolean) {
+  holdPause = v;
+}
+
 /** 双面元素清单（含线到达阈值与翻转状态，由 reality.ts 驱动） */
 export function getDuals(): Dual[] {
   return duals;
@@ -125,6 +131,10 @@ function visible(m: MEl): boolean {
 }
 
 function ambientTick() {
+  if (holdPause) {
+    setTimeout(ambientTick, 9000 + rand(5000));
+    return;
+  }
   // 进场归位过的元素（文章标题等）不再随机走神；轮换型交给 hover；
   // 醒态下双面元素不参与走神（醒面该是稳的）
   const pool = els.filter(

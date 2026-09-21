@@ -18,11 +18,22 @@
      非空闲时运转，每帧只写 CSS 变量与 transform，各阶段墙钟兜底。
    ───────────────────────────────────────────────────────────── */
 
-import { reducedMotion, easeOut } from './lib';
-import { getDuals, morphText, setMorphReality } from './morph';
+import { reducedMotion, easeOut, hexToRgb } from './lib';
+import { getDuals, morphText, setMorphReality, setMorphPause } from './morph';
 
 const eo3 = easeOut;
 const eio3 = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+
+/* 强调色双色（醒面=醒灰冷，doorcheck 语义）：梦端取 tokens 现值 */
+const ACCENT: Record<string, [number[], number[]]> = {
+  '--amber': [hexToRgb('#d9a05b'), hexToRgb('#a7b1ba')],
+  '--umber': [hexToRgb('#8a6a4f'), hexToRgb('#77828c')],
+  '--ghost-ink': [hexToRgb('#b98f74'), hexToRgb('#8e9aa6')],
+};
+const mixRgb = (a: number[], b: number[], t: number) =>
+  `rgb(${Math.round(a[0] + (b[0] - a[0]) * t)},${Math.round(a[1] + (b[1] - a[1]) * t)},${Math.round(
+    a[2] + (b[2] - a[2]) * t,
+  )})`;
 
 const T_GO = 2200;
 const T_BACK = 1300;
@@ -178,6 +189,10 @@ function drawThread(W: number, ang: number, coreOp: number, bandOp: number) {
 function setTint(cc: number) {
   if (tintWarm) tintWarm.style.opacity = `${((1 - cc) * 0.9).toFixed(3)}`;
   if (tintCool) tintCool.style.opacity = `${(cc * 0.9).toFixed(3)}`;
+  for (const k in ACCENT) {
+    const [d, w] = ACCENT[k];
+    docEl.style.setProperty(k, mixRgb(d, w, cc));
+  }
   docEl.style.setProperty('--reality-mix', cc.toFixed(4));
 }
 function showKnot(pack: boolean) {
@@ -255,6 +270,8 @@ function flipDualsByThread(half: number) {
 function flipAllDuals(instant: boolean) {
   const face = targetFace();
   for (const d of getDuals()) {
+    // 线到达时已翻过面的不再重复乱码（否则视觉上 morph 两次）
+    if (!instant && d.flipped) continue;
     d.flipped = true;
     if (instant) {
       morphText(d.el, face === 'wake' ? d.wake : d.dream, 0);
@@ -304,6 +321,7 @@ function beginHold(x: number, y: number, fromSrc: 'ptr' | 'kb') {
     d.flipped = false;
   }
   body.classList.add('reality-holding');
+  setMorphPause(true); // 按住/定格期间暂停走神，避免与线换面打架
   if (!RM) {
     if (thread) {
       thread.className = `thread ${dir}`;
@@ -359,6 +377,7 @@ function latch() {
     mode = 'idle';
     p = 0;
     stopLoop();
+    setMorphPause(false);
     return;
   }
   freezeW1 = fullW();
@@ -374,6 +393,7 @@ function finishFreeze() {
   if (dir === 'go') knotDissolve();
   else hideKnot();
   stopLoop();
+  setMorphPause(false);
 }
 function finishRetract() {
   mode = 'idle';
@@ -381,6 +401,7 @@ function finishRetract() {
   if (thread) thread.style.display = 'none';
   restoreDuals();
   stopLoop();
+  setMorphPause(false);
 }
 function toggleInstant() {
   // RM：按压即瞬时两态切换
@@ -422,6 +443,7 @@ function loop(now: number) {
     }
     if (p >= 1) {
       latch();
+      startLoop(); // 闩锁后定格分支仍需渲染（绷直/成结/微沉）
       return;
     }
   } else if (mode === 'retract') {
