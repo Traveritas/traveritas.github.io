@@ -31,8 +31,9 @@ docs/
 
 ## 写作
 
-- 新随笔：在 `src/content/articles/` 新建 `yyyy-mm-dd-slug.md`，frontmatter 含 `title` / `date` / `description`（可选）/ `tags`（可选）/ `draft`（可选）
+- 新随笔：`npm run new:article -- "标题" [slug]`（或手动在 `src/content/articles/` 新建 `yyyy-mm-dd-slug.md`），frontmatter 含 `title` / `date` / `description`（可选）/ `tags`（可选）/ `draft`（可选）/ `related`（可选）
 - 新项目：在 `src/content/projects/` 新建 md，另支持 `status`（构想中/进行中/已完成）与 `links`
+- **醒梦两态正文**：行内换字 `[[醒|梦]]`，块级换段 `:::dream` / `:::wake`，随全站长按入梦检验换面——语法手册见 `docs/writing.md`
 
 ## 部署
 
