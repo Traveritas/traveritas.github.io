@@ -233,6 +233,12 @@ function pageSink(now: number) {
     sinkTarget.style.animation = 'none';
     riseCut = true;
   }
+  // 相对定位平移而非 transform：transform 会让 .page 变成层叠上下文，
+  // 首屏负 z 纸壳（ps-sheet/leaf/wall，平时逃逸在根上下文、沉在全局
+  // 缝线/脑电之下）被关进 .page、整叠纸瞬间盖住线——背景线闪没一拍。
+  // relative+top 视觉等价（paint 时偏移、无 reflow），不产生层叠上下文，
+  // 也不劫持 fixed 后代的包含块
+  sinkTarget.style.position = 'relative';
   sinkOn = true;
   sinkT0 = now;
 }
@@ -241,7 +247,7 @@ function pageSinkTick(now: number) {
   const st = now - sinkT0;
   if (st < 175) {
     const jy = st < 50 ? 2.2 * Math.pow(st / 50, 3) : 2.2 * (1 - eo3((st - 50) / 120));
-    sinkTarget.style.transform = `translateY(${jy.toFixed(2)}px)`;
+    sinkTarget.style.top = `${jy.toFixed(2)}px`;
   } else {
     pageSinkEnd();
   }
@@ -249,7 +255,10 @@ function pageSinkTick(now: number) {
 function pageSinkEnd() {
   if (!sinkOn) return;
   sinkOn = false;
-  if (sinkTarget) sinkTarget.style.transform = '';
+  if (sinkTarget) {
+    sinkTarget.style.top = '';
+    sinkTarget.style.position = '';
+  }
 }
 
 /* ---------- 线头一弹（短按点击反馈，无状态变化） ---------- */
