@@ -42,6 +42,9 @@ const SETTLE_MS = 280;
 const CLICK_MS = 260;
 const EXCLUDE =
   'a,button,input,textarea,select,label,summary,[contenteditable],h1,h2,h3,h4,h5,h6,p,li,blockquote,figcaption,dt,dd,time,code,pre,[data-morph],[data-nofx]';
+/* 主页例外：文字不可选后正文/标题也可直接长按（入口与链接仍排除）；
+   其余页维持「空白处」语义，不打扰选字复制 */
+let ptrExclude = EXCLUDE;
 const KBD_DENY = 'a,button,input,textarea,select,summary,[contenteditable],[data-nofx]';
 const STORE_KEY = 'xm-reality';
 
@@ -496,7 +499,7 @@ function wireGestures() {
   document.addEventListener('pointerdown', (e) => {
     if (e.button !== undefined && e.button !== 0) return;
     const t = e.target;
-    if (t instanceof Element && t.closest(EXCLUDE)) return;
+    if (t instanceof Element && t.closest(ptrExclude)) return;
     if (src !== null) return;
     if (RM) {
       px = e.clientX;
@@ -578,6 +581,9 @@ export function initReality() {
   body = document.body;
   sinkTarget = document.querySelector<HTMLElement>('.page');
   buildFx();
+  if (document.getElementById('ns-hero')) {
+    ptrExclude = 'a,button,input,textarea,select,label,summary,[contenteditable],[data-nofx]';
+  }
 
   let stored: string | null = null;
   try {
