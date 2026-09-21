@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<!--
+  ═══════════════════════════════════════════════════════════════════
+  醒梦缝 · 一夜 — 长按检验机制稿 P8-FREE-C · 方案：朱墨对版
+  （自由探索轮；机制骨架沿用基础稿 p8-thread.html，特效层全部重造）
+  · 一句话：梦是一张没套准的朱墨套印印张——大标题「醒梦」浮着一层
+    错位的琥珀朱版；按住空白处即「对版」：指下浮起一枚套准规线
+    （两半十字 + 外圆，印刷校版符号），随指温渐渐合准，满页句子像
+    印张过机、自页首向页尾逐段「落版」，底色一路转冷；按满一瞬滚筒
+    轻轻压过（一记极淡的压印脉冲），朱影压进纸里、诸墨各就其位——
+    页上不留任何记号，醒来的事物只是「本来就印在那里」。
+  · 按住渐进（梦→醒 T_go=2200ms）：规线错位量 = 未合准度（随进度
+    收拢到 0，带 -7°→0 的旋正）；标题朱版（#plate，h1 内一层琥珀
+    拷贝）自错位 (9px,-5px,1.1deg) 滑向套准位；data-morph 文字按
+    「版序」（文档序，非空间前沿）逐段落版（短促 scramble，与
+    src/scripts/morph.ts 同族字符池）；全页颜色经单一 CSS 变量
+    --mix 以 color-mix 插值（梦 0 ↔ 醒 1）。
+  · 定格瞬间（按满 2200ms）：压印——朱版一记压下（90ms）后淡出
+    （320ms）；压印薄纱 #impose 全页一记 ≤340ms 的极淡脉冲（暖白/
+    回程冷灰）；规线中心点一记琥珀微芒（CSS 动画 ≤340ms），整枚
+    规线 ≤560ms 淡出。全部痕迹 ≤800ms 消失，页上零常驻元素。
+  · 回程（醒→梦 T_back=1300ms）：再按住即「松版」——同一枚规线再
+    度合准，朱版自套准位重新渗出错位，字按版序自页首向页尾逐段退
+    回梦面（阈值对称，天然反向），底色回暖；按满后朱版渗出至全错
+    位、随冷灰脉冲一起散尽；中途松手 ≤600ms 平滑退回原面，不换态。
+  · 短按点击特效（本轮新增）：轻点空白（<280ms 即松）= 排版工的
+    一次「试对」——按压点打一枚规线：两半十字 130ms 内合准、中心
+    琥珀一闪、微涨后散，≤450ms 完全消失，无任何状态变化；
+    window.__fx.clicks 计数 +1。长按的前段本身就是这枚规线的蓄势，
+    短松即落定为一次试对，长短按共用同一符号语言。
+  · 无 JS / prefers-reduced-motion：恒显醒面真值（CSS 默认 --mix:1，
+    正文写醒面文案）；RM 用户按住满时长即瞬时换面；?wake=1 /
+    ?dream=1 同步先置态、再播一遍定格（≤780ms 全清）。
+  · 性能要点：全页换色仅逐帧写 1 个 CSS 变量（--mix，颜色全部由
+    color-mix/calc 派生）；动画节点仅 3 个（#plate / #regmark /
+    #impose）+ ≤3 并发 scramble（FIFO 排队，各带 dur+400ms 看门狗），
+    每帧样式/变量写入 ≤11 次；只用 transform / opacity / SVG 属性 /
+    CSS 变量插值，零 blur、零 filter、零逐帧 box-shadow、零几何测量
+    （版序 = 文档序，规线坐标来自事件）；状态机各阶段墙钟 setTimeout
+    兜底；rAF 循环维护帧时长 EMA，__fx.perf() → {fps,avgMs}。
+  ═══════════════════════════════════════════════════════════════════
+-->
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#171b24">
+<title>醒梦 · 朱墨对版 — 长按机制稿 p8-free-c</title>
+<meta name="description" content="按住空白处即对版：规线合准、印张过机，字自页首向页尾逐段落版，按满压印、闩锁在醒面；轻点是排版工的一次试对。长按检验机制稿 P8-FREE-C · 方案：朱墨对版。">
+<link rel="preconnect" href="https://fastly.jsdelivr.net" crossorigin>
+<link rel="stylesheet" href="https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5.2.5/400.css">
+<link rel="stylesheet" href="https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5.2.5/600.css">
+<link rel="stylesheet" href="https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5.2.5/900.css">
+<style>
+/* ---------- 令牌：醒面真值为默认（无 JS / RM 恒醒）；html.pre-dream 为首绘入梦。
+   全页梦↔醒只插值一个 --mix（0=梦 1=醒），其余颜色由 color-mix / calc 派生 ---------- */
+:root{
+  --d-bg:#171b24; --d-fg:#e5e0d2; --d-soft:#b9b3a4; --d-faint:#837d70; --d-acc:#c2a382;
+  --d-line:rgba(229,224,210,.13); --d-mline:rgba(194,163,130,.42);
+  --w-bg:#12161d; --w-fg:#e9e5da; --w-soft:#aeb4ba; --w-faint:#77808a; --w-acc:#a7b1ba;
+  --w-line:rgba(169,179,190,.17); --w-mline:rgba(167,177,186,.42);
+  --mix:1;
+  --bg-now:color-mix(in srgb,var(--w-bg) calc(var(--mix)*100%),var(--d-bg));
+  --fg-now:color-mix(in srgb,var(--w-fg) calc(var(--mix)*100%),var(--d-fg));
+  --soft-now:color-mix(in srgb,var(--w-soft) calc(var(--mix)*100%),var(--d-soft));
+  --faint-now:color-mix(in srgb,var(--w-faint) calc(var(--mix)*100%),var(--d-faint));
+  --acc-now:color-mix(in srgb,var(--w-acc) calc(var(--mix)*100%),var(--d-acc));
+  --line-now:color-mix(in srgb,var(--w-line) calc(var(--mix)*100%),var(--d-line));
+  --morph-line:color-mix(in srgb,var(--w-mline) calc(var(--mix)*100%),var(--d-mline));
+  --warm-op:calc(.055 + var(--mix)*(.014 - .055));
+  --cool-op:calc(.012 + var(--mix)*(.05 - .012));
+  --amber:#d9a05b;
+  --serif:'Noto Serif SC','Source Han Serif SC','Songti SC','STSong',SimSun,serif;
+  --mono:ui-monospace,'Cascadia Mono',Consolas,'JetBrains Mono',Menlo,monospace;
+}
+html.pre-dream{--mix:0}
+*{margin:0;padding:0;box-sizing:border-box}
+html{background:var(--bg-now);scroll-behavior:auto}
+body{
+  font-family:var(--serif);color:var(--fg-now);line-height:1.95;
+  -webkit-font-smoothing:antialiased;overflow-x:hidden;touch-action:manipulation;
+  min-height:100vh;
+}
+body.holding{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+::selection{background:rgba(217,160,95,.26);color:var(--fg-now)}
+:focus-visible{outline:1px dashed var(--amber);outline-offset:4px}
+::-webkit-scrollbar{width:9px}
+::-webkit-scrollbar-thumb{background:rgba(233,229,218,.14)}
+::-webkit-scrollbar-track{background:transparent}
+
+/* ---------- 底色与颗粒（静态） ---------- */
+.bg{position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:
+    radial-gradient(88vmax 58vmax at 76% 10%, rgba(214,176,124,var(--warm-op)), transparent 62%),
+    radial-gradient(76vmax 56vmax at 16% 88%, rgba(156,172,188,var(--cool-op)), transparent 62%),
+    var(--bg-now);
+}
+.grain{position:fixed;inset:0;z-index:80;pointer-events:none;opacity:.045;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='180' height='180' filter='url(%23n)' opacity='0.6'/></svg>");
+}
+
+/* ---------- 版面 ---------- */
+main{position:relative;z-index:2;max-width:720px;margin:0 auto;padding:0 28px 60px;
+  animation:rise .8s ease both}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.hero{min-height:82vh;display:flex;flex-direction:column;justify-content:center;padding:15vh 0 8vh}
+.kicker{font-family:var(--mono);font-size:11px;letter-spacing:.3em;color:var(--faint-now);margin-bottom:36px}
+h1{position:relative;font-size:clamp(84px,15vw,160px);font-weight:900;line-height:1.05;letter-spacing:.06em;margin-left:-5px}
+h1 .m{color:var(--acc-now);letter-spacing:.14em;transition:letter-spacing .5s cubic-bezier(.3,.7,.3,1)}
+body[data-reality="wake"] h1 .m{letter-spacing:.02em}
+/* 朱版：h1 的一层琥珀拷贝，梦面错位、按住对版。仅在手势期间存在 */
+#plate{position:absolute;left:0;top:0;white-space:nowrap;color:var(--amber);
+  opacity:0;pointer-events:none;user-select:none;-webkit-user-select:none;
+  will-change:transform,opacity}
+#plate i{font-style:inherit}
+#plate .m{letter-spacing:.14em;transition:letter-spacing .5s cubic-bezier(.3,.7,.3,1)}
+body[data-reality="wake"] #plate .m{letter-spacing:.02em}
+.sub{margin-top:30px;max-width:36em;font-size:clamp(15px,2.1vw,17.5px);letter-spacing:.04em;color:var(--soft-now);min-height:2em}
+.howto{margin-top:44px;max-width:560px;border:1px solid var(--line-now);border-left:2px solid var(--acc-now);
+  padding:20px 24px;font-size:13.5px;line-height:2.15;color:var(--soft-now);letter-spacing:.03em;
+  background:rgba(233,229,218,.02)}
+.howto p+p{margin-top:8px}
+.howto b{color:var(--fg-now);font-weight:600}
+.howto .mono{font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;color:var(--faint-now)}
+
+.seam{margin:10vh 0 9vh;overflow:hidden;pointer-events:none}
+.seam i{display:block;border-top:1px dashed var(--line-now);transform:rotate(-4deg) scale(1.04)}
+
+.essay .lead{display:block;font-family:var(--mono);font-size:10.5px;letter-spacing:.3em;color:var(--faint-now);margin-bottom:22px}
+.essay p{font-size:16.5px;line-height:2.25;letter-spacing:.03em;max-width:34em}
+[data-morph]{border-bottom:1px dashed var(--morph-line);padding-bottom:1px}
+
+.readout{margin-top:54px;padding:15px 2px;min-height:3.4em;
+  border-top:1px solid var(--line-now);border-bottom:1px solid var(--line-now);
+  font-family:var(--mono);font-size:12px;letter-spacing:.14em;color:var(--soft-now);line-height:2}
+
+.actions{margin-top:42px;display:flex;flex-wrap:wrap;gap:16px 32px;align-items:center}
+.actions a{display:inline-flex;align-items:baseline;gap:.55em;font-size:15px;letter-spacing:.14em;
+  color:var(--fg-now);text-decoration:none;border-bottom:1px solid var(--line-now);
+  padding-bottom:.35em;transition:border-color .3s}
+.actions a:hover{border-color:var(--acc-now)}
+.actions .ar{font-family:var(--mono);font-size:12px;color:var(--faint-now)}
+.actions button{font-family:var(--serif);font-size:14.5px;letter-spacing:.14em;line-height:1.6;
+  color:var(--fg-now);background:transparent;border:1px solid var(--line-now);border-radius:2px;
+  padding:10px 24px;cursor:pointer;display:inline-flex;align-items:baseline;gap:.55em;
+  transition:border-color .3s,background .3s}
+.actions button:hover{border-color:var(--acc-now);background:rgba(233,229,218,.03)}
+
+footer{margin-top:13vh;text-align:center;color:var(--soft-now)}
+footer .f-morph{font-size:13px;letter-spacing:.18em}
+footer .f-mono{margin-top:12px;font-family:var(--mono);font-size:9.5px;letter-spacing:.3em;color:var(--faint-now);line-height:2.2}
+
+/* ---------- 特效层：套准规线 + 压印薄纱 ---------- */
+.fx{position:fixed;inset:0;z-index:60;pointer-events:none;overflow:hidden}
+#regmark{position:fixed;left:0;top:0;width:48px;height:48px;overflow:visible;opacity:0;color:rgba(169,179,190,.78)}
+#regmark line{stroke:currentColor;stroke-width:1;stroke-linecap:round}
+#regmark circle.ring{fill:none;stroke:currentColor;stroke-width:1;opacity:.85}
+#regDot{fill:var(--amber);opacity:0;transform-box:fill-box;transform-origin:center}
+#regDot.fire{animation:dotfire .34s ease-out both}
+@keyframes dotfire{0%{opacity:0;transform:scale(.4)}35%{opacity:.95;transform:scale(1)}100%{opacity:0;transform:scale(1)}}
+#impose{position:fixed;inset:0;opacity:0;will-change:opacity}
+
+/* ---------- 错误盒 ---------- */
+#errbox{position:fixed;left:0;right:0;bottom:0;z-index:120;pointer-events:none;
+  font-family:var(--mono);font-size:11px;letter-spacing:.06em;line-height:1.6;
+  color:#e3b990;background:rgba(22,15,10,.94);border-top:1px solid rgba(217,160,91,.45);
+  padding:8px 16px}
+
+/* ---------- reduced motion ---------- */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+  #plate,#regmark,#impose{opacity:0!important}
+}
+
+/* ---------- 响应式（390px 不破） ---------- */
+@media (max-width:640px){
+  main{padding:0 22px 40px}
+  .hero{min-height:76vh;padding-top:12vh}
+  .kicker{letter-spacing:.22em}
+  .howto{padding:16px 18px}
+  .essay p{font-size:15.5px}
+  .actions{gap:14px 22px}
+}
+</style>
+<script>
+/* 首绘前入梦：非 RM 且非 ?wake=1 时先把 --mix 拨到梦面（正文真值保持醒面，
+   页末主脚本随后接管；此脚本只为防首帧闪醒） */
+(function(){try{
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+  if(new URLSearchParams(location.search).get('wake')==='1')return;
+  document.documentElement.classList.add('pre-dream');
+}catch(e){}})();
+</script>
+</head>
+<body data-reality="wake">
+
+<div class="bg" aria-hidden="true"></div>
+
+<main>
+  <header class="hero">
+    <p class="kicker">醒梦 · XINGMENG — 在空白处长按 · 做一次现实检验</p>
+    <h1>醒<span class="m">梦</span><span id="plate" aria-hidden="true"><i>醒</i><i class="m">梦</i></span></h1>
+    <p class="sub"><span data-morph data-true="这是它醒着的一面。日期归位，数字落回真值，句句可查。" data-dream="你现在看到的是它梦着的一面——日期会漂，钟会走错，数字会夸大。">这是它醒着的一面。日期归位，数字落回真值，句句可查。</span></p>
+    <div class="howto">
+      <p>在空白处按下并保持：指下浮起一枚<b>套准规线</b>，两半十字先错开、随指温渐渐合准；满页的句子像印张过机，自页首向页尾逐段<b>落版</b>，标题上的朱影一路对齐，底色转冷。按满 <span class="mono">2200ms</span>，滚筒轻轻压过——<b>闩锁在醒面</b>，朱影压进纸里，页上不留任何记号。</p>
+      <p>再按一次（<span class="mono">1300ms</span>，更短），版一格格松开，梦的暖墨自错位处重新渗出；半途松手，已落版的字逐段退回，面不改。轻点一下（不足长按）是排版工的一次<b>试对</b>：规线一合即散。键盘：焦点不在任何控件上时，<b>按住空格</b>同样成立。</p>
+    </div>
+  </header>
+
+  <div class="seam" aria-hidden="true"><i></i></div>
+
+  <section class="essay">
+    <span class="lead">随笔 · 其一</span>
+    <p>浅睡的人写字最诚实——字还没醒，替我先说了。只是梦里抄录的东西总有些走样：<span data-morph data-true="日期是 2026-09-19" data-dream="日期停在九月三十一日">日期是 2026-09-19</span>，连<span data-morph data-true="那只是只走快了的普通钟" data-dream="钟走到过 25:61">那只是只走快了的普通钟</span>也算梦的破绽。要紧的话我写了两遍，一遍给梦，一遍给醒。</p>
+  </section>
+
+  <p class="readout"><span data-morph data-true="已收录 4 篇随笔 · 3 个项目 · 纯静态站 · 2026-09-19 上线 ✓ 已校准" data-dream="已收录 12 篇随笔 · 9 个项目 · 1 场进行中的梦 ⚠ 漂移">已收录 4 篇随笔 · 3 个项目 · 纯静态站 · 2026-09-19 上线 ✓ 已校准</span></p>
+
+  <div class="actions">
+    <a href="https://github.com/Traveritas" target="_blank" rel="noopener">GitHub <span class="ar">→</span></a>
+    <button type="button">全部随笔 <span class="ar">→</span></button>
+  </div>
+
+  <div class="seam" aria-hidden="true"><i></i></div>
+
+  <footer>
+    <p class="f-morph"><span data-morph data-true="本页已通过一次现实检验" data-dream="本页在梦中建成">本页已通过一次现实检验</span></p>
+    <p class="f-mono">醒梦 XINGMENG · 长按检验机制稿 P8-FREE-C · 方案：朱墨对版</p>
+  </footer>
+</main>
+
+<!-- 特效层：套准规线（SVG）+ 压印薄纱（#plate 在 h1 内） -->
+<div class="fx" aria-hidden="true">
+  <svg id="regmark" viewBox="0 0 48 48">
+    <g id="regRoot">
+      <g id="regRot">
+        <circle class="ring" cx="24" cy="24" r="15"/>
+        <g id="gH"><line x1="4" y1="24" x2="19" y2="24"/><line x1="29" y1="24" x2="44" y2="24"/></g>
+        <g id="gV"><line x1="24" y1="4" x2="24" y2="19"/><line x1="24" y1="29" x2="24" y2="44"/></g>
+        <circle id="regDot" cx="24" cy="24" r="2"/>
+      </g>
+    </g>
+  </svg>
+  <div id="impose"></div>
+</div>
+
+<div class="grain" aria-hidden="true"></div>
+<div id="errbox" hidden></div>
+
+<script>
+(function(){
+'use strict';
+/* ---------- 错误捕获（最先注册） ---------- */
+window.addEventListener('error',function(e){
+  window.__swarmErr=(e&&e.message)||((e&&e.type)||'unknown');
+  var b=document.getElementById('errbox');
+  if(b){b.hidden=false;b.textContent='ERR '+window.__swarmErr;}
+});
+
+var docEl=document.documentElement,body=document.body;
+var RM=matchMedia('(prefers-reduced-motion: reduce)').matches;
+var qs=new URLSearchParams(location.search);
+
+/* ---------- 全页换色：每帧只写一个 --mix（颜色由 color-mix/calc 派生） ---------- */
+var mixV=1;
+function setMix(v){
+  mixV=v<0?0:(v>1?1:v);
+  docEl.style.setProperty('--mix',mixV.toFixed(4));
+}
+
+/* ---------- 乱码字（与站内 morph.ts 同族：渐进解出 + 看门狗 + ≤3 并发排队） ---------- */
+var POOL='醒梦之间夜深空site0123456789abcdefghijklmnopqrstuvwxyz·—';
+function eo3(t){return 1-Math.pow(1-t,3)}
+function rnd(n){return Math.floor(Math.random()*n)}
+function renderStr(target,pp){
+  var n=Math.floor(pp*target.length),out='',i;
+  for(i=0;i<target.length;i++){
+    out+=i<n?target[i]:(Math.random()<.55?target[i]:POOL[rnd(POOL.length)]);
+  }
+  return out;
+}
+var ACT=0,Q=[];
+function qRemove(el){for(var i=Q.length-1;i>=0;i--)if(Q[i].el===el)Q.splice(i,1)}
+function pump(){while(ACT<3&&Q.length){var it=Q.shift();mStart(it.el,it.target,it.dur)}}
+function mStart(el,target,dur){
+  ACT++;el._run=true;
+  var done=false,t0=performance.now();
+  function fin(){
+    if(done)return;done=true;
+    el.textContent=target;el._raf=0;el._to=0;
+    if(el._run){el._run=false;ACT--}
+    pump();
+  }
+  function step(now){
+    var pp=Math.min(1,(now-t0)/dur);
+    el.textContent=renderStr(target,eo3(pp));
+    if(pp<1&&!done){el._raf=requestAnimationFrame(step)}else{fin()}
+  }
+  el._raf=requestAnimationFrame(step);
+  el._to=setTimeout(fin,dur+400); /* 看门狗：rAF 被节流也按时落定 */
+}
+function morphTo(el,target,dur,force){
+  if(el._raf){cancelAnimationFrame(el._raf);el._raf=0}
+  if(el._to){clearTimeout(el._to);el._to=0}
+  if(el._run){el._run=false;ACT--}
+  qRemove(el);
+  if(RM||dur<=0||force){el.textContent=target;return}
+  if(ACT>=3){Q.push({el:el,target:target,dur:dur});return}
+  mStart(el,target,dur);
+}
+
+var morphs=[],nodes=document.querySelectorAll('[data-morph]'),i,el;
+for(i=0;i<nodes.length;i++){
+  el=nodes[i];
+  var tt=el.getAttribute('data-true')||el.textContent.trim();
+  var dd=el.getAttribute('data-dream')||tt;
+  if(!el.getAttribute('aria-label'))el.setAttribute('aria-label',tt);
+  /* 版序：文档序（无几何测量），阈值等距、首处 > 短按窗口；face=当前逻辑面 */
+  morphs.push({el:el,t:tt,d:dd,flipped:false,face:'t',th:(i+1)/(nodes.length+1)});
+}
+function targetFace(){return dir==='go'?'t':'d'}
+function originFace(){return dir==='go'?'d':'t'}
+function tickMorphs(q){
+  var tf=targetFace(),of=originFace();
+  for(var k=0;k<morphs.length;k++){
+    var m=morphs[k];
+    if(!m.flipped&&q>=m.th){m.flipped=true;m.face=tf;morphTo(m.el,m[tf],320)}
+    else if(m.flipped&&q<m.th-.06){m.flipped=false;if(m.face!==of){m.face=of;morphTo(m.el,m[of],200)}}
+  }
+}
+function flipToTargetFace(instant){
+  var tf=targetFace();
+  for(var k=0;k<morphs.length;k++){
+    var m=morphs[k];
+    if(m.flipped&&!instant)continue;
+    m.flipped=true;m.face=tf;
+    morphTo(m.el,m[tf],instant?0:340,instant);
+  }
+}
+function restoreOriginFace(){
+  var of=originFace();
+  for(var k=0;k<morphs.length;k++){
+    var m=morphs[k];
+    if(m.flipped){m.flipped=false;if(m.face!==of){m.face=of;morphTo(m.el,m[of],180)}}
+  }
+}
+
+/* ---------- 特效节点：朱版 / 规线 / 压印 ---------- */
+var plate=document.getElementById('plate');
+var regmark=document.getElementById('regmark');
+var regRoot=document.getElementById('regRoot');
+var regRot=document.getElementById('regRot');
+var gH=document.getElementById('gH'),gV=document.getElementById('gV');
+var regDot=document.getElementById('regDot');
+var impose=document.getElementById('impose');
+var OFF={x:9,y:-5,r:1.1};          /* 梦面朱版错位量 */
+var RMAX={h:6,v:4,rot:-7};         /* 规线未合准错位量 */
+var px=innerWidth/2,py=innerHeight/2;
+
+function drawPlate(s,op,scl){
+  /* s=错位程度（1 全错 0 套准） */
+  if(op<=0){plate.style.opacity='0';return}
+  plate.style.transform='translate('+(OFF.x*s).toFixed(2)+'px,'+(OFF.y*s).toFixed(2)+'px) rotate('+(OFF.r*s).toFixed(2)+'deg)'+(scl?' scale('+scl+')':'');
+  plate.style.opacity=op.toFixed(3);
+}
+var dotFired=false;
+function fireDot(){
+  if(dotFired)return;dotFired=true;
+  regDot.classList.add('fire');
+  setTimeout(function(){regDot.classList.remove('fire');dotFired=false},380);
+}
+function drawReg(x,y,offH,offV,rot,op,scl){
+  regmark.style.opacity=op<=0?'0':op.toFixed(3);
+  if(op>0){
+    regRoot.setAttribute('transform','translate('+(x-24).toFixed(1)+','+(y-24).toFixed(1)+')'+(scl&&scl!==1?' scale('+scl.toFixed(3)+')':''));
+    regRot.setAttribute('transform','rotate('+rot.toFixed(2)+' 24 24)');
+    gH.setAttribute('transform','translate('+offH.toFixed(2)+',0)');
+    gV.setAttribute('transform','translate(0,'+offV.toFixed(2)+')');
+  }
+}
+function clearFx(){
+  plate.style.opacity='0';
+  regmark.style.opacity='0';
+  impose.style.opacity='0';
+}
+
+/* ---------- 状态机 ---------- */
+var T_GO=2200,T_BACK=1300,RETRACT_MS=560,SETTLE_MS=280,SHORT_MS=280;
+var reality='wake',mode='boot',dir='go',src=null,pid=null,p=0;
+var holdT0=0,retractT0=0,retractFrom=0,retractDur=0,retractShort=false;
+var freezeT0=0,freezePre=false,freezeOp0=.2,freezeFromS=0,settleFrom=1,settleTo=1;
+var wdRetract=0,wdFreeze=0,scrollMark=0;
+var clickOn=false,clickT0=0;
+var clicks=0;
+
+function beginHold(x,y,fromSrc){
+  var now=performance.now();
+  if(mode!=='idle'){
+    /* 定格收尾 340ms 后可被打断（痕迹将尽，直接清场） */
+    if(mode==='freeze'&&now-freezeT0>340){
+      clearTimeout(wdFreeze);
+      mode='idle';p=0;clearFx();
+    }else{return}
+  }
+  mode='hold';src=fromSrc;
+  dir=reality==='dream'?'go':'back';
+  px=x;py=y;p=0;holdT0=now;scrollMark=scrollY;
+  clickOn=false;
+  for(var k=0;k<morphs.length;k++){
+    var m=morphs[k];
+    if(m.el._enterT){clearTimeout(m.el._enterT);m.el._enterT=0}
+  }
+  body.classList.add('holding');
+  if(!RM){
+    /* 朱版在手势起点就该在场：go 从全错开始、back 从套准位渗出 */
+    drawPlate(dir==='go'?1:0,0,null);
+    drawReg(px,py,RMAX.h,RMAX.v,RMAX.rot,0,1);
+  }
+}
+function releaseHold(){
+  if(mode!=='hold')return;
+  var now=performance.now();
+  retractShort=(now-holdT0)<SHORT_MS;
+  mode='retract';src=null;pid=null;
+  body.classList.remove('holding');
+  retractT0=now;retractFrom=p;
+  retractDur=retractShort?Math.min(160,80+p*300):Math.min(RETRACT_MS,200+p*380);
+  if(retractShort)startClick(px,py);
+  clearTimeout(wdRetract);
+  wdRetract=setTimeout(finishRetract,retractDur+140);
+}
+function startClick(x,y){
+  clicks++;
+  window.__fx.clicks=clicks;
+  if(RM)return;
+  clickOn=true;clickT0=performance.now();
+  drawReg(x,y,5,3.5,-6,0,1);
+}
+function latch(){
+  mode='freeze';src=null;pid=null;
+  body.classList.remove('holding');
+  reality=dir==='go'?'wake':'dream';
+  body.setAttribute('data-reality',reality);
+  flipToTargetFace(RM);
+  settleFrom=mixV;settleTo=dir==='go'?1:0;
+  freezeT0=performance.now();freezePre=false;
+  clearTimeout(wdFreeze);
+  if(RM){
+    setMix(settleTo);
+    clearFx();
+    mode='idle';p=1;
+    return;
+  }
+  freezeOp0=dir==='go'?.2:.48;
+  freezeFromS=dir==='go'?0:1;
+  impose.style.background=dir==='go'?'#e8e2d4':'#b9c2cc';
+  wdFreeze=setTimeout(function(){
+    if(mode==='freeze'){setMix(settleTo);clearFx();mode='idle';p=1}
+  },940);
+}
+function finishRetract(){
+  if(mode!=='retract')return;
+  clearTimeout(wdRetract);
+  mode='idle';p=0;
+  clearFx();
+  restoreOriginFace();
+}
+
+/* ---------- 帧循环（各分支 + EMA 帧统计） ---------- */
+var emaMs=16.7,lastFrame=0;
+function plateHoldState(now,qq){
+  /* qq = 当前面进度（go: p, back: p）；s = 梦性（错位程度） */
+  var s=dir==='go'?1-qq:qq;
+  var op=Math.min(1,(now-holdT0)/260)*(0.2+0.28*s);
+  return{s:s,op:op};
+}
+function frameHold(now){
+  var T=dir==='go'?T_GO:T_BACK;
+  p=Math.min(1,(now-holdT0)/T);
+  if(!RM){
+    setMix(dir==='go'?p:1-p);
+    var st=plateHoldState(now,p);
+    drawPlate(st.s,st.op,null);
+    var g=1-p;
+    drawReg(px,py,RMAX.h*g,RMAX.v*g,RMAX.rot*g,Math.min(1,(now-holdT0)/180),1);
+    tickMorphs(p);
+  }
+  if(p>=1)latch();
+}
+function frameRetract(now){
+  var k=Math.min(1,(now-retractT0)/retractDur);
+  p=retractFrom*(1-eo3(k));
+  if(!RM){
+    setMix(dir==='go'?p:1-p);
+    var s=dir==='go'?1-p:p;
+    drawPlate(s,(0.2+0.28*s)*(1-k),null);
+    if(!retractShort){
+      var g=1-p;
+      drawReg(px,py,RMAX.h*g,RMAX.v*g,RMAX.rot*g,Math.min(1,(now-holdT0)/180)*(1-k),1);
+    }
+    tickMorphs(p);
+  }
+  if(k>=1)finishRetract();
+}
+function frameFreeze(now){
+  var ft=now-freezeT0;
+  setMix(settleFrom+(settleTo-settleFrom)*Math.min(1,ft/SETTLE_MS));
+  var pre=freezePre?180:0;
+  var t=ft-pre;
+  /* 朱版：pre 段滑入/渗出（go 1→0、back 0→1）→ 压下 90ms → 淡出 320ms */
+  if(t<0){
+    var kp=eo3(ft/180);
+    var ss=dir==='go'?1-kp:kp;
+    drawPlate(ss,.45*kp,null);
+  }else if(t<90){
+    drawPlate(freezeFromS,freezeOp0+(.5-freezeOp0)*eo3(t/90),null);
+    if(t>=60&&!dotFired)fireDot();
+  }else if(t<410){
+    var scl=1-0.012*Math.min(1,(t-90)/60);
+    drawPlate(freezeFromS,.5*(1-(t-90)/320),scl);
+  }else{
+    plate.style.opacity='0';
+  }
+  /* 压印薄纱：一记 ≤340ms 的极淡脉冲 */
+  var it=Math.max(0,ft-(pre+60));
+  if(it<340){
+    var peak=dir==='go'?.055:.04;
+    impose.style.opacity=(peak*Math.sin(Math.PI*it/340)).toFixed(4);
+  }else{
+    impose.style.opacity='0';
+  }
+  /* 规线：合准微涨后 ≤560ms 淡出 */
+  var rg=Math.min(1,ft/150);
+  var rop=rg*Math.max(0,1-Math.max(0,ft-320)/240);
+  if(rop>0){
+    var rs=1+.05*Math.sin(Math.PI*Math.min(1,ft/300));
+    drawReg(px,py,0,0,0,rop,rs);
+  }else{
+    regmark.style.opacity='0';
+  }
+  var total=(freezePre?780:640);
+  if(ft>=total){
+    clearTimeout(wdFreeze);
+    setMix(settleTo);clearFx();
+    mode='idle';p=1;
+  }
+}
+function frameClick(now){
+  var t=now-clickT0;
+  if(t<130){
+    var k=eo3(t/130);
+    drawReg(px,py,5*(1-k),3.5*(1-k),-6*(1-k),k,1);
+    if(k>=.96&&!dotFired)fireDot();
+  }else if(t<300){
+    drawReg(px,py,0,0,0,1,1);
+  }else if(t<450){
+    var k2=eo3((t-300)/150);
+    drawReg(px,py,0,0,0,1-k2,1+.08*k2);
+  }else{
+    clickOn=false;
+    regmark.style.opacity='0';
+  }
+}
+function loop(now){
+  if(lastFrame){
+    var dt=now-lastFrame;
+    if(dt>0&&dt<100)emaMs=emaMs*.9+dt*.1;
+  }
+  lastFrame=now;
+  if(mode==='hold')frameHold(now);
+  else if(mode==='retract'){
+    frameRetract(now);
+    if(clickOn)frameClick(now);
+  }
+  else if(mode==='freeze'&&!RM)frameFreeze(now);
+  else if(clickOn)frameClick(now);
+  requestAnimationFrame(loop);
+}
+
+/* ---------- 手势：空白处长按（指针） ---------- */
+var EXCLUDE='a,button,input,textarea,select,label,summary,[contenteditable],h1,h2,h3,h4,h5,h6,p,li,blockquote,figcaption,dt,dd,time,code,pre,[data-morph],[data-nofx]';
+var startX=0,startY=0;
+document.addEventListener('pointerdown',function(e){
+  if(e.button!==undefined&&e.button!==0)return;
+  var t=e.target;
+  if(t&&t.closest&&t.closest(EXCLUDE))return;
+  if(src!==null)return;
+  pid=e.pointerId;
+  startX=e.clientX;startY=e.clientY;
+  beginHold(e.clientX,e.clientY,'ptr');
+});
+document.addEventListener('pointermove',function(e){
+  if(mode!=='hold'||src!=='ptr'||e.pointerId!==pid)return;
+  if(Math.hypot(e.clientX-startX,e.clientY-startY)>20)releaseHold();
+});
+function onPtrEnd(e){
+  if(mode!=='hold'||src!=='ptr'||e.pointerId!==pid)return;
+  releaseHold();
+}
+document.addEventListener('pointerup',onPtrEnd);
+document.addEventListener('pointercancel',onPtrEnd);
+addEventListener('scroll',function(){
+  if(mode==='hold'&&Math.abs(scrollY-scrollMark)>4)releaseHold();
+},{passive:true});
+document.addEventListener('contextmenu',function(e){
+  if(body.classList.contains('holding'))e.preventDefault();
+});
+addEventListener('blur',function(){if(mode==='hold')releaseHold()});
+
+/* ---------- 手势：键盘空格（焦点不在交互件时） ---------- */
+var KBD_DENY='a,button,input,textarea,select,summary,[contenteditable],[data-nofx]';
+document.addEventListener('keydown',function(e){
+  if(e.code!=='Space'||e.repeat)return;
+  var ae=document.activeElement;
+  if(ae&&ae.closest&&ae.closest(KBD_DENY))return;
+  e.preventDefault();
+  if(src!==null)return;
+  beginHold(Math.round(innerWidth/2),Math.round(innerHeight/2),'kb');
+});
+document.addEventListener('keyup',function(e){
+  if(e.code==='Space'&&mode==='hold'&&src==='kb')releaseHold();
+});
+
+/* ---------- 启动 ---------- */
+function setTexts(faceKey){
+  for(var k=0;k<morphs.length;k++){
+    var m=morphs[k];
+    m.flipped=(faceKey==='t');
+    m.face=faceKey;
+    m.el.textContent=faceKey==='t'?m.t:m.d;
+  }
+}
+function boot(){
+  var q=qs.get('wake')==='1'?'wake':(qs.get('dream')==='1'?'dream':null);
+  if(q){
+    /* ?wake / ?dream：先同步置闩锁态，再播一遍定格（≤780ms 全清） */
+    var isWake=q==='wake';
+    reality=q;dir=isWake?'go':'back';
+    setMix(isWake?1:0);
+    setTexts(isWake?'t':'d');
+    px=innerWidth/2;py=innerHeight/2;p=1;
+    if(!RM){
+      freezePre=true;
+      freezeFromS=dir==='go'?0:1;
+      freezeOp0=.45;
+      settleFrom=settleTo=mixV;
+      impose.style.background=isWake?'#e8e2d4':'#b9c2cc';
+      freezeT0=performance.now();
+      mode='freeze';
+      clearTimeout(wdFreeze);
+      wdFreeze=setTimeout(function(){
+        if(mode==='freeze'){setMix(settleTo);clearFx();mode='idle';p=1}
+      },960);
+    }else{
+      mode='idle';p=1;
+    }
+  }else if(RM){
+    reality='wake';setMix(1);
+    setTexts('t');
+    mode='idle';
+  }else{
+    /* JS 加载后入梦（静息）：无影版、无规线，静息两面皆零常驻 */
+    reality='dream';setMix(0);
+    setTexts('d');
+    for(var k=0;k<morphs.length;k++){
+      (function(m,j){
+        m.el._enterT=setTimeout(function(){morphTo(m.el,m.d,460)},140+j*70);
+      })(morphs[k],k);
+    }
+    mode='idle';
+  }
+  body.setAttribute('data-reality',reality);
+}
+boot();
+requestAnimationFrame(loop);
+
+/* ---------- 调试接口 ---------- */
+window.__fx={
+  clicks:clicks,
+  state:function(){
+    return{reality:reality,holding:mode==='hold',progress:+p.toFixed(3)};
+  },
+  perf:function(){
+    return{fps:Math.min(120,Math.round(1000/emaMs)),avgMs:+emaMs.toFixed(2)};
+  }
+};
+})();
+</script>
+</body>
+</html>
