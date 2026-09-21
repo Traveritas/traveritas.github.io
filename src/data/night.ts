@@ -58,7 +58,7 @@ export const PALETTE = [
   { m: 0, bg: '#e9ecef', ink: '#262c33', soft: '#59626c' },
   { m: 16, bg: '#c9ced4', ink: '#2c333b', soft: '#5d6670' },
   { m: 34, bg: '#99a1ab', ink: '#333b43', soft: '#6a737c' },
-  { m: 48, bg: '#6b7481', ink: '#3a424b', soft: '#8b939c' },
+  { m: 48, bg: '#525a66', ink: '#d9d4c8', soft: '#b4ae9f' },
   { m: 62, bg: '#414a58', ink: '#d9d4c8', soft: '#b4ae9f' },
   { m: 78, bg: '#22272f', ink: '#e5e0d2', soft: '#b9b3a4' },
   { m: 100, bg: '#171b24', ink: '#e5e0d2', soft: '#b9b3a4' },
@@ -66,8 +66,8 @@ export const PALETTE = [
   { m: 352, bg: '#231e26', ink: '#e5e0d2', soft: '#b9b3a4' },
   { m: 373, bg: '#3a3340', ink: '#e5e0d2', soft: '#b9b3a4' },
   { m: 394, bg: '#6e655f', ink: '#e0d8c6', soft: '#b9b3a4' },
-  { m: 412, bg: '#a79e8c', ink: '#8a8172', soft: '#9a917f' },
-  { m: 424, bg: '#cbc4b6', ink: '#6b6355', soft: '#7a7364' },
+  { m: 412, bg: '#b9b1a1', ink: '#4f4a3c', soft: '#7a7364' },
+  { m: 424, bg: '#cbc4b6', ink: '#5d564a', soft: '#7a7364' },
   { m: 444, bg: '#efe9dd', ink: '#55503f', soft: '#7a7364' },
 ];
 
