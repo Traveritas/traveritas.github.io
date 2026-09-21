@@ -1,13 +1,11 @@
 /* ─────────────────────────────────────────────────────────────
    乱码字引擎（来自 p7-verify「现实检验」，氛围化改造）
    · [data-morph]：双文案元素。平时安静，每 9–14 秒随机一处
-     可视元素「走神漂移」几个字再归位；hover / focus 即刻归位。
-   · [data-morph][data-faces]：轮换文案（| 分隔），鼠标悬浮时
-     乱码过渡到下一面。
+     可视元素「走神漂移」几个字再归位；focus 即刻归位。
+     （鼠标悬浮换字已移除——梦/醒双态由入梦检验承担）
    · [data-morph][data-dream]：梦/醒双面元素（入梦检验机制用，
      见 reality.ts）。当前现实面由 setMorphReality 决定：
-     梦态走神＝纯乱码扰动，hover 归位归到当前现实面；
-     醒态不参与走神。
+     梦态走神＝纯乱码扰动；醒态不参与走神。
    · [data-clock]：钟。换分时有概率乱码一下——钟在梦里漂移。
    无 JS / 读屏时始终呈现醒面真文案（aria-label 固定）。
    ───────────────────────────────────────────────────────────── */
@@ -40,7 +38,6 @@ interface MEl {
   cur: string;
   raf: number;
   to: number;
-  lastHover: number;
 }
 
 const els: MEl[] = [];
@@ -135,7 +132,7 @@ function ambientTick() {
     setTimeout(ambientTick, 9000 + rand(5000));
     return;
   }
-  // 进场归位过的元素（文章标题等）不再随机走神；轮换型交给 hover；
+  // 进场归位过的元素（文章标题等）不再随机走神；
   // 醒态下双面元素不参与走神（醒面该是稳的）
   const pool = els.filter(
     (m) =>
@@ -189,7 +186,6 @@ export function initMorph() {
       cur: faces[0],
       raf: 0,
       to: 0,
-      lastHover: 0,
     };
     el.textContent = faces[0];
     els.push(m);
@@ -205,20 +201,6 @@ export function initMorph() {
       }, 260);
     }
 
-    el.addEventListener('pointerenter', () => {
-      if (RM()) return;
-      if (el.dataset.faces) {
-        const now = performance.now();
-        if (now - m.lastHover < 1600) return;
-        m.lastHover = now;
-        m.idx = (m.idx + 1) % faces.length;
-        animate(m, faces[m.idx], 640);
-        el.classList.add('is-lit');
-        setTimeout(() => el.classList.remove('is-lit'), 900);
-      } else if (m.cur !== faceOf(m)) {
-        settle(m);
-      }
-    });
     el.addEventListener('focus', () => {
       if (!RM() && m.cur !== faceOf(m)) settle(m);
     });
