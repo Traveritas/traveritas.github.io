@@ -19,15 +19,39 @@ const fmt = (d: Date) =>
 
 const pinsOf = (status: string) => ({ 构想中: 2, 进行中: 5, 已完成: 8 })[status] ?? 3;
 
+/* 账目核验：仓库链接在 frontmatter 里，有即 ✓，无即 ✗ */
+const repoOf = (p: (typeof projects)[number]) =>
+  (p.links ?? []).some((l) => /^https:\/\/github\.com\//.test(l.href));
+
 const manifesto = '这里不是梦，也不是现实。它是人在即将醒来时，看见的最后一层世界。';
 const frags = ['这里不是梦，', '也不是现实。', '它是人在即将醒来时，', '看见的最后一层世界。'];
 
 const seeds = [
-  { name: '花', desc: '抽象百合。不做被摆放的母题，做在场的。', label: '种子 01' },
-  { name: '水面', desc: '连续域扭曲的水彩晕染，构造上不量化。', label: '种子 02' },
-  { name: '细线', desc: '缝线与拴绳的本家，圆圈群已经醒了。', label: '种子 03' },
-  { name: '帷幕', desc: '遮与露之间的一层，尚未开工。', label: '种子 04' },
-  { name: '巨型空洞', desc: '尺度本身作为母题，最远的一粒。', label: '种子 05' },
+  { name: '水面', desc: '连续域扭曲的水彩晕染，构造上不量化。', lift: 0 },
+  { name: '细线', desc: '缝线与拴绳的本家，圆圈群已经醒了。', lift: 16 },
+  { name: '帷幕', desc: '遮与露之间的一层，尚未开工。', lift: 6 },
+  { name: '巨型空洞', desc: '尺度本身作为母题，最远的一粒。', lift: 22 },
+  { name: '花', desc: '三稿未成，回炉重做。', lift: 10 },
+];
+
+const deadSeeds = [{ name: '碎块', desc: '过于规整，已否决。' }];
+
+const wakeAnchors = [
+  {
+    name: 'GitHub',
+    href: 'https://github.com/Traveritas',
+    addr: 'github.com/Traveritas',
+    why: '找我 · 醒着的时候',
+    external: true,
+  },
+  {
+    name: '本站源码',
+    href: 'https://github.com/Traveritas/traveritas.github.io',
+    addr: 'traveritas.github.io',
+    why: '仓库 · 醒着的证据',
+    external: true,
+  },
+  { name: 'RSS', href: '/rss.xml', addr: '/rss.xml', why: '订阅 · 梦的定期投递', external: false },
 ];
 ---
 
@@ -69,41 +93,61 @@ const seeds = [
       }
     </div>
 
-    <p class="hero-scroll" data-boot style="--bd: 1.6s"><i></i>顺着缝线 · 过完这一夜</p>
+    <p class="hero-scroll" data-boot style="--bd: 1.6s">
+      <i></i><span data-morph data-true="顺着缝线 · 过完这一夜" data-dream="顺着缝线 · 越沉越深">顺着缝线 · 过完这一夜</span>
+    </p>
   </section>
 
-  <!-- ═══ N1–N2 浅梦 · 随笔：玻璃片浅浮于纸上 ═══ -->
+  <!-- ═══ N1–N2 浅梦 · 随笔：玻璃片沿左缘短划逐级下沉；纸面标签带叠影（半醒复视） ═══ -->
   <section class="band band-essays" id="ns-essays">
     <div class="container-wide">
       <StitchHeader title="随笔" stage="浅梦 · LIGHT · N1–N2" time={`${fmtNightTime(12)} → ${fmtNightTime(124)}`} />
-      <p class="band-intro" data-morph="
-        浅睡的人写字最诚实——字还没醒，替我先说了。">
+      <p class="verdict">
+        <span class="vtag warm">半可核验 · HALF-VERIFIABLE</span>
+        <span class="vword" data-morph data-true="写下时是醒的。" data-dream="读起来已像梦话。">写下时是醒的。</span>
+      </p>
+      <p class="band-intro" data-morph data-true="浅睡的人写字最诚实——字还没醒，替我先说了。" data-dream="浅睡的人写字最诚实——字先替我梦见了。">
         浅睡的人写字最诚实——字还没醒，替我先说了。
       </p>
-      <div class="chip-col">
+      <div class="ladder">
         {
-          articles.map((a, i) => (
-            <GlassChip
-              href={`/articles/${a.id}/`}
-              title={a.title}
-              desc={a.description}
-              meta={`${fmt(a.date)} · 随笔`}
-              style={`--stagger: ${(i * 9).toString()}%; --tilt: ${(i % 2 === 0 ? -1.1 : 1).toString()}deg; --d-phase: ${(-i * 2.3).toString()}s`}
-            />
-          ))
+          articles.map((a, i) => {
+            const label = `${fmt(a.date)} · ${a.tags.join(' · ')}`;
+            return (
+              <div class="rung" style={`--step: ${i * 9}`}>
+                <GlassChip
+                  href={`/articles/${a.id}/`}
+                  title={a.title}
+                  desc={a.description}
+                  meta={`随笔 · ${String(i + 1).padStart(2, '0')}`}
+                  style={`--tilt: ${(i % 2 === 0 ? -1.1 : 1).toString()}deg; --d-phase: ${(-i * 2.3).toString()}s`}
+                />
+                <p class="rung-label mono ghost-pair">
+                  <span class="ghost" aria-hidden="true">{label}</span>{label}
+                </p>
+              </div>
+            );
+          })
         }
       </div>
+      <p class="essay-cap">
+        <span data-morph data-true="标签的重影不是印坏——半睡的眼睛，看什么都是两层。" data-dream="标签的重影是梦在临帖，总也临不像。">标签的重影不是印坏——半睡的眼睛，看什么都是两层。</span>
+      </p>
       <p class="band-more"><a href="/articles/">全部随笔 · 账目</a></p>
     </div>
   </section>
 
-  <!-- ═══ N3 深眠 · 项目：整页入夜，圆圈群在账目背后 ═══ -->
+  <!-- ═══ N3 深眠 · 项目：夜最深处的账目反而最醒——放宽一档、绝对静止，行尾核验 ═══ -->
   <section class="band band-projects" id="ns-projects">
     <div class="nightfield" aria-hidden="true">
       <canvas id="rings-canvas"></canvas>
     </div>
-    <div class="container-wide">
+    <div class="still-col">
       <StitchHeader title="项目" stage="深眠 · DEEP · N3 δ" time={`${fmtNightTime(124)} → ${fmtNightTime(181)}`} />
+      <p class="verdict">
+        <span class="vtag cool">可核验 · CAN VERIFY</span>
+        <span class="vword" data-morph data-true="夜到最深处，账目反而最醒。" data-dream="夜到最深处，连账目都在打盹。">夜到最深处，账目反而最醒。</span>
+      </p>
       <p class="waso-note">
         <span class="mono waso-tag">微觉醒 · WASO {fmtNightTime(163)}</span>
         世界应当始终保留一种感觉：它可能马上消失。
@@ -126,6 +170,9 @@ const seeds = [
                   </span>
                   {p.description && <span class="ledger-desc">{p.description}</span>}
                 </span>
+                <span class:list={['tick', { 'tick-ok': repoOf(p), 'tick-na': !repoOf(p) }]}>
+                  {repoOf(p) ? '✓ 有仓库' : '✗ 暂无'}
+                </span>
               </a>
             </li>
           ))
@@ -135,54 +182,93 @@ const seeds = [
     </div>
   </section>
 
-  <!-- ═══ REM · 试验场：五粒母题种子 + 玻璃签 ═══ -->
+  <!-- ═══ REM · 试验场：种子药丸浮在玻璃签四周，否决的一枚划线留在场内 ═══ -->
   <section class="band band-rem" id="ns-rem">
     <div class="container-wide">
       <StitchHeader title="试验场" stage="异相 · REM · 眼动" time={`${fmtNightTime(181)} → ${fmtNightTime(352)}`} />
+      <p class="verdict">
+        <span class="vtag warm">还没有 · NOT YET</span>
+        <span class="vword" data-morph data-true="反复梦见的，迟早会被做出来。" data-dream="反复梦见的，就一直是梦。">反复梦见的，迟早会被做出来。</span>
+      </p>
       <p class="band-intro" data-morph data-true="后半夜的长梦里，五粒母题的种子还悬着。" data-dream="后半夜的长梦里，五粒母题的种子还悬在半空。">
         后半夜的长梦里，五粒母题的种子还悬着。
       </p>
-      <div class="seed-grid">
-        {
-          seeds.map((s, i) => (
-            <GlassChip
-              href="/articles/motif-exploration-log/"
-              title={s.name}
-              desc={s.desc}
-              meta={s.label}
-              compact
-              style={`--tilt: ${(i % 2 === 0 ? 1.2 : -0.9).toString()}deg; --d-phase: ${(-i * 1.7).toString()}s`}
-            />
-          ))
-        }
-      </div>
-      <div class="slip-stage">
-        <div class="slip-glow" aria-hidden="true"></div>
-        <canvas id="slip-canvas" aria-hidden="true"></canvas>
-        <div class="slip-fallback" aria-hidden="true">
-          <span class="sf-t">它可能<br />马上消失。</span>
-          <span class="sf-b mono">GLASS SLIP · 玻璃签</span>
+      <div class="rem-field">
+        <div class="pill-field">
+          {
+            seeds.map((s, i) => (
+              <span
+                class="pill drift"
+                style={`--d-amp: 6px; --d-dur: ${(6.4 + i * 0.7).toFixed(1)}s; --d-phase: ${(-i * 1.7).toFixed(1)}s; --d-rot: 0.5deg; --lift: ${s.lift}px`}
+              >
+                <span class="pill-skin" style={`--tilt: ${(i % 2 === 0 ? 1.2 : -0.9).toString()}deg`}>
+                  <b>{s.name}</b>
+                  <small>{s.desc}</small>
+                </span>
+              </span>
+            ))
+          }
+          {
+            deadSeeds.map((d) => (
+              <span class="pill-skin dead" style="--lift: 14px">
+                <b>{d.name}</b>
+                <small>{d.desc}</small>
+              </span>
+            ))
+          }
         </div>
-        <p class="slip-cap mono">丝印于玻璃 · 梦侧唯一允许发光的句子</p>
+        <div class="slip-stage">
+          <div class="slip-glow" aria-hidden="true"></div>
+          <canvas id="slip-canvas" aria-hidden="true"></canvas>
+          <div class="slip-fallback" aria-hidden="true">
+            <span class="sf-t">它可能<br />马上消失。</span>
+            <span class="sf-b mono">GLASS SLIP · 玻璃签</span>
+          </div>
+          <p class="slip-cap mono">丝印于玻璃 · 梦侧唯一允许发光的句子</p>
+        </div>
       </div>
+      <p class="rem-cap">
+        <span data-morph data-true="划线的一枚已否决；判定与三轮记录，都在" data-dream="划线的那枚已经醒来，其余的还梦着——见">划线的一枚已否决；判定与三轮记录，都在</span><a href="/articles/motif-exploration-log/">《母题探索记录》</a>。
+      </p>
     </div>
   </section>
 
-  <!-- ═══ 06:31 晨醒 · 关于：天亮了 ═══ -->
+  <!-- ═══ 06:31 晨醒 · 关于与出口：天亮了；需要把我叫醒的话，三个锚都在 ═══ -->
   <section class="band band-dawn" id="ns-dawn">
     <div class="container">
       <StitchHeader title="关于" stage="晨醒 · WAKE · β" time={`${fmtNightTime(352)} → ${fmtNightTime(444)}`} />
+      <p class="verdict verdict-center">
+        <span class="vtag cool">可到达 · REACHABLE</span>
+        <span class="vword" data-morph data-true="醒着的时候，都找得到我。" data-dream="梦里留的话，也有人收。">醒着的时候，都找得到我。</span>
+      </p>
       <p class="dawn-time mono" data-boot style="--bd: 0.2s">06:31 · 天亮了</p>
       <div class="dawn-card">
         <p class="dawn-line" data-morph data-faces="白天，我写代码。|夜里，我造梦。|此刻，我在缝这一页。">白天，我写代码。</p>
         <p class="dawn-line" data-morph data-true="这个网站由智能体与我共同建造。" data-dream="这个网站由智能体与梦共同建造。">
           这个网站由智能体与我共同建造。
         </p>
-        <p class="dawn-more"><a href="/about/">关于这个网站，与我</a></p>
+      </div>
+      <div class="wake">
+        <p class="wake-head">需要把我叫醒的话</p>
+        <p class="wake-sub">
+          <span data-morph data-true="以下链接真实有效——梦里点，也会通。" data-dream="这些是锚点中的锚点——在梦里点，也会通。">以下链接真实有效——梦里点，也会通。</span>
+        </p>
+        <div class="wake-row">
+          {
+            wakeAnchors.map((w) => (
+              <a class="wake-anchor" href={w.href} target={w.external ? '_blank' : undefined} rel={w.external ? 'noopener' : undefined}>
+                <span class="wa-name">{w.name}</span>
+                <span class="wa-href mono">{w.addr}</span>
+                <span class="wa-why">{w.why}</span>
+              </a>
+            ))
+          }
+        </div>
       </div>
       <p class="final-line ghost-pair">
         <span class="ghost">看见的最后一层世界。</span>看见的最后一层世界。
       </p>
+      <p class="band-more"><a href="/about/">关于这个网站，与我</a></p>
     </div>
   </section>
 </BaseLayout>
@@ -473,6 +559,36 @@ const seeds = [
     padding-block: clamp(5.5rem, 13vh, 9.5rem);
   }
 
+  /* 层级判词：一枚冷暖小签（可核验度）+ 一句随 morph 双声轨的话 */
+  .verdict {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0.3rem 0.85rem;
+    margin: -1.1rem 0 2.2rem;
+  }
+
+  .vtag {
+    --vt: color-mix(in srgb, var(--dream) 62%, var(--fg) 38%);
+    color: var(--vt);
+    font-family: var(--font-mono);
+    font-size: 0.58rem;
+    letter-spacing: 0.2em;
+    padding: 0.3rem 0.6rem 0.26rem;
+    border: 1px solid color-mix(in srgb, var(--vt) 45%, transparent);
+    white-space: nowrap;
+  }
+
+  .vtag.cool {
+    --vt: color-mix(in srgb, var(--wake) 50%, var(--fg) 50%);
+  }
+
+  .vword {
+    font-size: 0.85rem;
+    letter-spacing: 0.1em;
+    color: var(--fg-soft);
+  }
+
   .band-intro {
     margin: 0 0 3rem;
     max-width: 36em;
@@ -493,22 +609,47 @@ const seeds = [
     padding-bottom: 2px;
   }
 
-  /* 浅梦 · 玻璃片阶梯错位 */
-  .chip-col {
+  /* ── 浅梦 · 下沉的玻璃片梯：左缘短划逐级右移，纸面标签带叠影 ── */
+  .ladder {
     display: flex;
     flex-direction: column;
-    gap: 3.2rem;
+    gap: 3.4rem;
   }
 
-  .chip-col .chip-slot {
-    margin-left: var(--stagger, 0%);
+  .rung {
+    margin-left: calc(var(--step, 0) * 1%);
+    padding-left: 1.3rem;
+    border-left: 1px solid var(--line);
   }
 
-  /* 深眠 · 圆圈群垫底 */
+  .rung-label {
+    margin: 0.95rem 0 0 0.2rem;
+    font-size: 0.66rem;
+    letter-spacing: 0.16em;
+    color: var(--fg-soft);
+  }
+
+  .essay-cap {
+    margin: 3.2rem 0 0;
+    max-width: 34em;
+    font-size: 0.88rem;
+    line-height: 1.95;
+    color: var(--fg-soft);
+    letter-spacing: 0.04em;
+  }
+
+  /* ── 深眠 · 放宽一档的静止账目（核验列收在行尾） ── */
   .band-projects {
     min-height: 108vh;
     display: flex;
     align-items: center;
+  }
+
+  .still-col {
+    position: relative;
+    z-index: 2;
+    width: min(100% - 3rem, 68rem);
+    margin-inline: auto;
   }
 
   .nightfield {
@@ -521,11 +662,6 @@ const seeds = [
   .nightfield canvas {
     width: 100%;
     height: 100%;
-  }
-
-  .band-projects .container-wide {
-    position: relative;
-    z-index: 2;
   }
 
   .waso-note {
@@ -547,12 +683,119 @@ const seeds = [
     color: var(--amber);
   }
 
-  /* REM · 种子 + 玻璃签 */
-  .seed-grid {
+  .band-projects .ledger a {
+    grid-template-columns: 7.5em 1fr auto;
+    gap: 0 2rem;
+  }
+
+  .tick {
+    font-family: var(--font-mono);
+    font-size: 0.66rem;
+    letter-spacing: 0.16em;
+    white-space: nowrap;
+    padding-top: 0.42em;
+  }
+
+  .tick-ok {
+    color: color-mix(in srgb, var(--wake) 50%, var(--fg) 50%);
+  }
+
+  .tick-na {
+    color: var(--fg-faint);
+  }
+
+  @media (max-width: 34em) {
+    .band-projects .ledger a {
+      grid-template-columns: 1fr;
+      gap: 0.25rem;
+    }
+
+    .tick {
+      margin-top: 0.4rem;
+      padding-top: 0;
+    }
+  }
+
+  /* ── REM · 药丸星座：种子绕玻璃签漂，否决的一枚划线留在场内 ── */
+  .rem-field {
+    display: grid;
+    gap: 3.4rem;
+    margin-bottom: 3.4rem;
+  }
+
+  @media (min-width: 900px) {
+    .rem-field {
+      grid-template-columns: minmax(0, 32rem) minmax(16rem, auto);
+      align-items: center;
+      justify-content: center;
+      gap: clamp(3rem, 6vw, 5rem);
+    }
+  }
+
+  .pill-field {
     display: flex;
     flex-wrap: wrap;
-    gap: 2.2rem 2rem;
-    margin-bottom: 6rem;
+    align-items: flex-start;
+    gap: 1.1rem 1rem;
+  }
+
+  .pill {
+    margin-top: var(--lift, 0px);
+  }
+
+  .pill-skin {
+    display: grid;
+    gap: 0.3rem;
+    padding: 0.8rem 1.3rem 0.7rem;
+    border-radius: 999px;
+    border: 1px solid color-mix(in srgb, var(--dream) 42%, transparent);
+    background: color-mix(in srgb, var(--fg) 3%, transparent);
+    transform: rotate(var(--tilt, 0deg));
+    transition: border-color 0.3s ease;
+  }
+
+  .pill-skin:hover {
+    border-color: color-mix(in srgb, var(--dream) 75%, transparent);
+  }
+
+  .pill-skin b {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 1rem;
+    letter-spacing: 0.06em;
+    color: var(--fg);
+  }
+
+  .pill-skin small {
+    font-size: 0.72rem;
+    line-height: 1.65;
+    letter-spacing: 0.02em;
+    color: var(--fg-soft);
+  }
+
+  .pill-skin.dead {
+    margin-top: var(--lift, 0px);
+    border-style: dashed;
+    border-color: color-mix(in srgb, var(--fg-faint) 45%, transparent);
+  }
+
+  .pill-skin.dead b {
+    color: var(--fg-faint);
+    text-decoration: line-through;
+    text-decoration-thickness: 1px;
+  }
+
+  .pill-skin.dead small {
+    color: var(--fg-faint);
+  }
+
+  .rem-cap {
+    margin: 0;
+    max-width: 34em;
+    font-size: 0.88rem;
+    line-height: 1.95;
+    color: var(--fg-soft);
+    letter-spacing: 0.04em;
   }
 
   .slip-stage {
@@ -573,6 +816,14 @@ const seeds = [
     transform: translate(-50%, -50%);
     background: radial-gradient(circle, rgba(217, 160, 91, 0.16), transparent 65%);
     pointer-events: none;
+    /* 光晕只在玻璃签就位（canvas 加载或静态回退）后浮现，未加载时不裸奔 */
+    opacity: 0;
+    transition: opacity 1.2s ease;
+  }
+
+  .slip-stage:has(#slip-canvas[data-loaded]) .slip-glow,
+  .slip-stage:has(.slip-fallback.show) .slip-glow {
+    opacity: 1;
   }
 
   #slip-canvas {
@@ -627,13 +878,17 @@ const seeds = [
     color: var(--fg-soft);
   }
 
-  /* 晨醒 */
+  /* ── 晨醒 · 关于与出口 ── */
   .band-dawn {
     text-align: center;
   }
 
   .band-dawn :global(.stitch-head) {
     text-align: left;
+  }
+
+  .verdict-center {
+    justify-content: center;
   }
 
   .dawn-time {
@@ -647,7 +902,7 @@ const seeds = [
     display: grid;
     gap: 1.3rem;
     justify-items: center;
-    margin-bottom: 5rem;
+    margin-bottom: 4.6rem;
   }
 
   .dawn-line {
@@ -658,13 +913,71 @@ const seeds = [
     color: var(--fg-soft);
   }
 
-  .dawn-more {
-    margin: 0.6rem 0 0;
-    font-size: 0.9rem;
+  /* 唤醒方式：晨醒段的收束，三个真实锚点居中排开 */
+  .wake {
+    margin: 0 0 5rem;
+  }
+
+  .wake-head {
+    margin: 0 0 0.4rem;
+    font-family: var(--font-display);
+    font-size: 1.05rem;
+    letter-spacing: 0.16em;
+    color: var(--fg);
+  }
+
+  .wake-sub {
+    margin: 0 0 2.1rem;
+    font-size: 0.85rem;
+    letter-spacing: 0.06em;
+    color: var(--fg-soft);
+  }
+
+  .wake-row {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 1.1rem;
+  }
+
+  .wake-anchor {
+    display: grid;
+    gap: 0.32rem;
+    justify-items: center;
+    min-width: 11rem;
+    padding: 1.05rem 1.5rem 0.95rem;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    text-decoration: none;
+    transition: border-color 0.25s ease, transform 0.25s ease;
+  }
+
+  .wake-anchor:hover {
+    border-color: color-mix(in srgb, var(--amber) 55%, transparent);
+    transform: translateY(-3px);
+  }
+
+  .wa-name {
+    font-family: var(--font-display);
+    font-size: 1rem;
+    letter-spacing: 0.1em;
+    color: var(--fg);
+  }
+
+  .wa-href {
+    font-size: 0.62rem;
+    letter-spacing: 0.14em;
+    color: var(--fg-soft);
+  }
+
+  .wa-why {
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    color: var(--fg-faint);
   }
 
   .final-line {
-    margin: 0;
+    margin: 0 0 2.6rem;
     font-family: var(--font-display);
     font-size: clamp(1.2rem, 2.4vw, 1.7rem);
     letter-spacing: 0.14em;
@@ -730,9 +1043,13 @@ const seeds = [
       min-height: auto;
     }
 
-    .seed-grid {
-      flex-direction: column;
-      gap: 2rem;
+    /* 台阶收窄但不归零：窄屏上仍能读出「下沉」 */
+    .rung {
+      margin-left: calc(var(--step, 0) * 0.45%);
+    }
+
+    .rung-label {
+      font-size: 0.6rem;
     }
   }
 </style>
