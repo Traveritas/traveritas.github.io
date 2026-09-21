@@ -8,24 +8,19 @@
 
 ## 一、转交主页重设计线程（与在飞的首屏重设计强耦合，勿在别处单独修）
 
-1. **P0 · 过夜夜段可读性（未解决，2026-09-22 生产构建实测）**
-   `src/scripts/night.ts`（paletteAt/hexLerp）+ `src/data/night.ts`（PALETTE 停靠点）。
-   生产实测（4399 构建产物，梦态 26 停靠点全夜扫描）：
-   - 主文（fg）在 05:36–05:54 段跌至 **1.67–1.84:1**（黎明交叉带仍在）；
-   - **fg-soft 全夜 2.4–2.9:1**（01:12–03:38 恒 2.88 平台）——比审查模型预测的更广；
-   - vtag 判签 1.1–4.3；GlassChip meta 最低 **1.09:1**（00:29）；dawn 段 wa-why(faint) 1.8–2.8；
-   - 新增的 `--wash` 洗染未解决此问题（梦端 #8a5a30 把底色往中间调拉，交叉带略变差）；
-   - 观感佐证：深夜白玻璃卡成「亮岛」（明暗断层），ghost 重影标签在暗底上被误读为渲染瑕疵。
-   修法思路：PALETTE 各停靠点做**逐对可读性校准**（每个 m 站的 fg/fg-soft 对 bg ≥4.5:1 才入表——本质是给 soft 的夜间端留更高亮度差，而不是与 fg 同步沉没）；或插值加对比度守恒约束。
-   一并解决：`--fg-faint` / `--amber` / `--umber` 夜间**不随 PALETTE 插值**——静态强调色压在插值底上，深夜端必然失配。
-2. **P0 · GlassChip 白玻璃深夜不可读**（生产实测 chip-meta 1.09:1 @ 00:29、chip-desc 1.26–4.4）：`src/components/home/GlassChip.astro`。设计决定「昼夜全程白玻深字」保留——但深夜玻璃成亮岛断层 + meta 消失。修法：玻璃 alpha 随 bg 亮度联动，或 chip-meta 深夜换 `--fg` 级色。
-   附带新发现：主页 vtag 仍 62/38、主页 `.tick-ok` 仍 50/50（projects 列表页已修 30/70，两处不一致）；`window.__ps` 调试抓手未做 DEV 门控（`__fx` 已门控，标准应一致）；主页 `user-select:none` 全站文字不可选（有意为之，建议记录决议）；左轨/rail 深夜 2.4–2.9:1 几乎不可见；多个时钟并存（rail 时刻 vs 段范围 vs 页脚钟）初见像数据错误，建议至少给 rail 时刻加「此刻」标注。
+1. ~~**P0 · 过夜夜段可读性**~~ **已解决（2026-09-22 夜读性攻坚）**
+   - `src/data/night.ts` PALETTE 重校准为 13 站：**每一站 ink/soft 对（7% 洗染后）bg ≥4.5:1**（两洗染态取小，design/.calib-night.cjs 验证）；换面重排为「黄昏 m34→41 熄天开灯、黎明 m388→395 关灯见晨」两个 ~7 分钟窄窗。
+   - `src/scripts/night.ts` paletteAt 加**对比度护栏**：插值后 ink/bg < 3.4、soft/bg < 3.0 时沿所在侧推离 bg 亮度（换面瞬间 ink 必经 bg 亮度区，纯插值物理无解）。全夜实测（design/.sweep-night.cjs，140 步 + 六段元素普查）：fg ≥3.28 / soft ≥3.35，窗外整夜 ≥4.5，醒态抽查 fg ≥4.28。
+   - **勘误**：前一日「fg-soft 全夜 2.4–2.9」为测量伪影——评估脚本把 `color(srgb …)` 的 gamma 坐标当线性值二次编码，bg 亮度被平方级放大。停靠点级失败（旧 m48 站 2.11、m412 站 1.37 等）是真实的，已随重校准消除。
+2. ~~**P0 · GlassChip 白玻璃深夜不可读**~~ **已解决**：夜间分期（n1/n2/n3/rem/waso）玻璃下限抬至 `.80+`（昼夜「白玻深字」策略保留）；chip-meta #6d7681→#4c5560。含玻璃合成的元素级普查通过（此前测量漏算渐变背景，实况好于旧读数）。
+   本轮一并修复：主页 vtag 62/38、50/50 → **15/85**；`.note-stamp/.wa-why/.tick-na/.pill-skin.dead small` faint→soft；`.dawn-time/.axis-l` umber→soft（静态 umber 跨暗亮两相必失一头）；`window.__ps` 已 DEV 门控（与 `__fx` 同标准）。
+   仍遗留：主页 `.tick-ok` 50/50 与 projects 页 30/70 不一致（两处各自达标，纯一致性问题）；`user-select:none` 决议待记；多时钟并存（rail 时刻 vs 段范围 vs 页脚钟）建议给 rail 时刻加「此刻」标注；ghost 重影标签暗底观感待观察。
 3. **主页 `[data-boot]` 无脚本失败兜底**：JS 挂时面纱 6s 自动揭开但首屏元素永久 `opacity:0` = 空页（HEAD `index.astro` 门控样式）。给 `[data-boot]` 补与 BootVeil `boot-auto` 同节拍的 CSS keyframes 兜底。
 4. **300/900 字重下沉**：仅主页使用（标题/巨字），从 BaseLayout 挪进 index 自己 import——字体 P0（见下）的止血配合项。
 5. **night 每帧写 root 级 CSS 变量**：`documentElement` 上改继承变量 = 每帧全页 style recalc。重设计时把消费子树收窄（如 `.page`）或按阈值节流。
 6. **首访揭幕 ≥3.1s 把首个 PV 的 LCP 顶过 2.5s**（boot.ts 两档均不可跳过）：设计决策，可选折中——子页首访走快版 / 允许点击跳过 / 压缩到 ~1.8s。
-7. **vtag 判词签对比度**（昼面 3.5–3.8:1）：同本轮 projects 列表签的修法，`color-mix` 里 `--fg` 占比 ≥70%。
-8. `index.astro` 的外链 `rel="noopener"` 补 `noreferrer`（本轮已修 about/projects 两处，主页这处随重设计带上）。
+7. ~~**vtag 判词签对比度**~~ 已解决（见上，15/85）。
+8. ~~`index.astro` 的外链 `rel="noopener"` 补 `noreferrer`~~ 已随 347331b 补上。
 9. `.sr-only` 目前各自为战（index scoped 一份、404 本轮新加一份）：建议提取进 global.css 供全站复用。
 
 ## 二、被阻塞——等 BaseLayout / index 在飞改动合并后再动
@@ -35,7 +30,7 @@
 3. **skip link**：BaseLayout body 首位加 `.sr-only`「跳到正文」。
 4. **night.ts 改动态 import**：静态页白载 ~1.5KB gzip/页；`import('../scripts/night')` 或挪进主页自己的 script。
 5. **五个 init 无异常隔离**：`initBoot(); initChrome(); initNight(); initMorph(); initReality();` 顺序裸调，任一抛错连坐其后全部——各自 try/catch。
-6. **BaseLayout `rail` Props 缺 `readout` 字段**（文章页已在传、Rail 组件已声明）：补上后 `npm run check` 即可挂进 deploy.yml（本轮已装好 astro check 工具链与脚本）。
+6. ~~**BaseLayout `rail` Props 缺 `readout` 字段**~~ 已随 347331b 补上；`astro check` 现 **0 错误**，deploy.yml 可挂 `npm run check`（见五.1）。
 7. **Boot 揭幕期焦点被面纱遮蔽**（WCAG 2.4.11）：进门给 `.page` 设 `inert`，`booted` 后移除（BootVeil + BaseLayout 配合）。
 8. **字体 P0 主体——全站共享 CSS 501KB / gzip 211KB，97% 是 @font-face**（409 个声明，Noto Serif SC 4 字重 ×101 子集）：/about 字体实载 ≈805KB、文章页 ≈1MB。治本 = `cn-font-split` 按全站实际用字自切（CSS 可 <50KB gzip）；顺带只输出 woff2 单格式（现 dist 带 397 个冗余 .woff，31MB）。
 
@@ -105,3 +100,13 @@
 - `scripts/new-article.mjs`：frontmatter title 加引号转义（含冒号标题不再产出非法 YAML）
 - `.gitignore`：`.env`/`.env.production` → `.env*`（补 .env.local 等常见秘密文件名）
 - `package.json`：显式声明幻影依赖 `@astrojs/markdown-satteri@0.4.1`；新增 `check` 脚本 + `typescript@6.0.3`/`@astrojs/check@0.9.10` devDeps（此前全链路零类型检查，且有过 0f6a004 运行时事故）
+
+## 附二：2026-09-22 夜读性攻坚（全部经 .calib-night.cjs 数学验证 + .sweep-night.cjs 活体复验）
+
+- `src/data/night.ts`：PALETTE 14→13 站逐对校准（每站 ink/soft ≥4.5，梦/醒两洗染态）；黄昏/黎明换面各压成 ~7 分钟窄窗
+- `src/scripts/night.ts`：paletteAt 改 RGB 数组插值＋**对比度护栏**（ink 3.4 / soft 3.0，沿所在侧推离 bg）；顺带修掉 hexLerp 依赖
+- `src/pages/index.astro`：faint→soft ×4（note-stamp/wa-why/tick-na/pill-dead-small）、dawn-time umber→soft、vtag 15/85 ×2、夜间分期玻璃下限 .80+
+- `src/components/home/GlassChip.astro`：chip-meta 加深 #6d7681→#4c5560
+- `src/components/home/StitchHeader.astro`：axis-l umber→soft（静态 umber 跨暗亮两相必失一头）
+- `src/scripts/paperstack.ts`：`__ps` 调试抓手 DEV 门控（与 `__fx` 同标准）
+- 工具沉淀：`design/.calib-night.cjs`（色板纯数学扫描，含护栏模拟）、`design/.sweep-night.cjs`（CDP 活体全夜 token+元素普查，含渐变/洗染/面纱合成）——后续改色板请跑这两个

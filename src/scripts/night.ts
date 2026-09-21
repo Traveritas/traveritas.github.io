@@ -11,7 +11,7 @@ import {
   stageAt,
   fmtNightTime,
 } from '../data/night';
-import { clamp, hexLerp, onScrollRaf } from './lib';
+import { clamp, onScrollRaf } from './lib';
 
 interface Anchor {
   /** 段顶到达视口中心时的 scrollY */
@@ -51,17 +51,57 @@ function minuteAt(): number {
   return NIGHT_LEN;
 }
 
+type Rgb = [number, number, number];
+
+const hexRgb = (s: string): Rgb => [
+  parseInt(s.slice(1, 3), 16),
+  parseInt(s.slice(3, 5), 16),
+  parseInt(s.slice(5, 7), 16),
+];
+const rgbHex = (c: Rgb): string =>
+  '#' + c.map((v) => Math.round(Math.min(255, Math.max(0, v))).toString(16).padStart(2, '0')).join('');
+const lerpC = (a: Rgb, b: Rgb, t: number): Rgb => [
+  a[0] + (b[0] - a[0]) * t,
+  a[1] + (b[1] - a[1]) * t,
+  a[2] + (b[2] - a[2]) * t,
+];
+const lumC = (c: Rgb): number => {
+  const f = (v: number) => {
+    const s = v / 255;
+    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+  };
+  return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]);
+};
+const ratioC = (a: Rgb, b: Rgb): number => {
+  const x = lumC(a);
+  const y = lumC(b);
+  return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+};
+
+/** 换面护栏：ink/soft 与 bg 亮度重合时（开灯/关灯的半途），
+    沿所在侧推离 bg 直到达标——滚动中文字永不沉底。 */
+function guard(c: Rgb, bg: Rgb, floor: number): Rgb {
+  if (ratioC(c, bg) >= floor) return c;
+  const darken = lumC(c) < lumC(bg);
+  let out: Rgb = [c[0], c[1], c[2]];
+  for (let i = 0; i < 12 && ratioC(out, bg) < floor; i++) {
+    out = darken
+      ? [out[0] * 0.75, out[1] * 0.75, out[2] * 0.75]
+      : [out[0] + (255 - out[0]) * 0.3, out[1] + (255 - out[1]) * 0.3, out[2] + (255 - out[2]) * 0.3];
+  }
+  return out;
+}
+
 function paletteAt(m: number): { bg: string; ink: string; soft: string } {
   let i = 0;
   while (i < PALETTE.length - 2 && m > PALETTE[i + 1].m) i++;
   const a = PALETTE[i];
   const b = PALETTE[i + 1] ?? a;
   const t = clamp((m - a.m) / Math.max(b.m - a.m, 1), 0, 1);
-  return {
-    bg: hexLerp(a.bg, b.bg, t),
-    ink: hexLerp(a.ink, b.ink, t),
-    soft: hexLerp(a.soft, b.soft, t),
-  };
+  const bg = lerpC(hexRgb(a.bg), hexRgb(b.bg), t);
+  const ink = guard(lerpC(hexRgb(a.ink), hexRgb(b.ink), t), bg, 3.4);
+  const soft = guard(lerpC(hexRgb(a.soft), hexRgb(b.soft), t), bg, 3.0);
+  return { bg: rgbHex(bg), ink: rgbHex(ink), soft: rgbHex(soft) };
 }
 
 let railDot: HTMLElement | null = null;

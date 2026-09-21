@@ -208,51 +208,53 @@ export function initPaperstack() {
   applyAll();
   if (!RM) wake();
 
-  /* 调试抓手（截图验收用，生产无害） */
-  const state = () =>
-    JSON.stringify({
-      rm: RM,
-      booted,
-      spread: spreadOn,
-      spreadK: +spreadK.toFixed(3),
-      sway: SWAY,
-      havePtr,
-      target: [+tgt.nx.toFixed(3), +tgt.ny.toFixed(3)],
-      cur: [+cur.nx.toFixed(3), +cur.ny.toFixed(3)],
-      entMs: Math.round(entMs),
-      entranceDone,
-    });
-  const setPose = (x: number, y: number) => {
-    const n = normXY(x, y);
-    tgt.nx = n.nx;
-    tgt.ny = n.ny;
-    cur.nx = n.nx;
-    cur.ny = n.ny;
-    havePtr = true;
-    lastMove = performance.now();
-    booted = true;
-    entranceDone = true;
-    entMs = ENDT;
-    applyAll();
-    return state();
-  };
-  (window as unknown as Record<string, unknown>).__ps = {
-    state,
-    setPose,
-    spread: (v: boolean) => {
-      spreadOn = !!v;
-      if (!RM) wake();
-      return state();
-    },
-    enter: (ms: number) => {
+  /* 调试抓手（仅 dev，与 __fx 同标准） */
+  if (import.meta.env.DEV) {
+    const state = () =>
+      JSON.stringify({
+        rm: RM,
+        booted,
+        spread: spreadOn,
+        spreadK: +spreadK.toFixed(3),
+        sway: SWAY,
+        havePtr,
+        target: [+tgt.nx.toFixed(3), +tgt.ny.toFixed(3)],
+        cur: [+cur.nx.toFixed(3), +cur.ny.toFixed(3)],
+        entMs: Math.round(entMs),
+        entranceDone,
+      });
+    const setPose = (x: number, y: number) => {
+      const n = normXY(x, y);
+      tgt.nx = n.nx;
+      tgt.ny = n.ny;
+      cur.nx = n.nx;
+      cur.ny = n.ny;
+      havePtr = true;
+      lastMove = performance.now();
       booted = true;
-      entranceDone = false;
-      entMs = Math.max(0, Math.min(ENDT, ms ?? 900));
-      cur = { nx: 0, ny: 0 };
-      tgt.nx = 0;
-      tgt.ny = 0;
+      entranceDone = true;
+      entMs = ENDT;
       applyAll();
       return state();
-    },
-  };
+    };
+    (window as unknown as Record<string, unknown>).__ps = {
+      state,
+      setPose,
+      spread: (v: boolean) => {
+        spreadOn = !!v;
+        if (!RM) wake();
+        return state();
+      },
+      enter: (ms: number) => {
+        booted = true;
+        entranceDone = false;
+        entMs = Math.max(0, Math.min(ENDT, ms ?? 900));
+        cur = { nx: 0, ny: 0 };
+        tgt.nx = 0;
+        tgt.ny = 0;
+        applyAll();
+        return state();
+      },
+    };
+  }
 }

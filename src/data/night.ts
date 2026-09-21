@@ -53,22 +53,24 @@ export const SECTIONS = [
   { id: 'ns-dawn', from: 352, to: 444 },
 ] as const;
 
-/** 昼夜色板停靠点（分钟 → 页面三色） */
+/** 昼夜色板停靠点（分钟 → 页面三色）
+   约定：每一站 ink/soft 对（7% 洗染后）bg ≥4.5:1——可停留位置必须可读。
+   两个换面窗（m34→41 熄天开灯、m388→395 关灯见晨）内 ink 从深翻浅，
+   必然途经与 bg 亮度重合的瞬间，由 night.ts 的对比度护栏兜底 ≥3.4。 */
 export const PALETTE = [
   { m: 0, bg: '#e9ecef', ink: '#262c33', soft: '#59626c' },
-  { m: 16, bg: '#c9ced4', ink: '#2c333b', soft: '#5d6670' },
-  { m: 34, bg: '#99a1ab', ink: '#333b43', soft: '#6a737c' },
-  { m: 48, bg: '#6b7481', ink: '#3a424b', soft: '#8b939c' },
-  { m: 62, bg: '#414a58', ink: '#d9d4c8', soft: '#b4ae9f' },
-  { m: 78, bg: '#22272f', ink: '#e5e0d2', soft: '#b9b3a4' },
+  { m: 16, bg: '#c9ced4', ink: '#262c33', soft: '#4a525c' },
+  { m: 34, bg: '#99a1ab', ink: '#262c33', soft: '#2a3037' },
+  { m: 41, bg: '#1d222c', ink: '#ece7d9', soft: '#c8c2b4' },
   { m: 100, bg: '#171b24', ink: '#e5e0d2', soft: '#b9b3a4' },
   { m: 330, bg: '#171b24', ink: '#e5e0d2', soft: '#b9b3a4' },
   { m: 352, bg: '#231e26', ink: '#e5e0d2', soft: '#b9b3a4' },
   { m: 373, bg: '#3a3340', ink: '#e5e0d2', soft: '#b9b3a4' },
-  { m: 394, bg: '#6e655f', ink: '#e0d8c6', soft: '#b9b3a4' },
-  { m: 412, bg: '#a79e8c', ink: '#8a8172', soft: '#9a917f' },
-  { m: 424, bg: '#cbc4b6', ink: '#6b6355', soft: '#7a7364' },
-  { m: 444, bg: '#efe9dd', ink: '#55503f', soft: '#7a7364' },
+  { m: 388, bg: '#453c42', ink: '#e5e0d2', soft: '#b9b3a4' },
+  { m: 395, bg: '#a39a8b', ink: '#2e2a22', soft: '#332f27' },
+  { m: 412, bg: '#b3aa9a', ink: '#2e2a22', soft: '#403a30' },
+  { m: 424, bg: '#cbc4b6', ink: '#2e2a22', soft: '#403a30' },
+  { m: 444, bg: '#efe9dd', ink: '#55503f', soft: '#665f50' },
 ];
 
 /* ── 轨图几何（SVG viewBox 48 × 300；时间向下） ── */
