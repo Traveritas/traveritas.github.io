@@ -4,15 +4,33 @@
      可视元素「走神漂移」几个字再归位；hover / focus 即刻归位。
    · [data-morph][data-faces]：轮换文案（| 分隔），鼠标悬浮时
      乱码过渡到下一面。
+   · [data-morph][data-dream]：梦/醒双面元素（入梦检验机制用，
+     见 reality.ts）。当前现实面由 setMorphReality 决定：
+     梦态走神＝纯乱码扰动，hover 归位归到当前现实面；
+     醒态不参与走神。
    · [data-clock]：钟。换分时有概率乱码一下——钟在梦里漂移。
    无 JS / 读屏时始终呈现醒面真文案（aria-label 固定）。
    ───────────────────────────────────────────────────────────── */
 
 import { easeOut } from './lib';
 
+export type MorphReality = 'dream' | 'wake';
+
+export interface Dual {
+  el: HTMLElement;
+  dream: string;
+  wake: string;
+  /** 线到达其横向位置的距离阈值（reality.ts 按压时测量） */
+  dx: number;
+  flipped: boolean;
+}
+
 const POOL = '醒梦之间夜深空site0123456789abcdefghijklmnopqrstuvwxyz·—';
 const RM = () =>
   typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+let realityFace: MorphReality = 'wake';
+const duals: Dual[] = [];
 
 interface MEl {
   el: HTMLElement;
@@ -68,9 +86,37 @@ function animate(m: MEl, target: string, dur: number, done?: () => void) {
 }
 
 function settle(m: MEl) {
-  animate(m, m.faces[m.idx] ?? m.cur, 640);
+  animate(m, faceOf(m), 640);
   m.el.classList.add('is-lit');
   setTimeout(() => m.el.classList.remove('is-lit'), 900);
+}
+
+/** 当前现实面下该元素应呈现的文案（非 dual 维持原轮换逻辑） */
+function faceOf(m: MEl): string {
+  if (m.el.dataset.dream !== undefined) {
+    return realityFace === 'dream' ? m.el.dataset.dream : (m.faces[m.idx] ?? m.cur);
+  }
+  return m.faces[m.idx] ?? m.cur;
+}
+
+/** 供入梦检验机制（reality.ts）使用的现实面切换 */
+export function setMorphReality(face: MorphReality) {
+  realityFace = face;
+}
+
+/** 双面元素清单（含线到达阈值与翻转状态，由 reality.ts 驱动） */
+export function getDuals(): Dual[] {
+  return duals;
+}
+
+/** 对任意注册元素执行一次乱码过渡（dur=0 或 RM 直接落定） */
+export function morphText(el: HTMLElement, target: string, dur: number) {
+  const m = els.find((x) => x.el === el);
+  if (!m) {
+    el.textContent = target;
+    return;
+  }
+  animate(m, target, dur);
 }
 
 function visible(m: MEl): boolean {
@@ -79,13 +125,20 @@ function visible(m: MEl): boolean {
 }
 
 function ambientTick() {
-  // 进场归位过的元素（文章标题等）不再随机走神；轮换型交给 hover
+  // 进场归位过的元素（文章标题等）不再随机走神；轮换型交给 hover；
+  // 醒态下双面元素不参与走神（醒面该是稳的）
   const pool = els.filter(
-    (m) => visible(m) && !m.el.dataset.faces && m.el.dataset.entrance === undefined,
+    (m) =>
+      visible(m) &&
+      !m.el.dataset.faces &&
+      m.el.dataset.entrance === undefined &&
+      !(m.el.dataset.dream !== undefined && realityFace === 'wake'),
   );
   if (pool.length) {
     const m = pool[rand(pool.length)];
-    const driftTo = m.el.dataset.dream || scrambleFace(m.cur);
+    // 梦态双面元素已在梦面：走神＝纯乱码扰动再归回当前面
+    const driftTo =
+      m.el.dataset.dream !== undefined ? scrambleFace(m.cur) : (m.el.dataset.dream || scrambleFace(m.cur));
     animate(m, driftTo, 520, () => {
       setTimeout(() => {
         if (visible(m)) settle(m);
@@ -130,12 +183,15 @@ export function initMorph() {
     };
     el.textContent = faces[0];
     els.push(m);
+    if (el.dataset.dream !== undefined) {
+      duals.push({ el, dream: el.dataset.dream, wake: faces[0] ?? el.textContent.trim(), dx: 1e4, flipped: false });
+    }
 
-    // 进场归位：先漂一下再落回真文案（文章标题等）
+    // 进场归位：先漂一下再落回当前现实面（文章标题等）
     if (el.dataset.entrance !== undefined && !RM()) {
       const scrambled = scrambleFace(faces[0]);
       setTimeout(() => {
-        animate(m, scrambled, 460, () => setTimeout(() => animate(m, faces[0], 640), 160));
+        animate(m, scrambled, 460, () => setTimeout(() => animate(m, faceOf(m), 640), 160));
       }, 260);
     }
 
@@ -149,12 +205,12 @@ export function initMorph() {
         animate(m, faces[m.idx], 640);
         el.classList.add('is-lit');
         setTimeout(() => el.classList.remove('is-lit'), 900);
-      } else if (m.cur !== faces[m.idx]) {
+      } else if (m.cur !== faceOf(m)) {
         settle(m);
       }
     });
     el.addEventListener('focus', () => {
-      if (!RM() && m.cur !== faces[m.idx]) settle(m);
+      if (!RM() && m.cur !== faceOf(m)) settle(m);
     });
   }
 
