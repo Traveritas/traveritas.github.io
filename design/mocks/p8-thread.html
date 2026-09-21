@@ -334,18 +334,20 @@ var T_GO=2200,T_BACK=1300,RETRACT_MS=560,SETTLE_MS=280;
 var reality='wake',mode='boot',dir='go',src=null,pid=null,p=0,c=1;
 var holdT0=0,retractT0=0,retractFrom=0,retractDur=0;
 var freezeT0=0,freezeW1=0,settleFrom=1,settleTo=1,knotAt=0,scrollMark=0;
-var mainEl=document.querySelector('main'),riseCut=false,sinkOn=false;
+var mainEl=document.querySelector('main'),riseCut=false,sinkOn=false,sinkT0=0;
 /* 落印微沉（移植自 墨线一弹）：main 沉 2.2px 再回弹，特效层 fixed 不动形成相对运动。
-   rise 入场动画 fill:both 会压住 inline transform，故先解除（此时早已播完，无视觉影响） */
-function pageSink(){
+   rise 入场动画 fill:both 会压住 inline transform，故先解除（此时早已播完，无视觉影响）。
+   计时以微沉自身起点（sinkT0）为准，与定格总时长无关 */
+function pageSink(now){
   if(!mainEl||RM)return;
   if(!riseCut){mainEl.style.animation='none';riseCut=true}
-  sinkOn=true;
+  sinkOn=true;sinkT0=now;
 }
-function pageSinkTick(ft){
+function pageSinkTick(now){
   if(!sinkOn)return;
-  if(ft<175){
-    var jy=ft<50?2.2*Math.pow(ft/50,3):2.2*(1-eo3((ft-50)/120));
+  var st=now-sinkT0;
+  if(st<175){
+    var jy=st<50?2.2*Math.pow(st/50,3):2.2*(1-eo3((st-50)/120));
     mainEl.style.transform='translateY('+jy.toFixed(2)+'px)';
   }else{pageSinkEnd()}
 }
@@ -479,8 +481,8 @@ function frameFreeze(now){
     var a=ft<90?-4*(1-eo3(ft/90)):0;
     var W=ft<90?freezeW1:freezeW1+(10-freezeW1)*eio(Math.min(1,(ft-90)/240));
     drawThread(W,a,1,Math.max(0,.75-ft/150));
-    if(!knotShown&&now>=knotAt){showKnot(px,py);pageSink()}
-    pageSinkTick(ft);
+    if(!knotShown&&now>=knotAt){showKnot(px,py);pageSink(now)}
+    pageSinkTick(now);
     if(ft>=340)thread.style.display='none';
     if(ft>=840){mode='idle';p=0;pageSinkEnd();knotDissolve()}
   }else{
