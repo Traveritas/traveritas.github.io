@@ -4,6 +4,12 @@ description: 为「醒梦」寻找 2—4 个可以反复出现的核心视觉意
 date: 2026-09-19
 status: 构想中
 cover: https://picsum.photos/seed/xingmeng-motif/800/500
+note:
+  awake: 构想沉在深眠里，还没有落针。地址与仓库都先不占用，等它醒了再登记。
+  dream: 构想沉在深眠里，梦已经开始缝了。醒来数一数，也许已有三针。
+related:
+  - label: 《母题探索记录：从碎块到花》——三轮探索与两次否决的完整记录
+    href: /articles/motif-exploration-log/
 ---
 
 「醒梦」需要 2—4 个能够反复出现、最终成为识别符号的核心意象。它们应该能同时进入世界的每个角落：版式、界面、3D、动效，甚至文字的气味。

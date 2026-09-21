@@ -2,17 +2,32 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import { getCollection, render } from 'astro:content';
 
-export async function getStaticPaths() {
-  const projects = await getCollection('projects', (p) => !p.data.draft);
-  return projects.map((p) => ({ params: { slug: p.id }, props: { project: p } }));
-}
-
-const { project } = Astro.props;
-const { Content } = await render(project);
-const { title, description, date, status, links, cover } = project.data;
-
 const fmt = (d: Date) =>
   `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
+
+const pinsOf = (status: string) => ({ 构想中: 2, 进行中: 5, 已完成: 8 })[status] ?? 3;
+
+export async function getStaticPaths() {
+  const projects = await getCollection('projects', (p) => !p.data.draft);
+  // 案号与列表页同一规则：按立项先后编（最旧为 PRJ-01）
+  const sorted = [...projects].sort((a, b) => a.data.date.valueOf() - b.data.date.valueOf());
+  const codeOf = new Map<string, string>();
+  sorted.forEach((p, i) => codeOf.set(p.id, `PRJ-${String(i + 1).padStart(2, '0')}`));
+  return projects.map((p) => ({
+    params: { slug: p.id },
+    props: {
+      project: p,
+      code: codeOf.get(p.id) ?? 'PRJ-01',
+      // 「另一项」：账目里的下一件（循环）
+      other: sorted[(sorted.findIndex((x) => x.id === p.id) + 1) % sorted.length],
+    },
+  }));
+}
+
+const { project, code, other } = Astro.props;
+const { Content } = await render(project);
+const { title, description, date, status, links, related, note } = project.data;
+const pins = pinsOf(status);
 ---
 
 <BaseLayout
@@ -25,38 +40,408 @@ const fmt = (d: Date) =>
       <header class="prose-head">
         <h1 data-morph data-entrance data-true={title} aria-label={title}>{title}</h1>
         <p class="prose-meta">
-          <span class="status">{status}</span>
-          <time datetime={date.toISOString()}>{fmt(date)}</time>
+          <span class="status">{status}</span> · <time datetime={date.toISOString()}>{fmt(date)}</time>
         </p>
       </header>
       <hr class="prose-rule" />
-      {
-        cover && (
-          <img class="cover" src={cover} alt={`${title} 的封面`} loading="lazy" />
-        )
-      }
+
+      <div class="pin-line" aria-label={`第 ${pins} 针，共八针`}>
+        <span class="stitch-meter" aria-hidden="true">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <i class:list={{ on: i < pins }} />
+          ))}
+        </span>
+        <span class="prj-pin mono">第 {pins} 针 / 八针</span>
+        <span class="pin-cap mono">EIGHT PINS · 缝满即完成</span>
+      </div>
+
+      <!-- 封面：δ 波纹底板 + 描边幽灵案号（深眠绝对静止，波纹不漂） -->
+      <figure class="coverband" aria-hidden="true">
+        <svg viewBox="0 0 2200 150" preserveAspectRatio="none">
+          <path
+            style="stroke:rgba(167,177,186,.42);stroke-width:1;fill:none"
+            d="M0,48 Q68.75,6 137.5,48 T275,48 T550,48 T825,48 T1100,48 T1375,48 T1650,48 T1925,48 T2200,48"
+          />
+          <path
+            style="stroke:rgba(194,163,130,.38);stroke-width:1;fill:none"
+            d="M0,104 Q68.75,66 137.5,104 T275,104 T550,104 T825,104 T1100,104 T1375,104 T1650,104 T1925,104 T2200,104"
+          />
+        </svg>
+        <span class="ghostno">{code.replace('PRJ-', '')}</span>
+        <figcaption class="mono">COVER · {code} · 深眠留白 · N3 STILL</figcaption>
+      </figure>
+
       <Content />
+
       {
-        links.length > 0 && (
-          <nav class="link-list" aria-label="相关链接">
-            {links.map((l) => (
-              <a href={l.href} target="_blank" rel="noopener">
-                {l.label}
-              </a>
-            ))}
-          </nav>
+        note && (
+          <p class="file-note">
+            <span class="mono">N3 · 深眠注记</span>
+            <span data-morph data-true={note.awake} data-dream={note.dream}>{note.awake}</span>
+          </p>
         )
       }
+
+      {
+        related.length > 0 && (
+          <div class="xfile">
+            <span class="xfile-t mono">相关档案 · RELATED FILE</span>
+            {related.map((r) => (
+              <a href={r.href}>{r.label}</a>
+            ))}
+          </div>
+        )
+      }
+
+      <nav class="link-list" aria-label="相关链接">
+        <p class="ll-head">出口 · 醒着的证据<span class="ll-en mono">EXITS · CAN VERIFY</span></p>
+        {
+          links.length > 0 ? (
+            links.map((l) => (
+              <a class="ll-row" href={l.href} target="_blank" rel="noopener">
+                <span class="ll-name">{l.label}</span>
+                <span class="ll-href mono">{l.href.replace(/^https?:\/\//, '')}</span>
+                <span class="ll-why">仓库 · 醒着的证据</span>
+                <span class="ll-arrow">→</span>
+              </a>
+            ))
+          ) : (
+            <p class="ll-none mono">✗ 暂无出口 · 先不占用醒着的地址，等它落针再来登记</p>
+          )
+        }
+      </nav>
+
+      <nav class="pj-next" aria-label="项目导航">
+        <a href="/projects/">← 回项目账</a>
+        {other.id !== project.id && <a href={`/projects/${other.id}/`}>另一项：{other.data.title} →</a>}
+      </nav>
     </article>
   </div>
 </BaseLayout>
 
 <style>
-  .cover {
+  /* ── 八针：放大一档 ── */
+  .pin-line {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.6rem 1.1rem;
+    margin: -1.4rem 0 2.2rem;
+  }
+
+  .pin-line .stitch-meter {
+    gap: 7px;
+  }
+
+  .pin-line .stitch-meter i {
+    width: 15px;
+    height: 3px;
+  }
+
+  .prj-pin {
+    font-size: 0.62rem;
+    letter-spacing: 0.18em;
+    color: var(--umber);
+  }
+
+  .pin-cap {
+    font-size: 0.58rem;
+    letter-spacing: 0.22em;
+    color: var(--fg-faint);
+  }
+
+  /* ── 封面：δ 波纹底板（静止）+ 描边幽灵案号 ── */
+  .coverband {
+    position: relative;
+    height: 172px;
+    margin: 0 0 2.6rem;
+    border: 1px solid var(--line);
+    overflow: clip;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(225, 229, 234, 0.5));
+  }
+
+  .coverband svg {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0.8;
+  }
+
+  .coverband .ghostno {
+    position: absolute;
+    right: 18px;
+    bottom: -20px;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 118px;
+    line-height: 1;
+    color: transparent;
+    -webkit-text-stroke: 1px rgba(38, 44, 51, 0.22);
+    user-select: none;
+  }
+
+  .coverband figcaption {
+    position: absolute;
+    left: 14px;
+    bottom: 12px;
+    font-size: 0.56rem;
+    letter-spacing: 0.26em;
+    color: var(--fg-faint);
+  }
+
+  /* ── 立案正文：黑体账目体（与随笔的宋体夜话保持体温差） ── */
+  article.prose {
+    font-size: 1rem;
+    line-height: 2.05;
+    letter-spacing: 0.02em;
+    counter-reset: sec;
+  }
+
+  article.prose p {
+    margin: 1.3em 0;
+  }
+
+  article.prose h2 {
+    display: flex;
+    align-items: center;
+    gap: 0.85em;
+    font-size: 1.2rem;
+    font-weight: 700;
+    margin: 2.5em 0 0.8em;
+    letter-spacing: 0.04em;
+    counter-increment: sec;
+  }
+
+  article.prose h2::before {
+    content: counter(sec, cjk-ideographic);
+    flex: none;
+    font-size: 0.66em;
+    font-weight: 600;
+    color: var(--amber);
+    letter-spacing: 0.1em;
+    border: 1px solid rgba(217, 160, 91, 0.45);
+    padding: 0.3em 0.45em 0.25em;
+    line-height: 1;
+  }
+
+  article.prose h2::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--line);
+  }
+
+  article.prose ul {
+    list-style: none;
+    margin: 1.4em 0;
+    padding: 0;
+  }
+
+  article.prose li {
+    position: relative;
+    padding-left: 1.9em;
+    margin-bottom: 0.55em;
+  }
+
+  article.prose li::before {
+    position: absolute;
+    left: 0.1em;
+    top: 0;
+    font-family: var(--font-mono);
+    font-size: 0.78em;
+    content: '○';
+    color: var(--fg-faint);
+  }
+
+  /* 施工信纸：md 的 - [x] 勾选态渲染成 ✓ 账目行 */
+  article.prose li:has(input) {
+    padding-left: 1.9em;
+  }
+
+  article.prose li input {
+    display: none;
+  }
+
+  article.prose li:has(input)::before {
+    content: '○';
+  }
+
+  article.prose li:has(input:checked)::before {
+    content: '✓';
+    color: var(--amber);
+  }
+
+  article.prose li:has(input:checked) {
+    color: var(--fg);
+  }
+
+  article.prose li:not(:has(input:checked)) {
+    color: var(--fg-soft);
+  }
+
+  article.prose strong {
+    font-weight: 700;
+    background: linear-gradient(transparent 64%, rgba(217, 160, 91, 0.24) 64%);
+  }
+
+  article.prose a {
+    color: var(--umber);
+  }
+
+  /* 深眠注记：琥珀左边（醒/梦双声轨由 morph 驱动） */
+  .file-note {
+    margin: 2.4rem 0 0;
+    padding-left: 1.2rem;
+    border-left: 2px solid var(--amber);
+    font-size: 0.85rem;
+    line-height: 2;
+    color: var(--fg-soft);
+    letter-spacing: 0.05em;
+    max-width: 34em;
+  }
+
+  .file-note .mono {
     display: block;
-    width: min(100%, 30rem);
-    margin: 0 0 2.2rem;
-    border-radius: 4px;
-    filter: grayscale(0.7) contrast(0.92) opacity(0.9);
+    font-size: 0.58rem;
+    letter-spacing: 0.24em;
+    color: var(--amber);
+    margin-bottom: 0.3rem;
+  }
+
+  /* 相关档案 */
+  .xfile {
+    margin-top: 3rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--line);
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .xfile-t {
+    font-size: 0.58rem;
+    letter-spacing: 0.26em;
+    color: var(--fg-faint);
+  }
+
+  .xfile a {
+    font-family: var(--font-display);
+    font-size: 1rem;
+    letter-spacing: 0.03em;
+    text-decoration: none;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 2px;
+    align-self: flex-start;
+  }
+
+  .xfile a:hover {
+    border-color: color-mix(in srgb, var(--amber) 55%, transparent);
+  }
+
+  /* ── 出口区：账目语言 ── */
+  .link-list {
+    display: block;
+    font-size: inherit;
+  }
+
+  .ll-head {
+    font-family: var(--font-display);
+    font-size: 1rem;
+    letter-spacing: 0.14em;
+    margin-bottom: 0.4rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 1rem;
+  }
+
+  .ll-en {
+    font-size: 0.56rem;
+    letter-spacing: 0.28em;
+    color: var(--fg-faint);
+  }
+
+  .ll-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.4rem 1.2rem;
+    padding-block: 0.9rem;
+    border-bottom: 1px solid var(--line);
+    text-decoration: none;
+  }
+
+  .ll-row .ll-name {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 1rem;
+    letter-spacing: 0.08em;
+  }
+
+  .ll-row .ll-href {
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    color: var(--fg-soft);
+    word-break: break-all;
+  }
+
+  .ll-row .ll-why {
+    margin-left: auto;
+    font-size: 0.74rem;
+    letter-spacing: 0.08em;
+    color: var(--fg-faint);
+  }
+
+  .ll-row .ll-arrow {
+    font-family: var(--font-mono);
+    color: var(--fg-faint);
+    transition:
+      transform 0.25s,
+      color 0.25s;
+  }
+
+  .ll-row:hover .ll-arrow {
+    transform: translateX(5px);
+    color: var(--amber);
+  }
+
+  .ll-none {
+    padding-block: 0.9rem;
+    border-bottom: 1px solid var(--line);
+    font-size: 0.72rem;
+    letter-spacing: 0.16em;
+    color: var(--fg-faint);
+  }
+
+  .pj-next {
+    margin-top: 2.6rem;
+    padding-top: 1.4rem;
+    border-top: 1px solid var(--line);
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .pj-next a {
+    font-size: 0.88rem;
+  }
+
+  @media (max-width: 760px) {
+    .ll-row .ll-why {
+      display: none;
+    }
+
+    .coverband {
+      height: 132px;
+    }
+
+    .coverband .ghostno {
+      font-size: 86px;
+      bottom: -14px;
+    }
   }
 </style>

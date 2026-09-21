@@ -5,14 +5,20 @@
    · depth：文章页阅读深度（醒 / 入梦 / 深梦 / 将醒）
    · station：列表页仅站名
    < 1200px 隐藏（退化为顶部发丝线）。 */
+import { fmtNightTime } from '../../data/night';
+
 interface Props {
   mode?: 'night' | 'depth' | 'station';
   station: string;
   en?: string;
   depthTarget?: string;
+  /* depth 模式的夜内时钟（素夜：文章页唯一小仪器）——
+     阅读进度在 fromMin → fromMin+durMin 之间爬行，页面脚本按
+     data-from-min / data-dur-min 插值；stage 为静态分期注记 */
+  readout?: { fromMin: number; durMin: number; stage: string };
 }
 
-const { mode = 'station', station, en, depthTarget } = Astro.props;
+const { mode = 'station', station, en, depthTarget, readout } = Astro.props;
 const nightLabels = ['醒', '浅梦', '深眠', '晨醒'];
 const depthLabels = ['醒', '入梦', '深梦', '将醒'];
 const labels = mode === 'night' ? nightLabels : depthLabels;
@@ -41,6 +47,15 @@ const labels = mode === 'night' ? nightLabels : depthLabels;
       <div class="rail-read mono">
         <span id="rail-time">23:07</span>
         <span id="rail-stage">清醒 · β 波</span>
+      </div>
+    )
+  }
+
+  {
+    mode === 'depth' && readout && (
+      <div class="rail-read mono" data-from-min={readout.fromMin} data-dur-min={readout.durMin}>
+        <span class="rail-clock">{fmtNightTime(readout.fromMin)}</span>
+        <span class="rail-stage-txt">{readout.stage}</span>
       </div>
     )
   }
@@ -175,6 +190,19 @@ const labels = mode === 'night' ? nightLabels : depthLabels;
   }
 
   #rail-stage {
+    opacity: 0.72;
+    width: 100%;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  /* 夜内时钟（depth 模式）：与 night 读数同款式样 */
+  .rail-clock {
+    color: var(--fg);
+    font-size: 0.72rem;
+  }
+
+  .rail-stage-txt {
     opacity: 0.72;
     width: 100%;
     text-align: center;

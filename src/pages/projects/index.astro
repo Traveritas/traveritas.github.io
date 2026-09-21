@@ -1,15 +1,34 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import { getCollection } from 'astro:content';
+import { fmtNightTime } from '../../data/night';
 
-const projects = (await getCollection('projects', (p) => !p.data.draft))
-  .map(({ id, data }) => ({ id, ...data }))
-  .sort((a, b) => b.date.valueOf() - a.date.valueOf());
+/* 项目住在整夜的深眠段（night.ts SECTIONS 的 ns-projects，124→181 分钟） */
+const SEG_FROM = 124;
+const SEG_TO = 181;
 
 const fmt = (d: Date) =>
   `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
 
 const pinsOf = (status: string) => ({ 构想中: 2, 进行中: 5, 已完成: 8 })[status] ?? 3;
+
+/* 账目核验：仓库链接在 frontmatter 里，有即 ✓，无即 ✗ */
+const repoOf = (p: (typeof projects)[number]) =>
+  (p.links ?? []).some((l) => /^https:\/\/github\.com\//.test(l.href));
+
+const projects = (await getCollection('projects', (p) => !p.data.draft))
+  .map(({ id, data }) => ({ id, ...data }))
+  .sort((a, b) => b.date.valueOf() - a.date.valueOf());
+
+/* 案号：按立项先后编（最旧为 PRJ-01），展示仍新→旧 */
+const codeOf = new Map<string, string>();
+[...projects]
+  .reverse()
+  .forEach((p, i) => codeOf.set(p.id, `PRJ-${String(i + 1).padStart(2, '0')}`));
+
+const nRun = projects.filter((p) => p.status === '进行中').length;
+const nIdea = projects.filter((p) => p.status === '构想中').length;
+const nRepo = projects.filter(repoOf).length;
 ---
 
 <BaseLayout
@@ -17,7 +36,7 @@ const pinsOf = (status: string) => ({ 构想中: 2, 进行中: 5, 已完成: 8 }
   description="Traveritas 的项目与造物"
   rail={{ mode: 'station', station: '项目 · 深眠', en: 'PROJECTS N3' }}
 >
-  <div class="container page-body">
+  <div class="container-wide page-body">
     <header class="page-head">
       <h1>项目</h1>
       <p class="lede" data-morph data-true="正在做、做过、以及还只存在于念头里的东西。" data-dream="正在做、做过、以及还只存在于梦念里的东西。">
@@ -25,39 +44,242 @@ const pinsOf = (status: string) => ({ 构想中: 2, 进行中: 5, 已完成: 8 }
       </p>
     </header>
 
-    <ul class="ledger">
+    <p class="sumline">
+      <span>深眠台账 N3 · {fmtNightTime(SEG_FROM)} → {fmtNightTime(SEG_TO)}</span><i>·</i>
+      <span>共 <b>{projects.length}</b> 项</span><i>·</i>
+      <span>进行中 <b>{nRun}</b> · 构想中 <b>{nIdea}</b></span><i>·</i>
+      <span>有仓库 <b>{nRepo} / {projects.length}</b></span>
+    </p>
+
+    <ol class="prj-ledger">
       {
         projects.map((p) => (
           <li>
             <a href={`/projects/${p.id}/`}>
-              <span class="ledger-date">{fmt(p.date)}</span>
-              <span>
-                <span class="ledger-title">
+              <span class="r-code">
+                <b>{codeOf.get(p.id)}</b>
+                <i>{fmt(p.date)}</i>
+              </span>
+              <span class="r-main">
+                <span class="r-title">
                   {p.title}
-                  <span class="ledger-status">{p.status}</span>
+                  <span class:list={['status-chip', { 'st-idea': p.status === '构想中', 'st-run': p.status !== '构想中' }]}>{p.status}</span>
                   <span class="stitch-meter" title={`第 ${pinsOf(p.status)} 针 / 八针`}>
                     {Array.from({ length: 8 }).map((_, i) => (
                       <i class:list={{ on: i < pinsOf(p.status) }} />
                     ))}
                   </span>
                 </span>
-                {p.description && <span class="ledger-desc">{p.description}</span>}
+                {p.description && <span class="r-desc">{p.description}</span>}
+              </span>
+              <span class:list={['tick', { 'tick-ok': repoOf(p), 'tick-na': !repoOf(p) }]}>
+                {repoOf(p) ? '✓ 有仓库' : '✗ 暂无'}
               </span>
             </a>
           </li>
         ))
       }
-    </ul>
+    </ol>
 
     <p class="meter-note mono">八针进度：一针一格，缝满即完成</p>
+    <p class="list-foot">
+      <span data-morph data-true="夜到最深处，账目反而最醒。" data-dream="夜到最深处，连账目都在打盹。">夜到最深处，账目反而最醒。</span>
+    </p>
   </div>
 </BaseLayout>
 
 <style>
+  /* 一行结清：台账的总账 */
+  .sumline {
+    margin: -1.4rem 0 2.2rem;
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.18em;
+    color: var(--fg-faint);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1.1rem;
+  }
+
+  .sumline b {
+    color: var(--fg-soft);
+    font-weight: 400;
+  }
+
+  .sumline i {
+    font-style: normal;
+    color: var(--amber);
+    opacity: 0.7;
+    margin: 0 0.1em;
+  }
+
+  /* ── 夜档台账：编号列 ‖ 标题+状态签+八针 ‖ 核验列；绝对静止 ── */
+  .prj-ledger {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .prj-ledger li {
+    border-top: 1px solid var(--line);
+  }
+
+  .prj-ledger li:last-child {
+    border-bottom: 1px solid var(--line);
+  }
+
+  .prj-ledger a {
+    display: grid;
+    grid-template-columns: 5.4rem minmax(0, 1fr) auto;
+    gap: 0 1.7rem;
+    padding: 1.45rem 0.55rem 1.3rem;
+    align-items: start;
+    text-decoration: none;
+    transition: background 0.25s ease;
+  }
+
+  .prj-ledger a:hover {
+    background: rgba(167, 177, 186, 0.14);
+  }
+
+  .r-code {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    padding-top: 0.3rem;
+  }
+
+  .r-code b {
+    font-family: var(--font-mono);
+    font-weight: 400;
+    font-size: 0.8rem;
+    letter-spacing: 0.1em;
+    color: var(--fg-soft);
+  }
+
+  .r-code i {
+    font-style: normal;
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.12em;
+    color: var(--fg-faint);
+  }
+
+  .r-title {
+    display: block;
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 1.13rem;
+    letter-spacing: 0.02em;
+    color: var(--fg);
+    line-height: 1.6;
+    transition: color 0.2s;
+  }
+
+  .r-desc {
+    display: block;
+    margin-top: 0.32rem;
+    color: var(--fg-soft);
+    font-size: 0.94rem;
+    line-height: 1.85;
+    max-width: 40em;
+  }
+
+  .status-chip {
+    display: inline-block;
+    margin-left: 0.75rem;
+    vertical-align: 2px;
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.18em;
+    padding: 0.24rem 0.5rem 0.2rem;
+    border: 1px solid;
+  }
+
+  .status-chip.st-run {
+    color: color-mix(in srgb, var(--wake) 55%, var(--fg) 45%);
+    border-color: color-mix(in srgb, var(--wake) 55%, transparent);
+  }
+
+  .status-chip.st-idea {
+    color: color-mix(in srgb, var(--dream) 62%, var(--fg) 38%);
+    border-style: dashed;
+    border-color: color-mix(in srgb, var(--dream) 50%, transparent);
+  }
+
+  .prj-ledger .stitch-meter {
+    margin-left: 0.85rem;
+  }
+
+  .tick {
+    align-self: center;
+    font-family: var(--font-mono);
+    font-size: 0.64rem;
+    letter-spacing: 0.16em;
+    white-space: nowrap;
+    padding-top: 0.3rem;
+  }
+
+  .tick-ok {
+    color: color-mix(in srgb, var(--wake) 50%, var(--fg) 50%);
+  }
+
+  .tick-na {
+    color: var(--fg-faint);
+  }
+
   .meter-note {
     margin-top: 1.6rem;
     font-size: 0.6rem;
     letter-spacing: 0.22em;
     color: var(--fg-faint);
+  }
+
+  .list-foot {
+    margin-top: 1.2rem;
+    max-width: 34em;
+    font-family: var(--font-display);
+    font-size: 0.9rem;
+    letter-spacing: 0.05em;
+    color: var(--fg-soft);
+    line-height: 2;
+  }
+
+  /* 窄屏：两段折行 */
+  @media (max-width: 760px) {
+    .prj-ledger a {
+      grid-template-columns: 1fr;
+      gap: 0.3rem;
+      padding: 1.25rem 0.2rem 1.15rem;
+    }
+
+    .r-code {
+      flex-direction: row;
+      align-items: baseline;
+      gap: 0.8rem;
+      padding-top: 0;
+    }
+
+    .tick {
+      align-self: auto;
+      justify-self: start;
+      padding-top: 0;
+      margin-top: 0.2rem;
+    }
+
+    .r-title {
+      font-size: 1.06rem;
+    }
+
+    .status-chip,
+    .prj-ledger .stitch-meter {
+      margin-left: 0.5rem;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .sumline {
+      gap: 0.3rem 0.8rem;
+    }
   }
 </style>

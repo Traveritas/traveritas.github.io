@@ -1,15 +1,49 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import { getCollection } from 'astro:content';
+import { fmtNightTime } from '../../data/night';
 
-const articles = (await getCollection('articles', (a) => !a.data.draft))
-  .map(({ id, data }) => ({ id, ...data }))
-  .sort((a, b) => b.date.valueOf() - a.date.valueOf());
+/* 夜时刻：随笔住在整夜的浅梦段（night.ts SECTIONS 的 ns-essays，
+   12→124 分钟即 23:19→01:11）；各篇按写作先后在段内等分落位 */
+const SEG_FROM = 12;
+const SEG_TO = 124;
 
 const fmt = (d: Date) =>
   `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
 
-// 按年份分组（保持倒序）
+/* 字数核验：剥掉 markdown 语法后按非空白字符计（与素夜定稿同法） */
+function countChars(md: string): number {
+  return md
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/^>\s?/gm, '')
+    .replace(/^[-*]\s+(\[[ xX]\]\s+)?/gm, '')
+    .replace(/\*\*/g, '')
+    .replace(/\[(.+?)\]\(.+?\)/g, '$1')
+    .replace(/\s+/g, '').length;
+}
+
+const CN = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
+const cn = (n: number) => CN[n] ?? String(n);
+
+const entries = (await getCollection('articles', (a) => !a.data.draft))
+  .map(({ id, body, data }) => {
+    const chars = countChars(body ?? '');
+    return {
+      id,
+      ...data,
+      chars,
+      readMin: Math.max(1, Math.round(chars / 400)),
+    };
+  })
+  .sort((a, b) => a.date.valueOf() - b.date.valueOf());
+
+const nightMin = new Map<string, number>();
+entries.forEach((a, i) => {
+  nightMin.set(a.id, SEG_FROM + ((SEG_TO - SEG_FROM) * (i + 0.5)) / entries.length);
+});
+
+// 展示按新→旧；按年份分组（保持倒序）
+const articles = [...entries].reverse();
 const byYear = new Map<number, typeof articles>();
 for (const a of articles) {
   const y = a.date.getFullYear();
@@ -24,7 +58,7 @@ const years = [...byYear.keys()].sort((a, b) => b - a);
   description="Traveritas 的随笔与记录"
   rail={{ mode: 'station', station: '随笔 · 账目', en: 'ESSAYS LEDGER' }}
 >
-  <div class="container page-body">
+  <div class="container-wide page-body">
     <header class="page-head">
       <h1>随笔</h1>
       <p class="lede" data-morph data-true="想法、记录，与梦的边角料。" data-dream="想法、记录，与梦的边角梦见。">
@@ -36,28 +70,56 @@ const years = [...byYear.keys()].sort((a, b) => b - a);
       years.map((y) => (
         <section class="year-group">
           <div class="axis" aria-hidden="true">
-            <i class="axis-line"></i>
             <span class="axis-tag mono">
               {y} · {byYear.get(y)!.length} 篇
             </span>
-            <span class="axis-tag-en mono">WAKE · VERIFIABLE</span>
+            <span class="axis-tag-en mono">夜时刻为夜内位置 · DATES VERIFIABLE</span>
           </div>
-          <ul class="ledger">
+          <ol class="essay-ledger">
             {byYear.get(y)!.map((a) => (
               <li>
                 <a href={`/articles/${a.id}/`}>
-                  <span class="ledger-date">{fmt(a.date)}</span>
-                  <span>
-                    <span class="ledger-title">{a.title}</span>
-                    {a.description && <span class="ledger-desc">{a.description}</span>}
+                  <span class="el-night">
+                    <b>{fmtNightTime(nightMin.get(a.id) ?? SEG_FROM)}</b>
+                    <i>{fmt(a.date)}</i>
+                  </span>
+                  <span class="el-main">
+                    <span class="el-title">
+                      <span class="ghost" aria-hidden="true">
+                        {a.title}
+                      </span>
+                      {a.title}
+                    </span>
+                    {a.description && <span class="el-desc">{a.description}</span>}
+                    {a.tags.length > 0 && (
+                      <span class="el-tags">
+                        {a.tags.map((t) => (
+                          <i>{t}</i>
+                        ))}
+                      </span>
+                    )}
+                  </span>
+                  <span class="el-count">
+                    <b>{a.chars} 字</b>
+                    <i>读毕约{cn(a.readMin)}分钟</i>
                   </span>
                 </a>
               </li>
             ))}
-          </ul>
+          </ol>
         </section>
       ))
     }
+
+    <p class="ledger-cap">
+      <span
+        data-morph
+        data-true="夜时刻是各篇在这一夜里的位置；字数与日期，醒来均可核验。"
+        data-dream="夜时刻是各篇在梦里的位置；字数是梦抄的，醒来要重新数。"
+      >
+        夜时刻是各篇在这一夜里的位置；字数与日期，醒来均可核验。
+      </span>
+    </p>
   </div>
 </BaseLayout>
 
@@ -66,7 +128,7 @@ const years = [...byYear.keys()].sort((a, b) => b - a);
     margin-bottom: 3.4rem;
   }
 
-  /* 分段轴线：-4° 斜线 + mono 双语标签（来自入梦检验） */
+  /* 分年轴：mono 双语标签（素夜裁定：斜线删去，只留文字） */
   .axis {
     position: relative;
     margin: 0 0 1.6rem;
@@ -74,18 +136,6 @@ const years = [...byYear.keys()].sort((a, b) => b - a);
     display: flex;
     align-items: baseline;
     gap: 1.2rem;
-  }
-
-  .axis-line {
-    position: absolute;
-    left: -3.4rem;
-    top: 0.5em;
-    width: 150px;
-    height: 1px;
-    background: var(--fg-soft);
-    opacity: 0.4;
-    transform: rotate(-4deg);
-    transform-origin: right center;
   }
 
   .axis-tag {
@@ -98,5 +148,194 @@ const years = [...byYear.keys()].sort((a, b) => b - a);
     font-size: 0.56rem;
     letter-spacing: 0.24em;
     color: var(--fg-faint);
+  }
+
+  /* ── 回眠行语法：夜时刻纵列 ‖ 标题（悬停暖色叠影）+描述+标签 ‖ 字数核验 ── */
+  .essay-ledger {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .essay-ledger li {
+    border-top: 1px solid var(--line);
+  }
+
+  .essay-ledger li:last-child {
+    border-bottom: 1px solid var(--line);
+  }
+
+  .essay-ledger a {
+    display: grid;
+    grid-template-columns: 5.6rem minmax(0, 1fr) auto;
+    gap: 0 1.8rem;
+    padding-block: 1.45rem;
+    align-items: start;
+    text-decoration: none;
+  }
+
+  .el-night {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    padding-top: 0.35rem;
+  }
+
+  .el-night b {
+    font-family: var(--font-mono);
+    font-weight: 400;
+    font-size: 0.92rem;
+    letter-spacing: 0.08em;
+    color: var(--umber);
+  }
+
+  .el-night i {
+    font-style: normal;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    color: var(--fg-faint);
+  }
+
+  .el-title {
+    position: relative;
+    display: inline-block;
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 1.26rem;
+    letter-spacing: 0.03em;
+    line-height: 1.5;
+    color: var(--fg);
+  }
+
+  /* 半醒复视：悬停时标题显出暖色的另一份 */
+  .el-title .ghost {
+    position: absolute;
+    inset: 0;
+    color: var(--ghost-ink);
+    opacity: 0;
+    pointer-events: none;
+    transform: translate(-7px, 4px);
+    filter: blur(0.4px);
+    transition:
+      opacity 0.55s ease,
+      transform 0.55s ease;
+  }
+
+  .essay-ledger a:hover .el-title .ghost {
+    opacity: 0.5;
+    transform: translate(7px, -3px);
+  }
+
+  .essay-ledger a:hover .el-title {
+    color: var(--umber);
+  }
+
+  .el-desc {
+    display: block;
+    margin-top: 0.3rem;
+    color: var(--fg-soft);
+    font-size: 0.95rem;
+    line-height: 1.8;
+    max-width: 34em;
+  }
+
+  .el-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    margin-top: 0.7rem;
+  }
+
+  .el-tags i {
+    font-style: normal;
+    font-size: 0.66rem;
+    letter-spacing: 0.14em;
+    color: var(--fg-faint);
+    border: 1px solid var(--line);
+    padding: 0.14rem 0.5rem 0.1rem;
+    border-radius: 2px;
+  }
+
+  .el-count {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.15rem;
+    padding-top: 0.5rem;
+    white-space: nowrap;
+  }
+
+  .el-count b {
+    font-family: var(--font-mono);
+    font-weight: 400;
+    font-size: 0.74rem;
+    letter-spacing: 0.1em;
+    color: var(--fg-soft);
+  }
+
+  .el-count i {
+    font-style: normal;
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.14em;
+    color: var(--fg-faint);
+  }
+
+  .ledger-cap {
+    margin-top: 2.2rem;
+    font-size: 0.85rem;
+    letter-spacing: 0.05em;
+    color: var(--fg-faint);
+    line-height: 2;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .el-title .ghost {
+      display: none;
+    }
+  }
+
+  /* 窄屏：纵列转横排 */
+  @media (max-width: 760px) {
+    .essay-ledger a {
+      grid-template-columns: 1fr;
+      gap: 0.25rem;
+      padding-block: 1.3rem;
+    }
+
+    .el-night {
+      flex-direction: row;
+      align-items: baseline;
+      gap: 0.8rem;
+      padding-top: 0;
+    }
+
+    .el-night i::before {
+      content: '· ';
+      color: var(--fg-faint);
+    }
+
+    .el-count {
+      flex-direction: row;
+      gap: 0.8rem;
+      align-items: baseline;
+      padding-top: 0;
+    }
+
+    .el-count i::before {
+      content: '· ';
+      color: var(--fg-faint);
+    }
+
+    .el-title {
+      font-size: 1.14rem;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .axis {
+      gap: 0.3rem 0.8rem;
+    }
   }
 </style>

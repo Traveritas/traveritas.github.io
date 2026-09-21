@@ -1,15 +1,45 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import { getCollection, render } from 'astro:content';
+import { fmtNightTime, stageAt, STAGE_INFO } from '../../data/night';
+
+/* 夜时刻：与随笔列表同一规则（写作先后在浅梦段 12→124 分内等分） */
+const SEG_FROM = 12;
+const SEG_TO = 124;
+
+const fmt = (d: Date) =>
+  `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
+
+const CN = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
+const cn = (n: number) => CN[n] ?? String(n);
+
+function countChars(md: string): number {
+  return md
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/^>\s?/gm, '')
+    .replace(/^[-*]\s+(\[[ xX]\]\s+)?/gm, '')
+    .replace(/\*\*/g, '')
+    .replace(/\[(.+?)\]\(.+?\)/g, '$1')
+    .replace(/\s+/g, '').length;
+}
 
 export async function getStaticPaths() {
   const articles = (await getCollection('articles', (a) => !a.data.draft)).sort(
-    (a, b) => b.data.date.valueOf() - a.data.date.valueOf(),
+    (a, b) => a.data.date.valueOf() - b.data.date.valueOf(),
   );
+  /* 夜时刻：与随笔列表同一规则（写作先后在浅梦段 12→124 分内等分）；
+     getStaticPaths 编译在独立 chunk，段落常量需本地定义 */
+  const SEG_FROM = 12;
+  const SEG_TO = 124;
+  const nightMin = new Map<string, number>();
+  articles.forEach((a, i) => {
+    nightMin.set(a.id, SEG_FROM + ((SEG_TO - SEG_FROM) * (i + 0.5)) / articles.length);
+  });
   return articles.map((a, i) => ({
     params: { slug: a.id },
     props: {
       article: a,
+      nightMin: nightMin.get(a.id) ?? SEG_FROM,
       // 列表为倒序：较早的一篇在后面，较晚的一篇在前面
       older: i < articles.length - 1 ? articles[i + 1] : undefined,
       newer: i > 0 ? articles[i - 1] : undefined,
@@ -17,19 +47,27 @@ export async function getStaticPaths() {
   }));
 }
 
-const { article, older, newer } = Astro.props;
+const { article, older, newer, nightMin } = Astro.props;
 const { Content } = await render(article);
-const { title, description, date, tags } = article.data;
+const { title, description, date, tags, related } = article.data;
 
-const fmt = (d: Date) =>
-  `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
+const chars = countChars(article.body ?? '');
+const readMin = Math.max(1, Math.round(chars / 400));
+const stage = STAGE_INFO[stageAt(nightMin)];
+const stageLabel = `${stage.zh} · ${stage.wave}`;
 ---
 
 <BaseLayout
   title={`${title} — Traveritas`}
   description={description}
   type="article"
-  rail={{ mode: 'depth', station: '入梦 · 阅读', en: 'READING DEPTH', depthTarget: 'article.prose' }}
+  rail={{
+    mode: 'depth',
+    station: '入梦 · 阅读',
+    en: 'READING DEPTH',
+    depthTarget: 'article.prose',
+    readout: { fromMin: nightMin, durMin: readMin, stage: stageLabel },
+  }}
 >
   <div class="dawn-glow" aria-hidden="true"></div>
   <div class="container page-body">
@@ -51,28 +89,89 @@ const fmt = (d: Date) =>
           </nav>
         )
       }
-      <nav class="adjacent" aria-label="醒来后">
-        <p class="wake-label mono" aria-hidden="true">—— 读到这里，快醒了 ——</p>
-        {
-          older && (
-            <a href={`/articles/${older.id}/`} class="adj-item">
-              <span class="adj-label">较早</span>
-              <span class="adj-title">{older.data.title}</span>
-            </a>
-          )
-        }
-        {
-          newer && (
-            <a href={`/articles/${newer.id}/`} class="adj-item adj-right">
-              <span class="adj-label">较晚</span>
-              <span class="adj-title">{newer.data.title}</span>
-            </a>
-          )
-        }
-      </nav>
+      {
+        related.length > 0 && (
+          <div class="xfile">
+            <span class="xfile-t mono">相关档案 · RELATED FILE</span>
+            {related.map((r) => (
+              <a href={r.href}>{r.label}</a>
+            ))}
+          </div>
+        )
+      }
+      <footer class="wake-card">
+        <p class="wc-label mono" aria-hidden="true">—— 读到这里，快醒了 ——</p>
+        <p class="wc-line" data-morph data-true="这一篇读完了。" data-dream="天亮之前，这一篇读完了。">这一篇读完了。</p>
+        <div class="wc-nav">
+          {
+            older ? (
+              <a href={`/articles/${older.id}/`}>
+                <span class="wn-label mono">较早的一篇</span>
+                <span class="wn-title">{older.data.title}</span>
+              </a>
+            ) : (
+              <span class="wn-empty">
+                <span class="wn-label mono">较早的一篇</span>
+                <span class="wn-title">这是今夜最早的一篇。</span>
+              </span>
+            )
+          }
+          {
+            newer ? (
+              <a class="wn-right" href={`/articles/${newer.id}/`}>
+                <span class="wn-label mono">较晚的一篇</span>
+                <span class="wn-title">{newer.data.title}</span>
+              </a>
+            ) : (
+              <span class="wn-empty wn-right">
+                <span class="wn-label mono">较晚的一篇</span>
+                <span class="wn-title">这是今夜最新的一篇。</span>
+              </span>
+            )
+          }
+        </div>
+        <p class="wc-foot mono">
+          <a href="/articles/">回到随笔</a>
+          <span>全文约 {chars} 字 · 读毕约{cn(readMin)}分钟</span>
+        </p>
+      </footer>
     </article>
   </div>
 </BaseLayout>
+
+<script>
+  // 夜内时钟：阅读进度在本篇夜时刻 → +读时（分钟）之间爬行。
+  // 进度公式与 chrome.ts 的深度轨一致（0.6 视高处入文），针点与时钟同步下行。
+  const readout = document.querySelector<HTMLElement>('.rail-read[data-from-min]');
+  const prose = document.querySelector<HTMLElement>('article.prose');
+  const clock = readout?.querySelector<HTMLElement>('.rail-clock');
+  if (readout && prose && clock) {
+    const from = Number(readout.dataset.fromMin ?? 0);
+    const dur = Number(readout.dataset.durMin ?? 1);
+    const NIGHT_START = 23 * 60 + 7;
+    const fmtNight = (m: number) => {
+      const total = NIGHT_START + Math.min(Math.max(m, 0), 444);
+      const h = String(Math.floor(total / 60) % 24).padStart(2, '0');
+      const mm = String(Math.floor(total % 60)).padStart(2, '0');
+      return `${h}:${mm}`;
+    };
+    let raf = 0;
+    const tick = () => {
+      raf = 0;
+      const r = prose!.getBoundingClientRect();
+      const p = Math.min(1, Math.max(0, (innerHeight * 0.6 - r.top) / Math.max(r.height, 1)));
+      clock!.textContent = fmtNight(from + p * dur);
+    };
+    addEventListener(
+      'scroll',
+      () => {
+        if (!raf) raf = requestAnimationFrame(tick);
+      },
+      { passive: true },
+    );
+    tick();
+  }
+</script>
 
 <style>
   /* 晓线：暖光随阅读进度从底部升起，读到末尾天亮 */
@@ -89,73 +188,280 @@ const fmt = (d: Date) =>
     transition: opacity 0.3s linear;
   }
 
-  /* 引文是梦侧：轻轻浮动 */
+  /* ── 夜档正文：宋体 · 34em · 琥珀章号 · 针脚列表 ── */
+  article.prose {
+    counter-reset: sec;
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: clamp(1.0625rem, 1.0625rem + 0.32vw, 1.15625rem);
+    line-height: 2.08;
+    letter-spacing: 0.015em;
+    text-align: justify;
+  }
+
+  /* 起针：正文自一枚琥珀针脚开始 */
+  .prose-rule {
+    position: relative;
+  }
+
+  .prose-rule::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: -1px;
+    width: 3.4rem;
+    height: 1px;
+    background: var(--amber);
+  }
+
+  article.prose p {
+    margin: 0 0 1.5em;
+  }
+
+  article.prose h2 {
+    font-size: 1.28rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    line-height: 1.6;
+    margin: 2.65em 0 0.95em;
+    counter-increment: sec;
+  }
+
+  article.prose h2::before {
+    content: counter(sec, cjk-ideographic);
+    display: inline-block;
+    margin-right: 0.7em;
+    transform: translateY(-0.12em);
+    font-weight: 600;
+    font-size: 0.6em;
+    letter-spacing: 0.12em;
+    color: var(--amber);
+  }
+
+  article.prose ul {
+    list-style: none;
+    margin: 1.6em 0;
+    padding: 0;
+  }
+
+  article.prose li {
+    position: relative;
+    padding-left: 1.75em;
+    margin: 0.62em 0;
+  }
+
+  /* 列表符号是一枚枚 14° 的小针脚 */
+  article.prose li::before {
+    content: '';
+    position: absolute;
+    left: 0.22em;
+    top: 1em;
+    width: 0.85em;
+    height: 1.5px;
+    background: var(--amber);
+    opacity: 0.6;
+    transform: rotate(calc(var(--seam-angle) * -1));
+  }
+
+  article.prose strong {
+    font-weight: 600;
+    background: linear-gradient(transparent 66%, rgba(194, 163, 130, 0.3) 66%);
+  }
+
+  article.prose a {
+    color: var(--umber);
+  }
+
+  /* 引文是梦侧：暖边 · 左齐 · 轻轻浮动 */
   article.prose blockquote {
+    margin: 2em 0;
+    padding: 0.3em 0 0.3em 1.5em;
+    border-left: 2px solid var(--dream);
+    color: var(--fg-soft);
+    font-size: 0.96em;
+    letter-spacing: 0.02em;
+    text-align: left;
     animation: drift 9.5s ease-in-out infinite;
     --d-amp: 2.6px;
     --d-rot: 0.15deg;
   }
 
+  /* 标签行：纸面小签 */
   .tag-row {
     margin-top: 3rem;
     padding-top: 1.3rem;
     border-top: 1px solid var(--line);
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem 1.6rem;
-    font-size: 0.9rem;
+    gap: 0.45rem;
+    font-size: 0.66rem;
+    letter-spacing: 0.14em;
   }
 
-  .adjacent {
+  .tag-row a {
+    color: var(--fg-faint);
+    border: 1px solid var(--line);
+    padding: 0.14rem 0.5rem 0.1rem;
+    border-radius: 2px;
+    text-decoration: none;
+    transition: color 0.18s ease, border-color 0.18s ease;
+  }
+
+  .tag-row a:hover {
+    color: var(--fg-soft);
+    border-color: color-mix(in srgb, var(--dream) 50%, transparent);
+  }
+
+  /* 相关档案：跨页互链 */
+  .xfile {
     margin-top: 2.6rem;
     padding-top: 1.5rem;
     border-top: 1px solid var(--line);
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: 0.5rem;
   }
 
-  .wake-label {
-    margin: 0 0 0.4rem;
+  .xfile-t {
+    font-size: 0.58rem;
+    letter-spacing: 0.26em;
+    color: var(--fg-faint);
+  }
+
+  .xfile a {
+    font-family: var(--font-display);
+    font-size: 1rem;
+    letter-spacing: 0.03em;
+    text-decoration: none;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 2px;
+    align-self: flex-start;
+  }
+
+  .xfile a:hover {
+    border-color: color-mix(in srgb, var(--amber) 55%, transparent);
+  }
+
+  /* ── 醒来卡：较早/较晚 + 字数读时 ── */
+  .wake-card {
+    margin-top: 2.6rem;
+    border-top: 1px solid var(--line);
+    padding-top: 1.6rem;
+  }
+
+  .wc-label {
     text-align: center;
     font-size: 0.6rem;
     letter-spacing: 0.32em;
     color: var(--fg-faint);
+    margin: 0 0 1.05rem;
   }
 
-  .adj-item {
+  .wc-line {
+    text-align: center;
+    font-family: var(--font-display);
+    font-size: 1.02rem;
+    letter-spacing: 0.12em;
+    color: var(--fg-soft);
+    margin: 0 0 1.5rem;
+  }
+
+  .wc-nav {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border-top: 1px solid var(--line);
+  }
+
+  .wc-nav a,
+  .wc-nav .wn-empty {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: 0.3rem;
+    padding: 1rem 0.2rem 0.5rem;
     text-decoration: none;
-    max-width: 30em;
   }
 
-  .adj-right {
+  .wc-nav .wn-right {
+    border-left: 1px solid var(--line);
+    padding-left: 1.4rem;
     align-items: flex-end;
     text-align: right;
   }
 
-  .adj-label {
-    font-size: 0.78rem;
-    color: var(--fg-faint);
-    letter-spacing: 0.12em;
+  .wn-label {
+    font-size: 0.58rem;
+    letter-spacing: 0.3em;
+    color: var(--umber);
   }
 
-  .adj-title {
+  .wn-title {
     font-family: var(--font-display);
     font-size: 0.98rem;
+    line-height: 1.6;
     color: var(--fg-soft);
-    transition: color 0.18s ease;
+    transition: color 0.2s;
   }
 
-  .adj-item:hover .adj-title {
+  .wc-nav a:hover .wn-title {
+    color: var(--umber);
+  }
+
+  .wc-nav .wn-empty .wn-title {
+    color: var(--fg-faint);
+  }
+
+  .wc-foot {
+    margin: 1.2rem 0 0;
+    padding-top: 1.1rem;
+    border-top: 1px solid var(--line);
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0.5rem 1.4rem;
+    font-size: 0.66rem;
+    letter-spacing: 0.14em;
+    color: var(--fg-faint);
+  }
+
+  .wc-foot a {
+    color: var(--fg-soft);
+    text-decoration: none;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 2px;
+  }
+
+  .wc-foot a:hover {
     color: var(--umber);
   }
 
   @media (prefers-reduced-motion: reduce) {
     .dawn-glow {
       transition: none;
+    }
+
+    article.prose blockquote {
+      animation: none;
+    }
+  }
+
+  @media (max-width: 760px) {
+    .wc-nav {
+      grid-template-columns: 1fr;
+    }
+
+    .wc-nav .wn-right {
+      border-left: 0;
+      border-top: 1px solid var(--line);
+      padding-left: 0.2rem;
+      align-items: flex-start;
+      text-align: left;
+      padding-top: 1rem;
+    }
+  }
+
+  @media (max-width: 640px) {
+    article.prose {
+      text-align: left;
     }
   }
 </style>

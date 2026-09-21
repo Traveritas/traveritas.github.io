@@ -4,6 +4,9 @@ description: 由 Astro 与智能体共建的个人网站，遵循「醒梦」审
 date: 2026-09-19
 status: 进行中
 cover: https://picsum.photos/seed/xingmeng-site/800/500
+note:
+  awake: 深眠里的项目不浮动——它只是很慢地成为自己。此案缝到第五针，其余三针等天亮再缝。
+  dream: 深眠里的项目不浮动——它只是还没醒。第五针之后，针脚会自己走进梦里。
 links:
   - label: GitHub 仓库
     href: https://github.com/Traveritas/traveritas.github.io
