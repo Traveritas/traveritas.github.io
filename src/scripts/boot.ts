@@ -1,9 +1,11 @@
 /* ─────────────────────────────────────────────────────────────
-   开屏 · 校准·穿针（每会话一次）
-   方波校准 1s 描完 → 收成一根线 → 一枚针落下穿线（第一针）
-   → 揭幕（html.booted 触发缝线划出与首屏逐级浮现）。
-   任意输入跳过；reduced-motion / 无 JS 直接进页
-   （无 JS 时靠 CSS 兜底动画自动揭幕）。
+   开屏 · 校准·穿针（两档最短停留）
+   · 首次进入（每会话一次）：全套校准·穿针，揭幕前至少停留 3s
+     （方波 1.5s → 收线 → 落针 → 第一针 → 揭幕）。
+   · 站内切换（同会话后续页面）：快版穿针，至少停留 1s
+     （方波压缩到 0.5s，直接进穿针段）。
+   · 两档都不可跳过；reduced-motion / 无 JS 直接进页
+     （无 JS 时靠 CSS 兜底动画自动揭幕）。
    ───────────────────────────────────────────────────────────── */
 
 import { reducedMotion } from './lib';
@@ -35,39 +37,47 @@ export function initBoot() {
     /* ignore */
   }
 
-  if (seen || reducedMotion()) {
+  if (reducedMotion()) {
     veil.remove();
     done();
     return;
   }
 
+  // 计数 000 → 100（与方波描线同步，时长随档位）
   const pct = document.getElementById('bootpct');
-  const skip = () => {
-    veil.classList.add('ph-out');
-    done();
+  const runCount = (dur: number) => {
+    const t0 = performance.now();
+    const count = () => {
+      const p = Math.min((performance.now() - t0) / dur, 1);
+      if (pct) pct.textContent = String(Math.floor(p * 100)).padStart(3, '0');
+      if (p < 1) requestAnimationFrame(count);
+    };
+    requestAnimationFrame(count);
   };
-  addEventListener('pointerdown', skip, { once: true });
-  addEventListener('keydown', skip, { once: true });
-  addEventListener('wheel', skip, { once: true, passive: true });
-  addEventListener('touchstart', skip, { once: true, passive: true });
 
-  // 计数 000 → 100（与方波描线同步）
-  const t0 = performance.now();
-  const count = () => {
-    const p = Math.min((performance.now() - t0) / 1000, 1);
-    if (pct) pct.textContent = String(Math.floor(p * 100)).padStart(3, '0');
-    if (p < 1) requestAnimationFrame(count);
+  /** tBoot：html.booted（页内缝线划出、首屏浮现开始）；tOut：揭幕淡出 */
+  const settle = (tBoot: number, tOut: number) => {
+    setTimeout(() => root.classList.add('booted'), tBoot);
+    setTimeout(() => {
+      veil.classList.add('ph-out');
+      done();
+    }, tOut);
   };
-  requestAnimationFrame(count);
 
-  setTimeout(() => veil.classList.add('ph-thread'), 1050); // 方波收成线
-  setTimeout(() => veil.classList.add('ph-needle'), 1350); // 针落下
-  setTimeout(() => veil.classList.add('ph-stitch'), 1850); // 第一针
-  setTimeout(() => {
-    root.classList.add('booted');
-  }, 2050); // 缝线开始划出
-  setTimeout(() => {
-    veil.classList.add('ph-out');
-    done();
-  }, 2350);
+  if (seen) {
+    // 站内切换：快版穿针，≥1s
+    veil.classList.add('ph-fast');
+    runCount(900);
+    setTimeout(() => veil.classList.add('ph-thread'), 430);
+    setTimeout(() => veil.classList.add('ph-needle'), 650);
+    setTimeout(() => veil.classList.add('ph-stitch'), 820);
+    settle(900, 1050);
+  } else {
+    // 首次进入：全套校准·穿针，≥3s
+    runCount(1500);
+    setTimeout(() => veil.classList.add('ph-thread'), 1500);
+    setTimeout(() => veil.classList.add('ph-needle'), 1950);
+    setTimeout(() => veil.classList.add('ph-stitch'), 2500);
+    settle(2600, 3100);
+  }
 }
