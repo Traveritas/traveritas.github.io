@@ -1,0 +1,1111 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<!--
+  ═══════════════════════════════════════════════════════════════════
+  素夜 · p10-f 「余线 · 双边」 — 短按点击特效设计稿（C 延伸轮 · 迭代二）
+  · 一句话：松手归缝，针脚只缝住了线的一处——没缝住的余线向
+    「两侧」同时滑脱（沿 −4° 轴各自顺自己那半边离开针脚）：一侧
+    密、一侧疏，段数长短间距时机两侧各异（绝不镜像），每次点击
+    的样子都带受控随机、连点不重样；停一拍后脱针的波自针脚端向
+    两端交错传去，逐段「亮—细—滑—熄」，最后针脚被缝线原地抽走
+    ——线尾归手势，针脚归缝线，页面无痕。
+  · 迭代二改动（对用户意见）：① 双边出线（此前只交代了一半）；
+    ② 受控随机（手工感，非故障感）；③ seed 可复现机制。
+  ── 四拍时序（自松手 t=0 计，总寿命恒 ≤798ms；名义值，均带随机区间）──
+  拍一 · 按压：线段自指下生长（照 reality.ts：−4°、W=p·fullW()、
+       1px 线心＋64px 柔带；柔带在松手瞬间即撤）。
+  拍二 · 快松（≤260ms）收针——元素 .snap 接力，p10fA 232ms：
+       0–136ms  甩入  rotate −4°→+10° · scaleX 1→.45 · scaleY→1.3
+                · cubic-bezier(.22,.75,.3,1)
+     136–192ms  过冲  rotate→15.6° · scaleX→ks×1.16 · scaleY→1.7
+                · cubic-bezier(.3,.5,.35,1)
+     192–232ms  坐定  rotate 归 +14° · scaleX=ks（=14/W0）· scaleY 1.5
+                · opacity .92 · cubic-bezier(.25,.5,.4,1)   ← 主拍落定
+  拍三 · 付线（缩小）：232ms 处换件为 14px 原生宽度 .anchor（防大
+     栅格缩放洗淡渐变）；232–352ms scaleX 1→.65（14→9.1px）·
+     scaleY 1.5→1.4 · opacity .92→.88 · cb(.3,.6,.35,1)——针脚变短
+     ＝线被抽去喂两侧余线。
+  拍四 · 双侧余线滑脱＋逐段闪灭（本轮重心）——元素 .dash ×3–5：
+     出线点：缝轴向两侧各 8–10px（O＝指下 ±eOff·(cos14°,sin14°)）；
+     两侧同住 −4° 轴（同一根线的两半），行进方向各自背离针脚
+     （D＝±(cos−4°,sin−4°)）；出生角恒 +14°（与缝线同轴，语义
+     不抖），滑出途中过峰值（驻角−1.2°）归各自驻角（−4°±1.5°）。
+     时序（名义）：密侧 236–252ms 起滑（级差 53–71ms）、疏侧
+     252–276ms 起滑（级差 66–90ms）；各段入场 108–127ms；最迟
+     ~500ms 落定 → +34–46ms 起波：密侧先起、疏侧延 22–34ms 交错，
+     两侧各自内→外（脱针自针脚端向两端传）；闪灭各 99–117ms
+     （前 40ms 亮起 op→1·顺向外滑 3–4.5px·变细，后段 scaleX→.4·
+     op→0）。钳制：最迟闪灭 ≤756ms（超则等比压缩级差）；锚针
+     退场＝min(718, 最迟闪灭起+40–52ms) 起、82ms 收——总寿命 798。
+  ── 双侧布局规则（不镜像）──────────────────────────────────
+  · 密侧（右/阅读向概率 0.72，左 0.28）：2–3 段、间距 2.5–4.5px、
+    起滑早、级差密、首段 9.5–11.5px；
+  · 疏侧（对侧）：1–2 段、间距 4–7px、起滑晚、级差疏、首段
+    7.5–9.5px；
+  · 两侧段数/长度/间距/粗细/驻角/时机全部独立抽取——段数相等时
+    其余维度仍不对称；全局 3–5 段。
+  ── 受控随机维度清单（mulberry32；同 seed 同指位 → 布局与时序
+     完全可复现；所有区间按「渐短渐细、亮一下即灭」语汇定界）──
+  ① 密侧方向：右 0.72 / 左 0.28
+  ② 段数：密 2–3（+1 概率 .5）、疏 1–2（+1 概率 .45）
+  ③ 首段长：密 9.5–11.5px / 疏 7.5–9.5px；后续段长 ×0.70–0.78
+     逐段递减（逐段新抽）
+  ④ 段间距：密 2.5–4.5px / 疏 4–7px（逐段新抽，含与针脚的起始距）
+  ⑤ 段粗 scaleY：密首段 1.34–1.42 / 疏首段 1.24–1.32，每外伸一段
+     −0.05（渐细）
+  ⑥ 驻角微抖：−4°±1.5°（逐段独立——两段不严格共线，手工感）
+  ⑦ 滑出行程：10–14px/段
+  ⑧ 出线点偏移：缝轴两侧各 8–10px
+  ⑨ 起滑/级差/入场：密起 236–252ms·级差 53–71ms / 疏起 252–276ms·
+     级差 66–90ms；入场 108–127ms（整体时序抖动约 ±8%，钳制兜底）
+  ⑩ 喂线让位窗：108–127ms（仅同侧有后继者；且钳到不与闪灭重叠）
+  ⑪ 闪灭：波起点＝最迟落定+34–46ms；疏侧延 22–34ms；级差密
+     49–65ms / 疏 52–70ms；时长 99–117ms；顺向外滑 3–4.5px
+  ⑫ 锚针退场：min(718, 最迟闪灭+40–52ms)
+  ── seed 机制 ─────────────────────────────────────────────
+  · replay(x,y,{seed})：固定 seed 固定整条随机序列；真实点击每次
+    真随机（state().seed 报告当次种子）；
+  · ?seed=N：进页 700ms 后以该 seed 自动演示一次；
+  · ?demo=loop：每轮换新 seed（角标显示当拍 seed）；
+  · freezeAt 用 curSeed（初始＝?seed，未设则 0→默认 861003；
+    __p10.seed(n) 可随时设定）；
+  · __p10.plan(seed,x,y)：返回该 seed 的完整排程 JSON（段布局＋
+    时序＋波起点＋锚退场），供验收脚本按相位选冻结时刻。
+  ── 边界收缩（双侧，防裁边）──────────────────────────────
+  每侧可用宽＝指位到该侧视缘−10px；该侧需求超限先等比收缩
+  （系数 ≥0.55），不足则自最外段起丢弃直至放下；两侧独立处理
+  ——窄屏近缘指位两侧都不裁边（段变少变短，不切断不变形）。
+  ── 双色与 RM ──────────────────────────────────────────────
+  · 双色：琥珀线心恒定 rgba(217,160,91,.8)（渐变中段，全站唯一
+    异质色，不随面降级）；线尾随面——梦暖 rgba(194,163,130,.4) /
+    醒冷 rgba(167,177,186,.38)，与 reality.ts t-core 同值；针脚与
+    余线同一线心渐变（同一条线）。?face=dream|wake 预览。
+  · prefers-reduced-motion：按压不画线；松手处一枚静态针脚
+    （+14° 直接成形，无位移）仅 160ms 淡出——无余线、无闪灭、
+    无随机（RM 不需要花样）。?reduced=1 可模拟。
+  ── 不破相 ──────────────────────────────────────────────────
+  每次点击独立元素组＋独立生成的一段 @keyframes（具名防串），
+  animationend 自拆（换件与清场另有墙钟兜底）；连点各自成针互
+  不叠加（replay 不清场，不误伤在播实例）；贴文字边缘不触发
+  （EXCLUDE 语义与 reality.ts 同）；触屏按 pointer 坐标定位，
+  touch-action:manipulation；长按期间禁选择、禁右键菜单；
+  >260ms 松手＝线原路缩回（reality.ts 公式），无针脚。
+  ── 验收 ────────────────────────────────────────────────────
+  ?demo=loop 循环演示（交替双色 · 70/150/230ms 变按压时长 · 每轮
+  换 seed）；window.__p10 = { state()（含 seed）· press(x,y) ·
+  release() · replay(x,y,{hold,face,seed}) · seed(n) · plan(seed,x,y)
+  · freezeAt(ms,x,y,keep) · spots() · clearFx() · loop(on) }；
+  freezeAt 由 JS 按同一 run 对象分段解算该相位全部元素 pose，
+  scaleX 烧进宽度后写内联定格（.pose 挂 animation:none!important，
+  压过 no-motion 的 RM 淡出），与实况共用同一组数——同 seed 同
+  相位冻结帧＝实况帧。
+  ═══════════════════════════════════════════════════════════════════
+-->
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#e9ecef">
+<meta name="description" content="素夜 p10-f「余线·双边」：短按点击特效设计稿——松手归缝成一针，没缝住的余线向两侧滑脱、逐段闪灭（受控随机，seed 可复现），最后针脚被缝线抽走。">
+<title>随笔 — Traveritas · 素夜 · p10-f 余线（双边）</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%23e9ecef'/><rect x='9' y='15.2' width='14' height='1.6' fill='%23d9a05b' transform='rotate(-14 16 16)'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Serif+SC:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+/* ═══ 素夜 · PLAIN NIGHT 令牌（与 src/styles/tokens.css 同源） ═══ */
+:root{
+  --bg:#e9ecef; --bg-sunken:#e1e5ea;
+  --fg:#262c33; --fg-soft:#59626c; --fg-faint:#8a929b;
+  --line:rgba(38,44,51,.14);
+  --wake:#a7b1ba; --dream:#c2a382; --umber:#8a6a4f;
+  --amber:#d9a05b;
+  --seam-angle:14deg;
+  --ghost-ink:#b98f74;
+  --font-display:'Noto Serif SC','Palatino Linotype','Iowan Old Style',Palatino,Georgia,'Source Han Serif SC','Songti SC',SimSun,serif;
+  --font-body:system-ui,-apple-system,'PingFang SC','Hiragino Sans GB','Microsoft YaHei UI','Microsoft YaHei','Noto Sans SC',sans-serif;
+  --font-mono:'IBM Plex Mono',ui-monospace,'Cascadia Mono',Consolas,'JetBrains Mono',monospace;
+  --measure:34em;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%;overflow-x:clip}
+body{
+  font-family:var(--font-body);font-size:1.0625rem;line-height:1.9;
+  color:var(--fg);background:var(--bg);
+  text-rendering:optimizeLegibility;overflow-x:clip;min-height:100dvh;
+  display:flex;flex-direction:column;
+  touch-action:manipulation;-webkit-tap-highlight-color:transparent;
+}
+[hidden]{display:none!important}
+img,svg{display:block;max-width:100%}
+a{color:inherit;text-decoration-thickness:1px;text-underline-offset:.3em;transition:color .18s ease}
+a:hover{color:var(--umber)}
+:focus-visible{outline:2px solid var(--amber);outline-offset:3px;border-radius:1px}
+::selection{background:rgba(217,160,91,.32)}
+.mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums;letter-spacing:.04em}
+ul,ol{list-style:none}
+body.holding{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+
+/* ── 全站 chrome：14° 缝线 · 纸纹 ── */
+.seam{
+  position:fixed;left:50%;top:50%;width:170vmax;height:1px;z-index:0;pointer-events:none;
+  background:linear-gradient(90deg,rgba(167,177,186,0),rgba(167,177,186,.26) 24%,rgba(194,163,130,.20) 76%,rgba(194,163,130,0));
+  transform:translate(-50%,-50%) rotate(var(--seam-angle));
+  opacity:.5;
+}
+.grain{
+  position:fixed;inset:0;z-index:50;pointer-events:none;opacity:.045;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='180' height='180' filter='url(%23n)' opacity='.6'/></svg>");
+}
+
+/* ── 左轨 station（≥1200px） ── */
+.rail{
+  position:fixed;left:30px;top:50%;transform:translateY(-50%);z-index:40;
+  display:flex;flex-direction:column;align-items:center;gap:1.15rem;
+  pointer-events:none;color:var(--fg-soft);
+}
+.rail-station{writing-mode:vertical-rl;display:flex;gap:.9rem;align-items:center;
+  padding-left:.8rem;border-left:1px solid var(--line)}
+.rail-name{font-family:var(--font-display);font-size:.8rem;letter-spacing:.42em}
+.rail-en{font-size:.56rem;letter-spacing:.3em;opacity:.66}
+
+/* ── 版面 ── */
+.page{min-height:100dvh;display:flex;flex-direction:column}
+main{flex:1;position:relative;z-index:10}
+.wrap{width:min(100% - 3rem,56rem);margin-inline:auto}
+.view{padding-block:clamp(2.8rem,7vh,4.6rem) clamp(3rem,8vh,5rem);animation:viewIn .5s ease both}
+@keyframes viewIn{from{opacity:0;transform:translateY(8px)}}
+
+/* ── 站头 ── */
+.site-header{padding-block:1.4rem;position:relative;z-index:20}
+.header-row{width:min(100% - 3rem,62rem);margin-inline:auto;
+  display:flex;align-items:center;justify-content:space-between;gap:1.5rem}
+.brand{display:inline-flex;align-items:center;gap:.55rem;color:var(--fg);
+  text-decoration:none;font-family:var(--font-display);font-size:1.05rem;letter-spacing:.02em}
+.brand .brand-dot{width:5px;height:5px;background:var(--amber);transform:rotate(45deg)}
+.site-nav{display:flex;gap:1.6rem}
+.site-nav a{color:var(--fg-soft);text-decoration:none;font-size:.95rem}
+.site-nav a:hover,.site-nav a[aria-current="page"]{color:var(--fg)}
+.site-nav a[aria-current="page"]::after{
+  content:'';display:block;width:1.1em;height:1px;margin:2px auto 0;background:var(--amber);
+}
+
+/* ── 列表页头 / 分年轴 ── */
+.page-head{margin-bottom:clamp(3.4rem,7vh,4.4rem)}
+.page-head h1{font-family:var(--font-display);font-weight:600;
+  font-size:clamp(1.5rem,3.5vw,2rem);letter-spacing:.06em}
+.lede{margin:.75rem 0 0;color:var(--fg-soft);max-width:var(--measure);
+  font-size:.98rem;letter-spacing:.05em}
+.axis{position:relative;margin:0 0 1.6rem;padding-left:.2rem;
+  display:flex;align-items:baseline;gap:1.2rem}
+.axis-line{position:absolute;left:-3.4rem;top:.5em;width:150px;height:1px;
+  background:var(--fg-soft);opacity:.4;transform:rotate(-4deg);transform-origin:right center}
+.axis-tag{font-size:.72rem;letter-spacing:.2em;color:var(--umber)}
+.axis-tag-en{font-size:.56rem;letter-spacing:.24em;color:var(--fg-faint)}
+
+/* ── 随笔列表：回眠行语法（照 p9-S） ── */
+.essay-ledger li{border-top:1px solid var(--line)}
+.essay-ledger li:last-child{border-bottom:1px solid var(--line)}
+.essay-ledger a{
+  display:grid;grid-template-columns:5.6rem minmax(0,1fr) auto;gap:0 1.8rem;
+  padding-block:1.45rem;align-items:start;text-decoration:none;
+}
+.el-night{display:flex;flex-direction:column;gap:.15rem;padding-top:.35rem}
+.el-night b{font-family:var(--font-mono);font-weight:500;font-size:.92rem;
+  letter-spacing:.08em;color:var(--umber)}
+.el-night i{font-style:normal;font-family:var(--font-mono);font-size:.7rem;
+  letter-spacing:.1em;color:var(--fg-faint)}
+.el-title{position:relative;display:inline-block;font-family:var(--font-display);
+  font-weight:600;font-size:1.26rem;letter-spacing:.03em;line-height:1.5;color:var(--fg)}
+.el-title .ghost{position:absolute;inset:0;color:var(--ghost-ink);opacity:0;
+  pointer-events:none;transform:translate(-7px,4px);filter:blur(.4px);
+  transition:opacity .55s ease,transform .55s ease}
+.essay-ledger a:hover .el-title .ghost{opacity:.5;transform:translate(7px,-3px)}
+.essay-ledger a:hover .el-title{color:var(--umber)}
+.el-desc{display:block;margin-top:.3rem;color:var(--fg-soft);font-size:.95rem;
+  line-height:1.8;max-width:34em}
+.el-tags{display:flex;flex-wrap:wrap;gap:.45rem;margin-top:.7rem}
+.el-tags i{font-style:normal;font-size:.66rem;letter-spacing:.14em;color:var(--fg-faint);
+  border:1px solid var(--line);padding:.14rem .5rem .1rem;border-radius:2px}
+.el-count{display:flex;flex-direction:column;align-items:flex-end;gap:.15rem;
+  padding-top:.5rem;white-space:nowrap}
+.el-count b{font-family:var(--font-mono);font-weight:400;font-size:.74rem;
+  letter-spacing:.1em;color:var(--fg-soft)}
+.el-count i{font-style:normal;font-family:var(--font-mono);font-size:.6rem;
+  letter-spacing:.14em;color:var(--fg-faint)}
+.ledger-cap{margin-top:2.2rem;font-size:.85rem;letter-spacing:.05em;
+  color:var(--fg-faint);line-height:2;max-width:38em}
+
+/* ── 站尾 ── */
+.site-footer{border-top:1px solid var(--line);margin-top:clamp(3.5rem,9vh,6rem);
+  padding-block:1.6rem 2rem;font-size:.875rem;color:var(--fg-faint);position:relative;z-index:10}
+.footer-row{width:min(100% - 3rem,62rem);margin-inline:auto;
+  display:flex;align-items:baseline;justify-content:space-between;gap:1rem 2rem;flex-wrap:wrap}
+.site-footer a{color:var(--fg-faint);text-decoration:none}
+.site-footer a:hover{color:var(--fg-soft)}
+.footer-clock{font-size:.8rem;color:var(--fg-soft)}
+.ft-links{display:flex;gap:1.4rem}
+
+/* ═══ 特效层：按压拉线（JS 宽度绘制）＋ 收针/付线/双侧余线（生成式 CSS 动画） ═══ */
+.fx{position:fixed;inset:0;z-index:210;pointer-events:none;overflow:hidden}
+.fx .thread{position:absolute;left:0;top:0;width:0;height:0;display:none;transform-origin:0 0}
+.fx .t-core{position:absolute;top:-.5px;left:0;width:0;height:1px;opacity:1;
+  background:linear-gradient(90deg,
+    rgba(167,177,186,0),rgba(167,177,186,.38) 8%,rgba(217,160,91,.8) 50%,
+    rgba(167,177,186,.38) 92%,rgba(167,177,186,0))}
+html[data-face="dream"] .fx .t-core{background:linear-gradient(90deg,
+    rgba(194,163,130,0),rgba(194,163,130,.4) 8%,rgba(217,160,91,.8) 50%,
+    rgba(194,163,130,.4) 92%,rgba(194,163,130,0))}
+.fx .t-band{position:absolute;top:-32px;left:0;width:0;height:64px;opacity:0;
+  -webkit-mask-image:linear-gradient(90deg,transparent,#000 14%,#000 86%,transparent);
+  mask-image:linear-gradient(90deg,transparent,#000 14%,#000 86%,transparent);
+  background:linear-gradient(180deg,rgba(157,170,182,0),rgba(157,170,182,.11) 50%,rgba(157,170,182,0))}
+html[data-face="dream"] .fx .t-band{background:linear-gradient(180deg,
+    rgba(198,166,130,0),rgba(198,166,130,.12) 50%,rgba(198,166,130,0))}
+
+/* 拍二 .snap：松手时线段定格，同几何同渐变元素以 CSS 接力甩角收拢。
+   --tx/--ty = 元素左上角；--ks = 14px / W0；transform-origin 居中。 */
+.fx .snap{
+  position:absolute;left:0;top:0;height:1px;display:block;pointer-events:none;
+  transform-origin:center;will-change:transform,opacity;
+  background:linear-gradient(90deg,
+    rgba(167,177,186,0),rgba(167,177,186,.38) 8%,rgba(217,160,91,.8) 50%,
+    rgba(167,177,186,.38) 92%,rgba(167,177,186,0));
+  transform:translate(var(--tx,0px),var(--ty,0px)) rotate(-4deg);
+  animation:p10fA .232s linear both;
+}
+.fx .snap.dream{background:linear-gradient(90deg,
+    rgba(194,163,130,0),rgba(194,163,130,.4) 8%,rgba(217,160,91,.8) 50%,
+    rgba(194,163,130,.4) 92%,rgba(194,163,130,0))}
+@keyframes p10fA{
+  0%{transform:translate(var(--tx,0px),var(--ty,0px)) rotate(-4deg) scale(1,1);opacity:1;
+     animation-timing-function:cubic-bezier(.22,.75,.3,1)}
+  58.6%{transform:translate(var(--tx,0px),var(--ty,0px)) rotate(10deg) scale(.45,1.3);opacity:1;
+     animation-timing-function:cubic-bezier(.3,.5,.35,1)}
+  82.8%{transform:translate(var(--tx,0px),var(--ty,0px)) rotate(15.6deg) scale(calc(var(--ks,1)*1.16),1.7);opacity:1;
+     animation-timing-function:cubic-bezier(.25,.5,.4,1)}
+  100%{transform:translate(var(--tx,0px),var(--ty,0px)) rotate(14deg) scale(var(--ks,1),1.5);opacity:.92}
+}
+
+/* 拍三 .anchor：232ms 处由 14px 原生宽度新元素接力；付线缩短 → 驻留
+   → 原地抽走。动画名为每次点击生成的 p10fA{n}（退场时机随 run），
+   由 JS 内联指定；RM 用静态 p10rm 淡出。 */
+.fx .anchor{
+  position:absolute;left:0;top:0;height:1px;width:14px;display:block;pointer-events:none;
+  transform-origin:center;will-change:transform,opacity;
+  background:linear-gradient(90deg,
+    rgba(167,177,186,0),rgba(167,177,186,.38) 8%,rgba(217,160,91,.8) 50%,
+    rgba(167,177,186,.38) 92%,rgba(167,177,186,0));
+  transform:translate(var(--tx,0px),var(--ty,0px)) rotate(14deg) scale(1,1.5);
+}
+.fx .anchor.dream{background:linear-gradient(90deg,
+    rgba(194,163,130,0),rgba(194,163,130,.4) 8%,rgba(217,160,91,.8) 50%,
+    rgba(194,163,130,.4) 92%,rgba(194,163,130,0))}
+/* RM：静态针脚，仅淡出（无位移、无余线、无随机） */
+.fx .anchor.rm{animation:p10rm .16s linear both}
+@keyframes p10rm{from{opacity:.9}to{opacity:0}}
+
+/* 拍四 .dash：双侧余线段。--ex/--ey 出生位、--fx/--fy 驻位、
+   --gx/--gy 闪灭顺向滑后的位（均指元素左上角）。出生角恒 +14°。
+   动画名 p10fK{n} 每次点击生成（布局/时序随 seed），0% 帧与基态同值。 */
+.fx .dash{
+  position:absolute;left:0;top:0;height:1px;display:block;pointer-events:none;
+  transform-origin:center;will-change:transform,opacity;
+  background:linear-gradient(90deg,
+    rgba(167,177,186,0),rgba(167,177,186,.38) 8%,rgba(217,160,91,.8) 50%,
+    rgba(167,177,186,.38) 92%,rgba(167,177,186,0));
+  transform:translate(var(--ex,0px),var(--ey,0px)) rotate(14deg) scale(.35,1.15);
+  opacity:0;
+}
+.fx .dash.dream{background:linear-gradient(90deg,
+    rgba(194,163,130,0),rgba(194,163,130,.4) 8%,rgba(217,160,91,.8) 50%,
+    rgba(194,163,130,.4) 92%,rgba(194,163,130,0))}
+/* 相位冻结态：JS 解算关键帧插值为内联 transform/opacity（scaleX 烧进
+   宽度）。!important 压过 body.no-motion 的 p10rm 规则（?reduced=1 下
+   否则冻结件会被 RM 淡出动画在截图前洗没） */
+.fx .snap.pose,.fx .anchor.pose,.fx .dash.pose{animation:none!important}
+
+/* 长按示意 ◆（静态，非本稿重心） */
+.fx .knot{position:absolute;left:0;top:0;width:14px;height:14px;margin:-7px 0 0 -7px;
+  display:none;transform:translate(-100px,-100px) rotate(45deg);opacity:0;
+  transition:opacity .25s ease}
+.fx .knot i{position:absolute;inset:0;display:block;
+  border:1px solid rgba(38,44,51,.55);background:rgba(217,160,91,.14)}
+.fx .knot i::after{content:'';position:absolute;left:5px;top:5px;width:4px;height:4px;
+  background:var(--amber)}
+.fx .knot.still{display:block;opacity:1}
+
+/* 注记 / 演示角标 */
+.lp-note{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:220;
+  max-width:min(88vw,40em);text-align:center;
+  font-size:.62rem;letter-spacing:.18em;color:var(--fg-soft);line-height:1.9;
+  background:rgba(233,236,239,.92);border:1px solid var(--line);
+  padding:.5rem 1rem .45rem;pointer-events:none;
+  opacity:0;transition:opacity .3s ease}
+.lp-note.on{opacity:1}
+.demo-chip{position:fixed;left:18px;bottom:18px;z-index:220;
+  font-size:.62rem;letter-spacing:.14em;color:var(--fg-soft);
+  background:rgba(233,236,239,.92);border:1px solid var(--line);
+  padding:.42rem .7rem .38rem;pointer-events:none}
+
+/* ── 退让 ── */
+@media (prefers-reduced-motion:reduce){
+  .view{animation:none}
+  .seam{opacity:.4}
+  a{transition:none}
+  .el-title .ghost{display:none}
+}
+html.rm .view{animation:none}
+html.rm a{transition:none}
+html.rm .el-title .ghost{display:none}
+body.no-motion *{transition:none!important}
+body.no-motion .fx .anchor{animation:p10rm .16s linear both}
+
+/* ── 响应式 ── */
+@media (max-width:1199px){.rail{display:none}}
+@media (max-width:760px){
+  body{font-size:1rem}
+  .site-header{padding-block:1.1rem}
+  .site-nav{gap:1.05rem}
+  .site-nav a{font-size:.88rem}
+  .brand{font-size:.95rem}
+  .essay-ledger a{grid-template-columns:1fr;gap:.25rem;padding-block:1.3rem}
+  .el-night{flex-direction:row;align-items:baseline;gap:.8rem;order:0;padding-top:0}
+  .el-night i::before{content:'· ';color:var(--fg-faint)}
+  .el-count{flex-direction:row;gap:.8rem;align-items:baseline;padding-top:0}
+  .el-count i::before{content:'· ';color:var(--fg-faint)}
+  .el-title{font-size:1.14rem}
+}
+@media (max-width:640px){
+  .wrap{width:calc(100% - 2.2rem)}
+  .axis-line{left:-1.15rem;width:1rem}
+}
+</style>
+</head>
+<body>
+
+<!-- 全站 chrome：14° 缝线 · 纸纹 -->
+<div class="seam" aria-hidden="true"></div>
+<div class="grain" aria-hidden="true"></div>
+
+<!-- 左轨 station -->
+<aside class="rail" aria-hidden="true">
+  <div class="rail-station">
+    <span class="rail-name">随笔 · 账目</span>
+    <span class="rail-en mono">ESSAYS LEDGER</span>
+  </div>
+</aside>
+
+<div class="page">
+
+<header class="site-header">
+  <div class="header-row">
+    <a class="brand" href="#" data-dead><i class="brand-dot" aria-hidden="true"></i>Traveritas</a>
+    <nav class="site-nav" aria-label="主导航">
+      <a href="#" data-dead aria-current="page">随笔</a>
+      <a href="#" data-dead>项目</a>
+      <a href="#" data-dead title="示例稿未含关于页">关于</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+  <section class="view" aria-label="随笔列表">
+    <div class="wrap">
+      <header class="page-head">
+        <h1>随笔</h1>
+        <p class="lede">想法、记录，与梦的边角料。</p>
+      </header>
+
+      <div class="axis" aria-hidden="true">
+        <i class="axis-line"></i>
+        <span class="axis-tag mono">2026 · 3 篇</span>
+        <span class="axis-tag-en mono">夜时刻为夜内位置 · DATES VERIFIABLE</span>
+      </div>
+
+      <ol class="essay-ledger">
+        <li>
+          <a href="#/articles/hello-xingmeng" data-dead>
+            <span class="el-night"><b>23:31</b><i>2026.09.19</i></span>
+            <span class="el-main">
+              <span class="el-title"><span class="ghost" aria-hidden="true">开站：在醒与梦之间</span>开站：在醒与梦之间</span>
+              <span class="el-desc">这个网站为什么存在，以及它想长成什么样子。</span>
+              <span class="el-tags"><i>建站</i><i>醒梦</i></span>
+            </span>
+            <span class="el-count"><b>405 字</b><i>读毕约一分钟</i></span>
+          </a>
+        </li>
+        <li>
+          <a href="#/articles/building-with-agents" data-dead>
+            <span class="el-night"><b>00:44</b><i>2026.09.19</i></span>
+            <span class="el-main">
+              <span class="el-title"><span class="ghost" aria-hidden="true">与智能体一起造一个网站</span>与智能体一起造一个网站</span>
+              <span class="el-desc">记录这个站点的另一种建造方式：我出方向，智能体出手。</span>
+              <span class="el-tags"><i>建站</i><i>智能体</i></span>
+            </span>
+            <span class="el-count"><b>374 字</b><i>读毕约一分钟</i></span>
+          </a>
+        </li>
+        <li>
+          <a href="#/articles/motif-exploration-log" data-dead>
+            <span class="el-night"><b>01:02</b><i>2026.09.19</i></span>
+            <span class="el-main">
+              <span class="el-title"><span class="ghost" aria-hidden="true">母题探索记录：从碎块到花</span>母题探索记录：从碎块到花</span>
+              <span class="el-desc">主页视觉母题的三轮探索与两次否决——一份仍在进行中的设计日志。</span>
+              <span class="el-tags"><i>建站</i><i>设计</i><i>醒梦</i></span>
+            </span>
+            <span class="el-count"><b>630 字</b><i>读毕约二分钟</i></span>
+          </a>
+        </li>
+      </ol>
+
+      <p class="ledger-cap">
+        夜时刻是各篇在这一夜里的位置；字数与日期，醒来均可核验。轻点空白处：指下抽出一截线，松手归缝成一针——没缝住的余线向两侧滑脱、逐段闪灭，每次的样子都略有不同；按住不放，线长才足以成结。
+      </p>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="footer-row">
+    <span>Traveritas 2026</span>
+    <span class="footer-clock mono" aria-label="夜里时刻">夜里 00:47</span>
+    <span>在醒与梦之间</span>
+    <span class="ft-links">
+      <a href="https://github.com/Traveritas" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://traveritas.github.io/rss.xml">RSS</a>
+    </span>
+  </div>
+</footer>
+
+</div><!-- /.page -->
+
+<!-- 特效层：拉线 · 收针/付线 · 双侧余线 · 示意结 -->
+<div class="fx" id="fx" aria-hidden="true">
+  <div class="thread" id="thread"><i class="t-band" id="tBand"></i><i class="t-core" id="tCore"></i></div>
+  <div class="knot" id="knot"><i></i></div>
+</div>
+
+<p class="lp-note mono" id="lpNote">长按示意 · 线继续生长 —— 按满成 ◆ 结 · 环闪 · 全页微沉（p8 语汇，本稿从简）</p>
+<p class="demo-chip mono" id="demoChip" hidden></p>
+
+<script>
+(function(){
+'use strict';
+/* 错误钩子（照 p9 做法） */
+window.__swarmErr='none';
+window.addEventListener('error',function(e){
+  window.__swarmErr=String((e&&e.message)||((e&&e.type)||'unknown'));
+});
+window.addEventListener('unhandledrejection',function(e){
+  window.__swarmErr='rej '+String((e&&e.reason&&e.reason.message)||e.reason);
+});
+
+var d=document,docEl=d.documentElement,body=d.body;
+var qs=new URLSearchParams(location.search);
+var RM=qs.get('reduced')==='1'||
+  (window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches);
+if(qs.get('reduced')==='1'){docEl.classList.add('rm');body.classList.add('no-motion');}
+
+/* ── 面：默认醒；?face=dream 预览梦面线尾 ── */
+var FACE=qs.get('face')==='dream'?'dream':'wake';
+function setFace(f){FACE=f;docEl.dataset.face=f;}
+setFace(FACE);
+
+/* ── 常量（与 reality.ts 同值） ── */
+var T_GO=2200,CLICK_MS=260,RETRACT_MS=560;
+var EXCLUDE='a,button,input,textarea,select,label,summary,[contenteditable],h1,h2,h3,h4,h5,h6,p,li,blockquote,figcaption,dt,dd,time,code,pre,[data-morph],[data-nofx]';
+var KBD_DENY='a,button,input,textarea,select,summary,[contenteditable],[data-nofx]';
+function eo3(t){return 1-Math.pow(1-t,3)}
+
+var fx=d.getElementById('fx'),thread=d.getElementById('thread'),
+    tCore=d.getElementById('tCore'),tBand=d.getElementById('tBand'),
+    knot=d.getElementById('knot'),lpNote=d.getElementById('lpNote'),
+    demoChip=d.getElementById('demoChip');
+
+var mode='idle',src=null,pid=-1,px=Math.round(innerWidth/2),py=Math.round(innerHeight/2),
+    p=0,holdT0=0,rt0=0,rFrom=0,rdur=0,startX=0,startY=0,scrollMark=0,raf=0,clicks=0;
+var frozen=[];
+var apiSeed=null; /* replay({seed}) 挂起的一次性种子 */
+
+/* ── 按压拉线（几何与 reality.ts 一致） ── */
+function fullW(){return 2*Math.max(px,innerWidth-px)+80}
+function fullWAt(x){return 2*Math.max(x,innerWidth-x)+80}
+function draw(W,coreOp,bandOp){
+  thread.style.transform='translate('+px+'px,'+py+'px) rotate(-4deg)';
+  tCore.style.width=W+'px';tCore.style.left=(-W/2)+'px';
+  tBand.style.width=W+'px';tBand.style.left=(-W/2)+'px';
+  tCore.style.opacity=coreOp;tBand.style.opacity=bandOp;
+}
+
+/* ══ 受控随机：mulberry32（同 seed 同序列；makeRun 为 (seed,x,y) 纯函数） ══ */
+function mulberry(seed){
+  var s=seed>>>0;
+  return function(){
+    s|=0;s=s+0x6D2B79F5|0;
+    var t=Math.imul(s^s>>>15,1|s);
+    t=t+Math.imul(t^t>>>7,61|t)^t;
+    return((t^t>>>14)>>>0)/4294967296;
+  };
+}
+function jr(r,a,b){return a+(b-a)*r()}
+var curSeed=0;
+(function(){
+  var v=qs.get('seed');
+  if(v!=null&&v!==''){var n=parseInt(v,10);if(!isNaN(n))curSeed=n>>>0;}
+})();
+function newSeed(){return (Math.random()*2147483647)|0}
+
+/* ══ 双侧余线排程（所有范围见头注「受控随机维度清单」） ══ */
+var A14=14*Math.PI/180,AX14=Math.cos(A14),AY14=Math.sin(A14);
+var U4=-4*Math.PI/180,UX=Math.cos(U4),UY=Math.sin(U4);
+var TOT=798,SNAP_T=232;
+function sideSegs(r,kind,sgn){
+  var n=kind==='d'?2+(r()<.5?1:0):1+(r()<.45?1:0);
+  var segs=[],edge=0,
+      L0=kind==='d'?jr(r,9.5,11.5):jr(r,7.5,9.5),
+      sy0=kind==='d'?jr(r,1.34,1.42):jr(r,1.24,1.32),
+      gA=kind==='d'?2.5:4,gB=kind==='d'?4.5:7;
+  for(var i=0;i<n;i++){
+    var len=i===0?L0:L0*Math.pow(jr(r,.70,.78),i);
+    var gap=jr(r,gA,gB);
+    var off=edge+gap+len/2;edge=off+len/2;
+    segs.push({sgn:sgn,kind:kind,w:+len.toFixed(2),off:+off.toFixed(2),
+      rest:+(-4+jr(r,-1.5,1.5)).toFixed(2),trav:+jr(r,10,14).toFixed(2),
+      syE:+(sy0-.05*i).toFixed(3)});
+  }
+  return segs;
+}
+/* 边界收缩：先等比（≥.55），不足则丢最外段直至放下；两侧独立 */
+function shrinkSide(segs,avail){
+  var last=segs[segs.length-1],need=last.off+last.w/2+3;
+  if(need<=avail)return segs;
+  var k=avail/need;
+  if(k>=.55){
+    segs.forEach(function(s){s.off=+(s.off*k).toFixed(2);s.w=+(Math.max(6,s.w*Math.max(.6,k))).toFixed(2);s.trav=+(s.trav*k).toFixed(2);});
+    return segs;
+  }
+  while(segs.length>1){
+    segs.pop();
+    last=segs[segs.length-1];need=last.off+last.w/2+3;
+    if(need<=avail*1.06)break;
+  }
+  var need2=segs[segs.length-1].off+segs[segs.length-1].w/2+3;
+  if(need2>avail){
+    var k2=Math.max(.5,avail/need2);
+    segs.forEach(function(s){s.off=+(s.off*k2).toFixed(2);s.w=+(Math.max(6,s.w*k2)).toFixed(2);s.trav=+(s.trav*k2).toFixed(2);});
+  }
+  return segs;
+}
+function segGeom(x,y,s){
+  var ox=x+s.sgn*s.eOff*AX14,oy=y+s.eOff*AY14,dx=s.sgn*UX,dy=s.sgn*UY;
+  s.cx=ox+s.off*dx;s.cy=oy+s.off*dy;
+  s.px=ox+(s.off-s.trav)*dx;s.py=oy+(s.off-s.trav)*dy;
+  s.gx=ox+(s.off+s.slip)*dx;s.gy=oy+(s.off+s.slip)*dy;
+}
+function makeRun(seed,x,y){
+  var r=mulberry(seed>>>0);
+  var denseSgn=r()<.72?1:-1;
+  var dsegs=sideSegs(r,'d',denseSgn),ssegs=sideSegs(r,'s',-denseSgn);
+  var eOffD=9+jr(r,-1,1),eOffS=9+jr(r,-1,1);
+  dsegs.forEach(function(s){s.eOff=+eOffD.toFixed(2)});
+  ssegs.forEach(function(s){s.eOff=+eOffS.toFixed(2)});
+  /* 双侧边界收缩（随指位；同 seed 同点位 → 同结果） */
+  var availR=innerWidth-x-10,availL=x-10;
+  var rd=denseSgn===1?dsegs:ssegs,rs=denseSgn===1?ssegs:dsegs;
+  rd=shrinkSide(rd,denseSgn===1?availR:availL);
+  rs=shrinkSide(rs,denseSgn===1?availL:availR);
+  /* 时序：密侧先起、疏侧晚起 */
+  var t0d=jr(r,236,252),cadd=jr(r,53,71),t0s=jr(r,252,276),cads=jr(r,66,90);
+  function timing(segs,t0,cad){
+    var t=t0;
+    segs.forEach(function(s,i){
+      s.e0=Math.round(t);s.eDur=Math.round(jr(r,108,127));
+      if(i<segs.length-1){s.feed=true;s.feedDur=Math.round(jr(r,108,127));}
+      else{s.feed=false;s.feedDur=0;}
+      t+=cad;
+    });
+  }
+  timing(rd,t0d,cadd);timing(rs,t0s,cads);
+  var segs=rd.concat(rs);
+  var lastLand=0;segs.forEach(function(s){lastLand=Math.max(lastLand,s.e0+s.eDur)});
+  /* 闪灭波：自针脚端向两端交错（密侧先起） */
+  var W0=Math.round(lastLand+jr(r,34,46));
+  var W0s=W0+Math.round(jr(r,22,34));
+  var cfd=jr(r,49,65),cfs=jr(r,52,70);
+  var fDurD=Math.round(jr(r,99,117)),fDurS=Math.round(jr(r,99,117));
+  rd.forEach(function(s,i){s.u0=W0+Math.round(i*cfd);s.fDur=fDurD});
+  rs.forEach(function(s,i){s.u0=W0s+Math.round(i*cfs);s.fDur=fDurS});
+  var slipD=+jr(r,3,4.5).toFixed(2),slipS=+jr(r,3,4.5).toFixed(2);
+  rd.forEach(function(s){s.slip=slipD});rs.forEach(function(s){s.slip=slipS});
+  /* 钳制一：喂线窗不与闪灭重叠（保关键帧次序） */
+  segs.forEach(function(s){
+    if(s.feed&&s.e0+s.eDur+s.feedDur>s.u0-8)
+      s.feedDur=Math.max(24,s.u0-8-s.e0-s.eDur);
+  });
+  /* 钳制二：最迟闪灭 ≤756（超则等比压缩级差） */
+  var maxU0=0,maxFD=0;
+  segs.forEach(function(s){maxU0=Math.max(maxU0,s.u0);maxFD=Math.max(maxFD,s.fDur)});
+  if(maxU0+maxFD>756&&maxU0>W0){
+    var k=Math.max(0,(756-W0-maxFD)/(maxU0-W0));
+    segs.forEach(function(s){s.u0=W0+Math.round((s.u0-W0)*k)});
+    maxU0=0;segs.forEach(function(s){maxU0=Math.max(maxU0,s.u0)});
+  }
+  segs.forEach(function(s){s.u1=s.u0+s.fDur});
+  /* 钳制三：锚针退场 */
+  var exit0=Math.min(718,Math.round(maxU0+jr(r,40,52)));
+  if(TOT-exit0<72)exit0=726;
+  var exitDur=TOT-exit0;
+  segs.forEach(function(s){segGeom(x,y,s)});
+  return{seed:seed>>>0,segs:segs,denseSgn:denseSgn,W0:W0,
+    lastLand:Math.round(lastLand),exit0:exit0,exitDur:exitDur};
+}
+
+/* ── 分段缓动（冻结用，与生成关键帧同数） ── */
+function bez(x1,y1,x2,y2,xx){
+  if(xx<=0)return 0;
+  if(xx>=1)return 1;
+  var t=xx,i,o,xt,dx;
+  for(i=0;i<14;i++){
+    o=1-t;
+    xt=3*o*o*t*x1+3*o*t*t*x2+t*t*t-xx;
+    if(Math.abs(xt)<1e-5)break;
+    dx=3*o*o*x1+6*o*t*(x2-x1)+3*t*t*(1-x2);
+    if(Math.abs(dx)<1e-6)break;
+    t-=xt/dx;
+    if(t<0)t=0;
+    if(t>1)t=1;
+  }
+  o=1-t;
+  return 3*o*o*t*y1+3*o*t*t*y2+t*t*t;
+}
+/* 拍二 .snap：0–232ms（scale 空间插值，索引 ≥2 乘 ks） */
+var KA=[
+  {t:0,  e:[.22,.75,.3,1], r:-4,  sx:1,   sy:1,   op:1},
+  {t:136,e:[.3,.5,.35,1],  r:10,  sx:.45, sy:1.3, op:1},
+  {t:192,e:[.25,.5,.4,1],  r:15.6,sx:1.16,sy:1.7, op:1},
+  {t:232,e:null,           r:14,  sx:1,   sy:1.5, op:.92}
+];
+function poseA(ms,W0){
+  var ks=14/W0,u=Math.min(SNAP_T,Math.max(0,ms)),i,a,b,KS2=2;
+  for(i=KA.length-1;i>=0;i--){if(u>=KA[i].t){a=KA[i];b=KA[Math.min(i+1,KA.length-1)];break;}}
+  if(!a){a=KA[0];b=KA[1];}
+  var span=(b.t-a.t)||1;
+  var e=a.e?bez(a.e[0],a.e[1],a.e[2],a.e[3],(u-a.t)/span):1;
+  function sxOf(k,idx){return idx>=KS2?k.sx*ks:k.sx}
+  function lp(q,w){return q+(w-q)*e}
+  return{r:lp(a.r,b.r),sx:lp(sxOf(a,i),sxOf(b,i+1)),sy:lp(a.sy,b.sy),op:lp(a.op,b.op)};
+}
+/* 拍三 .anchor：付线 → 驻留 → 随 run 退场 */
+function poseAnchor(run,ms){
+  var ex=run.exit0-SNAP_T;
+  var u=Math.min(TOT,Math.max(SNAP_T,ms))-SNAP_T;
+  var a,b,e;
+  if(u<120){a=[0,1,1.5,.92];b=[120,.65,1.4,.88];e=bez(.3,.6,.35,1,u/120);}
+  else if(u<ex){a=[120,.65,1.4,.88];b=[ex,.65,1.4,.88];e=Math.min(1,(u-120)/((ex-120)||1));}
+  else{a=[ex,.65,1.4,.88];b=[TOT-SNAP_T,.27,1.2,0];e=bez(.45,0,.75,.5,Math.min(1,(u-ex)/((TOT-SNAP_T-ex)||1)));}
+  return{sx:a[1]+(b[1]-a[1])*e,sy:a[2]+(b[2]-a[2])*e,op:a[3]+(b[3]-a[3])*e};
+}
+/* 拍四 .dash：绝对毫秒 → {off,r,sx,sy,op}（与生成关键帧同式） */
+function segPose(ms,s){
+  if(ms<s.e0||ms>=s.u1)return null;
+  var ePeak=s.e0+s.eDur*.75,eEnd=s.e0+s.eDur,f,peak=s.rest-1.2,
+      syF=s.syE-.1,syP=s.syE-.22,syX=Math.max(.72,s.syE-.55);
+  if(ms>=s.u0){
+    var syS=s.feed?syF:s.syE,opS=s.feed?.7:.78;
+    if(ms<s.u0+40){
+      f=bez(.2,.6,.4,1,(ms-s.u0)/40);
+      return{off:s.off+s.slip*f,r:s.rest,sx:1,sy:syS+(syP-syS)*f,op:opS+(1-opS)*f};
+    }
+    f=bez(.5,0,.8,.4,(ms-s.u0-40)/(s.fDur-40));
+    return{off:s.off+s.slip,r:s.rest,sx:1+(0.4-1)*f,sy:syP+(syX-syP)*f,op:1-f};
+  }
+  if(ms<ePeak){
+    f=bez(.2,.75,.3,1,(ms-s.e0)/(ePeak-s.e0));
+    return{off:s.off-s.trav+s.trav*f,r:14+(peak-14)*f,sx:.35+.7*f,sy:1.15+.33*f,op:.9*f};
+  }
+  if(ms<eEnd){
+    f=bez(.25,.5,.4,1,(ms-ePeak)/(eEnd-ePeak));
+    return{off:s.off,r:peak+(s.rest-peak)*f,sx:1.05-.05*f,sy:1.48+(s.syE-1.48)*f,op:.9-.05*f};
+  }
+  if(s.feed&&ms<eEnd+s.feedDur){
+    f=bez(.3,.6,.4,1,(ms-eEnd)/s.feedDur);
+    return{off:s.off,r:s.rest,sx:1,sy:s.syE+(syF-s.syE)*f,op:.85+(0.7-0.85)*f};
+  }
+  if(s.feed)return{off:s.off,r:s.rest,sx:1,sy:syF,op:.7};
+  f=Math.min(1,(ms-eEnd)/((s.u0-eEnd)||1));
+  return{off:s.off,r:s.rest,sx:1,sy:s.syE,op:.85+(0.78-0.85)*f};
+}
+
+/* ══ 生成式关键帧（实况用；与 segPose/poseAnchor 同一组数） ══ */
+var gid=0;
+function kfDash(kid,s){
+  var D=s.u1-s.e0;
+  function pct(abs){return +(100*(abs-s.e0)/D).toFixed(2)}
+  var pPeak=pct(s.e0+s.eDur*.75),pEnd=pct(s.e0+s.eDur),
+      peak=(s.rest-1.2).toFixed(2),rest=s.rest.toFixed(2),
+      syE=s.syE.toFixed(3),syF=(s.syE-.1).toFixed(3),
+      syP=(s.syE-.22).toFixed(3),syX=Math.max(.72,s.syE-.55).toFixed(3),
+      T='translate(var(--fx,0px),var(--fy,0px))';
+  var L=['@keyframes p10fK'+kid+'{'];
+  L.push('0%{transform:translate(var(--ex,0px),var(--ey,0px)) rotate(14deg) scale(.35,1.15);opacity:0;animation-timing-function:cubic-bezier(.2,.75,.3,1)}');
+  L.push(pPeak+'%{transform:'+T+' rotate('+peak+'deg) scale(1.05,1.48);opacity:.9;animation-timing-function:cubic-bezier(.25,.5,.4,1)}');
+  if(s.feed){
+    L.push(pEnd+'%{transform:'+T+' rotate('+rest+'deg) scale(1,'+syE+');opacity:.85;animation-timing-function:cubic-bezier(.3,.6,.4,1)}');
+    L.push(pct(eEndAbs(s)+s.feedDur)+'%{transform:'+T+' rotate('+rest+'deg) scale(1,'+syF+');opacity:.7;animation-timing-function:linear}');
+  }else{
+    L.push(pEnd+'%{transform:'+T+' rotate('+rest+'deg) scale(1,'+syE+');opacity:.85;animation-timing-function:linear}');
+  }
+  L.push(pct(s.u0)+'%{transform:'+T+' rotate('+rest+'deg) scale(1,'+(s.feed?syF:syE)+');opacity:'+(s.feed?'.7':'.78')+';animation-timing-function:cubic-bezier(.2,.6,.4,1)}');
+  L.push(pct(s.u0+40)+'%{transform:translate(var(--gx,0px),var(--gy,0px)) rotate('+rest+'deg) scale(1,'+syP+');opacity:1;animation-timing-function:cubic-bezier(.5,0,.8,.4)}');
+  L.push('100%{transform:translate(var(--gx,0px),var(--gy,0px)) rotate('+rest+'deg) scale(.4,'+syX+');opacity:0}}');
+  return L.join('');
+  function eEndAbs(x){return x.e0+x.eDur}
+}
+function kfAnchorKid(aid,run){
+  var pEx=+(100*(run.exit0-SNAP_T)/(TOT-SNAP_T)).toFixed(2);
+  var T='translate(var(--tx,0px),var(--ty,0px))';
+  return '@keyframes p10fA'+aid+'{'+
+    '0%{transform:'+T+' rotate(14deg) scale(1,1.5);opacity:.92;animation-timing-function:cubic-bezier(.3,.6,.35,1)}'+
+    '21.2%{transform:'+T+' rotate(14deg) scale(.65,1.4);opacity:.88;animation-timing-function:linear}'+
+    pEx+'%{transform:'+T+' rotate(14deg) scale(.65,1.4);opacity:.88;animation-timing-function:cubic-bezier(.45,0,.75,.5)}'+
+    '100%{transform:'+T+' rotate(14deg) scale(.27,1.2);opacity:0}}';
+}
+
+/* ══ 生成器 ══ */
+function mkEl(cls){
+  var el=d.createElement('i');
+  el.className=cls+(FACE==='dream'?' dream':'');
+  return el;
+}
+/* 拍二：线段定格 → 甩角收拢；232ms 换件给 .anchor（animationend＋墙钟兜底） */
+function spawnSnapA(W0,x,y,run,st,my){
+  var el=mkEl('snap');
+  el.style.width=W0+'px';
+  el.style.setProperty('--tx',(x-W0/2).toFixed(1)+'px');
+  el.style.setProperty('--ty',y.toFixed(1)+'px');
+  el.style.setProperty('--ks',(14/W0).toFixed(4));
+  var handed=false;
+  function handoff(){
+    if(handed)return;handed=true;
+    el.remove();
+    spawnAnchor(x,y,false,run,st,my);
+  }
+  el.addEventListener('animationend',handoff);
+  setTimeout(handoff,340);
+  fx.appendChild(el);
+}
+/* 拍三：付线 → 驻留 → 原地抽走（动画 p10fA{my} 随 run 生成） */
+function spawnAnchor(x,y,rm,run,st,my){
+  var el=mkEl('anchor'+(rm?' rm':''));
+  el.style.setProperty('--tx',(x-7).toFixed(1)+'px');
+  el.style.setProperty('--ty',y.toFixed(1)+'px');
+  if(!rm){
+    el.style.animation='p10fA'+my+' '+(TOT-SNAP_T)+'ms linear both';
+    el.addEventListener('animationend',function(){el.remove();if(st)st.remove();});
+    setTimeout(function(){el.remove();if(st)st.remove();},TOT+260);
+  }else{
+    el.addEventListener('animationend',function(){el.remove()});
+    setTimeout(function(){el.remove()},400);
+  }
+  fx.appendChild(el);
+}
+/* 拍四：双侧余线段（各自 delay 排开，backwards 填充驻 0% 隐形） */
+function spawnDash(s,kid){
+  var el=mkEl('dash');
+  el.style.width=s.w+'px';
+  el.style.setProperty('--ex',(s.px-s.w/2).toFixed(1)+'px');
+  el.style.setProperty('--ey',s.py.toFixed(1)+'px');
+  el.style.setProperty('--fx',(s.cx-s.w/2).toFixed(1)+'px');
+  el.style.setProperty('--fy',s.cy.toFixed(1)+'px');
+  el.style.setProperty('--gx',(s.gx-s.w/2).toFixed(1)+'px');
+  el.style.setProperty('--gy',s.gy.toFixed(1)+'px');
+  el.style.animation='p10fK'+kid+' '+(s.u1-s.e0)+'ms linear '+s.e0+'ms both';
+  el.addEventListener('animationend',function(){el.remove()});
+  setTimeout(function(){el.remove()},s.u1+400);
+  fx.appendChild(el);
+}
+function clickBurst(W0,x,y,seed){
+  if(RM){spawnAnchor(x,y,true,null,null,0);return;}
+  var run=makeRun(seed,x,y);
+  var my=++gid,st=d.createElement('style'),css=[];
+  run.segs.forEach(function(s,ix){css.push(kfDash(my*10+ix,s))});
+  css.push(kfAnchorKid(my,run));
+  st.textContent=css.join('\n');
+  d.head.appendChild(st);
+  setTimeout(function(){st.remove()},TOT+500);
+  spawnSnapA(W0,x,y,run,st,my);
+  run.segs.forEach(function(s,ix){spawnDash(s,my*10+ix)});
+}
+function clearFrozen(){frozen.forEach(function(e){e.remove()});frozen=[]}
+
+/* ── 长按示意（从简：静态 ◆ ＋ 注记） ── */
+function knotOn(){
+  knot.style.transform='translate('+px+'px,'+py+'px) rotate(45deg)';
+  knot.className='knot still';
+  lpNote.classList.add('on');
+}
+function knotOff(){knot.className='knot';lpNote.classList.remove('on')}
+
+/* ── 状态机：hold → locked(示意满按) / retract / idle ── */
+function beginHold(x,y){
+  if(mode!=='idle')return false;
+  mode='hold';px=x;py=y;p=0;holdT0=performance.now();scrollMark=scrollY;
+  body.classList.add('holding');
+  if(!RM){thread.style.display='block';draw(0,1,0.16);}
+  startLoop(); /* 入口即排程：idle 停摆后重启 rAF（上轮坑） */
+  return true;
+}
+function releaseHold(){
+  if(mode!=='hold'&&mode!=='locked')return;
+  var held=performance.now()-holdT0;
+  mode='retract';
+  body.classList.remove('holding');
+  knotOff();
+  if(held<=CLICK_MS){
+    /* 点击：线定格 → 收针付线 → 双侧余线滑脱（柔带随 live 线一起撤下） */
+    var W0=RM?14:Math.max(6,p*fullW());
+    thread.style.display='none';
+    var sd=(src==='api'&&apiSeed!=null)?apiSeed:newSeed();
+    apiSeed=null;
+    curSeed=sd>>>0;
+    clickBurst(W0,px,py,sd);
+    clicks++;
+    src=null;pid=-1;
+    finishRetract();
+    return;
+  }
+  rt0=performance.now();rFrom=p;rdur=Math.min(RETRACT_MS,200+p*380);
+  src=null;pid=-1;
+  startLoop();
+}
+function finishRetract(){mode='idle';p=0;thread.style.display='none'}
+function startLoop(){if(!raf)raf=requestAnimationFrame(loop)}
+function loop(now){
+  raf=0;
+  if(mode==='hold'){
+    p=Math.min(1,(now-holdT0)/T_GO);
+    if(!RM)draw(p*fullW(),1,0.16+0.5*p);
+    if(p>=1){
+      mode='locked';
+      if(!RM)knotOn();else lpNote.classList.add('on');
+      return;
+    }
+  }else if(mode==='retract'){
+    var k=Math.min(1,(now-rt0)/rdur);
+    p=rFrom*(1-eo3(k));
+    if(!RM)draw(p*fullW(),1,0.16+0.5*p);
+    if(k>=1){finishRetract();return;}
+  }else{return;}
+  if(mode!=='idle')raf=requestAnimationFrame(loop);
+}
+
+/* ── 手势（沿 reality.ts：EXCLUDE / 滑动撤销 / 滚动撤销 / 空格等价） ── */
+d.addEventListener('pointerdown',function(e){
+  if(e.button!==undefined&&e.button!==0)return;
+  var t=e.target;
+  if(t instanceof Element&&t.closest(EXCLUDE))return;
+  if(src!==null||mode!=='idle')return;
+  src='ptr';pid=e.pointerId;startX=e.clientX;startY=e.clientY;
+  beginHold(e.clientX,e.clientY);
+});
+d.addEventListener('pointermove',function(e){
+  if(mode!=='hold'&&mode!=='locked')return;
+  if(src!=='ptr'||e.pointerId!==pid)return;
+  if(Math.hypot(e.clientX-startX,e.clientY-startY)>20)releaseHold();
+});
+function onPtrEnd(e){
+  if(src!=='ptr'||e.pointerId!==pid)return;
+  if(mode!=='hold'&&mode!=='locked')return;
+  releaseHold();
+}
+d.addEventListener('pointerup',onPtrEnd);
+d.addEventListener('pointercancel',onPtrEnd);
+addEventListener('scroll',function(){
+  if((mode==='hold'||mode==='locked')&&Math.abs(scrollY-scrollMark)>4)releaseHold();
+},{passive:true});
+d.addEventListener('contextmenu',function(e){
+  if(body.classList.contains('holding'))e.preventDefault();
+});
+addEventListener('blur',function(){if(mode==='hold'||mode==='locked')releaseHold()});
+d.addEventListener('visibilitychange',function(){
+  if(d.hidden&&(mode==='hold'||mode==='locked'))releaseHold();
+});
+d.addEventListener('keydown',function(e){
+  if(e.code!=='Space'||e.repeat)return;
+  var ae=d.activeElement;
+  if(ae instanceof Element&&ae.closest(KBD_DENY))return;
+  e.preventDefault();
+  if(src!==null||mode!=='idle')return;
+  src='kb';
+  beginHold(Math.round(innerWidth/2),Math.round(innerHeight*0.42));
+});
+d.addEventListener('keyup',function(e){
+  if(e.code==='Space'&&src==='kb')releaseHold();
+});
+
+/* 死链不跳转 */
+d.querySelectorAll('a[data-dead]').forEach(function(a){
+  a.addEventListener('click',function(e){e.preventDefault();});
+});
+
+/* ── 空白采样点（按版式实测空白带；供演示 / 截图用） ── */
+function spots(){
+  var out=[],wrap=d.querySelector('.wrap');
+  if(!wrap)return[{x:Math.round(innerWidth*0.62),y:Math.round(innerHeight*0.4)}];
+  var wr=wrap.getBoundingClientRect(),ys=[];
+  function band(topEl,botEl,min){
+    if(!topEl||!botEl)return;
+    var a=topEl.getBoundingClientRect(),b=botEl.getBoundingClientRect();
+    if(b.top-a.bottom>=min)ys.push((a.bottom+b.top)/2);
+  }
+  band(d.querySelector('.site-header'),d.querySelector('.page-head h1'),40);
+  band(d.querySelector('.page-head'),d.querySelector('.axis'),40);
+  band(d.querySelector('.essay-ledger'),d.querySelector('.ledger-cap'),40);
+  var margin=innerWidth-wr.right;
+  if(margin>=80){
+    ys.slice(0,3).forEach(function(y){
+      out.push({x:Math.round(wr.right+margin*0.55),y:Math.round(Math.min(y,innerHeight-36))});
+    });
+    out.push({x:Math.round(wr.right+margin*0.55),y:Math.round(innerHeight*0.52)});
+  }else{
+    ys.slice(0,3).forEach(function(y){
+      out.push({x:Math.round(innerWidth*0.62),y:Math.round(Math.min(y,innerHeight-56))});
+    });
+  }
+  if(!out.length)out.push({x:Math.round(innerWidth*0.62),y:Math.round(innerHeight*0.35)});
+  return out;
+}
+
+/* ── 调试 API：程序化手势 / 相位冻结 / seed ══
+   freezeAt(ms,x,y[,keep]) 用 curSeed（初始＝?seed，未设则默认 861003）；
+   freeze 前可 __p10.seed(n) 设定。plan(seed,x,y) 返回排程 JSON。 */
+function press(x,y){
+  if(mode!=='idle'||src!==null)return false;
+  beginHold(x,y);src='api';return true;
+}
+function release(){if(src!=='api')return;releaseHold()}
+function replay(x,y,opts){
+  opts=opts||{};
+  if(opts.face)setFace(opts.face);
+  if(opts.seed!=null)apiSeed=(parseInt(opts.seed,10)>>>0);
+  if(!press(x,y))return false;
+  setTimeout(release,opts.hold!=null?opts.hold:150);
+  return true;
+}
+function freezeAt(ms,x,y,keep){
+  if(!keep)clearFrozen();
+  var s=spots();
+  var sx=x!=null?x:s[0].x,sy=y!=null?y:s[0].y;
+  var W0=RM?14:Math.max(6,(130/T_GO)*fullWAt(sx));
+  var m=Math.max(0,ms==null?0:ms);
+  var seed=curSeed||861003;
+  function push(el){frozen.push(el);fx.appendChild(el)}
+  if(RM){
+    var er=mkEl('anchor rm pose');
+    er.style.setProperty('--tx',(sx-7).toFixed(1)+'px');
+    er.style.setProperty('--ty',sy.toFixed(1)+'px');
+    er.style.opacity=Math.max(0,.9*(1-m/160)).toFixed(3);
+    push(er);
+    return true;
+  }
+  if(m<=SNAP_T){
+    var pa=poseA(m,W0);
+    var es=mkEl('snap pose');
+    var Wp=Math.max(2,W0*pa.sx);
+    es.style.width=Wp.toFixed(1)+'px';
+    es.style.transform='translate('+(sx-Wp/2).toFixed(1)+'px,'+sy.toFixed(1)+'px) rotate('+pa.r.toFixed(2)+'deg) scale(1,'+pa.sy.toFixed(4)+')';
+    es.style.opacity=pa.op.toFixed(3);
+    push(es);
+  }else{
+    var run=makeRun(seed,sx,sy);
+    var pb=poseAnchor(run,m);
+    var ea=mkEl('anchor pose');
+    var Wp2=Math.max(1.5,14*pb.sx);
+    ea.style.width=Wp2.toFixed(1)+'px';
+    ea.style.transform='translate('+(sx-Wp2/2).toFixed(1)+'px,'+sy.toFixed(1)+'px) rotate(14deg) scale(1,'+pb.sy.toFixed(4)+')';
+    ea.style.opacity=pb.op.toFixed(3);
+    push(ea);
+    for(var k=0;k<run.segs.length;k++){
+      var sg=run.segs[k],ps=segPose(m,sg);
+      if(!ps)continue;
+      var bw=Math.max(1,sg.w*ps.sx); /* scaleX 烧进宽度；烧后仍以线心居中 */
+      var ed=mkEl('dash pose');
+      ed.style.width=bw.toFixed(1)+'px';
+      ed.style.transform='translate('+(sg.cx-bw/2).toFixed(1)+'px,'+sg.cy.toFixed(1)+'px) rotate('+ps.r.toFixed(2)+'deg) scale(1,'+ps.sy.toFixed(4)+')';
+      ed.style.opacity=ps.op.toFixed(3);
+      push(ed);
+    }
+  }
+  return true;
+}
+function planApi(seed,x,y){
+  var s=spots();
+  var sx=x!=null?x:s[0].x,sy=y!=null?y:s[0].y;
+  var run=makeRun((parseInt(seed,10)>>>0),sx,sy);
+  return JSON.stringify({seed:run.seed,W0:run.W0,lastLand:run.lastLand,
+    exit0:run.exit0,denseSgn:run.denseSgn,
+    segs:run.segs.map(function(g){return{side:g.sgn>0?'R':'L',kind:g.kind,w:g.w,
+      off:g.off,rest:g.rest,e0:g.e0,u0:g.u0,u1:g.u1,feed:g.feed}})});
+}
+
+/* ── 循环演示（?demo=loop）：交替双色 · 变按压时长 · 每轮换 seed ── */
+var loopOn=false,loopT=0,cycle=0;
+function loopTick(){
+  if(!loopOn)return;
+  if(mode==='idle'&&src===null){
+    var s=spots();
+    if(s.length){
+      var pt=s[cycle%s.length],sd=newSeed();
+      setFace(cycle%2?'dream':'wake');
+      replay(pt.x,pt.y,{hold:[70,150,230][cycle%3],seed:sd});
+      demoChip.textContent='循环演示 · 第 '+(cycle+1)+' 拍 · '+
+        (FACE==='dream'?'梦面 · 暖':'醒面 · 冷')+' · seed '+sd+' · 轻点空白可自试';
+    }
+  }
+  cycle++;
+  loopT=setTimeout(loopTick,1800);
+}
+function demoLoop(on){
+  loopOn=!!on;
+  demoChip.hidden=!loopOn;
+  clearTimeout(loopT);
+  if(loopOn){cycle=0;loopTick();}
+  return loopOn;
+}
+if(qs.get('demo')==='loop'){
+  addEventListener('load',function(){setTimeout(function(){demoLoop(true)},500)});
+}
+/* ?seed=N：进页以该 seed 自动演示一次 */
+if(qs.get('seed')!=null&&qs.get('seed')!==''){
+  addEventListener('load',function(){setTimeout(function(){
+    var s=spots();
+    if(s.length)replay(s[0].x,s[0].y,{hold:130,seed:curSeed});
+  },700)});
+}
+
+window.__p10={
+  state:function(){
+    return JSON.stringify({
+      mode:mode,face:FACE,clicks:clicks,seed:curSeed,
+      holding:mode==='hold'||mode==='locked',
+      progress:+p.toFixed(3),rm:RM,demo:loopOn,
+      fxN:d.querySelectorAll('.fx .snap,.fx .anchor,.fx .dash').length,
+      err:window.__swarmErr
+    });
+  },
+  press:press,
+  release:release,
+  replay:function(x,y,opts){return replay(x,y,opts)},
+  seed:function(n){curSeed=parseInt(n,10)>>>0;return curSeed},
+  plan:function(seed,x,y){return planApi(seed,x,y)},
+  freezeAt:function(ms,x,y,keep){return freezeAt(ms,x,y,keep)},
+  spots:function(){return JSON.stringify(spots())},
+  clearFx:function(){clearFrozen();
+    d.querySelectorAll('.fx .snap,.fx .anchor,.fx .dash').forEach(function(e){e.remove()});return true},
+  loop:function(on){return demoLoop(on)}
+};
+})();
+</script>
+</body>
+</html>

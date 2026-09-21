@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<!--
+  ═══════════════════════════════════════════════════════════════════
+  素夜 · p11-b 「夜潮」 — 主页首屏重设计稿（四路并行探索 · B 路）
+  · 一句话：把首屏那袭静态冷→暖淡染，升级成一张缓慢呼吸的「夜潮」——
+    冷潮（醒色）与暖潮（梦色）之间横着一条涨落的潮线（晨昏线意象），
+    像水彩在湿纸上洇开；鼠标是水流扰动，推得动潮线、搅得出尾迹。
+  · 潮场结构（自底向上三明治）：
+      z1  幽灵描边「梦」——沉在潮底，隔水可见（潮是半透明水色）
+      z2  后潮 canvas（1440×900 下约 144×90 像素，逐像素水彩合成，
+          CSS 放大 + blur(8px)）：冷潮 alpha 峰 0.30 贴线、向上 11 网格
+          指数褪回纸面；暖潮 = 湿边（umber，σ≈1.9 网格的洇边）+ 回渗带
+          + 基底（dream，随距离衰减至 0.075 底水位，页脚再淡出），
+          叠 2 维低频 mottle（±18%）制造洇开不匀
+      z3  14° 缝线 + 脑电（站 chrome，画在潮面之上）
+      z4  琥珀浮标：缝线与潮线的交点，潮呼吸时沿线缓移（约 0.36–0.53
+          屏宽），带 ±1.5px 垂浮与 ±4° 晃动——本稿潮上唯一的琥珀
+      z5  排印层（见下）
+      z7  前潮 canvas（同网格，blur(6px)）：水面弯月线（meniscus，跨过
+          字身的那道极淡深色水缘）+ 鼠标尾迹波纹——最近层
+  · 潮线解算（全部为纯函数，帧帧确定性）：
+      h(x,T) = L0 − TILT·(x−½) + 呼吸(17s/23s 双正弦，幅 ±0.041 屏高)
+               + 三列行波(1.3/2.9/5.1 波长，26s/41s/33s 周期)
+               + u(x) 鼠标扰动场
+      桌面 L0=0.475、TILT=0.075（左高右低，与缝线同向更缓：暖池在
+      左下漫住「梦」，冷色在右上托住「醒」）；窄屏 L0=0.505。
+  · 鼠标扰动的因果与衰减：
+      指针 rAF 节流 + 指数 lerp（k=1−e^(−9dt)）。潮线场 u 走弹簧+
+      波动方程（u'' = c²∇²u − Ku − Cu'，c≈45 列/秒）：指针高斯核
+      (σ≈6.5 列)内的潮线被牵向指针纵坐标（表面张力意象，钳 ±4.5
+      网格≈±45px），松手后以波纹方式沿潮线传开、2–3 秒内阻尼归零
+      ——牵一发而全潮微动。移动每 ~38px 落一枚尾迹斑（同心环
+      r=1.6+8.5t 网格，寿命 4.6s，(1−t/T)^1.8 二次衰减），按压落
+      一枚大斑；斑只画在前潮 canvas（压在字上=字在水里）。
+  · 排印如何借潮：
+      「醒」右上高旱地，绝对静止（醒静）；「梦」左下骑在潮线上
+      （潮呼吸时浸没 25%↔60%），其浸没边缘由同位副本 .ch-immersed
+      实现：clip-path 逐帧沿潮线取样 13 点生成多边形，字身湿区
+      深化偏暖（umber 混墨）、blur(1.3px)、下沉 2.5px——遮挡即深度。
+      宣言四行浮于潮上（原位逐字微错位+叠影保留），块下带一份
+      scaleY(-1) 渐隐倒影（梦色，op .13，blur 1.5px）；HYPNOGRAM
+      竖排小注的末梢恰好蘸水。无鼠标/触屏：潮自呼吸即是完整构图。
+  · 降级：prefers-reduced-motion 或 ?reduced=1 → 潮定格在呼吸上升段
+      最美相位（扫描取 breath≈0.6·峰值处；波、湿边、mottle、浮标、
+      浸没缘俱全——静潮不死潮），停用指针扰动与漂移。
+  · 调试钩子：window.__p11 = { state() · freeze(cfg) · setTide(t) ·
+      setPointer(x,y,hold) · poke(x,y,amp) · resume() }
+      freeze({t:'high'|'low'|秒, pointer:{x,y,hold 毫秒},
+      trail:[{x,y,age}...]}) —— 重置扰动场后以 1/60 定步长无渲染
+      同步推进 hold 毫秒再渲染一帧，完全确定、不依赖动画时钟；
+      t 预设 'high'/'low' 为初始化时扫描出的呼吸极值时刻。
+      ?demo=loop 循环演示（幻影指针沿潮线行走、间歇按压）；
+      ?reduced=1 模拟动效降级。
+  ═══════════════════════════════════════════════════════════════════
+-->
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#e9ecef">
+<meta name="description" content="素夜 p11-b「夜潮」：主页首屏重设计稿——冷潮与暖潮之间一条缓慢涨落的潮线，鼠标是水流扰动。">
+<title>Traveritas · 素夜 · p11-b 夜潮</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%23e9ecef'/><rect x='4' y='19' width='24' height='1.4' fill='%23c2a382'/><rect x='15' y='15.4' width='4' height='4' fill='%23d9a05b' transform='rotate(45 17 17.4)'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Serif+SC:wght@300;500;700;900&display=swap" rel="stylesheet">
+<style>
+/* ═══ 素夜 · PLAIN NIGHT 令牌（与 src/styles/tokens.css 同源） ═══ */
+:root{
+  --bg:#e9ecef; --bg-sunken:#e1e5ea;
+  --fg:#262c33; --fg-soft:#59626c; --fg-faint:#8a929b;
+  --line:rgba(38,44,51,.14);
+  --wake:#a7b1ba; --dream:#c2a382; --umber:#8a6a4f;
+  --amber:#d9a05b;
+  --seam-angle:14deg;
+  --ghost-ink:#b98f74;
+  --echo:.3;
+  --font-display:'Noto Serif SC','Palatino Linotype','Iowan Old Style',Palatino,Georgia,'Source Han Serif SC','Songti SC',SimSun,serif;
+  --font-body:system-ui,-apple-system,'PingFang SC','Hiragino Sans GB','Microsoft YaHei UI','Microsoft YaHei','Noto Sans SC',sans-serif;
+  --font-mono:'IBM Plex Mono',ui-monospace,'Cascadia Mono',Consolas,'JetBrains Mono',monospace;
+  --measure:34em;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%;overflow-x:clip}
+body{
+  font-family:var(--font-body);font-size:1.0625rem;line-height:1.9;
+  color:var(--fg);background:var(--bg);
+  text-rendering:optimizeLegibility;overflow-x:clip;
+  user-select:none;-webkit-user-select:none;
+  touch-action:manipulation;-webkit-tap-highlight-color:transparent;
+}
+[hidden]{display:none!important}
+img,svg,canvas{display:block;max-width:100%}
+a{color:inherit;text-decoration-thickness:1px;text-underline-offset:.3em;transition:color .18s ease}
+a:hover{color:var(--umber)}
+:focus-visible{outline:2px solid var(--amber);outline-offset:3px;border-radius:1px}
+::selection{background:rgba(217,160,91,.32)}
+.mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums;letter-spacing:.04em}
+ul,ol{list-style:none}
+
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
+  clip:rect(0 0 0 0);white-space:nowrap;border:0}
+
+/* ── 潮场：三明治 z 轴 ── */
+#tideBack,#tideFront{
+  position:fixed;left:-20px;top:-20px;
+  width:calc(100vw + 40px);height:calc(100vh + 40px);
+  pointer-events:none;
+}
+#tideBack{z-index:2;filter:blur(10px)}
+#tideFront{z-index:7;filter:blur(6px)}
+
+/* 沉在潮底的幽灵「梦」：隔水可见 */
+.tide-ghost{
+  position:absolute;left:53%;top:60%;transform:translate(-50%,-50%);
+  font-family:var(--font-display);font-weight:900;line-height:1;
+  font-size:min(64vmin,32rem);color:transparent;
+  -webkit-text-stroke:1px rgba(38,44,51,.10);
+  z-index:1;pointer-events:none;
+}
+
+/* 全站 chrome：14° 缝线（画在潮面之上）· 脑电 · 纸纹 · 暗角 */
+.seam{
+  position:fixed;left:50%;top:50%;width:170vmax;height:1px;z-index:3;pointer-events:none;
+  background:linear-gradient(90deg,rgba(167,177,186,0),rgba(167,177,186,.26) 24%,rgba(194,163,130,.20) 76%,rgba(194,163,130,0));
+  transform:translate(-50%,-50%) rotate(var(--seam-angle));
+  opacity:.5;
+}
+.eeg{position:fixed;inset:0;width:100vw;height:100vh;z-index:3;pointer-events:none;overflow:visible}
+.eeg path{stroke:var(--umber);stroke-width:1.2;fill:none;opacity:.3;
+  stroke-linecap:round;stroke-linejoin:round}
+.grain{
+  position:fixed;inset:0;z-index:50;pointer-events:none;opacity:.05;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='180' height='180' filter='url(%23n)' opacity='.6'/></svg>");
+}
+.vignette{
+  position:fixed;inset:0;z-index:6;pointer-events:none;
+  background:radial-gradient(120% 92% at 50% 44%,transparent 54%,rgba(8,10,16,.5) 100%);
+  opacity:.26;
+}
+
+/* 琥珀浮标：缝线与潮线的交点（本稿潮上唯一的琥珀） */
+.buoy{
+  position:fixed;left:0;top:0;width:9px;height:9px;margin:-4.5px 0 0 -4.5px;
+  background:var(--amber);z-index:4;pointer-events:none;opacity:.95;
+  box-shadow:0 0 9px 2px rgba(217,160,91,.30);
+  will-change:transform;
+}
+
+/* ── 站头（在首屏内，随潮滚走）── */
+.site-header{position:absolute;inset:0 0 auto 0;padding-block:1.4rem;z-index:20}
+.header-row{width:min(100% - 3rem,62rem);margin-inline:auto;
+  display:flex;align-items:center;justify-content:space-between;gap:1.5rem}
+.brand{display:inline-flex;align-items:center;gap:.55rem;color:var(--fg);
+  text-decoration:none;font-family:var(--font-display);font-size:1.05rem;letter-spacing:.02em}
+.brand .brand-dot{width:5px;height:5px;background:var(--amber);transform:rotate(45deg)}
+.site-nav{display:flex;gap:1.6rem}
+.site-nav a{color:var(--fg-soft);text-decoration:none;font-size:.95rem}
+.site-nav a:hover,.site-nav a[aria-current="page"]{color:var(--fg)}
+.site-nav a[aria-current="page"]::after{
+  content:'';display:block;width:1.1em;height:1px;margin:2px auto 0;background:var(--amber);
+}
+
+/* 左轨 station（≥1200px） */
+.rail{
+  position:fixed;left:30px;top:50%;transform:translateY(-50%);z-index:40;
+  display:flex;flex-direction:column;align-items:center;gap:1.15rem;
+  pointer-events:none;color:var(--fg-soft);
+}
+.rail-station{writing-mode:vertical-rl;display:flex;gap:.9rem;align-items:center;
+  padding-left:.8rem;border-left:1px solid var(--line)}
+.rail-name{font-family:var(--font-display);font-size:.8rem;letter-spacing:.42em}
+.rail-en{font-size:.56rem;letter-spacing:.3em;opacity:.66}
+
+/* ── 首屏排印层 ── */
+.hero{position:relative;min-height:106vh;overflow:clip}
+.type-layer{position:absolute;inset:0;z-index:5;pointer-events:none}
+.hero{
+  --gfs:clamp(150px,18.5vw,240px);
+  --dreamTop:290px;
+  --fragsTop:calc(var(--dreamTop) + var(--gfs) + 58px);
+}
+.ch{position:absolute;font-family:var(--font-display);font-weight:900;
+  font-size:var(--gfs);line-height:1}
+.ch-wake{left:57vw;top:112px;color:var(--fg)}
+
+.vsub{
+  position:absolute;left:calc(57vw + var(--gfs) + 28px);top:118px;
+  writing-mode:vertical-rl;font-family:var(--font-display);
+  font-size:13px;font-weight:300;letter-spacing:.52em;color:var(--fg-soft);
+}
+.vlat{
+  position:absolute;left:calc(14vw - 46px);top:302px;
+  writing-mode:vertical-rl;font-family:var(--font-mono);
+  font-size:10.5px;letter-spacing:.4em;color:var(--fg-soft);opacity:.8;
+}
+
+/* 梦字骑潮线：醒静梦动——外层慢漂，内层真身 + 浸没副本（clip 随潮线）。
+   .ch 自带 absolute 不占流，wrap 必须显式定尺寸，否则 shrink-to-fit 为 0 */
+.dream-wrap{position:absolute;left:14vw;top:var(--dreamTop);
+  display:block;width:var(--gfs);height:var(--gfs);
+  animation:drift 11s ease-in-out -3s infinite}
+@keyframes drift{
+  0%,100%{transform:translate3d(0,-6px,0) rotate(-.4deg)}
+  50%{transform:translate3d(3px,6px,0) rotate(.4deg)}
+}
+.ch-dream{color:color-mix(in srgb,var(--fg) 78%,var(--dream))}
+.ch-immersed{
+  position:absolute;inset:0;color:color-mix(in srgb,var(--umber) 52%,var(--fg) 48%);
+  transform:translateY(3px) scaleY(1.02);filter:blur(1.5px);opacity:.95;
+  clip-path:polygon(0 100%,100% 100%,100% 101%,0 101%);
+}
+
+/* 宣言：浮于潮上（原位语汇保留：逐字微错位 + 叠影 + 倒影） */
+.hero-frags{position:absolute;left:14vw;top:var(--fragsTop);max-width:min(42rem,74vw)}
+.frag{margin:0 0 1.05rem;font-family:var(--font-display);font-weight:500;color:var(--fg)}
+.frag .c{display:inline-block;white-space:pre}
+.frag .c:nth-child(4n+2){transform:translateY(.13em)}
+.frag .c:nth-child(4n+3){transform:translateY(-.09em) rotate(.8deg)}
+.frag .c:nth-child(7n+5){filter:blur(.75px);opacity:.8}
+.frag .c:nth-child(9n+4){transform:rotate(-1.1deg)}
+.f1{font-size:clamp(1.4rem,2.1vw,1.75rem)}
+.f2{margin-left:9%;font-size:clamp(.88rem,1.3vw,1rem);letter-spacing:.32em;color:var(--fg-soft)}
+.f3{margin-left:4%;font-size:clamp(.88rem,1.35vw,1rem);color:var(--fg-soft)}
+.f4{margin-left:14%;font-size:clamp(1.15rem,1.8vw,1.5rem)}
+.drift-soft{animation:drift 9s ease-in-out infinite;--amp:2px}
+@keyframes drift-soft{
+  0%,100%{transform:translateY(-1.5px)}
+  50%{transform:translateY(2px)}
+}
+/* 叠影（本稿静态 --echo=.3） */
+.ghost-pair{position:relative;display:inline-block}
+.ghost-pair .ghost{position:absolute;inset:0;color:var(--ghost-ink);opacity:.5;
+  pointer-events:none;filter:blur(.4px);
+  transform:translate(calc(var(--echo)*11px),calc(var(--echo)*-4px))}
+/* 倒影：宣言在潮面的余像 */
+.frags-mirror{
+  transform:scaleY(-1) translateY(-4px);opacity:.13;filter:blur(1.5px);
+  -webkit-mask-image:linear-gradient(180deg,rgba(0,0,0,.8),transparent 74%);
+  mask-image:linear-gradient(180deg,rgba(0,0,0,.8),transparent 74%);
+  color:color-mix(in srgb,var(--dream) 62%,var(--umber) 38%);
+  margin-top:.4rem;
+}
+.frags-mirror p{font-family:var(--font-display);font-weight:500;line-height:1.9;margin-bottom:1.05rem}
+.frags-mirror .f1{font-size:clamp(1.4rem,2.1vw,1.75rem)}
+.frags-mirror .f2{margin-left:9%;font-size:clamp(.88rem,1.3vw,1rem);letter-spacing:.32em}
+.frags-mirror .f3{margin-left:4%;font-size:clamp(.88rem,1.35vw,1rem)}
+.frags-mirror .f4{margin-left:14%;font-size:clamp(1.15rem,1.8vw,1.5rem)}
+
+.hero-scroll{
+  position:absolute;right:6vw;top:calc(100vh - 104px);
+  font-size:14px;font-weight:300;letter-spacing:.26em;color:var(--fg-soft);
+}
+.hero-scroll i{display:inline-block;width:24px;height:2px;background:var(--amber);
+  opacity:.5;transform:rotate(calc(var(--seam-angle)*-1));vertical-align:middle;margin-right:12px}
+
+/* ── 收边暗示（页面总高 ~140vh）── */
+.edge{position:relative;z-index:5;padding-block:7vh 9vh;
+  border-top:1px solid var(--line)}
+.edge .wrap{width:min(100% - 3rem,56rem);margin-inline:auto}
+.edge-head{display:flex;align-items:baseline;gap:1.2rem;flex-wrap:wrap;margin-bottom:1.6rem}
+.edge-head h2{font-family:var(--font-display);font-weight:600;font-size:1.3rem;letter-spacing:.06em}
+.edge-stage{font-size:.62rem;letter-spacing:.2em;color:var(--umber)}
+.edge-time{font-size:.62rem;letter-spacing:.14em;color:var(--fg-faint);margin-left:auto}
+.edge-ledger li{border-top:1px solid var(--line);padding-block:1.2rem;
+  display:grid;grid-template-columns:5.6rem 1fr auto;gap:0 1.6rem;align-items:baseline}
+.edge-ledger li:last-child{border-bottom:1px solid var(--line)}
+.el-t{font-family:var(--font-mono);font-size:.86rem;color:var(--umber)}
+.el-title{font-family:var(--font-display);font-weight:600;font-size:1.14rem;letter-spacing:.03em}
+.el-n{font-family:var(--font-mono);font-size:.66rem;letter-spacing:.14em;color:var(--fg-faint)}
+.edge-more{margin-top:1.8rem;font-size:.88rem;letter-spacing:.1em}
+.edge-more a{text-decoration:none;border-bottom:1px solid var(--line);padding-bottom:2px}
+.edge-note{margin-top:3.2rem;font-size:.6rem;letter-spacing:.22em;color:var(--fg-faint)}
+
+/* 演示角标 */
+.demo-chip{position:fixed;left:18px;bottom:18px;z-index:60;
+  font-size:.62rem;letter-spacing:.14em;color:var(--fg-soft);
+  background:rgba(233,236,239,.92);border:1px solid var(--line);
+  padding:.42rem .7rem .38rem;pointer-events:none}
+
+/* ── 揭幕编排（?boot=1 瞬时全显：截图确定性用）── */
+[data-boot]{opacity:0;transform:translateY(12px);
+  transition:opacity .9s ease var(--bd,0s),transform .9s ease var(--bd,0s)}
+html.booted [data-boot]{opacity:1;transform:none}
+html.boot-in [data-boot]{transition:none!important}
+
+/* ── 退让 ── */
+@media (prefers-reduced-motion:reduce){
+  [data-boot]{opacity:1;transform:none;transition:none}
+  .dream-wrap,.drift-soft{animation:none}
+  .frag .c{transform:none!important;filter:none!important;opacity:1!important}
+  .ghost-pair .ghost{display:none}
+  .frags-mirror{display:none}
+  a{transition:none}
+}
+html.rm [data-boot]{opacity:1;transform:none;transition:none}
+html.rm .dream-wrap,html.rm .drift-soft{animation:none}
+html.rm .frag .c{transform:none!important;filter:none!important;opacity:1!important}
+html.rm .ghost-pair .ghost{display:none}
+html.rm .frags-mirror{display:none}
+@media (prefers-reduced-transparency:reduce){.grain{display:none!important}}
+
+/* ── 响应式 ── */
+@media (max-width:1199px){.rail{display:none}}
+@media (max-width:760px){
+  body{font-size:1rem}
+  .site-header{padding-block:1.1rem}
+  .site-nav{gap:1.05rem}
+  .site-nav a{font-size:.88rem}
+  .brand{font-size:.95rem}
+  .hero{--gfs:clamp(96px,30vw,140px);--dreamTop:380px;
+    --fragsTop:calc(var(--dreamTop) + var(--gfs) + 36px)}
+  .ch-wake{left:44vw;top:96px}
+  .vsub{writing-mode:horizontal-tb;left:44vw;top:calc(96px + var(--gfs) + 14px);
+    letter-spacing:.4em;font-size:12px}
+  .dream-wrap{left:5vw}
+  .vlat{display:none}
+  .hero-frags{left:6vw;right:6vw;max-width:none}
+  .f2,.f3,.f4{margin-left:0}
+  .frag{margin-bottom:1.3rem}
+  .hero-scroll{right:auto;left:6vw;top:calc(var(--fragsTop) + 15rem)}
+  .tide-ghost{font-size:92vw;top:56%}
+  .edge-ledger li{grid-template-columns:4.4rem 1fr}
+  .el-n{display:none}
+}
+</style>
+</head>
+<body>
+
+<!-- 潮场（后潮在字后·远；前潮波纹在字前·最近） -->
+<canvas id="tideBack" aria-hidden="true"></canvas>
+<canvas id="tideFront" aria-hidden="true"></canvas>
+
+<section class="hero" id="hero">
+  <h1 class="sr-only">Traveritas —— 这里不是梦，也不是现实。它是人在即将醒来时，看见的最后一层世界。</h1>
+
+  <span class="tide-ghost" data-boot style="--bd:1.4s" aria-hidden="true">梦</span>
+
+  <header class="site-header">
+    <div class="header-row">
+      <a class="brand" href="#" data-dead><i class="brand-dot" aria-hidden="true"></i>Traveritas</a>
+      <nav class="site-nav" aria-label="主导航">
+        <a href="#" data-dead>随笔</a>
+        <a href="#" data-dead>项目</a>
+        <a href="#" data-dead title="示例稿未含关于页">关于</a>
+      </nav>
+    </div>
+  </header>
+
+  <div class="type-layer" aria-hidden="true">
+    <span class="ch ch-wake" data-boot style="--bd:.4s">醒</span>
+    <span class="vsub" data-boot style="--bd:.9s">在醒与梦之间</span>
+
+    <span class="dream-wrap" id="dreamWrap" data-boot style="--bd:.62s">
+      <span class="ch ch-dream">梦</span>
+      <span class="ch ch-immersed" id="immersed">梦</span>
+    </span>
+
+    <span class="vlat mono" data-boot style="--bd:1.05s">HYPNOGRAM · NIGHT 2026-09</span>
+
+    <div class="hero-frags" data-boot style="--bd:.85s">
+      <p class="frag f1 ghost-pair"><span class="ghost">这里不是梦，</span><span class="c">这</span><span class="c">里</span><span class="c">不</span><span class="c">是</span><span class="c">梦</span><span class="c">，</span></p>
+      <p class="frag f2 drift-soft"><span class="c">也</span><span class="c">不</span><span class="c">是</span><span class="c">现</span><span class="c">实</span><span class="c">。</span></p>
+      <p class="frag f3 drift-soft"><span class="c">它</span><span class="c">是</span><span class="c">人</span><span class="c">在</span><span class="c">即</span><span class="c">将</span><span class="c">醒</span><span class="c">来</span><span class="c">时</span><span class="c">，</span></p>
+      <p class="frag f4 ghost-pair"><span class="ghost">看见的最后一层世界。</span><span class="c">看</span><span class="c">见</span><span class="c">的</span><span class="c">最</span><span class="c">后</span><span class="c">一</span><span class="c">层</span><span class="c">世</span><span class="c">界</span><span class="c">。</span></p>
+      <div class="frags-mirror" aria-hidden="true">
+        <p class="f1">这里不是梦，</p>
+        <p class="f2">也不是现实。</p>
+        <p class="f3">它是人在即将醒来时，</p>
+        <p class="f4">看见的最后一层世界。</p>
+      </div>
+    </div>
+
+    <p class="hero-scroll" data-boot style="--bd:1.6s"><i></i>顺着缝线 · 过完这一夜</p>
+  </div>
+</section>
+
+<!-- 收边暗示：潮仍在，页暂止 -->
+<section class="edge" data-boot style="--bd:1.8s">
+  <div class="wrap">
+    <div class="edge-head">
+      <h2>随笔</h2>
+      <span class="edge-stage mono">浅梦 · LIGHT · N1–N2</span>
+      <span class="edge-time mono">23:31 → 00:44</span>
+    </div>
+    <ol class="edge-ledger">
+      <li>
+        <span class="el-t">23:31</span>
+        <span class="el-title ghost-pair"><span class="ghost" aria-hidden="true">开站：在醒与梦之间</span>开站：在醒与梦之间</span>
+        <span class="el-n">405 字 · 读毕约一分钟</span>
+      </li>
+    </ol>
+    <p class="edge-more"><a href="#" data-dead>全部随笔 · 账目</a></p>
+    <p class="edge-note mono">NIGHT TIDE · 潮位随夜呼吸 · 本稿止于首屏之下</p>
+  </div>
+</section>
+
+<!-- 全站 chrome -->
+<div class="seam" aria-hidden="true"></div>
+<svg class="eeg" id="eeg" aria-hidden="true"><g id="eegG"><path id="eegMain"/></g></svg>
+<aside class="rail" aria-hidden="true">
+  <div class="rail-station">
+    <span class="rail-name">今夜 · 落针</span>
+    <span class="rail-en mono">FIRST STITCH</span>
+  </div>
+</aside>
+<div class="vignette" aria-hidden="true"></div>
+<div class="grain" aria-hidden="true"></div>
+
+<i class="buoy" id="buoy" aria-hidden="true"></i>
+<p class="demo-chip mono" id="demoChip" hidden></p>
+
+<script>
+(function(){
+'use strict';
+window.__swarmErr='none';
+window.addEventListener('error',function(e){
+  window.__swarmErr=String((e&&e.message)||((e&&e.type)||'unknown'));
+});
+window.addEventListener('unhandledrejection',function(e){
+  window.__swarmErr='rej '+String((e&&e.reason&&e.reason.message)||e.reason);
+});
+
+var d=document,docEl=d.documentElement;
+var qs=new URLSearchParams(location.search);
+var RM=qs.get('reduced')==='1'||
+  (window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches);
+if(qs.get('reduced')==='1')docEl.classList.add('rm');
+
+/* ── 色域（令牌 RGB）：纸家族 + 醒冷/梦暖低饱和混色 ── */
+var PAPER=[233,236,239],WAKE=[167,177,186],DREAM=[194,163,130],UMBER=[138,106,79];
+var COOL=[206,212,218];            /* paper→wake 42% */
+var RINGC=[186,150,114];           /* dream↔umber */
+var TAU=Math.PI*2;
+
+/* ── 潮线参数（屏高分数）── */
+var L0=0.475,TILT=0.075;
+var BREATH=[{a:.026,p:17,ph:0},{a:.015,p:23,ph:2.1}];
+var WAVES=[
+  {a:.011,k:1.3,w:TAU/26,p0:0.7},
+  {a:.007,k:2.9,w:-TAU/41,p0:3.1},
+  {a:.0042,k:5.1,w:TAU/33,p0:5.6}
+];
+function breath(t){
+  var v=0,i;
+  for(i=0;i<BREATH.length;i++)v+=BREATH[i].a*Math.sin(TAU*t/BREATH[i].p+BREATH[i].ph);
+  return v;
+}
+/* 呼吸极值时刻（确定性预设）*/
+var THI=0,TLO=0,BMAX=-9,BMIN=9;
+for(var s=0;s<600;s++){
+  var tt=s*0.1,b=breath(tt);
+  if(b>BMAX){BMAX=b;THI=tt;}
+  if(b<BMIN){BMIN=b;TLO=tt;}
+}
+var T_RM=0; /* RM 定格：呼吸上升段 breath≈0.6·峰值 */
+for(s=0;s<340;s++){if(breath(s*0.05)>=0.6*BMAX){T_RM=s*0.05;break;}}
+
+/* ── 画布网格 ── */
+var cvsB=d.getElementById('tideBack'),ctxB=cvsB.getContext('2d');
+var cvsF=d.getElementById('tideFront'),ctxF=cvsF.getContext('2d');
+var vw=0,vh=0,COLS=0,ROWS=0,sx=1,sy=1,imgB,imgF,dataB,dataF;
+var hArr=new Float32Array(256),u=new Float32Array(256),up=new Float32Array(256);
+
+/* ── 状态 ── */
+var T=0,running=!RM,frozen=false,rafId=0;
+var ptr={x:0,y:0,tx:0,ty:0,active:false,lx:0,ly:0,acc:0};
+var blobs=[];
+var LIFE=4.6;
+var seamTan=Math.tan(14*Math.PI/180);
+
+function resize(){
+  vw=innerWidth;vh=innerHeight;
+  L0=vw<=760?0.505:0.475;
+  COLS=Math.max(48,Math.min(168,Math.round(vw/10)));
+  ROWS=Math.max(30,Math.round(COLS*vh/vw));
+  sx=vw/COLS;sy=vh/ROWS;
+  cvsB.width=COLS;cvsB.height=ROWS;
+  cvsF.width=COLS;cvsF.height=ROWS;
+  imgB=ctxB.createImageData(COLS,ROWS);dataB=imgB.data;
+  imgF=ctxF.createImageData(COLS,ROWS);dataF=imgF.data;
+  if(RM){renderAll();}
+}
+addEventListener('resize',function(){resize();});
+
+/* ── 潮线解算：h(x,T)=基底+呼吸+行波+扰动（纯函数 + u 场）── */
+function lineRest(i){
+  var x=i/(COLS-1);
+  var v=L0-TILT*(x-0.5)+breath(T),w;
+  for(w=0;w<WAVES.length;w++){
+    var WW=WAVES[w];v+=WW.a*Math.sin(TAU*WW.k*x+WW.w*T+WW.p0);
+  }
+  return v*ROWS;
+}
+
+/* ── d 距离 LUT（d=像素 y − 潮线 y，整数；范围 −64..128 网格）── */
+var DOFF=64,LN=193;
+var coolLUT=new Float32Array(LN),edgeLUT=new Float32Array(LN),
+    backLUT=new Float32Array(LN),baseLUT=new Float32Array(LN),
+    menLUT=new Float32Array(LN);
+(function(){
+  for(var k=0;k<LN;k++){
+    var dd=k-DOFF;
+    coolLUT[k]=dd<0?Math.max(0,0.30*Math.exp(dd/11)-0.015):0;
+    edgeLUT[k]=0.20*Math.exp(-(dd/1.9)*(dd/1.9));
+    backLUT[k]=0.055*Math.exp(-((dd-5.5)/3.4)*((dd-5.5)/3.4));
+    baseLUT[k]=dd>=0?0.16*Math.exp(-dd/24)+0.075:0;
+    menLUT[k]=0.10*Math.exp(-(dd/1.15)*(dd/1.15));
+  }
+})();
+
+/* ── 后潮渲染：逐像素水彩合成（premultiplied 累加）── */
+function renderBack(){
+  var i,j;
+  for(i=0;i<COLS;i++)hArr[i]=lineRest(i)+u[i];
+  dataB.fill(0);
+  for(i=0;i<COLS;i++){
+    var hf=Math.round(hArr[i]),xn=i/(COLS-1);
+    for(j=0;j<ROWS;j++){
+      var dd=j-hf,k=dd+DOFF;
+      if(k<0)k=0;else if(k>=LN)k=LN-1;
+      var cov=0,r=0,g=0,b=0,a;
+      if(dd<0){
+        a=coolLUT[k];
+        if(a>0.004){r=COOL[0]*a;g=COOL[1]*a;b=COOL[2]*a;cov=a;}
+      }else{
+        a=edgeLUT[k];
+        if(a>0.004){r=UMBER[0]*a;g=UMBER[1]*a;b=UMBER[2]*a;cov=a;}
+        var yf=j/ROWS;
+        var warmMul=yf>0.86?1-(yf-0.86)/0.14*0.55:1;
+        var mm=0.84+0.32*(0.5+0.5*Math.sin(xn*11.5+T*0.21)*Math.sin(yf*9.5-T*0.16));
+        a=(backLUT[k]+baseLUT[k]*mm)*warmMul;
+        if(a>0.004){
+          var e2=a*(1-cov);
+          r+=DREAM[0]*e2;g+=DREAM[1]*e2;b+=DREAM[2]*e2;cov+=e2;
+        }
+      }
+      if(cov>0.004){
+        var p=(j*COLS+i)*4,ic=1/cov;
+        dataB[p]=r*ic;dataB[p+1]=g*ic;dataB[p+2]=b*ic;dataB[p+3]=cov*255;
+      }
+    }
+  }
+  ctxB.putImageData(imgB,0,0);
+}
+
+/* ── 前潮渲染：水面弯月线 + 尾迹波纹 + 指针晕（透明层）── */
+function blendF(p,r,g,b,a){
+  var pa=dataF[p+3]/255;
+  var na=a+pa*(1-a),ia=na>0?1/na:0;
+  dataF[p]=(r*a+dataF[p]*pa*(1-a))*ia;
+  dataF[p+1]=(g*a+dataF[p+1]*pa*(1-a))*ia;
+  dataF[p+2]=(b*a+dataF[p+2]*pa*(1-a))*ia;
+  dataF[p+3]=na*255;
+}
+function renderFront(){
+  var i,j;
+  dataF.fill(0);
+  /* 弯月线：潮线上一道极淡深色水缘（跨过字身=字在水里的深度线索）*/
+  for(i=0;i<COLS;i++){
+    var hf=Math.round(hArr[i]);
+    var j0=Math.max(0,hf-4),j1=Math.min(ROWS-1,hf+4);
+    for(j=j0;j<=j1;j++){
+      var dd=j-hf,k=dd+DOFF;
+      if(k<0||k>=LN)continue;
+      var a=menLUT[k];
+      if(a>0.004)blendF((j*COLS+i)*4,UMBER[0],UMBER[1],UMBER[2],a);
+    }
+  }
+  /* 尾迹斑：同心环 + 内晕，二次衰减 */
+  var n;
+  for(n=0;n<blobs.length;n++){
+    var bl=blobs[n];
+    if(bl.age>=LIFE)continue;
+    var rr=1.6+8.5*bl.age;
+    var fad=Math.pow(1-bl.age/LIFE,1.7);
+    var x0=Math.max(0,Math.floor(bl.x-rr-4)),x1=Math.min(COLS-1,Math.ceil(bl.x+rr+4));
+    var y0=Math.max(0,Math.floor(bl.y-rr-4)),y1=Math.min(ROWS-1,Math.ceil(bl.y+rr+4));
+    for(i=x0;i<=x1;i++)for(j=y0;j<=y1;j++){
+      var dx=i-bl.x,dy=j-bl.y,dist=Math.sqrt(dx*dx+dy*dy);
+      var q=(dist-rr)/1.35;
+      var a2=fad*bl.amp*(0.20*Math.exp(-q*q)+0.05*Math.exp(-(dist/5.2)*(dist/5.2)));
+      if(a2>0.004)blendF((j*COLS+i)*4,RINGC[0],RINGC[1],RINGC[2],Math.min(0.45,a2));
+    }
+  }
+  /* 指针晕：手悬潮上的一小片暖 */
+  if(ptr.active){
+    var px=ptr.x/sx,py=ptr.y/sy;
+    var bx0=Math.max(0,Math.floor(px-8)),bx1=Math.min(COLS-1,Math.ceil(px+8));
+    var by0=Math.max(0,Math.floor(py-8)),by1=Math.min(ROWS-1,Math.ceil(py+8));
+    for(i=bx0;i<=bx1;i++)for(j=by0;j<=by1;j++){
+      var ddx=i-px,ddy=j-py,ds=Math.sqrt(ddx*ddx+ddy*ddy);
+      var a3=0.06*Math.exp(-(ds/4.5)*(ds/4.5));
+      if(a3>0.004)blendF((j*COLS+i)*4,DREAM[0],DREAM[1],DREAM[2],a3);
+    }
+  }
+  ctxF.putImageData(imgF,0,0);
+}
+
+/* ── 扰动场物理：u''=c²∇²u−Ku−Cu'（弹簧+波动方程，牵一发动全潮）── */
+var DT=1/60,K_SPR=3.0,K_DMP=1.1,C2=2000,K_PULL=30;
+function applyForce(dt){
+  if(!ptr.active)return;
+  var pc=ptr.x/sx,pyc=ptr.y/sy;
+  var i0=Math.max(0,Math.floor(pc-20)),i1=Math.min(COLS-1,Math.ceil(pc+20));
+  for(var i=i0;i<=i1;i++){
+    var q=i-pc,g=Math.exp(-(q*q)/(2*6.5*6.5));
+    if(g<0.01)continue;
+    var target=(pyc-lineRest(i))*0.5;
+    if(target>4.5)target=4.5;else if(target<-4.5)target=-4.5;
+    up[i]+=(target-u[i])*K_PULL*g*dt;
+  }
+}
+function stepSim(dt){
+  var i;
+  applyForce(dt);
+  for(i=0;i<COLS;i++){
+    var lap=(i>0?u[i-1]:u[i])+(i<COLS-1?u[i+1]:u[i])-2*u[i];
+    up[i]+=C2*lap*dt-K_SPR*u[i]*dt-K_DMP*up[i]*dt;
+  }
+  for(i=0;i<COLS;i++){
+    u[i]+=up[i]*dt;
+    if(u[i]>5.5)u[i]=5.5;else if(u[i]<-5.5)u[i]=-5.5;
+  }
+  var keep=[];
+  for(i=0;i<blobs.length;i++){blobs[i].age+=dt;if(blobs[i].age<LIFE)keep.push(blobs[i]);}
+  blobs=keep;
+}
+function press(x,y,amp){
+  blobs.push({x:x/sx,y:y/sy,age:0,amp:amp});
+  if(blobs.length>16)blobs.shift();
+}
+
+/* ── 脑电（站 chrome：缝线上恒定的缓慢波动）── */
+var eegMain=d.getElementById('eegMain'),eegG=d.getElementById('eegG');
+function drawEeg(){
+  var cy=vh*0.5,half=Math.sqrt(vw*vw+vh*vh)/2+60,dd='',first=true,x;
+  for(x=-half;x<=half;x+=26){
+    var uu=x/600;
+    var y=Math.sin(uu*0.5*TAU+T*2.6)*3.6+Math.sin(uu*0.5*TAU*2.7+T*1.3)*1.44;
+    dd+=(first?'M':'L')+(vw/2+x).toFixed(1)+' '+(cy+y).toFixed(1);
+    first=false;
+  }
+  eegMain.setAttribute('d',dd);
+  eegG.setAttribute('transform','rotate(14 '+(vw/2)+' '+cy+')');
+}
+
+/* ── 浮标：缝线×潮线交点 ── */
+var buoy=d.getElementById('buoy'),buoyX=0.72,buoyHave=false;
+function seamYf(xf){return 0.5+seamTan*(vw/vh)*(xf-0.5);}
+function updateBuoy(){
+  var prev=null,s;
+  for(s=0;s<=32;s++){
+    var xf=s/32,ty=hArr[Math.min(COLS-1,Math.max(0,Math.round(xf*(COLS-1))))]/ROWS;
+    var diff=seamYf(xf)-ty;
+    if(prev!==null&&((prev.d<0&&diff>=0)||(prev.d>0&&diff<=0))){
+      var f=prev.d/(prev.d-diff);
+      buoyX=prev.x+(xf-prev.x)*f;buoyHave=true;break;
+    }
+    prev={x:xf,d:diff};
+  }
+  if(!buoyHave)buoyX=0.52;
+  var i2=Math.min(COLS-1,Math.max(0,Math.round(buoyX*(COLS-1))));
+  var by=hArr[i2]*sy;
+  var bob=Math.sin(T*TAU/3.3+1)*1.5,wob=Math.sin(T*TAU/4.7)*4;
+  buoy.style.transform='translate('+(buoyX*vw-4.5).toFixed(1)+'px,'+(by+bob-5).toFixed(1)+'px) rotate('+(45+wob).toFixed(2)+'deg)';
+}
+
+/* ── 浸没边缘：clip-path 沿潮线取样（梦字骑潮）── */
+var dreamWrap=d.getElementById('dreamWrap'),immersed=d.getElementById('immersed');
+function updateClip(){
+  var rect=dreamWrap.getBoundingClientRect();
+  if(rect.height<10||rect.width<10)return;
+  var pts=[],k;
+  for(k=0;k<=12;k++){
+    var xr=rect.left+rect.width*(0.02+0.96*k/12);
+    var i=Math.min(COLS-1,Math.max(0,Math.round(xr/sx)));
+    var hy=hArr[i]*sy;
+    var ly=(hy-rect.top)/rect.height;
+    if(ly<0)ly=0;else if(ly>1)ly=1;
+    pts.push((2+96*k/12).toFixed(1)+'% '+(ly*100).toFixed(1)+'%');
+  }
+  pts.push('98% 102%','2% 102%');
+  immersed.style.clipPath='polygon('+pts.join(',')+')';
+}
+function updateDom(){updateBuoy();updateClip();drawEeg();}
+function renderAll(){renderBack();renderFront();updateDom();}
+
+/* ── 主循环（rAF；指针 lerp 节流；后潮 24fps / 前潮 30fps）── */
+var lastTs=0,acc=0,lastBack=0,lastFront=0;
+function frame(ts){
+  if(!running)return;
+  rafId=requestAnimationFrame(frame);
+  if(!lastTs)lastTs=ts;
+  var dt=Math.min(0.05,(ts-lastTs)/1000);lastTs=ts;
+  T+=dt;
+  if(demoOn)demoTick(dt);
+  var k=1-Math.exp(-dt*9);
+  ptr.x+=(ptr.tx-ptr.x)*k;ptr.y+=(ptr.ty-ptr.y)*k;
+  if(ptr.active){
+    var dd=Math.hypot(ptr.x-ptr.lx,ptr.y-ptr.ly);
+    ptr.acc+=dd;
+    if(ptr.acc>3.8*sx){
+      press(ptr.x,ptr.y,0.35+Math.min(0.55,dd/Math.max(1e-4,dt)/1400));
+      ptr.acc=0;
+    }
+    ptr.lx=ptr.x;ptr.ly=ptr.y;
+  }
+  acc+=dt;var n=0;
+  while(acc>=DT&&n<5){stepSim(DT);acc-=DT;n++;}
+  if(n===5)acc=0;
+  if(ts-lastBack>42){renderBack();lastBack=ts;}
+  if(ts-lastFront>33){renderFront();lastFront=ts;}
+  updateDom();
+}
+
+/* ── 指针输入 ── */
+addEventListener('pointermove',function(e){
+  if(RM||frozen)return;
+  ptr.tx=e.clientX;ptr.ty=e.clientY;
+  if(!ptr.active){ptr.active=true;ptr.x=ptr.tx;ptr.y=ptr.ty;ptr.lx=ptr.x;ptr.ly=ptr.y;ptr.acc=0;}
+},{passive:true});
+addEventListener('pointerdown',function(e){
+  if(RM||frozen)return;
+  press(e.clientX,e.clientY,1.6);
+},{passive:true});
+addEventListener('pointerleave',function(){ptr.active=false;});
+d.addEventListener('visibilitychange',function(){if(!d.hidden){lastTs=0;}});
+
+/* ── 确定性冻结（截图抓手）：重置后 1/60 定步长同步推进再渲染一帧 ── */
+function freeze(cfg){
+  cfg=cfg||{};
+  running=false;frozen=true;
+  if(rafId)cancelAnimationFrame(rafId),rafId=0;
+  u.fill(0);up.fill(0);blobs=[];
+  var t=cfg.t;
+  if(t==='high')T=THI;else if(t==='low')T=TLO;
+  else if(typeof t==='number')T=t;else T=0;
+  if(cfg.trail)for(var i=0;i<cfg.trail.length;i++){
+    var tr=cfg.trail[i];
+    blobs.push({x:tr.x/sx,y:tr.y/sy,age:Math.max(0,tr.age||0),amp:tr.amp||0.8});
+  }
+  if(cfg.pointer){
+    ptr.active=true;
+    ptr.x=ptr.tx=cfg.pointer.x;ptr.y=ptr.ty=cfg.pointer.y;
+    ptr.lx=ptr.x;ptr.ly=ptr.y;ptr.acc=0;
+    var hold=(cfg.pointer.hold||900)/1000,n=Math.round(hold/DT);
+    for(var s2=0;s2<n;s2++)stepSim(DT);
+  }else{
+    ptr.active=false;
+  }
+  renderAll();
+  return true;
+}
+
+/* ── 循环演示：幻影指针沿潮线行走 ── */
+var demoOn=false,demoT=0,demoPressT=0;
+var DEMO_PTS=[[0.30,0.56],[0.52,0.47],[0.74,0.55],[0.62,0.62],[0.40,0.60]];
+var demoChip=d.getElementById('demoChip');
+function demoTick(dt){
+  demoT+=dt;demoPressT+=dt;
+  var seg=DEMO_PTS.length,tt=(demoT*0.045)%1,fi=tt*seg,i0=Math.floor(fi)%seg,i1=(i0+1)%seg,f=fi-i0;
+  f=f*f*(3-2*f);
+  var xf=DEMO_PTS[i0][0]+(DEMO_PTS[i1][0]-DEMO_PTS[i0][0])*f;
+  var yf=DEMO_PTS[i0][1]+(DEMO_PTS[i1][1]-DEMO_PTS[i0][1])*f;
+  ptr.active=true;ptr.tx=xf*vw;ptr.ty=yf*vh;
+  if(demoPressT>2.4){demoPressT=0;press(ptr.tx,ptr.ty,1.5);}
+  demoChip.textContent='循环演示 · 幻影指针行于潮上 · 第 '+Math.floor(demoT)+' 秒 · 挪动真鼠标即可接管';
+}
+function demoLoop(on){
+  demoOn=!!on;
+  demoChip.hidden=!demoOn;
+  if(demoOn){demoT=0;demoPressT=0;if(!running){running=true;frozen=false;lastTs=0;rafId=requestAnimationFrame(frame);}}
+  return demoOn;
+}
+
+/* ── 初始化 ── */
+resize();
+if(qs.get('t'))T=parseFloat(qs.get('t'))||0;
+if(RM){
+  T=T_RM;running=false;frozen=true;
+  renderAll();
+}else{
+  rafId=requestAnimationFrame(frame);
+}
+if(qs.get('demo')==='loop'){
+  addEventListener('load',function(){setTimeout(function(){demoLoop(true)},600)});
+}
+/* 揭幕：boot=1 瞬时；正常路径 load 或 900ms 兜底（字体慢时不悬停于隐形）*/
+function bootNow(instant){
+  if(docEl.classList.contains('booted'))return;
+  docEl.classList.add('booted');
+  if(instant)docEl.classList.add('boot-in');
+}
+if(qs.get('boot')==='1'){
+  bootNow(true);
+}else if(!RM){
+  addEventListener('load',function(){requestAnimationFrame(function(){bootNow(false);})});
+  setTimeout(function(){bootNow(false)},900);
+}
+/* RM：字体到位后补一帧，浸没缘对准真字身 */
+addEventListener('load',function(){if(RM)setTimeout(renderAll,120);});
+
+d.querySelectorAll('a[data-dead]').forEach(function(a){
+  a.addEventListener('click',function(e){e.preventDefault();});
+});
+
+window.__p11={
+  state:function(){
+    return JSON.stringify({
+      t:+T.toFixed(2),rm:RM,running:running,frozen:frozen,
+      pointer:ptr.active?{x:Math.round(ptr.x),y:Math.round(ptr.y)}:null,
+      blobs:blobs.length,cols:COLS,rows:ROWS,
+      presets:{high:+THI.toFixed(2),low:+TLO.toFixed(2),rmT:+T_RM.toFixed(2)},
+      err:window.__swarmErr
+    });
+  },
+  freeze:function(cfg){return freeze(cfg)},
+  setTide:function(t){return freeze({t:t})},
+  setPointer:function(x,y,hold){return freeze({pointer:{x:x,y:y,hold:hold||900}})},
+  poke:function(x,y,amp){
+    press(x,y,amp||1.2);
+    if(!running)renderAll();
+    return true;
+  },
+  resume:function(){
+    running=true;frozen=false;lastTs=0;acc=0;
+    if(!rafId)rafId=requestAnimationFrame(frame);
+    return true;
+  },
+  loop:function(on){return demoLoop(on)}
+};
+})();
+</script>
+</body>
+</html>

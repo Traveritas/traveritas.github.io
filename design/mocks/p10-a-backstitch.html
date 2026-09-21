@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<!--
+  ═══════════════════════════════════════════════════════════════════
+  素夜 · 短按点击特效机制稿 p10-A · 方案：回针 BACKSTITCH
+  （与 reality.ts 线头一弹 xmFlick 的替换关系：p10 是「那段线如何收场」）
+  · 一句话：短按松手的那一小段线不消失，而是回手缝了一针——线段先
+    弹张一记（松手的余劲），随即向指下收拢、拧过缝线角（-4° → +14°），
+    落成一枚 14px 琥珀针脚（与长按的 ◆ 结同尺，与站内 stitch 记号 /
+    缝线同角同族），针脚向纸面里沉半拍后散尽——页面不留痕迹。
+  · 因果与形态连续：按下抽出多长，松手就从多长收针——按压期间线段
+    原样交给针脚对象（同几何同渐变，无跳变）；按得越久针前线段越长，
+    收拢行程越长而节拍不变（收拢恒 180ms）。长按拉线→成结→环闪→
+    全页微沉是兄长；短按抽线→回针落缝是幼弟——同一根线，两种收场。
+    微沉是结的专属落印，针脚不惊动页面。
+  · 按住渐进（照 reality.ts）：按下即出线，W = 按压时长 / 2200ms ×
+    fullW，-4°，1px 发丝芯（边缘随面暖/冷、中心琥珀）＋64px 雾带
+    （不透明度 .16 + .5p）。移动 >20px、滚动 >4px、失焦即取消松手。
+  · 短按收场时序（t = 0 为松手；总寿命 470ms ≤ 500ms）：
+      0–70ms    弹张：L → L×1.08，琥珀芯不透明度 .8→1；easeOutCubic
+      70–250ms  收拢：L×1.08 → 14px，-4° → +14°（拧入缝线角）；
+                cubic-bezier(.55,0,.85,.45)（与 knotPack 同缓动：被
+                抽走的感觉）；雾带 ≤110ms 先行散尽
+      250–290ms 落针：scaleY .5→1（1px→2px 实体针脚），渐变芯换
+                实心针色；easeOutCubic
+      290–470ms 沉入：translateY 0→+1.5px ＋ opacity→0；easeInQuad
+    针脚定格 14px 长 × 2px 高 @ +14°（结 ◆ 14px / stitch 记号 9–15px
+    @ 14° 之间——正好落在两族语汇的交点上）。
+  · 双色决策：特效不自带颜色。线段边缘与针脚吃全站强调色插值——
+    梦面边缘暖沙 rgba(194,163,130)、针脚琥珀 #d9a05b；醒面边缘冷灰
+    rgba(167,177,186)、针脚随全站 --amber 在 c=1 处的插值终点同样
+    转冷（#a7b1ba）。?face=wake 可预览。真实集成读 reality 的醒度 c。
+  · prefers-reduced-motion：不做动画。短按＝一枚静止针脚原地亮
+    320ms 即撤（无弹张/收拢/沉入）；按住不拉线。?reduced=1 可强启。
+  · 连点 / 贴字 / 触点：针脚对象池 ×4 各走各的钟，复用最旧一枚——
+    连点即缝一串针脚，不叠加成灾；特效层 fixed 全屏坐标系，随指针
+    定位不错位；触点走 pointer 语义。点在文字上（EXCLUDE 命中：
+    a/button/输入件/标题/正文段落等，与 reality.ts 同表）不触发。
+  · 长按在本稿仅示意：线按 2200ms 线性生长（满格停住）＋ 700ms 后
+    一枚「长按：拉线→成结」注记；松手原路缩回（reality.ts 的
+    retract 公式：min(560, 200 + p×380)），不成结（成结语汇见 p8）。
+  · 实现：动画走 rAF 时间线（与 reality.ts 同法，每帧只写
+    transform / opacity / width 于 1px 级小元素），便于相位冻结；
+    无 CSS 滤镜、无 box-shadow 糊光、无粒子。
+  · 调试：window.__p10 = { state(), replay(x, y, {hold}), freezeAt(
+    ms, {x, y, hold}), holdAt(ms, x, y), resume() }；?demo=loop 角落
+    循环演示；?face=dream|wake；?reduced=1；?scroll=0..1。
+  ═══════════════════════════════════════════════════════════════════
+-->
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#e9ecef">
+<meta name="description" content="素夜 · 短按点击特效机制稿 p10-A：回针 backstitch——短按松手的那小段线回手缝成一枚 14px 琥珀针脚，沉入纸面。">
+<title>随笔 — Traveritas · 素夜 p10-a 回针</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%23e9ecef'/><rect x='9' y='15' width='14' height='2' fill='%23d9a05b' transform='rotate(14 16 16)'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Serif+SC:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+/* ═══ 素夜 PLAIN NIGHT 基底（取自 p9-s 令牌与行语法；本稿只留随笔列表一面） ═══ */
+:root{
+  --bg:#e9ecef; --bg-sunken:#e1e5ea;
+  --fg:#262c33; --fg-soft:#59626c; --fg-faint:#8a929b;
+  --line:rgba(38,44,51,.14);
+  --wake:#a7b1ba; --dream:#c2a382; --umber:#8a6a4f;
+  --amber:#d9a05b;
+  --seam-angle:14deg;
+  --ghost-ink:#b98f74;
+  --font-display:'Noto Serif SC','Palatino Linotype','Iowan Old Style',Palatino,Georgia,'Source Han Serif SC','Songti SC',SimSun,serif;
+  --font-body:system-ui,-apple-system,'PingFang SC','Hiragino Sans GB','Microsoft YaHei UI','Microsoft YaHei','Noto Sans SC',sans-serif;
+  --font-mono:'IBM Plex Mono',ui-monospace,'Cascadia Mono',Consolas,'JetBrains Mono',monospace;
+  --measure:34em;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%;overflow-x:clip}
+body{
+  font-family:var(--font-body);font-size:1.0625rem;line-height:1.9;
+  color:var(--fg);background:var(--bg);
+  text-rendering:optimizeLegibility;overflow-x:clip;min-height:100dvh;
+  display:flex;flex-direction:column;touch-action:manipulation;
+}
+body.holding{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+[hidden]{display:none!important}
+a{color:inherit;text-decoration-thickness:1px;text-underline-offset:.3em;transition:color .18s ease}
+a:hover{color:var(--umber)}
+:focus-visible{outline:2px solid var(--amber);outline-offset:3px;border-radius:1px}
+::selection{background:rgba(217,160,91,.32)}
+.mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums;letter-spacing:.04em}
+ol{list-style:none}
+
+/* 全站 chrome：14° 缝线 · 纸纹 · 发丝进度 */
+.seam{
+  position:fixed;left:50%;top:50%;width:170vmax;height:1px;z-index:0;pointer-events:none;
+  background:linear-gradient(90deg,rgba(167,177,186,0),rgba(167,177,186,.26) 24%,rgba(194,163,130,.20) 76%,rgba(194,163,130,0));
+  transform:translate(-50%,-50%) rotate(var(--seam-angle));
+  opacity:.5;
+}
+.grain{
+  position:fixed;inset:0;z-index:50;pointer-events:none;opacity:.045;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='180' height='180' filter='url(%23n)' opacity='.6'/></svg>");
+}
+.hairline{
+  position:fixed;top:0;left:0;height:2px;width:0;z-index:60;pointer-events:none;
+  background:linear-gradient(90deg,color-mix(in srgb,var(--amber) 60%,var(--umber)),var(--amber));
+  opacity:.85;
+}
+
+/* 左轨（≥1200px）：列表页仅站名 */
+.rail{
+  position:fixed;left:30px;top:50%;transform:translateY(-50%);z-index:40;
+  display:flex;flex-direction:column;align-items:center;gap:1.15rem;
+  pointer-events:none;color:var(--fg-soft);
+}
+.rail-station{writing-mode:vertical-rl;display:flex;gap:.9rem;align-items:center;
+  padding-left:.8rem;border-left:1px solid var(--line)}
+.rail-name{font-family:var(--font-display);font-size:.8rem;letter-spacing:.42em}
+.rail-en{font-size:.56rem;letter-spacing:.3em;opacity:.66}
+
+/* 站头 */
+.site-header{padding-block:1.4rem;position:relative;z-index:20}
+.header-row{width:min(100% - 3rem,62rem);margin-inline:auto;
+  display:flex;align-items:center;justify-content:space-between;gap:1.5rem}
+.brand{display:inline-flex;align-items:center;gap:.55rem;color:var(--fg);
+  text-decoration:none;font-family:var(--font-display);font-size:1.05rem;letter-spacing:.02em}
+.brand .brand-dot{width:5px;height:5px;background:var(--amber);transform:rotate(45deg)}
+.site-nav{display:flex;gap:1.6rem}
+.site-nav a{color:var(--fg-soft);text-decoration:none;font-size:.95rem}
+.site-nav a:hover,.site-nav a[aria-current="page"]{color:var(--fg)}
+.site-nav a[aria-current="page"]::after{
+  content:'';display:block;width:1.1em;height:1px;margin:2px auto 0;background:var(--amber);
+}
+
+/* 布局 */
+.page{min-height:100dvh;display:flex;flex-direction:column}
+main{flex:1;position:relative;z-index:10}
+.wrap{width:min(100% - 3rem,56rem);margin-inline:auto}
+.view{padding-block:clamp(2.8rem,7vh,4.6rem) clamp(3rem,8vh,5rem);animation:viewIn .5s ease both}
+@keyframes viewIn{from{opacity:0;transform:translateY(8px)}}
+
+/* 列表页头 */
+.page-head{margin-bottom:clamp(2.4rem,6vh,3.6rem)}
+.page-head h1{font-family:var(--font-display);font-weight:600;
+  font-size:clamp(1.5rem,3.5vw,2rem);letter-spacing:.06em}
+.lede{margin:.75rem 0 0;color:var(--fg-soft);max-width:var(--measure);
+  font-size:.98rem;letter-spacing:.05em}
+
+/* 分年轴 */
+.axis{position:relative;margin:0 0 1.6rem;padding-left:.2rem;
+  display:flex;align-items:baseline;gap:1.2rem}
+.axis-line{position:absolute;left:-3.4rem;top:.5em;width:150px;height:1px;
+  background:var(--fg-soft);opacity:.4;transform:rotate(-4deg);transform-origin:right center}
+.axis-tag{font-size:.72rem;letter-spacing:.2em;color:var(--umber)}
+.axis-tag-en{font-size:.56rem;letter-spacing:.24em;color:var(--fg-faint)}
+
+/* 随笔列表：回眠行语法 */
+.essay-ledger li{border-top:1px solid var(--line)}
+.essay-ledger li:last-child{border-bottom:1px solid var(--line)}
+.essay-ledger a{
+  display:grid;grid-template-columns:5.6rem minmax(0,1fr) auto;gap:0 1.8rem;
+  padding-block:1.45rem;align-items:start;text-decoration:none;
+}
+.el-night{display:flex;flex-direction:column;gap:.15rem;padding-top:.35rem}
+.el-night b{font-family:var(--font-mono);font-weight:500;font-size:.92rem;
+  letter-spacing:.08em;color:var(--umber)}
+.el-night i{font-style:normal;font-family:var(--font-mono);font-size:.7rem;
+  letter-spacing:.1em;color:var(--fg-faint)}
+.el-title{position:relative;display:inline-block;font-family:var(--font-display);
+  font-weight:600;font-size:1.26rem;letter-spacing:.03em;line-height:1.5;color:var(--fg)}
+.el-title .ghost{position:absolute;inset:0;color:var(--ghost-ink);opacity:0;
+  pointer-events:none;transform:translate(-7px,4px);filter:blur(.4px);
+  transition:opacity .55s ease,transform .55s ease}
+.essay-ledger a:hover .el-title .ghost{opacity:.5;transform:translate(7px,-3px)}
+.essay-ledger a:hover .el-title{color:var(--umber)}
+.el-desc{display:block;margin-top:.3rem;color:var(--fg-soft);font-size:.95rem;
+  line-height:1.8;max-width:34em}
+.el-tags{display:flex;flex-wrap:wrap;gap:.45rem;margin-top:.7rem}
+.el-tags i{font-style:normal;font-size:.66rem;letter-spacing:.14em;color:var(--fg-faint);
+  border:1px solid var(--line);padding:.14rem .5rem .1rem;border-radius:2px}
+.el-count{display:flex;flex-direction:column;align-items:flex-end;gap:.15rem;
+  padding-top:.5rem;white-space:nowrap}
+.el-count b{font-family:var(--font-mono);font-weight:400;font-size:.74rem;
+  letter-spacing:.1em;color:var(--fg-soft)}
+.el-count i{font-style:normal;font-family:var(--font-mono);font-size:.6rem;
+  letter-spacing:.14em;color:var(--fg-faint)}
+.ledger-cap{margin-top:2.2rem;font-size:.85rem;letter-spacing:.05em;
+  color:var(--fg-faint);line-height:2}
+.ledger-cap b{color:var(--fg-soft);font-weight:400}
+
+/* 站尾 */
+.site-footer{border-top:1px solid var(--line);margin-top:clamp(3.5rem,9vh,6rem);
+  padding-block:1.6rem 2rem;font-size:.875rem;color:var(--fg-faint);position:relative;z-index:10}
+.footer-row{width:min(100% - 3rem,62rem);margin-inline:auto;
+  display:flex;align-items:baseline;justify-content:space-between;gap:1rem 2rem;flex-wrap:wrap}
+.site-footer a{color:var(--fg-faint);text-decoration:none}
+.site-footer a:hover{color:var(--fg-soft)}
+.footer-clock{font-size:.8rem;color:var(--fg-soft)}
+.ft-links{display:flex;gap:1.4rem}
+
+/* ═════ 特效层：拉线（按住）＋回针针脚（松手）＋长按注记 ═════ */
+.fx-p10{position:fixed;inset:0;z-index:210;pointer-events:none;overflow:hidden}
+.fx-p10 .thread,.fx-p10 .st{position:absolute;left:0;top:0;width:0;height:0;display:none;transform-origin:0 0}
+.fx-p10 .t-core{position:absolute;top:-.5px;left:0;width:0;height:1px}
+.fx-p10 .st .c{position:absolute;top:-1px;left:0;width:0;height:2px;display:block;transform:scaleY(.5)}
+.fx-p10 .t-band,.fx-p10 .st .b{position:absolute;top:-32px;left:0;width:0;height:64px;opacity:0;
+  -webkit-mask-image:linear-gradient(90deg,transparent,#000 14%,#000 86%,transparent);
+  mask-image:linear-gradient(90deg,transparent,#000 14%,#000 86%,transparent)}
+.fx-p10 .lp-note{position:absolute;max-width:200px;padding:.35rem .6rem .3rem;
+  border-left:1px solid var(--amber);
+  font-family:var(--font-mono);font-size:.6rem;letter-spacing:.14em;line-height:1.9;
+  color:var(--fg-soft);background:color-mix(in srgb,var(--bg) 84%,transparent);
+  opacity:0;transition:opacity .25s ease}
+
+/* 角落调试徽记（不参与特效） */
+.p10-badge{position:fixed;left:14px;bottom:12px;z-index:220;pointer-events:none;
+  font-family:var(--font-mono);font-size:.58rem;letter-spacing:.18em;line-height:2;
+  color:var(--fg-faint)}
+.p10-badge b{font-weight:400;color:var(--umber)}
+
+/* 退让：reduced motion */
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  .view{animation:none}
+  .seam{opacity:.4}
+  a{transition:none}
+  .el-title .ghost{display:none}
+  .lp-note{transition:none}
+}
+html.rm .view{animation:none}
+html.rm a{transition:none}
+html.rm .el-title .ghost{display:none}
+html.rm .lp-note{transition:none}
+body.no-motion *{transition:none!important}
+
+/* 响应式 */
+@media (max-width:1199px){.rail{display:none}}
+@media (max-width:760px){
+  body{font-size:1rem}
+  .site-header{padding-block:1.1rem}
+  .site-nav{gap:1.05rem}
+  .site-nav a{font-size:.88rem}
+  .brand{font-size:.95rem}
+  .essay-ledger a{grid-template-columns:1fr;gap:.25rem;padding-block:1.3rem}
+  .el-night{flex-direction:row;align-items:baseline;gap:.8rem;order:0;padding-top:0}
+  .el-night i::before{content:'· ';color:var(--fg-faint)}
+  .el-count{flex-direction:row;gap:.8rem;align-items:baseline;padding-top:0}
+  .el-count i::before{content:'· ';color:var(--fg-faint)}
+  .el-title{font-size:1.14rem}
+}
+@media (max-width:640px){
+  .wrap{width:calc(100% - 2.2rem)}
+  .axis-line{left:-1.15rem;width:1rem}
+}
+</style>
+</head>
+<body>
+
+<!-- 全站 chrome -->
+<div class="seam" aria-hidden="true"></div>
+<div class="grain" aria-hidden="true"></div>
+<div class="hairline" id="hairline" aria-hidden="true"></div>
+
+<!-- 左轨：站名 -->
+<aside class="rail" aria-hidden="true">
+  <div class="rail-station">
+    <span class="rail-name">随笔 · 账目</span>
+    <span class="rail-en mono">ESSAYS LEDGER</span>
+  </div>
+</aside>
+
+<div class="page">
+
+<header class="site-header">
+  <div class="header-row">
+    <a class="brand" href="#" data-dead><i class="brand-dot" aria-hidden="true"></i>Traveritas</a>
+    <nav class="site-nav" aria-label="主导航">
+      <a href="#" aria-current="page">随笔</a>
+      <a href="#" data-dead>项目</a>
+      <a href="#" data-dead>关于</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+  <section class="view" aria-label="随笔列表">
+    <div class="wrap">
+      <header class="page-head">
+        <h1>随笔</h1>
+        <p class="lede">想法、记录，与梦的边角料。</p>
+      </header>
+
+      <div class="axis" aria-hidden="true">
+        <i class="axis-line"></i>
+        <span class="axis-tag mono">2026 · 3 篇</span>
+        <span class="axis-tag-en mono">夜时刻为夜内位置 · DATES VERIFIABLE</span>
+      </div>
+
+      <ol class="essay-ledger">
+        <li>
+          <a href="#" data-dead>
+            <span class="el-night"><b>23:31</b><i>2026.09.19</i></span>
+            <span>
+              <span class="el-title"><span class="ghost" aria-hidden="true">开站：在醒与梦之间</span>开站：在醒与梦之间</span>
+              <span class="el-desc">这个网站为什么存在，以及它想长成什么样子。</span>
+              <span class="el-tags"><i>建站</i><i>醒梦</i></span>
+            </span>
+            <span class="el-count"><b>405 字</b><i>读毕约一分钟</i></span>
+          </a>
+        </li>
+        <li>
+          <a href="#" data-dead>
+            <span class="el-night"><b>00:44</b><i>2026.09.19</i></span>
+            <span>
+              <span class="el-title"><span class="ghost" aria-hidden="true">与智能体一起造一个网站</span>与智能体一起造一个网站</span>
+              <span class="el-desc">记录这个站点的另一种建造方式：我出方向，智能体出手。</span>
+              <span class="el-tags"><i>建站</i><i>智能体</i></span>
+            </span>
+            <span class="el-count"><b>374 字</b><i>读毕约一分钟</i></span>
+          </a>
+        </li>
+        <li>
+          <a href="#" data-dead>
+            <span class="el-night"><b>01:02</b><i>2026.09.19</i></span>
+            <span>
+              <span class="el-title"><span class="ghost" aria-hidden="true">母题探索记录：从碎块到花</span>母题探索记录：从碎块到花</span>
+              <span class="el-desc">主页视觉母题的三轮探索与两次否决——一份仍在进行中的设计日志。</span>
+              <span class="el-tags"><i>建站</i><i>设计</i><i>醒梦</i></span>
+            </span>
+            <span class="el-count"><b>630 字</b><i>读毕约二分钟</i></span>
+          </a>
+        </li>
+      </ol>
+
+      <p class="ledger-cap">
+        在空白处<b>短按</b>一下：按下抽出的那一小段线，松手会回手缝成一枚针脚，沉进纸里。<b>长按</b>则拉线成结——那是另一场检验。
+      </p>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="footer-row">
+    <span>Traveritas 2026</span>
+    <span class="footer-clock mono" aria-label="夜里时刻">夜里 00:47</span>
+    <span>在醒与梦之间</span>
+    <span class="ft-links">
+      <a href="https://github.com/Traveritas" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://traveritas.github.io/rss.xml">RSS</a>
+    </span>
+  </div>
+</footer>
+
+</div><!-- /.page -->
+
+<!-- 特效层：拉线（按住）· 回针针脚（松手）· 长按注记 -->
+<div class="fx-p10" id="fx" aria-hidden="true">
+  <div class="thread" id="thread"><i class="t-band" id="tBand"></i><i class="t-core" id="tCore"></i></div>
+  <div class="lp-note" id="lpNote"></div>
+</div>
+
+<div class="p10-badge mono" id="badge" data-nofx aria-hidden="true">
+  p10-a · <b>回针 backstitch</b><br>
+  短按空白试针 · ?demo=loop 循环 · ?face=wake 醒面 · __p10 调试
+</div>
+
+<script>
+(function(){
+'use strict';
+/* 错误钩子（照 p9 做法） */
+window.__swarmErr='none';
+window.addEventListener('error',function(e){window.__swarmErr=(e&&e.message)||'error'});
+window.addEventListener('unhandledrejection',function(e){window.__swarmErr='rej '+(e.reason&&e.reason.message||e.reason)});
+
+var d=document,root=d.documentElement,body=d.body;
+var qs=new URLSearchParams(location.search);
+var RM=qs.get('reduced')==='1'||(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches);
+if(qs.get('reduced')==='1'){root.classList.add('rm');body.classList.add('no-motion')}
+var FACE=qs.get('face')==='wake'?'wake':'dream';
+
+/* ── 常量与面色（特效不自带颜色：吃全站强调色插值的两端） ── */
+var T_GO=2200, CLICK_MS=260;
+var SNAP=70, GATH=250, LOCK=290, SINK=470;      /* 回针时间线（t=0 为松手） */
+var STITCH_L=14, ANG0=-4, ANG1=14, OVER=1.08;   /* 14px @ +14°：结与针脚两族语的交点 */
+var COL={
+  dream:{edge:[194,163,130],band:[198,166,130],acc:[217,160,91]},
+  wake :{edge:[167,177,186],band:[157,170,182],acc:[167,177,186]} /* 醒面 --amber 插值终点 */
+};
+var C=COL[FACE];
+function rgba(c,a){return 'rgba('+c[0]+','+c[1]+','+c[2]+','+(a===undefined?1:a).toFixed(3)+')'}
+function grad(accA){
+  return 'linear-gradient(90deg,'+rgba(C.edge,0)+','+rgba(C.edge,.4)+' 8%,'
+    +rgba(C.acc,accA)+' 50%,'+rgba(C.edge,.4)+' 92%,'+rgba(C.edge,0)+')';
+}
+var BAND_G='linear-gradient(180deg,'+rgba(C.band,0)+','+rgba(C.band,.12)+' 50%,'+rgba(C.band,0)+')';
+
+/* ── 缓动 ── */
+function eo3(t){return 1-Math.pow(1-t,3)}
+function ei2(t){return t*t}
+function bezier(x1,y1,x2,y2){ /* cubic-bezier 求值（Newton＋二分兜底） */
+  var cx=3*x1,bx=3*(x2-x1)-cx,ax=1-cx-bx,cy=3*y1,by=3*(y2-y1)-cy,ay=1-cy-by;
+  function sx(t){return ((ax*t+bx)*t+cx)*t}
+  function sy(t){return ((ay*t+by)*t+cy)*t}
+  function dx(t){return (3*ax*t+2*bx)*t+cx}
+  return function(t){
+    if(t<=0)return 0; if(t>=1)return 1;
+    var x=t,i,e,g;
+    for(i=0;i<8;i++){e=sx(x)-t;if(Math.abs(e)<1e-5)break;g=dx(x);if(Math.abs(g)<1e-6)break;x-=e/g}
+    if(x<0)x=0;if(x>1)x=1;
+    if(Math.abs(sx(x)-t)>1e-4){var lo=0,hi=1;for(i=0;i<24;i++){var m=(lo+hi)/2;if(sx(m)<t)lo=m;else hi=m}x=(lo+hi)/2}
+    return sy(x);
+  };
+}
+var eGather=bezier(.55,0,.85,.45); /* 与 knotPack 同缓动：被抽走的感觉 */
+
+/* ── 特效层 DOM ── */
+var fx=d.getElementById('fx'),thread=d.getElementById('thread'),
+    tBand=d.getElementById('tBand'),tCore=d.getElementById('tCore'),
+    note=d.getElementById('lpNote');
+tCore.style.background=grad(.8);
+tBand.style.background=BAND_G;
+
+var px=Math.round(innerWidth/2),py=Math.round(innerHeight/2);
+function fullW(){return 2*Math.max(px,innerWidth-px)+80}
+function fullWAt(x){return 2*Math.max(x,innerWidth-x)+80}
+
+/* ── 拉线绘制（照 reality.ts drawThread） ── */
+function drawThread(W,bandA){
+  thread.style.display='block';
+  thread.style.transform='translate('+px+'px,'+py+'px) rotate('+ANG0+'deg)';
+  tCore.style.width=W+'px';tCore.style.left=(-W/2)+'px';
+  tBand.style.width=W+'px';tBand.style.left=(-W/2)+'px';
+  tBand.style.opacity=bandA;
+}
+
+/* ── 回针针脚：对象池 ×4，各走各的钟 ── */
+var pool=[],active=[],clicks=0;
+function spawnStitch(x,y,L,b0){
+  var a;
+  if(pool.length)a=pool.pop();
+  else{a={el:d.createElement('div')};a.el.innerHTML='<i class="b"></i><i class="c"></i>';
+    a.band=a.el.children[0];a.core=a.el.children[1];
+    a.band.style.background=BAND_G;fx.appendChild(a.el)}
+  a.el.className='st';a.el.style.display='block';
+  a.x=x;a.y=y;a.L0=L;a.b0=b0||0;a.rm=false;a.frozen=false;a.done=false;
+  a.t=0;a.t0=performance.now();
+  active.push(a);startLoop();
+  return a;
+}
+/* 时间线：t → 几何。纯函数，便于 freezeAt 抓相位 */
+function renderActor(a){
+  var t=a.t,L,ang,sy,op,ty,solid,accA;
+  if(a.rm){L=STITCH_L;ang=ANG1;sy=1;op=1;ty=0;solid=true;accA=1}
+  else if(t<SNAP){var k1=eo3(t/SNAP);
+    L=a.L0*(1+(OVER-1)*k1);ang=ANG0;sy=.5;op=1;ty=0;solid=false;accA=.8+.2*k1}
+  else if(t<GATH){var k2=eGather((t-SNAP)/(GATH-SNAP));var Ls=a.L0*OVER;
+    L=Ls+(STITCH_L-Ls)*k2;ang=ANG0+(ANG1-ANG0)*k2;sy=.5;op=1;ty=0;solid=false;accA=1}
+  else if(t<LOCK){var k3=eo3((t-GATH)/(LOCK-GATH));
+    L=STITCH_L;ang=ANG1;sy=.5+.5*k3;op=1;ty=0;solid=true;accA=1}
+  else if(t<SINK){var k4=ei2((t-LOCK)/(SINK-LOCK));
+    L=STITCH_L;ang=ANG1;sy=1;op=1-k4;ty=1.5*k4;solid=true;accA=1}
+  else{a.done=true}
+  if(a.done){a.el.style.display='none';return}
+  a.el.style.transform='translate('+a.x+'px,'+(a.y+ty)+'px) rotate('+ang+'deg)';
+  a.core.style.width=L+'px';a.core.style.left=(-L/2)+'px';
+  a.core.style.transform='scaleY('+sy+')';
+  a.core.style.opacity=op;
+  a.core.style.background=solid?rgba(C.acc,1):grad(accA);
+  var bOp=a.b0*Math.max(0,1-t/110); /* 雾带 ≤110ms 先行散尽 */
+  a.band.style.width=L+'px';a.band.style.left=(-L/2)+'px';a.band.style.opacity=bOp;
+}
+
+/* ── 长按注记 ── */
+var noteShown=false;
+function positionNote(){
+  var left=px+18,top=py-34;
+  if(left+210>innerWidth)left=px-18-210;
+  if(top<76)top=py+18;
+  note.style.left=left+'px';note.style.top=top+'px';
+}
+function noteTick(now){
+  if(!noteShown&&now-holdT0>700){
+    noteShown=true;positionNote();
+    note.textContent=p>=1?'长按已满 2200ms：拉线→成结→环闪（本稿仅示意，语汇见 p8-thread）'
+                         :'长按示意：线继续生长，满 2200ms 成结（本稿不演）';
+    note.style.opacity='1';
+  }
+}
+function noteHide(){noteShown=false;note.style.opacity='0'}
+
+/* ── 状态机：idle / hold / retract ── */
+var rafId=0,mode='idle',holdT0=0,holdFrozen=false,p=0,
+    retractT0=0,retractFrom=0,retractDur=0,watchdog=0,
+    pid=null,startX=0,startY=0,scrollMark=0;
+function startLoop(){if(!rafId)rafId=requestAnimationFrame(loop)}
+function loop(now){
+  rafId=0;
+  if(mode==='hold'&&!holdFrozen&&!RM){
+    p=Math.min(1,(now-holdT0)/T_GO);
+    drawThread(p*fullW(),.16+.5*p);
+    noteTick(now);
+  }else if(mode==='retract'){
+    var kk=Math.min(1,(now-retractT0)/retractDur);
+    p=retractFrom*(1-eo3(kk));
+    drawThread(p*fullW(),.16+.5*p);
+    if(kk>=1)finishRetract();
+  }
+  for(var i=active.length-1;i>=0;i--){
+    var a=active[i];
+    if(!a.frozen)a.t=now-a.t0;
+    renderActor(a);
+    if(a.done){active.splice(i,1);pool.push(a)}
+  }
+  if(mode!=='idle'||active.length)rafId=requestAnimationFrame(loop);
+}
+function finishRetract(){
+  mode='idle';p=0;thread.style.display='none';noteHide();
+}
+function release(){
+  if(mode!=='hold')return;
+  var held=performance.now()-holdT0;
+  mode='idle';pid=null;
+  body.classList.remove('holding');
+  clearTimeout(watchdog);
+  if(RM){
+    thread.style.display='none';noteHide();
+    if(held<=CLICK_MS){ /* RM：静止针脚亮 320ms 即撤 */
+      var a=spawnStitch(px,py,STITCH_L,0);a.rm=true;
+      setTimeout(function(){a.done=true},320);
+    }
+    return;
+  }
+  if(held<=CLICK_MS){
+    /* 回针：那段线原样交给针脚收场（同几何同渐变，无缝交接） */
+    var L=p*fullW();
+    thread.style.display='none';noteHide();
+    spawnStitch(px,py,L,.16+.5*p);
+    clicks++;
+  }else{
+    mode='retract';retractT0=performance.now();retractFrom=p;
+    retractDur=Math.min(560,200+p*380);
+    watchdog=setTimeout(function(){if(mode==='retract')finishRetract()},retractDur+200);
+  }
+  startLoop();
+}
+
+/* ── 手势（EXCLUDE 与 reality.ts 同表） ── */
+var EXCLUDE='a,button,input,textarea,select,label,summary,[contenteditable],h1,h2,h3,h4,h5,h6,p,li,blockquote,figcaption,dt,dd,time,code,pre,[data-morph],[data-nofx]';
+d.addEventListener('pointerdown',function(e){
+  if(e.button!==undefined&&e.button!==0)return;
+  var t=e.target;
+  if(t&&t.closest&&t.closest(EXCLUDE))return;
+  if(pid!==null)return;
+  pid=e.pointerId;startX=e.clientX;startY=e.clientY;
+  px=e.clientX;py=e.clientY;
+  mode='hold';holdFrozen=false;holdT0=performance.now();p=0;scrollMark=scrollY;
+  body.classList.add('holding');
+  if(!RM){thread.style.display='block';drawThread(0,0)}
+  startLoop();
+});
+d.addEventListener('pointermove',function(e){
+  if(mode!=='hold'||pid===null||e.pointerId!==pid)return;
+  if(Math.hypot(e.clientX-startX,e.clientY-startY)>20)release();
+});
+function onPtrEnd(e){
+  if(mode!=='hold'||pid===null||e.pointerId!==pid)return;
+  release();
+}
+d.addEventListener('pointerup',onPtrEnd);
+d.addEventListener('pointercancel',onPtrEnd);
+addEventListener('scroll',function(){
+  if(mode==='hold'&&Math.abs(scrollY-scrollMark)>4)release();
+},{passive:true});
+d.addEventListener('contextmenu',function(e){
+  if(body.classList.contains('holding'))e.preventDefault();
+});
+addEventListener('blur',function(){if(mode==='hold'&&!holdFrozen)release()});
+d.addEventListener('visibilitychange',function(){
+  if(d.hidden&&mode==='hold'&&!holdFrozen)release();
+});
+d.querySelectorAll('a[data-dead]').forEach(function(a){
+  a.addEventListener('click',function(e){e.preventDefault()});
+});
+
+/* ── 发丝进度（素夜 chrome） ── */
+var hair=d.getElementById('hairline');
+function hairTick(){
+  var max=Math.max(1,root.scrollHeight-innerHeight);
+  hair.style.width=(Math.min(1,Math.max(0,scrollY/max))*100).toFixed(2)+'%';
+}
+addEventListener('scroll',hairTick,{passive:true});
+addEventListener('resize',hairTick);
+hairTick();
+
+/* ── ?demo=loop：角落循环演示 ── */
+var badge=d.getElementById('badge');
+if(qs.get('demo')==='loop'&&!RM){
+  badge.innerHTML='p10-a · <b>回针 backstitch · 循环演示中</b><br>?face=wake 醒面 · __p10 调试';
+  var POS=[[.86,.47],[.87,.6],[.12,.35],[.12,.7],[.68,.13],[.5,.9]];
+  var di=0;
+  setInterval(function(){
+    if(d.hidden)return;
+    var s=POS[di++%POS.length];
+    window.__p10.replay(Math.round(innerWidth*s[0]),Math.round(innerHeight*s[1]),
+      {hold:90+Math.round(Math.random()*150)});
+  },1500);
+}
+
+/* ── ?scroll= 直达 ── */
+if(qs.get('scroll')){
+  var f=parseFloat(qs.get('scroll'));
+  if(!isNaN(f)){
+    var max=Math.max(0,root.scrollHeight-innerHeight);
+    scrollTo(0,max*Math.min(1,Math.max(0,f)));
+  }
+}
+
+/* ── 调试接口 ── */
+window.__p10={
+  state:function(){
+    var fz=0;active.forEach(function(a){if(a.frozen)fz++});
+    return JSON.stringify({mode:mode,face:FACE,rm:RM,clicks:clicks,
+      actors:active.length,frozen:fz,err:window.__swarmErr});
+  },
+  replay:function(x,y,opts){
+    opts=opts||{};
+    var hold=Math.max(16,opts.hold||140);
+    var L=RM?STITCH_L:Math.max(24,hold/T_GO*fullWAt(x));
+    spawnStitch(x,y,L,0);
+    clicks++;
+    return true;
+  },
+  freezeAt:function(ms,opts){
+    opts=opts||{};
+    var x=opts.x!=null?opts.x:Math.round(innerWidth*.82),
+        y=opts.y!=null?opts.y:Math.round(innerHeight*.5),
+        hold=opts.hold||150;
+    var a=spawnStitch(x,y,Math.max(24,hold/T_GO*fullWAt(x)),0);
+    a.frozen=true;a.t=ms;renderActor(a);
+    return true;
+  },
+  holdAt:function(ms,x,y){
+    x=x!=null?x:Math.round(innerWidth*.78);y=y!=null?y:Math.round(innerHeight*.45);
+    px=x;py=y;mode='hold';holdFrozen=true;
+    p=Math.min(1,ms/T_GO);
+    drawThread(p*fullW(),.16+.5*p);
+    noteShown=true;positionNote();
+    note.textContent='长按示意：线继续生长，满 2200ms 成结（本稿不演）';
+    note.style.opacity='1';
+    startLoop();
+    return true;
+  },
+  resume:function(){
+    holdFrozen=false;
+    if(mode==='hold'){mode='idle';p=0}
+    thread.style.display='none';noteHide();
+    var now=performance.now();
+    active.forEach(function(a){if(a.frozen){a.frozen=false;a.t0=now-a.t}});
+    return true;
+  }
+};
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<!--
+  ═══════════════════════════════════════════════════════════════════
+  素夜 · p11-D 「对开」 — 主页首屏重设计稿（四路并行探索 · D 路 · 重排幅度最大）
+  · 一句话概念：把首屏重排成一册摊开的对开本——左页「醒」是账目与目录的
+    冷静 verso，右页「梦」是竖排宣言的暖浮 recto，全站那条 14° 缝线在这里
+    「立起来」升格为斜穿两页之间的中缝（书脊）：一列 14° 针脚把两页钉在
+    一夜的书脊上，脑电波就沿着书脊流。
+  · 两页内容与排印——
+    左页 醒（VERSO，冷 / 静 / 账目感，绝对静止）：
+      品牌印记 Traveritas（站头 brand）＋ FIRST STITCH 小字；
+      巨字「醒」（display 900，墨色，字重随灯变）；「今夜目录」＝导航目录
+      （随笔 23:19 / 项目 01:11 / 试验场 02:08 / 关于 04:59，账目式发丝线
+      ＋点线引导＋夜时刻当页码）；「醒侧核验」三条可核验事实（✓ 仓库公开
+      可查 / ✓ 由智能体与我共同建造 / ✓ RSS 真实有效）；左缘刻度尺（夜内
+      时刻 23:07→06:31，23:07 处一枚琥珀落针点——左轨仪表收进书页）；
+      HYPNOGRAM · NIGHT 2026-09 mono 小字。排印以 mono＋发丝线为主调。
+    右页 梦（RECTO，暖 / 浮 / 字感，drift 常驻）：
+      巨字「梦」（梦暖调，drift 浮动）；竖排小注「在醒与梦之间」（页顶右
+      缘，running head 位置）；宣言四行改竖排四列、从右往左读（传统书序），
+      保留逐字微错位＋局部失焦，末列「看见的最后一层世界。」带叠影残迹；
+      远层幽灵描边「梦」；滚动提示做醒/梦双声轨叠影（底文「顺着缝线 ·
+      过完这一夜」，残影「顺着缝线 · 越沉越深」，前缀重合、只在句尾劈叉）。
+  · 中缝构造：缝线家族角度 14°——全站横缝在水平方向倾 14°，本稿把它立
+    起来：中缝为「垂直线倾 14°」（与水平方向成 76°＝90°−14°），仍是同一
+    个角度家族。三层：① 1px 冷→琥珀→暖渐变缝线（boot 时沿轴划出）；
+    ② 一列 10 枚针脚（14×1.5px，恰与全站 stitch-meter 同比例，且因容器
+    自带 14° 旋转，针脚天然横陈于「水平倾 14°」——垂直于书脊，正是
+    p10-c「一针」的角度），琥珀线心；③ 脑电波沿书脊流动（Eeg.astro 移植，
+    两层正弦，umber 30fps）。中缝中心一枚琥珀锚点（书脊上的「结」）。
+    两页纸面：各是一张绕书脊旋转 14° 的超大纸，折口处各自让开 1px，
+    露出 2px 深色壑影（书沟）；右页沿书脊整体低 1.6px、左页高 0.6px——
+    「摊开」的微错位。
+  · 层次（前→后）：中缝（书脊针脚＋锚点＋脑电）→ 两页纸面（含折口阴影）
+    → 页内远层（幽灵「梦」、纸纹 grain）→ 背景洗地（案面深一度的冷灰）。
+  · 鼠标冷暖再平衡（缓移的呼吸，不是开关）：
+    split s ∈ [−1,+1]，目标 t = clamp((x/innerWidth − .5) × 2.2)，rAF 内
+    s += (t−s)×.06（约 0.6–0.8s 缓释），只写 transform/opacity/颜色：
+      醒权重 W = .5 − .5s，梦权重 D = .5 + .5s。
+      左页正文墨色 = fg→fg-soft 掺 (1−W)×34%（最暗仍 66% fg，全程可读）；
+      次级文字掺 (1−W)×30%；刻度尺数字 opacity .26→.88、随灯平移 0→10px
+      浮现；右页墨色 = fg→dream 掺 10%→28%（转暖），梦巨字更暖一档
+      （16%→30%）；次级转 umber；
+      梦页整体 lift = (0.5−D)×12px（右极 −6px 抬起，左极 +6px 下坠，
+      全程 ±6px）；叠影分离 --echo = .16+.62D（×11px/−4px 位移）；
+      琥珀线心亮度 .5→.8，越接近权重中心（|s|→0）越亮——灯悬在书脊上。
+    指针离开窗口回中 0。
+  · 入幕编排（分级苏醒，全部 CSS animation＋--bd 延迟，fill both）：
+    0ms 书脊先亮（先有装帧，后有书页）：缝线沿轴划出 1.2s、针脚自中心
+      向两端逐枚落钉（±70ms 级差）、脑电先淡入；
+    320/420ms 两页纸面落定：左页利落 0.8s（醒侧果断），右页迟缓 1.3s
+      缠绵（梦侧拖沓），摊开错位在落定帧里成形；
+    560–1160ms 醒页内容账目式逐行核进（目录行 60ms 级差、核验行 50ms）；
+    860–2900ms 梦页内容迟缓升起：巨字 1.7s 长缓动，宣言四列按竖排阅读
+      序（右→左）180ms 级差逐列入位，幽灵「梦」2.4s 呼出；
+    2100ms 滚动提示最后落定。全程 ≈2.7s。
+  · 移动端（≤760px，390×844）：对开改「上下两阕」——书脊放倒为全站原型
+    的水平 14° 缝线（中缝横贯 50vh），醒阕在上、梦阕在下；两阕排印语气
+    不变。选它而不选「首屏只示梦页」：上下阕保住了「一册两页被一条缝线
+    缝合」的对开前提，冷热两套排印同屏成立；只示梦页则整个概念弃守。
+    竖排宣言在窄屏放不平，改为横排四行（错位与叠影保留）；刻度尺与点线
+    引导收起；核验压成一行。指针横移仍生效（触屏拖动即再平衡），默认居中。
+  · 降级（prefers-reduced-motion / ?reduced=1）：两页直接落定、权重居中
+    静画（lift/echo 居中值、针脚全成形、脑电静止首帧、drift 停、叠影隐），
+    构图完整；指针再平衡改为瞬时跳变（无缓动动画）。
+  · 调试钩子：window.__p11 = { state() · setSplit(v)（−1..1 同步内联定格，
+    不依赖动画时钟）· setPointer(x)（按光标横位定格）· freezeBoot(ms)
+    （入幕时间轴负延迟定格，确定性）· finishBoot() · unfreezeBoot() ·
+    loop(on) }；查询参数 ?reduced=1、?demo=loop（split 正弦巡梭演示）、
+    ?split=−1..1、?settle=1（载入即定格入幕末帧）、?boot=ms（载入即定格
+    入幕中途帧）——后两个参数在解析期同步定格，供抓拍零竞态。
+    环境动画（drift/锚点呼吸/脑电）自 load 起 0 相位、固定抓拍时点相位可复现。
+  ═══════════════════════════════════════════════════════════════════
+-->
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#e9ecef">
+<meta name="description" content="素夜 p11-D「对开」：主页首屏重设计稿——首屏摊成一册对开本，左页醒的账目与目录，右页梦的竖排宣言，14° 缝线立起来成为书脊。">
+<title>Traveritas · 素夜 · p11-D 对开</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%23e9ecef'/><rect x='4' y='6' width='10' height='20' fill='%23dfe4e9'/><rect x='18' y='8' width='10' height='20' fill='%23e6e2da'/><rect x='15.6' y='3' width='1.2' height='26' fill='%23d9a05b' transform='rotate(8 16 16)'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Serif+SC:wght@300;400;600;900&display=swap" rel="stylesheet">
+<style>
+/* ═══ 素夜 · PLAIN NIGHT 令牌（与 src/styles/tokens.css 同源） ═══ */
+:root{
+  --bg:#e9ecef; --bg-sunken:#e1e5ea;
+  --fg:#262c33; --fg-soft:#59626c; --fg-faint:#8a929b;
+  --line:rgba(38,44,51,.14);
+  --wake:#a7b1ba; --dream:#c2a382; --umber:#8a6a4f;
+  --amber:#d9a05b;
+  --seam-angle:14deg;
+  --ghost-ink:#b98f74;
+  --font-display:'Noto Serif SC','Palatino Linotype','Iowan Old Style',Palatino,Georgia,'Source Han Serif SC','Songti SC',SimSun,serif;
+  --font-body:system-ui,-apple-system,'PingFang SC','Hiragino Sans GB','Microsoft YaHei UI','Microsoft YaHei','Noto Sans SC',sans-serif;
+  --font-mono:'IBM Plex Mono',ui-monospace,'Cascadia Mono',Consolas,'JetBrains Mono',monospace;
+  --measure:34em;
+  /* 冷暖再平衡变量（JS applySplit 写入；默认 = 权重居中） */
+  --w-ink:#2f353d; --w-sub:#606973;
+  --w-tick-op:.57; --w-tick-x:5px;
+  --d-ink:#454443; --d-sub:#666464; --d-char:#4a4744;
+  --d-lift:0px; --echo:.47;
+  --spine-op:.8;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%;overflow-x:clip}
+body{
+  font-family:var(--font-body);font-size:1.0625rem;line-height:1.9;
+  color:var(--fg);background:var(--bg);
+  text-rendering:optimizeLegibility;overflow-x:clip;
+  touch-action:manipulation;-webkit-tap-highlight-color:transparent;
+}
+img,svg{display:block;max-width:100%}
+a{color:inherit;text-decoration-thickness:1px;text-underline-offset:.3em;transition:color .18s ease}
+a:hover{color:var(--umber)}
+:focus-visible{outline:2px solid var(--amber);outline-offset:3px;border-radius:1px}
+::selection{background:rgba(217,160,91,.32)}
+.mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums;letter-spacing:.04em}
+ul,ol{list-style:none}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+
+/* ── 全站 chrome：横向 14° 缝线（首屏让位给立起的中缝，滚过首屏后接回）· 纸纹 ── */
+.seam-h{
+  position:fixed;left:50%;top:50%;width:170vmax;height:1px;z-index:1;pointer-events:none;
+  background:linear-gradient(90deg,rgba(167,177,186,0),rgba(167,177,186,.26) 24%,rgba(194,163,130,.20) 76%,rgba(194,163,130,0));
+  transform:translate(-50%,-50%) rotate(var(--seam-angle));
+  opacity:.5;
+}
+.grain{
+  position:fixed;inset:0;z-index:60;pointer-events:none;opacity:.045;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='180' height='180' filter='url(%23n)' opacity='.6'/></svg>");
+}
+
+/* ═══════════ 对开本 ═══════════ */
+.folio{
+  position:relative;height:100vh;height:100svh;min-height:620px;
+  overflow:clip;user-select:none;-webkit-user-select:none;
+  /* 案面：比两页纸深一度的冷灰洗地 */
+  background:radial-gradient(120% 112% at 50% 38%, #e3e7ec 0%, #d7dce2 60%, #cbd1d9 100%);
+}
+
+/* 两页纸面：绕书脊（过视口中心、垂直线倾 14°）旋转的超大张；折口各让 1px 露出书沟 */
+.sheet{position:absolute;top:50%;width:calc(160vmax - 1px);height:300vmax;margin-top:-150vmax;z-index:1;pointer-events:none}
+.sheet-l{
+  right:50%;transform-origin:100% 50%;
+  background:linear-gradient(270deg,#e2e6eb 0%,var(--bg) 34%,#eef0f3 100%);
+  transform:rotate(14deg) translateY(-.6px);
+}
+.sheet-r{
+  left:50%;transform-origin:0% 50%;
+  background:linear-gradient(90deg,color-mix(in srgb,var(--bg) 85%,var(--dream)) 0%,var(--bg) 34%,color-mix(in srgb,var(--bg) 95.5%,var(--dream)) 100%);
+  transform:rotate(14deg) translateY(1.6px);
+}
+/* 折口阴影：折进书脊处的暗带（左页冷墨调 / 右页暖褐调），让「两页纸」可感 */
+.sheet::after{content:'';position:absolute;top:0;bottom:0;width:150px;pointer-events:none}
+.sheet-l::after{right:0;background:linear-gradient(270deg,rgba(38,44,51,.085),rgba(38,44,51,0))}
+.sheet-r::after{left:0;background:linear-gradient(90deg,rgba(96,74,52,.10),rgba(96,74,52,0))}
+
+/* 页内远层：幽灵「梦」描边（右页纸面之上、字之下） */
+.far{position:absolute;inset:0;z-index:2;pointer-events:none}
+.ghost-meng{
+  position:absolute;right:1vw;top:30%;
+  font-family:var(--font-display);font-weight:900;line-height:1;
+  font-size:min(46vmin,470px);
+  color:transparent;-webkit-text-stroke:1px rgba(38,44,51,.07);
+}
+
+/* ── 中缝（书脊）：缝线 · 针脚列 · 琥珀锚点 · 脑电 ── */
+.spine-z{position:absolute;inset:0;z-index:4;pointer-events:none}
+.spine-line{
+  position:absolute;left:50%;top:50%;width:1px;height:170vmax;
+  background:linear-gradient(180deg,
+    rgba(167,177,186,0),rgba(167,177,186,.30) 17%,
+    rgba(217,160,91,calc(.55*var(--spine-op))) 50%,
+    rgba(194,163,130,.32) 83%,rgba(194,163,130,0));
+  transform:translate(-50%,-50%) rotate(14deg);
+  transform-origin:center;
+}
+.spine-stitches{
+  position:absolute;left:50%;top:50%;
+  display:flex;flex-direction:column;align-items:center;gap:69px;
+  transform:translate(-50%,-50%) rotate(14deg);
+}
+.stitch{
+  width:14px;height:1.5px;
+  background:linear-gradient(90deg,
+    rgba(167,177,186,0),rgba(167,177,186,.34) 20%,
+    rgba(217,160,91,var(--spine-op)) 50%,
+    rgba(194,163,130,.32) 80%,rgba(194,163,130,0));
+  opacity:.92;
+}
+.seam-anchor{
+  width:8px;height:8px;border-radius:50%;background:var(--amber);
+  box-shadow:0 0 10px 2px rgba(217,160,91,.55),0 0 26px 6px rgba(217,160,91,.2);
+}
+@keyframes anchor-breathe{
+  0%,100%{box-shadow:0 0 8px 1px rgba(217,160,91,.45),0 0 20px 4px rgba(217,160,91,.16)}
+  50%{box-shadow:0 0 13px 3px rgba(217,160,91,.72),0 0 34px 9px rgba(217,160,91,.3)}
+}
+.eeg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.eeg path{stroke:var(--umber);stroke-width:1.1;fill:none;opacity:.62;stroke-linecap:round;stroke-linejoin:round}
+
+/* ═══ 左页 · 醒（VERSO）：账目与目录，绝对静止 ═══ */
+.page-l{
+  position:absolute;z-index:3;
+  left:clamp(64px,5.8vw,96px);top:40px;bottom:36px;
+  /* 右界清开书脊在页底的最窄处：x = 50vw − 50vh·tan14° − 24px（right 自右缘量距，故为 50vw + …） */
+  right:calc(50vw + 12.5vh + 24px);
+  display:flex;flex-direction:column;
+  color:var(--w-ink);
+}
+.brand{display:flex;align-items:baseline;gap:.9rem;flex-wrap:wrap}
+.brand-a{
+  display:inline-flex;align-items:center;gap:.55rem;
+  font-family:var(--font-display);font-size:1.05rem;letter-spacing:.02em;
+  color:var(--w-ink);text-decoration:none;
+}
+.brand-dot{width:5px;height:5px;background:var(--amber);transform:rotate(45deg)}
+.brand-sub{font-size:.56rem;letter-spacing:.26em;color:var(--w-sub)}
+.wake-row{
+  display:flex;align-items:stretch;gap:1.5rem;
+  margin-top:clamp(.4rem,1.6vh,1.2rem);
+}
+.wake-char{
+  font-family:var(--font-display);font-weight:900;line-height:.98;
+  font-size:clamp(112px,13vw,190px);
+  color:var(--w-ink);
+}
+/* 竖排页注：紧贴巨字右侧的 running note（与右页竖排注同一解剖位） */
+.wake-cap{
+  writing-mode:vertical-rl;
+  align-self:stretch;
+  padding-left:.85rem;border-left:1px solid var(--line);
+  font-family:var(--font-mono);font-size:.62rem;letter-spacing:.34em;
+  color:var(--w-sub);white-space:nowrap;
+}
+/* 今夜目录＝导航（账目式）：名（display）· 分期注（mono）· 点线 · 夜时刻当页码 */
+.toc{margin-top:clamp(1.2rem,3.6vh,2.4rem)}
+.toc-title{font-size:.6rem;letter-spacing:.3em;color:var(--w-sub);margin-bottom:.55rem}
+.toc a{
+  display:flex;align-items:baseline;gap:.7rem;
+  padding-block:.72rem;border-top:1px solid var(--line);
+  text-decoration:none;
+}
+.toc li:last-child a{border-bottom:1px solid var(--line)}
+.toc-name{font-family:var(--font-display);font-weight:600;font-size:1.08rem;letter-spacing:.05em;color:var(--w-ink);white-space:nowrap}
+.toc a:hover .toc-name{color:var(--umber)}
+.toc-stage{font-size:.56rem;letter-spacing:.16em;color:var(--w-sub);white-space:nowrap}
+.toc-lead{flex:1;border-bottom:1px dotted rgba(38,44,51,.30);transform:translateY(-.28em);min-width:1.4rem}
+.toc-time{font-size:.7rem;letter-spacing:.1em;color:color-mix(in srgb,var(--umber) 72%,var(--w-ink))}
+/* 醒侧核验：三条可核验事实 */
+.facts{margin-top:clamp(1.2rem,3.4vh,2.2rem)}
+.facts-title{font-size:.6rem;letter-spacing:.3em;color:var(--w-sub);margin-bottom:.4rem}
+.fact{
+  display:flex;align-items:baseline;gap:.8rem;
+  padding-block:.42rem;border-top:1px solid var(--line);
+  font-size:.82rem;letter-spacing:.04em;
+}
+.fact:last-child{border-bottom:1px solid var(--line)}
+.fact .tick{font-family:var(--font-mono);font-size:.66rem;letter-spacing:.12em;color:color-mix(in srgb,var(--wake) 45%,var(--fg) 55%)}
+.fact b{font-weight:600;font-family:var(--font-display);color:var(--w-ink)}
+.fact .addr{margin-left:auto;font-family:var(--font-mono);font-size:.6rem;letter-spacing:.1em;color:var(--w-sub);white-space:nowrap}
+.hypno{margin-top:auto;font-size:.6rem;letter-spacing:.38em;color:var(--w-sub)}
+/* 左缘刻度尺：夜内时刻（再平衡时数字浮现） */
+.ruler{position:absolute;left:36px;top:15vh;bottom:13vh;width:10px;z-index:3}
+.rl{position:absolute;left:0;top:0;bottom:0;width:1px;background:var(--line)}
+.rtick{position:absolute;left:0;width:100%;height:1px}
+.rtick i{display:block;width:6px;height:1px;background:rgba(38,44,51,.3)}
+.rtick.major i{width:10px;background:rgba(38,44,51,.42)}
+.rtick b{
+  position:absolute;left:16px;top:-.5em;
+  font-weight:400;font-size:.6rem;letter-spacing:.14em;
+  color:var(--w-sub);white-space:nowrap;
+  opacity:var(--w-tick-op);transform:translateX(var(--w-tick-x));
+}
+.rtick.pin i{width:10px;background:var(--amber);box-shadow:0 0 6px 1px rgba(217,160,91,.4)}
+
+/* ═══ 右页 · 梦（RECTO）：竖排宣言与巨字，drift 常驻 ═══ */
+.page-r{
+  position:absolute;z-index:3;
+  left:calc(50vw + 13vh + 20px);right:clamp(40px,4.5vw,72px);top:40px;bottom:36px;
+  color:var(--d-ink);
+}
+.vsub{
+  position:absolute;right:0;top:0;
+  writing-mode:vertical-rl;
+  font-family:var(--font-display);font-weight:300;font-size:13px;
+  letter-spacing:.52em;color:var(--d-sub);
+}
+.dream-wrap{position:absolute;top:1vh;left:14%;will-change:transform}
+.dream-char{
+  display:block;font-family:var(--font-display);font-weight:900;line-height:1;
+  font-size:clamp(140px,15vw,225px);
+  color:var(--d-char);
+}
+/* 宣言四列：竖排，从右往左读（DOM 顺序＝阅读顺序） */
+.mfield{
+  position:absolute;right:1.5vw;bottom:14vh;height:56vh;
+  writing-mode:vertical-rl;
+}
+.mcol{font-family:var(--font-display);font-weight:500;color:var(--d-ink)}
+.mcol .c{display:inline-block;white-space:pre}
+.mcol .c:nth-child(4n+2){transform:translateY(.13em)}
+.mcol .c:nth-child(4n+3){transform:translateY(-.09em) rotate(.8deg)}
+.mcol .c:nth-child(7n+5){filter:blur(.9px);opacity:.8}
+.mcol .c:nth-child(9n+4){transform:rotate(-1.1deg)}
+.c1{font-size:clamp(1.28rem,1.5vw,1.45rem)}
+.c2{margin-top:22px;font-size:clamp(.86rem,1vw,.95rem);letter-spacing:.32em;color:var(--d-sub)}
+.c3{margin-top:44px;font-size:clamp(.86rem,1vw,.95rem);color:var(--d-sub)}
+.c4{margin-top:66px;font-size:clamp(1.1rem,1.3vw,1.22rem)}
+.mcol.ghost-pair{position:relative}
+.mcol .ghost{
+  position:absolute;inset:0;color:var(--ghost-ink);opacity:.5;pointer-events:none;
+  transform:translate(calc(var(--echo)*10px),calc(var(--echo)*-4px));
+  filter:blur(.4px);
+}
+/* 滚动提示：醒/梦双声轨叠影（前缀重合，句尾劈叉） */
+.scroll-hint{
+  position:absolute;right:0;bottom:0;
+  font-size:13px;font-weight:300;letter-spacing:.26em;color:var(--d-sub);
+}
+.scroll-hint i{
+  display:inline-block;width:24px;height:2px;background:var(--amber);
+  opacity:.5;transform:rotate(calc(var(--seam-angle) * -1));
+  vertical-align:middle;margin-right:18px;
+}
+.scroll-hint .pair{position:relative;display:inline-block}
+.scroll-hint .ghost{
+  position:absolute;inset:0;color:var(--ghost-ink);opacity:.55;pointer-events:none;
+  transform:translate(calc(var(--echo)*11px),calc(var(--echo)*-4px));
+  filter:blur(.4px);white-space:nowrap;
+}
+
+/* ═══ 首屏之下：收边暗示——下一段「随笔」自右页下缘探入，总高 ~142vh ═══ */
+.nextband{position:relative;z-index:2;min-height:42vh;padding-block:clamp(2.6rem,7vh,4.4rem) 3rem}
+.nb-in{width:min(100% - 3rem,40rem);margin-left:auto;margin-right:clamp(20px,4vw,64px)}
+.nb-head{display:flex;align-items:baseline;gap:1rem;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:1.1rem}
+.nb-no{font-size:.6rem;letter-spacing:.24em;color:var(--fg-faint)}
+.nb-head h2{font-size:clamp(1.5rem,3vw,1.9rem);letter-spacing:.06em}
+.nb-stage{font-size:.6rem;letter-spacing:.2em;color:var(--umber)}
+.nb-verdict{display:flex;align-items:baseline;gap:.85rem;margin:1.1rem 0 .9rem}
+.vtag{
+  color:color-mix(in srgb,var(--dream) 62%,var(--fg) 38%);
+  font-family:var(--font-mono);font-size:.58rem;letter-spacing:.2em;
+  padding:.3rem .6rem .26rem;border:1px solid color-mix(in srgb,var(--dream) 45%,transparent);
+  white-space:nowrap;
+}
+.vword{font-size:.85rem;letter-spacing:.1em;color:var(--fg-soft)}
+.nb-line{color:var(--fg-soft);font-size:.98rem;letter-spacing:.06em;max-width:34em}
+
+/* ═══ 入幕编排（全部 CSS animation＋--bd；RM 直落） ═══ */
+[data-bd]{opacity:0}
+html.booted [data-bd]{animation-delay:var(--bd,0ms)}
+html.booted .b-in{animation:p11in .55s cubic-bezier(.2,.7,.3,1) both}
+html.booted .b-col{animation:p11col 1.25s cubic-bezier(.16,.5,.3,1) both}
+html.booted .b-fade{animation:p11fade .9s ease both}
+html.booted .sheet-l{animation:p11sheetL .8s cubic-bezier(.2,.7,.3,1) both}
+html.booted .sheet-r{animation:p11sheetR 1.3s cubic-bezier(.19,.6,.28,1) both}
+html.booted .spine-line{animation:p11spineV 1.2s cubic-bezier(.22,.61,.36,1) both}
+html.booted .stitch{animation:p11stitch .45s cubic-bezier(.2,.7,.3,1) both}
+html.booted .seam-anchor{animation:p11in .5s ease both,anchor-breathe 5.5s ease-in-out 1.5s infinite;animation-delay:var(--bd,0ms),var(--bd2,1.5s)}
+html.booted .eeg-w{animation:p11eeg 1.6s ease both}
+html.booted .dream-wrap{animation:p11inT 1.7s cubic-bezier(.16,.55,.25,1) both}
+html.booted .ghost-meng{animation:p11ghost 2.4s ease both}
+@keyframes p11in{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
+@keyframes p11col{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@keyframes p11fade{from{opacity:0}to{opacity:1}}
+@keyframes p11sheetL{from{opacity:0;transform:rotate(14deg) translateY(-9px)}to{opacity:1;transform:rotate(14deg) translateY(-.6px)}}
+@keyframes p11sheetR{from{opacity:0;transform:rotate(14deg) translateY(13px)}to{opacity:1;transform:rotate(14deg) translateY(1.6px)}}
+@keyframes p11spineV{from{transform:translate(-50%,-50%) rotate(14deg) scaleY(.05);opacity:0}40%{opacity:1}to{transform:translate(-50%,-50%) rotate(14deg) scaleY(1);opacity:1}}
+@keyframes p11spineH{from{transform:translate(-50%,-50%) rotate(14deg) scaleX(.05);opacity:0}40%{opacity:1}to{transform:translate(-50%,-50%) rotate(14deg) scaleX(1);opacity:1}}
+@keyframes p11stitch{from{opacity:1;transform:scaleX(0)}to{opacity:1;transform:scaleX(1)}}
+@keyframes p11eeg{from{opacity:0}to{opacity:.85}}
+@keyframes p11inT{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(var(--d-lift,0px))}}
+@keyframes p11ghost{from{opacity:0}to{opacity:1}}
+
+/* 梦侧浮动（global.css .drift 同源） */
+@keyframes drift{
+  0%,100%{transform:translate3d(0,calc(var(--d-amp,7px)*-.6),0) rotate(calc(var(--d-rot,.5deg)*-1))}
+  50%{transform:translate3d(calc(var(--d-x,3px)*.6),var(--d-amp,7px),0) rotate(var(--d-rot,.5deg))}
+}
+.drift{animation:drift var(--d-dur,8s) ease-in-out var(--d-phase,0s) infinite}
+
+/* ── 退让：reduced-motion（?reduced=1 同效） ── */
+html.rm [data-bd]{animation:none!important;opacity:1!important;transform:none!important}
+html.rm .sheet-l{transform:rotate(14deg) translateY(-.6px)!important}
+html.rm .sheet-r{transform:rotate(14deg) translateY(1.6px)!important}
+html.rm .spine-line{transform:translate(-50%,-50%) rotate(14deg)!important}
+html.rm .seam-anchor{animation:none!important}
+html.rm .drift{animation:none!important}
+html.rm .mcol .ghost,html.rm .scroll-hint .ghost{display:none}
+html.rm .mcol .c{transform:none!important;filter:none!important;opacity:1!important}
+@media (prefers-reduced-motion:reduce){
+  html:not(.rm) [data-bd]{animation:none!important;opacity:1!important;transform:none!important}
+  html:not(.rm) .sheet-l{transform:rotate(14deg) translateY(-.6px)!important}
+  html:not(.rm) .sheet-r{transform:rotate(14deg) translateY(1.6px)!important}
+  html:not(.rm) .spine-line{transform:translate(-50%,-50%) rotate(14deg)!important}
+  html:not(.rm) .drift{animation:none!important}
+}
+
+/* 演示角标 */
+.demo-chip{
+  position:fixed;left:18px;bottom:18px;z-index:70;
+  font-size:.62rem;letter-spacing:.14em;color:var(--fg-soft);
+  background:rgba(233,236,239,.92);border:1px solid var(--line);
+  padding:.42rem .7rem .38rem;pointer-events:none;
+}
+
+/* ── 矮视口（宽而矮的桌面窗口）：左页收紧 ── */
+@media (max-height:780px) and (min-width:761px){
+  .wake-char{font-size:clamp(88px,9.6vw,136px)}
+  .toc a{padding-block:.5rem}
+  .fact{padding-block:.3rem}
+  .mfield{height:60vh;bottom:10vh}
+}
+
+/* ═══ 移动端（≤760px，390×844）：对开 → 上下两阕，书脊放倒为水平 14° 缝线 ═══ */
+@media (max-width:760px){
+  body{font-size:1rem}
+  .sheet{width:300vmax;height:calc(160vmax - 1px);margin:0}
+  .sheet-l{ /* 上阕纸：底缘坐在缝线上，绕缝线旋转 */
+    right:auto;left:50%;top:auto;bottom:50%;
+    width:300vmax;height:calc(160vmax - 1px);margin-left:-150vmax;
+    transform-origin:50% 100%;
+    background:linear-gradient(180deg,#eef0f3 0%,var(--bg) 40%,#e6eaee 100%);
+    transform:rotate(14deg) translateX(-.6px);
+  }
+  .sheet-r{ /* 下阕纸：顶缘坐在缝线上 */
+    right:auto;top:calc(50% + 1px);left:50%;
+    width:300vmax;height:calc(160vmax - 1px);margin-left:-150vmax;
+    transform-origin:50% 0%;
+    background:linear-gradient(0deg,color-mix(in srgb,var(--bg) 96.5%,var(--dream)) 0%,var(--bg) 40%,color-mix(in srgb,var(--bg) 89%,var(--dream)) 100%);
+    transform:rotate(14deg) translateX(.8px);
+  }
+  html.booted .sheet-l{animation-name:p11sheetLt}
+  html.booted .sheet-r{animation-name:p11sheetRt}
+  html.rm .sheet-l{transform:rotate(14deg) translateX(-.6px)!important}
+  html.rm .sheet-r{transform:rotate(14deg) translateX(.8px)!important}
+  @keyframes p11sheetLt{from{opacity:0;transform:rotate(14deg) translateY(-9px)}to{opacity:1;transform:rotate(14deg) translateX(-.6px)}}
+  @keyframes p11sheetRt{from{opacity:0;transform:rotate(14deg) translateY(13px)}to{opacity:1;transform:rotate(14deg) translateX(.8px)}}
+  .spine-line{width:170vmax;height:1px}
+  html.booted .spine-line{animation-name:p11spineH}
+  html.rm .spine-line{transform:translate(-50%,-50%) rotate(14deg)!important}
+  .spine-stitches{flex-direction:row;gap:33px}
+  .stitch{width:1.5px;height:14px;background:linear-gradient(180deg,
+    rgba(167,177,186,0),rgba(167,177,186,.34) 20%,
+    rgba(217,160,91,var(--spine-op)) 50%,
+    rgba(194,163,130,.32) 80%,rgba(194,163,130,0))}
+  @keyframes p11stitchM{from{opacity:1;transform:scaleY(0)}to{opacity:1;transform:scaleY(1)}}
+  html.booted .stitch{animation-name:p11stitchM}
+
+  /* 上阕 · 醒（下界清开缝线在左缘的最高点 50% − 12.5vw） */
+  .page-l{left:22px;right:22px;top:14px;bottom:calc(50% + 13vw);width:auto}
+  .brand-sub{display:none}
+  .wake-row{margin-top:.2rem;gap:1rem}
+  .wake-char{font-size:clamp(84px,24vw,104px)}
+  .wake-cap{font-size:.56rem;letter-spacing:.28em}
+  .toc{margin-top:.7rem}
+  .toc a{padding-block:.5rem;gap:.5rem}
+  .toc-name{font-size:.98rem}
+  .toc-stage,.toc-lead{display:none}
+  .toc-time{margin-left:auto}
+  .facts{margin-top:.8rem}
+  .facts .fact{padding-block:.3rem}
+  .facts .fact:not(:first-child){display:none}
+  .fact .addr{display:none}
+  .facts-title{margin-bottom:.2rem}
+  .hypno{margin-top:.7rem}
+  .ruler{display:none}
+
+  /* 下阕 · 梦（上界清开缝线在右缘的最低点 50% + 12.5vw） */
+  .page-r{left:22px;right:22px;top:calc(50% + 13vw);bottom:14px}
+  .vsub{writing-mode:horizontal-tb;right:auto;left:0;top:-4px;letter-spacing:.4em;font-size:12px}
+  .dream-wrap{top:26px;left:0}
+  .dream-char{font-size:clamp(88px,25vw,110px)}
+  .ghost-meng{right:-6vw;top:52%;font-size:78vw;opacity:.8}
+  .mfield{writing-mode:horizontal-tb;right:auto;left:0;bottom:54px;height:auto;width:auto}
+  .mcol{margin-top:0;margin-bottom:.5rem}
+  .c1{font-size:1.12rem}
+  .c2{margin-left:1.2em;font-size:.78rem;letter-spacing:.3em}
+  .c3{margin-left:.6em;font-size:.78rem}
+  .c4{margin-left:1.8em;font-size:.95rem}
+  .scroll-hint{right:auto;left:0;bottom:0;font-size:12px}
+
+  .nb-in{margin-inline:auto}
+}
+</style>
+</head>
+<body>
+
+<!-- 全站 chrome：横向 14° 缝线（首屏被案面覆住，滚过首屏接回）· 纸纹 -->
+<div class="seam-h" aria-hidden="true"></div>
+<div class="grain" aria-hidden="true"></div>
+
+<main>
+<h1 class="sr-only">Traveritas —— 这里不是梦，也不是现实。它是人在即将醒来时，看见的最后一层世界。</h1>
+
+<!-- ═══ 对开本：案面 · 两页纸 · 远层幽灵 · 中缝书脊 · 两页内容 ═══ -->
+<section class="folio" aria-label="对开 · 首屏">
+
+  <!-- 两页纸面（绕书脊旋转的大张；折口各让 1px 露书沟；右页沿脊低 1.6px） -->
+  <div class="sheet sheet-l" data-bd="320" aria-hidden="true"></div>
+  <div class="sheet sheet-r" data-bd="420" aria-hidden="true"></div>
+
+  <!-- 页内远层：幽灵「梦」描边 -->
+  <div class="far" aria-hidden="true">
+    <span class="ghost-meng" data-bd="1250" style="--bd:1.25s">梦</span>
+  </div>
+
+  <!-- 中缝（书脊）：缝线 · 针脚列 · 琥珀锚点 · 脑电 -->
+  <div class="spine-z" aria-hidden="true">
+    <div class="eeg-w" data-bd="300" style="--bd:.3s">
+      <svg class="eeg" id="eeg"><g id="eeg-g"><path id="eeg-p"/></g></svg>
+    </div>
+    <div class="spine-line" data-bd="0"></div>
+    <div class="spine-stitches b-fade" data-bd="380" style="--bd:.38s">
+      <i class="stitch" data-bd="800" style="--bd:.8s"></i>
+      <i class="stitch" data-bd="730" style="--bd:.73s"></i>
+      <i class="stitch" data-bd="660" style="--bd:.66s"></i>
+      <i class="stitch" data-bd="590" style="--bd:.59s"></i>
+      <i class="stitch" data-bd="520" style="--bd:.52s"></i>
+      <span class="seam-anchor" data-bd="760,1500" style="--bd:.76s;--bd2:1.5s"></span>
+      <i class="stitch" data-bd="520" style="--bd:.52s"></i>
+      <i class="stitch" data-bd="590" style="--bd:.59s"></i>
+      <i class="stitch" data-bd="660" style="--bd:.66s"></i>
+      <i class="stitch" data-bd="730" style="--bd:.73s"></i>
+      <i class="stitch" data-bd="800" style="--bd:.8s"></i>
+    </div>
+  </div>
+
+  <!-- 左缘刻度尺（夜内时刻；只标两端——落针与天亮，中段刻度留给「灯偏左」时浮现的细节） -->
+  <div class="ruler b-fade" data-bd="1020" style="--bd:1.02s" aria-hidden="true">
+    <i class="rl"></i>
+    <span class="rtick major pin" style="top:0%"><i></i><b class="mono">23:07 · 落针</b></span>
+    <span class="rtick" style="top:14%"><i></i></span>
+    <span class="rtick" style="top:28%"><i></i></span>
+    <span class="rtick major" style="top:33%"><i></i></span>
+    <span class="rtick" style="top:47%"><i></i></span>
+    <span class="rtick major" style="top:56%"><i></i></span>
+    <span class="rtick" style="top:71%"><i></i></span>
+    <span class="rtick major" style="top:81%"><i></i></span>
+    <span class="rtick major" style="top:100%"><i></i><b class="mono">06:31 · 天亮</b></span>
+  </div>
+
+  <!-- ══ 左页 · 醒：品牌印记 · 巨字 · 目录 · 核验 · HYPNOGRAM ══ -->
+  <div class="page-l">
+    <header class="brand b-in" data-bd="560" style="--bd:.56s">
+      <a class="brand-a" href="#" data-dead><i class="brand-dot" aria-hidden="true"></i>Traveritas</a>
+      <span class="brand-sub mono">FOLIO · 对开本 · FIRST STITCH</span>
+    </header>
+
+    <div class="wake-row">
+      <p class="wake-char b-in" data-bd="640" style="--bd:.64s" aria-hidden="true">醒</p>
+      <p class="wake-cap b-in" data-bd="760" style="--bd:.76s" aria-hidden="true">左页 · 醒侧可核验 · VERSO · WAKE β</p>
+    </div>
+
+    <nav class="toc b-in" data-bd="700" style="--bd:.7s" aria-label="今夜目录">
+      <p class="toc-title mono">今夜目录 · CONTENTS</p>
+      <ul>
+        <li><a class="b-in" data-bd="740" style="--bd:.74s" href="#/articles/">
+          <span class="toc-name">随笔</span><span class="toc-stage mono">浅梦 N1–N2</span><i class="toc-lead"></i><span class="toc-time mono">23:19</span></a></li>
+        <li><a class="b-in" data-bd="800" style="--bd:.8s" href="#/projects/">
+          <span class="toc-name">项目</span><span class="toc-stage mono">深眠 N3 δ</span><i class="toc-lead"></i><span class="toc-time mono">01:11</span></a></li>
+        <li><a class="b-in" data-bd="860" style="--bd:.86s" href="#/lab/">
+          <span class="toc-name">试验场</span><span class="toc-stage mono">异相 REM</span><i class="toc-lead"></i><span class="toc-time mono">02:08</span></a></li>
+        <li><a class="b-in" data-bd="920" style="--bd:.92s" href="#/about/">
+          <span class="toc-name">关于</span><span class="toc-stage mono">晨醒 β</span><i class="toc-lead"></i><span class="toc-time mono">04:59</span></a></li>
+      </ul>
+    </nav>
+
+    <div class="facts b-in" data-bd="950" style="--bd:.95s">
+      <p class="facts-title mono">醒侧核验 · CAN VERIFY</p>
+      <ul>
+        <li class="fact b-in" data-bd="990" style="--bd:.99s"><span class="tick">✓</span><b>仓库公开可查</b><span class="addr">github.com/Traveritas</span></li>
+        <li class="fact b-in" data-bd="1040" style="--bd:1.04s"><span class="tick">✓</span><b>由智能体与我共同建造</b><span class="addr">建造记录 · 随笔</span></li>
+        <li class="fact b-in" data-bd="1090" style="--bd:1.09s"><span class="tick">✓</span><b>RSS 真实有效</b><span class="addr">/rss.xml</span></li>
+      </ul>
+    </div>
+
+    <p class="hypno mono b-in" data-bd="1160" style="--bd:1.16s">HYPNOGRAM · NIGHT 2026-09</p>
+  </div>
+
+  <!-- ══ 右页 · 梦：竖排注 · 巨字 · 宣言四列 · 滚动提示 ══ -->
+  <div class="page-r">
+    <p class="vsub b-col" data-bd="1010" style="--bd:1.01s" aria-hidden="true">在醒与梦之间</p>
+
+    <div class="dream-wrap" data-bd="860" style="--bd:.86s">
+      <span class="dream-char drift" style="--d-amp:8px;--d-dur:9s;--d-rot:.4deg" aria-hidden="true">梦</span>
+    </div>
+
+    <div class="mfield" aria-hidden="true">
+      <p class="mcol c1 b-col" data-bd="1100" style="--bd:1.1s"><span class="c">这</span><span class="c">里</span><span class="c">不</span><span class="c">是</span><span class="c">梦</span><span class="c">，</span></p>
+      <p class="mcol c2 b-col" data-bd="1280" style="--bd:1.28s"><span class="c">也</span><span class="c">不</span><span class="c">是</span><span class="c">现</span><span class="c">实</span><span class="c">。</span></p>
+      <p class="mcol c3 b-col" data-bd="1460" style="--bd:1.46s"><span class="c">它</span><span class="c">是</span><span class="c">人</span><span class="c">在</span><span class="c">即</span><span class="c">将</span><span class="c">醒</span><span class="c">来</span><span class="c">时</span><span class="c">，</span></p>
+      <p class="mcol c4 ghost-pair b-col" data-bd="1640" style="--bd:1.64s"><span class="ghost" aria-hidden="true">看见的最后一层世界。</span><span class="c">看</span><span class="c">见</span><span class="c">的</span><span class="c">最</span><span class="c">后</span><span class="c">一</span><span class="c">层</span><span class="c">世</span><span class="c">界</span><span class="c">。</span></p>
+    </div>
+
+    <p class="scroll-hint b-col" data-bd="2100" style="--bd:2.1s">
+      <i aria-hidden="true"></i><span class="pair"><span class="ghost" aria-hidden="true">顺着缝线 · 越沉越深</span>顺着缝线 · 过完这一夜</span>
+    </p>
+  </div>
+</section>
+
+<!-- ═══ 收边：下一段「随笔 · 浅梦」自右页下缘探入（总高 ~142vh） ═══ -->
+<section class="nextband" aria-label="下一夜段">
+  <div class="nb-in">
+    <header class="nb-head">
+      <span class="nb-no mono">下一段 · 01 / N1–N2</span>
+      <h2>随笔</h2>
+      <span class="nb-stage mono">浅梦 · LIGHT · 23:19 → 01:11</span>
+    </header>
+    <p class="nb-verdict">
+      <span class="vtag">半可核验 · HALF-VERIFIABLE</span>
+      <span class="vword">写下时是醒的。</span>
+    </p>
+    <p class="nb-line">浅睡的人写字最诚实——字还没醒，替我先说了。合上这一册，缝线还会继续往下走。</p>
+  </div>
+</section>
+</main>
+
+<p class="demo-chip mono" id="demoChip" hidden></p>
+
+<script>
+(function(){
+'use strict';
+window.__swarmErr='none';
+window.addEventListener('error',function(e){
+  window.__swarmErr=String((e&&e.message)||((e&&e.type)||'unknown'));
+});
+window.addEventListener('unhandledrejection',function(e){
+  window.__swarmErr='rej '+String((e&&e.reason&&e.reason.message)||e.reason);
+});
+
+var d=document,docEl=d.documentElement;
+var qs=new URLSearchParams(location.search);
+var RM=qs.get('reduced')==='1'||
+  (window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches);
+if(qs.get('reduced')==='1'){docEl.classList.add('rm');}
+
+/* ── 冷暖再平衡：split ∈ [-1,+1] → 十二个变量内联写入（transform/opacity/颜色） ── */
+var C={fg:[38,44,51],soft:[89,98,108],faint:[138,146,155],dream:[194,163,130],umber:[138,106,79]};
+function clamp(v,a,b){return v<a?a:(v>b?b:v)}
+function mix(a,b,k){k=clamp(k,0,1);
+  return 'rgb('+Math.round(a[0]+(b[0]-a[0])*k)+','+Math.round(a[1]+(b[1]-a[1])*k)+','+Math.round(a[2]+(b[2]-a[2])*k)+')'}
+var s=0,t=0,raf=0,demoOn=false,frozenT=null;
+function apply(v){
+  var W=.5-.5*v,D=.5+.5*v,r=docEl.style;
+  r.setProperty('--w-ink',mix(C.fg,C.soft,(1-W)*.34));       /* 左页墨：最淡仍 66% fg */
+  r.setProperty('--w-sub',mix(C.soft,C.faint,(1-W)*.30));
+  r.setProperty('--w-tick-op',(0.26+0.62*W).toFixed(3));     /* 刻度数字 .26→.88 */
+  r.setProperty('--w-tick-x',((1-W)*10).toFixed(1)+'px');
+  r.setProperty('--d-ink',mix(C.fg,C.dream,.10+.18*D));      /* 右页墨转暖 10%→28% */
+  r.setProperty('--d-sub',mix(C.soft,C.umber,.12+.28*D));
+  r.setProperty('--d-char',mix(C.fg,C.dream,.16+.14*D));     /* 梦巨字：更暖一档 */
+  r.setProperty('--d-lift',((0.5-D)*12).toFixed(2)+'px');    /* 梦页浮沉 ±6px */
+  r.setProperty('--echo',(0.16+0.62*D).toFixed(3));          /* 叠影分离 .16→.78 */
+  r.setProperty('--spine-op',(0.50+0.30*(1-Math.abs(v))).toFixed(3)); /* 琥珀线心 .5→.8 */
+}
+function loop(now){
+  raf=0;
+  if(demoOn)t=clamp(Math.sin(now/4200),-1,1);
+  if(Math.abs(t-s)<=.0012){s=t;apply(s);return}
+  s+=(t-s)*(RM?1:.06);
+  apply(s);
+  raf=requestAnimationFrame(loop);
+}
+function kick(){if(!raf)raf=requestAnimationFrame(loop)}
+function setBoth(v){s=t=clamp(v,-1,1);apply(s);return s}
+addEventListener('pointermove',function(e){
+  t=clamp(((e.clientX/innerWidth)-.5)*2.2,-1,1);
+  if(RM){s=t;apply(s);return}   /* RM：瞬时，无缓动 */
+  kick();
+},{passive:true});
+docEl.addEventListener('mouseleave',function(){t=0;if(RM){s=0;apply(0)}else kick()});
+apply(0);
+var qsplit=parseFloat(qs.get('split'));
+if(isFinite(qsplit))setBoth(qsplit);
+
+/* ── 入幕：booted 立即挂上（animation from 态即隐藏，无闪现）；
+   ?settle=1 → 同步定格入幕末帧；?boot=ms → 同步定格该相位（均不依赖动画时钟） ── */
+var bootEls=[].slice.call(d.querySelectorAll('[data-bd]'));
+docEl.classList.add('booted');
+function freezeBoot(ms){
+  if(RM)return false;
+  frozenT=ms;
+  bootEls.forEach(function(el){
+    var bds=(el.getAttribute('data-bd')||'0').split(',');
+    el.style.animationDelay=bds.map(function(x){return (parseFloat(x)-ms)+'ms'}).join(',');
+    el.style.animationPlayState='paused';
+  });
+  return true;
+}
+function unfreezeBoot(){
+  frozenT=null;
+  bootEls.forEach(function(el){el.style.animationDelay='';el.style.animationPlayState=''});
+}
+function finishBoot(){return freezeBoot(9e4)}
+if(qs.get('settle')==='1')finishBoot();
+if(qs.get('boot')!==null){
+  var bms=parseFloat(qs.get('boot'));
+  if(isFinite(bms))freezeBoot(Math.max(0,bms));
+}
+
+/* ── 书脊脑电（Eeg.astro 移植：两层正弦；宽屏沿立缝、窄屏沿横缝；30fps） ── */
+var eegP=d.getElementById('eeg-p'),eegG=d.getElementById('eeg-g');
+var TAU=Math.PI*2,AMP=3.6,FREQ=.5,SPD=2.6,lastPh=0;
+function drawEeg(ph){
+  if(!eegP)return;
+  lastPh=ph;
+  var W=innerWidth,H=innerHeight,cx=W/2,cy=H/2;
+  var half=Math.sqrt(W*W+H*H)/2+60;
+  var vert=innerWidth>760; /* 宽：竖波＋rotate14＝沿立缝；窄：横波＋rotate14＝沿横缝 */
+  var str='',first=true,u,w,X,Y;
+  for(u=-half;u<=half;u+=26){
+    w=Math.sin(u/600*FREQ*TAU+ph*SPD)*AMP+Math.sin(u/600*FREQ*2.7+ph*1.3)*AMP*.4;
+    if(vert){X=cx+w;Y=cy+u}else{X=cx+u;Y=cy+w}
+    str+=(first?'M':'L')+X.toFixed(1)+' '+Y.toFixed(1);
+    first=false;
+  }
+  eegP.setAttribute('d',str);
+  eegG.setAttribute('transform','rotate(14 '+cx+' '+cy+')');
+}
+drawEeg(0);
+if(!RM){
+  var last=0;
+  (function eloop(ts){
+    requestAnimationFrame(eloop);
+    if(ts-last<33)return;
+    last=ts;
+    if(!document.hidden)drawEeg(ts/1000);
+  })(0);
+}
+addEventListener('resize',function(){drawEeg(lastPh)});
+
+/* ── 演示循环（?demo=loop）：split 正弦巡梭 ── */
+var chip=d.getElementById('demoChip');
+function demoLoop(on){
+  demoOn=!!on;
+  chip.hidden=!demoOn;
+  if(demoOn){chip.textContent='冷暖巡梭 · demo · 光标横移可夺回';kick()}
+  return demoOn;
+}
+if(qs.get('demo')==='loop'){setTimeout(function(){demoLoop(true)},600)}
+
+/* 死链不跳转 */
+d.querySelectorAll('a[data-dead],a[href^="#/"]').forEach(function(a){
+  a.addEventListener('click',function(e){e.preventDefault()});
+});
+
+window.__p11={
+  state:function(){
+    return JSON.stringify({
+      split:+s.toFixed(3),target:+t.toFixed(3),rm:RM,demo:demoOn,
+      booted:docEl.classList.contains('booted'),
+      bootFrozenAt:frozenT,err:window.__swarmErr
+    });
+  },
+  setSplit:function(v){raf=0;if(demoOn){demoOn=false;chip.hidden=true}return setBoth(v)},   /* 权重定格 */
+  setPointer:function(x){raf=0;return setBoth(((x/innerWidth)-.5)*2.2)},    /* 按光标横位定格 */
+  freezeBoot:freezeBoot,
+  finishBoot:finishBoot,
+  unfreezeBoot:unfreezeBoot,
+  loop:function(on){return demoLoop(on)}
+};
+})();
+</script>
+</body>
+</html>

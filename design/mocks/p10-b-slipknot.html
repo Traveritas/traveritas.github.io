@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-face="dream">
+<!--
+   ═══════════════════════════════════════════════════════════════════
+   素夜 · 短按「点击特效」设计稿 p10-B —— 滑结 SLIP KNOT
+   · 一句话：松手一瞬，指下那段已抽出的小线绷直、两头急速收拢，打成一
+     枚 5px 的琥珀微结——线太短，结没打住：线头沿 -4° 一弹滑开、散尽
+     无痕；它是长按「绷直→收拢→成结→环闪→闩锁」的小兄弟，共用前三
+     拍，后两拍（环闪、微沉）因「没换面」而缺席。
+   · 与按压过程的因果连续性：特效不是另起的闪光，而是那段线的「收场」
+     ——松手时在同一位置、同一角度（-4°）、同一长度上无缝接管按住时
+     正在生长的线段（reality.ts 的 retract 在 ≤260ms 短按情形下被特
+     效取代）。从此线段→特效一体：按下抽出多长，松手就收多长。
+   · 时序（自松手起算，总寿命 415ms ≤ 500ms；全部 transform/opacity）：
+       绷  0–70ms    角 -4°→0°，长度不变 · cubic-bezier(.25,.7,.3,1)
+                     ——长按定格「绷直」一拍的微缩；
+       拢  70–200ms  长度 L→4.4px（scaleX→.011，基宽 400px），两端向
+                     指下加速收拢 · cubic-bezier(.55,.05,.85,.4)；
+                     线尾 90–100% 淡出交棒给微结——「收拢成结」的微缩；
+       结  200–350ms 5px ◆ 微结倒旋弹入（0–36ms：scale .25→1 ·
+                     rotate -100°→0 · cubic-bezier(.2,.8,.3,1)）→ 定住
+                     27ms → 散去 87ms（scale→.12 · rotate 55° ·
+                     ease-in）。结芯琥珀＝线心琥珀收拢而成（线渐变中央恒
+                     为 #d9a05b）：这是「环闪」的位置，但降为结芯一闪
+                     ——短按不换面，不盖环闪的印；全页微沉同样不做
+                     （点击不该晃页面），层级由 14px◆+环闪+2.2px沉 对
+                     5px◆+芯闪+无沉 拉开；
+       滑  265–415ms 12px 琥珀线头自结点沿 -4° 向左下弹出滑走
+                     （translateX 0→-13px · scaleX .25→1 · 中段 .95 亮
+                     度 → 渐隐）· cubic-bezier(.2,.7,.3,1)——「结没打
+                     住，线头滑走」的一拍，也是对旧 38px xmFlick 硬闪
+                     的替换与告别。
+   · 双色决策：随面变色。线段两端梦面 #c2a382 / 醒面 #a7b1ba（与
+     reality.ts thread.back / thread.go 渐变同族，透明度按素夜纸白底
+     调至 .55），线心、微结、滑走线头恒为琥珀 #d9a05b（机制色不随
+     面）。右下角按钮可切换两面验证；?face=dream|wake 直达。
+   · prefers-reduced-motion（含 ?reduced=1 强制）：不做动画。短按在
+     指下出现一帧静态 11px 琥珀短线（-4°，无任何过渡）180ms 作极简
+     确认；按压不生长、不出结、无长按注记动画。冻结调试（freeze）时
+     该静态线常驻，便于截图。
+   · 手势与边界（EXCLUDE 语义同 reality.ts：a/button/输入件/标题/正
+     文段落等上不触发）：按下即拉线（2200ms 线满全屏宽，-4°，中心恒
+     在指下，与全站机制同参）；≤260ms 松手→滑结；260ms–满程松手→线
+     原路缩回（无特效）；满 2200ms→线停满＋一句注记（长按机制仅示
+     意，全机制见 design/mocks/p8-thread.html / src/scripts/reality.ts）；
+     拖动 >20px / 滚动 >4px → 取消（原路缩回，无特效）。连点各自独
+     立播放，节点 700ms 自清理、同屏 ≤6 枚；特效层 pointer-events:
+     none，z-index 210，只挂 transform/opacity。
+   · 调试：?demo=loop 循环演示（在空白试按区随机短按）；window.__p10 =
+     { state(), replay(x, y, {hold, face, freeze}), freezeAt(ms),
+       press(x, y, ms), clear() }；freeze 以负 animation-delay ＋
+     animation-play-state:paused 冻结在指定相位，供截图抓拍瞬时画面。
+   ═══════════════════════════════════════════════════════════════════
+-->
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#e9ecef">
+<title>随笔 — Traveritas · 素夜 · p10-B 滑结</title>
+<meta name="description" content="短按点击特效设计稿 p10-B 滑结：松手一瞬，指下那段线绷直、收拢，打成一枚没打住的微结，线头滑开散尽。">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%23e9ecef'/><rect x='6' y='15' width='20' height='1.4' fill='%23d9a05b' transform='rotate(-14 16 16)'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Serif+SC:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+/* ── 令牌（与 src/styles/tokens.css 同源；p9-S 素夜基准） ── */
+:root{
+  --bg:#e9ecef; --bg-sunken:#e1e5ea;
+  --fg:#262c33; --fg-soft:#59626c; --fg-faint:#8a929b;
+  --line:rgba(38,44,51,.14);
+  --wake:#a7b1ba; --dream:#c2a382; --umber:#8a6a4f;
+  --amber:#d9a05b;
+  --seam-angle:14deg;
+  --font-display:'Noto Serif SC','Palatino Linotype','Iowan Old Style',Palatino,Georgia,'Source Han Serif SC','Songti SC',SimSun,serif;
+  --font-body:system-ui,-apple-system,'PingFang SC','Hiragino Sans GB','Microsoft YaHei UI','Microsoft YaHei','Noto Sans SC',sans-serif;
+  --font-mono:'IBM Plex Mono',ui-monospace,'Cascadia Mono',Consolas,'JetBrains Mono',monospace;
+  --measure:34em;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%;scroll-behavior:smooth;overflow-x:clip}
+body{
+  font-family:var(--font-body);font-size:1.0625rem;line-height:1.9;
+  color:var(--fg);background:var(--bg);
+  text-rendering:optimizeLegibility;overflow-x:clip;min-height:100dvh;
+  display:flex;flex-direction:column;touch-action:manipulation;
+}
+body.holding{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+[hidden]{display:none!important}
+a{color:inherit;text-decoration-thickness:1px;text-underline-offset:.3em;transition:color .18s ease}
+a:hover{color:var(--umber)}
+:focus-visible{outline:2px solid var(--amber);outline-offset:3px;border-radius:1px}
+::selection{background:rgba(217,160,91,.32)}
+.mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums;letter-spacing:.04em}
+ul,ol{list-style:none}
+
+/* ── 全站 chrome：14° 缝线 · 纸纹 ── */
+.seam{
+  position:fixed;left:50%;top:50%;width:170vmax;height:1px;z-index:0;pointer-events:none;
+  background:linear-gradient(90deg,rgba(167,177,186,0),rgba(167,177,186,.26) 24%,rgba(194,163,130,.20) 76%,rgba(194,163,130,0));
+  transform:translate(-50%,-50%) rotate(var(--seam-angle));
+  opacity:.5;
+}
+.grain{
+  position:fixed;inset:0;z-index:50;pointer-events:none;opacity:.045;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='180' height='180' filter='url(%23n)' opacity='.6'/></svg>");
+}
+
+/* ── 布局 ── */
+.page{min-height:100dvh;display:flex;flex-direction:column}
+main{flex:1;position:relative;z-index:10}
+.wrap{width:min(100% - 3rem,56rem);margin-inline:auto}
+.view{padding-block:clamp(2.8rem,7vh,4.6rem) clamp(3rem,8vh,5rem);animation:viewIn .5s ease both}
+@keyframes viewIn{from{opacity:0;transform:translateY(8px)}}
+
+/* ── 站头 ── */
+.site-header{padding-block:1.4rem;position:relative;z-index:20}
+.header-row{width:min(100% - 3rem,62rem);margin-inline:auto;
+  display:flex;align-items:center;justify-content:space-between;gap:1.5rem}
+.brand{display:inline-flex;align-items:center;gap:.55rem;color:var(--fg);
+  text-decoration:none;font-family:var(--font-display);font-size:1.05rem;letter-spacing:.02em}
+.brand .brand-dot{width:5px;height:5px;background:var(--amber);transform:rotate(45deg)}
+.site-nav{display:flex;gap:1.6rem}
+.site-nav a{color:var(--fg-soft);text-decoration:none;font-size:.95rem}
+.site-nav a:hover,.site-nav a[aria-current="page"]{color:var(--fg)}
+.site-nav a[aria-current="page"]::after{
+  content:'';display:block;width:1.1em;height:1px;margin:2px auto 0;background:var(--amber);
+}
+
+/* ── 列表页头 ── */
+.page-head{margin-bottom:clamp(1.8rem,4vh,2.6rem)}
+.page-head h1{font-family:var(--font-display);font-weight:600;
+  font-size:clamp(1.5rem,3.5vw,2rem);letter-spacing:.06em}
+.lede{margin:.75rem 0 0;color:var(--fg-soft);max-width:var(--measure);
+  font-size:.98rem;letter-spacing:.05em}
+
+/* ── 分年轴（-4° 斜线，与拉线同角） ── */
+.axis{position:relative;margin:0 0 1.6rem;padding-left:.2rem;
+  display:flex;align-items:baseline;gap:1.2rem}
+.axis-line{position:absolute;left:-3.4rem;top:.5em;width:150px;height:1px;
+  background:var(--fg-soft);opacity:.4;transform:rotate(-4deg);transform-origin:right center}
+.axis-tag{font-size:.72rem;letter-spacing:.2em;color:var(--umber)}
+.axis-tag-en{font-size:.56rem;letter-spacing:.24em;color:var(--fg-faint)}
+
+/* ── 试按区：大片留白＋一枚小注（注内是 p，点击不触发特效） ── */
+.practice{position:relative;min-height:clamp(280px,34vh,420px);margin:0 0 3.4rem;
+  display:flex;align-items:flex-start}
+.howto{max-width:26rem;border:1px solid var(--line);border-left:2px solid var(--amber);
+  padding:1rem 1.2rem .9rem;background:rgba(255,255,255,.28)}
+.ht-tag{display:block;font-family:var(--font-mono);font-size:.6rem;letter-spacing:.24em;
+  color:var(--umber);margin-bottom:.5rem}
+.howto p{font-size:.85rem;line-height:2;color:var(--fg-soft);letter-spacing:.04em}
+.howto p + p{margin-top:.4rem}
+.howto .mono{font-size:.68rem;color:var(--fg-faint)}
+.howto b{color:var(--fg);font-weight:600}
+
+/* ── 随笔列表（p9-S 回眠行语法） ── */
+.essay-ledger li{border-top:1px solid var(--line)}
+.essay-ledger li:last-child{border-bottom:1px solid var(--line)}
+.essay-ledger a{
+  display:grid;grid-template-columns:5.6rem minmax(0,1fr) auto;gap:0 1.8rem;
+  padding-block:1.45rem;align-items:start;text-decoration:none;
+}
+.el-night{display:flex;flex-direction:column;gap:.15rem;padding-top:.35rem}
+.el-night b{font-family:var(--font-mono);font-weight:500;font-size:.92rem;
+  letter-spacing:.08em;color:var(--umber)}
+.el-night i{font-style:normal;font-family:var(--font-mono);font-size:.7rem;
+  letter-spacing:.1em;color:var(--fg-faint)}
+.el-title{position:relative;display:inline-block;font-family:var(--font-display);
+  font-weight:600;font-size:1.26rem;letter-spacing:.03em;line-height:1.5;color:var(--fg)}
+.el-title .ghost{position:absolute;inset:0;color:var(--ghost-ink,#b98f74);opacity:0;
+  pointer-events:none;transform:translate(-7px,4px);
+  transition:opacity .55s ease,transform .55s ease}
+.essay-ledger a:hover .el-title .ghost{opacity:.5;transform:translate(7px,-3px)}
+.essay-ledger a:hover .el-title{color:var(--umber)}
+.el-desc{display:block;margin-top:.3rem;color:var(--fg-soft);font-size:.95rem;
+  line-height:1.8;max-width:34em}
+.el-tags{display:flex;flex-wrap:wrap;gap:.45rem;margin-top:.7rem}
+.el-tags i{font-style:normal;font-size:.66rem;letter-spacing:.14em;color:var(--fg-faint);
+  border:1px solid var(--line);padding:.14rem .5rem .1rem;border-radius:2px}
+.el-count{display:flex;flex-direction:column;align-items:flex-end;gap:.15rem;
+  padding-top:.5rem;white-space:nowrap}
+.el-count b{font-family:var(--font-mono);font-weight:400;font-size:.74rem;
+  letter-spacing:.1em;color:var(--fg-soft)}
+.el-count i{font-style:normal;font-family:var(--font-mono);font-size:.6rem;
+  letter-spacing:.14em;color:var(--fg-faint)}
+.ledger-cap{margin-top:2.2rem;font-size:.85rem;letter-spacing:.05em;
+  color:var(--fg-faint);line-height:2}
+
+/* ── 站尾 ── */
+.site-footer{border-top:1px solid var(--line);margin-top:clamp(3.5rem,9vh,6rem);
+  padding-block:1.6rem 2rem;font-size:.875rem;color:var(--fg-faint);position:relative;z-index:10}
+.footer-row{width:min(100% - 3rem,62rem);margin-inline:auto;
+  display:flex;align-items:baseline;justify-content:space-between;gap:1rem 2rem;flex-wrap:wrap}
+.site-footer a{color:var(--fg-faint);text-decoration:none}
+.site-footer a:hover{color:var(--fg-soft)}
+.footer-clock{font-size:.8rem;color:var(--fg-soft)}
+
+/* ── 控制角（面切换 / 循环演示）与长按注记 ── */
+.hud{position:fixed;right:16px;bottom:14px;z-index:220;display:flex;gap:.5rem;align-items:center}
+.hud button{font-family:var(--font-mono);font-size:.62rem;letter-spacing:.16em;
+  color:var(--fg-soft);background:rgba(233,236,239,.88);border:1px solid var(--line);
+  border-radius:2px;padding:.34rem .6rem .28rem;cursor:pointer}
+.hud button:hover{color:var(--fg);border-color:var(--fg-faint)}
+.hud .hud-tag{font-family:var(--font-mono);font-size:.58rem;letter-spacing:.2em;
+  color:var(--umber);border:1px dashed rgba(217,160,91,.5);padding:.3rem .5rem .24rem}
+.lpnote{position:fixed;left:50%;bottom:64px;transform:translateX(-50%);z-index:215;
+  max-width:min(88vw,36rem);text-align:center;font-size:.66rem;letter-spacing:.14em;
+  line-height:1.9;color:var(--fg-soft);background:rgba(233,236,239,.94);
+  border-block:1px solid var(--line);padding:.5rem 1rem}
+
+/* ═══ 特效层：按压段（rAF 生长）＋ 松手滑结（纯 CSS transform/opacity） ═══ */
+.fx{position:fixed;inset:0;z-index:210;pointer-events:none;overflow:hidden}
+.holdseg{position:absolute;left:0;top:0;width:0;height:0;display:none}
+.holdseg i{position:absolute;left:-200px;top:-.5px;width:400px;height:1px;
+  transform-origin:50% 50%;will-change:transform}
+html[data-face="dream"] .holdseg i,
+html[data-face="dream"] .eff .ln{
+  background:linear-gradient(90deg,
+    rgba(194,163,130,0),rgba(194,163,130,.55) 8%,rgba(217,160,91,.85) 50%,
+    rgba(194,163,130,.55) 92%,rgba(194,163,130,0))}
+html[data-face="wake"] .holdseg i,
+html[data-face="wake"] .eff .ln{
+  background:linear-gradient(90deg,
+    rgba(167,177,186,0),rgba(167,177,186,.55) 8%,rgba(217,160,91,.85) 50%,
+    rgba(167,177,186,.55) 92%,rgba(167,177,186,0))}
+
+/* 松手特效节点：绷→拢（.ln 0–200ms）→ 结（.kt 200–350ms）→ 滑（.sp 265–415ms） */
+.eff{position:absolute;left:0;top:0;width:0;height:0;--s0:.25}
+.eff .ln{position:absolute;left:-200px;top:-.5px;width:400px;height:1px;opacity:0;
+  transform-origin:50% 50%;will-change:transform,opacity;
+  animation:p10ln 200ms both}
+.eff .kt{position:absolute;left:-2.5px;top:-2.5px;width:5px;height:5px;
+  transform:rotate(45deg)}
+.eff .kt i{position:absolute;inset:0;display:block;background:var(--amber);
+  box-shadow:0 0 0 1px rgba(38,44,51,.22);opacity:0;will-change:transform,opacity;
+  animation:p10kt 150ms cubic-bezier(.2,.8,.3,1) 200ms both}
+.eff .sp{position:absolute;left:-6px;top:-.5px;width:12px;height:1px;opacity:0;
+  background:linear-gradient(90deg,
+    rgba(217,160,91,0),rgba(217,160,91,.9) 45%,rgba(217,160,91,.9) 60%,rgba(217,160,91,0));
+  transform-origin:50% 50%;will-change:transform,opacity;
+  animation:p10sp 150ms cubic-bezier(.2,.7,.3,1) 265ms both}
+.eff.fz .ln,.eff.fz .kt i,.eff.fz .sp{animation-play-state:paused}
+
+@keyframes p10ln{
+  0%{transform:rotate(-4deg) scaleX(var(--s0));opacity:1;
+     animation-timing-function:cubic-bezier(.25,.7,.3,1)}
+  35%{transform:rotate(0deg) scaleX(var(--s0));opacity:1;
+     animation-timing-function:cubic-bezier(.55,.05,.85,.4)}
+  90%{opacity:1}
+  100%{transform:rotate(0deg) scaleX(.011);opacity:0}
+}
+@keyframes p10kt{
+  0%{transform:scale(.25) rotate(-100deg);opacity:0}
+  24%{transform:scale(1) rotate(0deg);opacity:1}
+  42%{transform:scale(1) rotate(0deg);opacity:1;
+     animation-timing-function:cubic-bezier(.5,.05,.8,.5)}
+  100%{transform:scale(.12) rotate(55deg);opacity:0}
+}
+@keyframes p10sp{
+  0%{transform:rotate(-4deg) translateX(0) scaleX(.25);opacity:0}
+  30%{transform:rotate(-4deg) translateX(-3px) scaleX(1);opacity:.95}
+  100%{transform:rotate(-4deg) translateX(-13px) scaleX(1);opacity:0}
+}
+
+/* RM：一帧静态琥珀短线（无过渡、无动画） */
+.rmark{position:absolute;width:11px;height:1px;margin:-.5px 0 0 -5.5px;
+  background:var(--amber);transform:rotate(-4deg);opacity:.9}
+
+/* ── 退让：reduced motion 全退让（?reduced=1 → html.rm / body.no-motion） ── */
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  .view{animation:none}
+  .seam{opacity:.4}
+  a{transition:none}
+  .el-title .ghost{display:none}
+  .eff .ln,.eff .kt i,.eff .sp{animation:none!important}
+}
+html.rm .view{animation:none}
+html.rm a{transition:none}
+html.rm .el-title .ghost{display:none}
+html.rm .eff .ln,html.rm .eff .kt i,html.rm .eff .sp{animation:none!important}
+body.no-motion *{transition:none!important}
+
+/* ── 响应式 ── */
+@media (max-width:760px){
+  body{font-size:1rem}
+  .site-header{padding-block:1.1rem}
+  .site-nav{gap:1.05rem}
+  .site-nav a{font-size:.88rem}
+  .brand{font-size:.95rem}
+  .practice{min-height:clamp(300px,40vh,440px)}
+  .howto{max-width:100%}
+  .essay-ledger a{grid-template-columns:1fr;gap:.25rem;padding-block:1.3rem}
+  .el-night{flex-direction:row;align-items:baseline;gap:.8rem;order:0;padding-top:0}
+  .el-night i::before{content:'· ';color:var(--fg-faint)}
+  .el-count{flex-direction:row;gap:.8rem;align-items:baseline;padding-top:0}
+  .el-count i::before{content:'· ';color:var(--fg-faint)}
+  .el-title{font-size:1.14rem}
+}
+@media (max-width:640px){
+  .wrap{width:calc(100% - 2.2rem)}
+  .axis-line{left:-1.15rem;width:1rem}
+}
+</style>
+</head>
+<body>
+<script>
+/* 错误钩子：任何页内报错都会写进 __swarmErr（截图脚本顺带核验） */
+window.__swarmErr = 'none';
+(function(){
+  function fail(m){ window.__swarmErr = String(m && m.message || m); }
+  window.addEventListener('error', function(e){ fail(e); });
+  window.addEventListener('unhandledrejection', function(e){ fail('rej ' + (e.reason && e.reason.message || e.reason)); });
+})();
+</script>
+
+<!-- 全站 chrome：一条隐约缝线 · 纸纹 -->
+<div class="seam" aria-hidden="true"></div>
+<div class="grain" aria-hidden="true"></div>
+
+<div class="page">
+
+<!-- 站头 -->
+<header class="site-header">
+  <div class="header-row">
+    <a class="brand" href="#" data-dead><i class="brand-dot" aria-hidden="true"></i>Traveritas</a>
+    <nav class="site-nav" aria-label="主导航">
+      <a href="#" aria-current="page">随笔</a>
+      <a href="#" data-dead>项目</a>
+      <a href="#" data-dead>关于</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+  <section class="view" aria-label="随笔列表">
+    <div class="wrap">
+      <header class="page-head">
+        <h1>随笔</h1>
+        <p class="lede">想法、记录，与梦的边角料。</p>
+      </header>
+
+      <div class="axis" aria-hidden="true">
+        <i class="axis-line"></i>
+        <span class="axis-tag mono">2026 · 3 篇</span>
+        <span class="axis-tag-en mono">短按空白处 · 见滑结</span>
+      </div>
+
+      <!-- 试按区：左一注，右大片留白 -->
+      <div class="practice" id="practice" aria-label="试按区">
+        <div class="howto">
+          <span class="ht-tag">短按检验 · p10-B 滑结 SLIP KNOT</span>
+          <p>在这片空白<b>按下、很快松手</b>：指下抽出的一小段线会绷直、两头收拢，打成一枚没打住的微结——线头一弹、滑开，散尽无痕。</p>
+          <p>按住不放，线继续生长；满 <span class="mono">2200ms</span> 绷直成结、环闪、闩锁换面（长按仅示意）。<span class="mono">?demo=loop</span> 自动循环演示。</p>
+        </div>
+      </div>
+
+      <ol class="essay-ledger">
+        <li>
+          <a href="#" data-dead>
+            <span class="el-night"><b>23:31</b><i>2026.09.19</i></span>
+            <span class="el-main">
+              <span class="el-title"><span class="ghost" aria-hidden="true">开站：在醒与梦之间</span>开站：在醒与梦之间</span>
+              <span class="el-desc">这个网站为什么存在，以及它想长成什么样子。</span>
+              <span class="el-tags"><i>建站</i><i>醒梦</i></span>
+            </span>
+            <span class="el-count"><b>405 字</b><i>读毕约一分钟</i></span>
+          </a>
+        </li>
+        <li>
+          <a href="#" data-dead>
+            <span class="el-night"><b>00:44</b><i>2026.09.19</i></span>
+            <span class="el-main">
+              <span class="el-title"><span class="ghost" aria-hidden="true">与智能体一起造一个网站</span>与智能体一起造一个网站</span>
+              <span class="el-desc">记录这个站点的另一种建造方式：我出方向，智能体出手。</span>
+              <span class="el-tags"><i>建站</i><i>智能体</i></span>
+            </span>
+            <span class="el-count"><b>374 字</b><i>读毕约一分钟</i></span>
+          </a>
+        </li>
+        <li>
+          <a href="#" data-dead>
+            <span class="el-night"><b>01:02</b><i>2026.09.19</i></span>
+            <span class="el-main">
+              <span class="el-title"><span class="ghost" aria-hidden="true">母题探索记录：从碎块到花</span>母题探索记录：从碎块到花</span>
+              <span class="el-desc">主页视觉母题的三轮探索与两次否决——一份仍在进行中的设计日志。</span>
+              <span class="el-tags"><i>建站</i><i>设计</i><i>醒梦</i></span>
+            </span>
+            <span class="el-count"><b>630 字</b><i>读毕约二分钟</i></span>
+          </a>
+        </li>
+      </ol>
+
+      <p class="ledger-cap">夜时刻是各篇在这一夜里的位置；字数与日期，醒来均可核验。点在链接或文字上不会有线——线只认空白。</p>
+    </div>
+  </section>
+</main>
+
+<!-- 站尾 -->
+<footer class="site-footer">
+  <div class="footer-row">
+    <span>Traveritas 2026</span>
+    <span class="footer-clock mono">夜里 00:47</span>
+    <span>在醒与梦之间</span>
+    <span>
+      <a href="https://github.com/Traveritas" target="_blank" rel="noopener">GitHub</a>
+    </span>
+  </div>
+</footer>
+
+</div><!-- /.page -->
+
+<!-- 特效层：按住生长的线段（松手时由滑结特效无缝接管） -->
+<div class="fx" id="fx" aria-hidden="true">
+  <div class="holdseg" id="holdseg"><i></i></div>
+</div>
+
+<!-- 长按示意注记（线满 2200ms 时出现） -->
+<p class="lpnote mono" id="lpnote" hidden>长按满 2200ms —— 绷直 · 收拢 14px ◆ · 琥珀环闪 · 闩锁换面（长按仅示意至线满；本稿主角是松手一瞬的滑结）</p>
+
+<!-- 控制角 -->
+<div class="hud">
+  <span class="hud-tag" id="demoTag" hidden>DEMO · LOOP</span>
+  <button type="button" id="faceBtn">面 · 梦</button>
+  <button type="button" id="demoBtn">演示 · 循环</button>
+</div>
+
+<script>
+(function(){
+'use strict';
+var d = document, root = d.documentElement, body = d.body;
+var qs = new URLSearchParams(location.search);
+var REDUCE = qs.get('reduced') === '1' ||
+  (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+if (qs.get('reduced') === '1'){ root.classList.add('rm'); body.classList.add('no-motion'); }
+
+/* ── 机制参数（与 reality.ts 同参） ── */
+var T_GO = 2200, CLICK_MS = 260, BASE = 400;
+var EXCLUDE = 'a,button,input,textarea,select,label,summary,[contenteditable],h1,h2,h3,h4,h5,h6,p,li,blockquote,figcaption,dt,dd,time,code,pre,[data-nofx]';
+var KBD_DENY = 'a,button,input,textarea,select,summary,[contenteditable],[data-nofx]';
+
+var fx = d.getElementById('fx'),
+    holdSeg = d.getElementById('holdseg'),
+    holdBar = holdSeg.firstElementChild,
+    note = d.getElementById('lpnote');
+
+var face = qs.get('face') === 'wake' ? 'wake' : 'dream';
+var mode = 'idle', src = null, pid = null;
+var px = 0, py = 0, holdT0 = 0, holdW = 0, noteOn = false;
+var rT0 = 0, rFrom = 0, rDur = 0, raf = 0, watch = 0;
+var scrollMark = 0, startX = 0, startY = 0;
+var rmArmed = false, rmX = 0, rmY = 0, rmT0 = 0;
+var demoOn = false, demoTimer = 0, demoHold = 0, lastReplay = null;
+
+function eo3(t){ return 1 - Math.pow(1 - t, 3); }
+function fullW(x){ return 2 * Math.max(x, innerWidth - x) + 80; }
+
+function setFace(f){
+  face = f;
+  root.setAttribute('data-face', f);
+  var b = d.getElementById('faceBtn');
+  if (b) b.textContent = '面 · ' + (f === 'dream' ? '梦' : '醒');
+}
+function drawHold(){
+  holdSeg.style.transform = 'translate(' + px + 'px,' + py + 'px) rotate(-4deg)';
+  holdBar.style.transform = 'scaleX(' + (holdW / BASE).toFixed(4) + ')';
+}
+
+/* ── 松手特效节点（绷→拢→结→滑，纯 CSS；freeze＝负延迟＋paused） ── */
+var DELAYS = { ln: 0, kt: 200, sp: 265 };
+function spawnEffect(x, y, W, fc, fz){
+  setFace(fc);
+  var n = d.createElement('div');
+  n.className = 'eff';
+  n.style.transform = 'translate(' + x + 'px,' + y + 'px)';
+  n.style.setProperty('--s0', (W / BASE).toFixed(4));
+  n.innerHTML = '<i class="ln"></i><span class="kt"><i></i></span><i class="sp"></i>';
+  if (fz != null){
+    n.classList.add('fz');
+    n.querySelector('.ln').style.animationDelay = (DELAYS.ln - fz) + 'ms';
+    n.querySelector('.kt i').style.animationDelay = (DELAYS.kt - fz) + 'ms';
+    n.querySelector('.sp').style.animationDelay = (DELAYS.sp - fz) + 'ms';
+  }
+  fx.appendChild(n);
+  var live = fx.querySelectorAll('.eff:not(.fz)');
+  if (live.length > 6) live[0].remove();
+  if (fz == null) setTimeout(function(){ if (n.parentNode) n.remove(); }, 700);
+  return n;
+}
+function staticMark(x, y, persist){
+  var m = d.createElement('i');
+  m.className = 'rmark';
+  m.style.left = x + 'px';
+  m.style.top = y + 'px';
+  fx.appendChild(m);
+  if (!persist) setTimeout(function(){ if (m.parentNode) m.remove(); }, 200);
+  return m;
+}
+function clearFx(){
+  fx.querySelectorAll('.eff,.rmark').forEach(function(n){ n.remove(); });
+}
+
+/* ── 长按示意注记 ── */
+function showNote(){ if (noteOn) return; noteOn = true; note.hidden = false; }
+function hideNote(){ if (!noteOn) return; noteOn = false; note.hidden = true; }
+
+/* ── 帧循环：按压生长 / 原路缩回（只写 transform） ── */
+function loop(now){
+  if (mode === 'hold'){
+    var p = Math.min(1, (now - holdT0) / T_GO);
+    holdW = p * fullW(px);
+    drawHold();
+    if (p >= 1) showNote();
+    raf = requestAnimationFrame(loop);
+  } else if (mode === 'retract'){
+    var k = Math.min(1, (now - rT0) / rDur);
+    holdW = rFrom * (1 - eo3(k));
+    drawHold();
+    if (k >= 1){ finishRetract(); }
+    else raf = requestAnimationFrame(loop);
+  } else raf = 0;
+}
+function startRetract(){
+  mode = 'retract';
+  rT0 = performance.now();
+  rFrom = holdW;
+  var p = holdW / fullW(px);
+  rDur = Math.min(560, 200 + p * 380);
+  if (!raf) raf = requestAnimationFrame(loop);
+}
+function finishRetract(){ mode = 'idle'; holdW = 0; holdSeg.style.display = 'none'; }
+
+/* ── 手势状态机 ── */
+function beginHold(x, y, fromSrc){
+  if (mode !== 'idle') return;
+  mode = 'hold'; src = fromSrc;
+  px = x; py = y; holdT0 = performance.now(); holdW = 0;
+  scrollMark = scrollY;
+  body.classList.add('holding');
+  holdSeg.style.display = 'block';
+  drawHold();
+  if (!raf) raf = requestAnimationFrame(loop);
+  clearTimeout(watch);
+  watch = setTimeout(function(){ if (mode === 'hold') showNote(); }, T_GO + 140);
+}
+function release(){
+  if (mode !== 'hold') return;
+  var held = performance.now() - holdT0;
+  clearTimeout(watch);
+  body.classList.remove('holding'); src = null; pid = null;
+  hideNote();
+  if (REDUCE){
+    mode = 'idle'; holdSeg.style.display = 'none';
+    if (held <= CLICK_MS) staticMark(px, py, false);
+    return;
+  }
+  if (held <= CLICK_MS){
+    /* 短按：滑结特效无缝接管当前线段（同位置、同角度、同长度） */
+    mode = 'idle';
+    var W = holdW;
+    holdSeg.style.display = 'none';
+    spawnEffect(px, py, W, face);
+    return;
+  }
+  startRetract();
+}
+function cancelHold(){
+  if (mode !== 'hold') return;
+  clearTimeout(watch);
+  body.classList.remove('holding'); src = null; pid = null;
+  hideNote();
+  if (REDUCE){ mode = 'idle'; holdSeg.style.display = 'none'; return; }
+  startRetract();
+}
+
+/* ── 指针手势（EXCLUDE 语义同 reality.ts） ── */
+d.addEventListener('pointerdown', function(e){
+  if (e.button !== undefined && e.button !== 0) return;
+  var t = e.target;
+  if (t instanceof Element && t.closest(EXCLUDE)) return;
+  if (src !== null) return;
+  stopDemo();
+  if (REDUCE){
+    rmArmed = true; rmX = e.clientX; rmY = e.clientY; rmT0 = performance.now();
+    return;
+  }
+  pid = e.pointerId;
+  startX = e.clientX; startY = e.clientY;
+  beginHold(e.clientX, e.clientY, 'ptr');
+});
+d.addEventListener('pointermove', function(e){
+  if (mode !== 'hold' || src !== 'ptr' || e.pointerId !== pid) return;
+  if (Math.hypot(e.clientX - startX, e.clientY - startY) > 20) cancelHold();
+});
+function onPtrEnd(e){
+  if (REDUCE){
+    if (rmArmed && performance.now() - rmT0 <= CLICK_MS) staticMark(rmX, rmY, false);
+    rmArmed = false;
+    return;
+  }
+  if (mode !== 'hold' || src !== 'ptr' || e.pointerId !== pid) return;
+  release();
+}
+d.addEventListener('pointerup', onPtrEnd);
+d.addEventListener('pointercancel', function(e){
+  if (mode === 'hold' && src === 'ptr') cancelHold();
+});
+addEventListener('scroll', function(){
+  if (mode === 'hold' && Math.abs(scrollY - scrollMark) > 4) cancelHold();
+}, { passive: true });
+d.addEventListener('contextmenu', function(e){
+  if (body.classList.contains('holding')) e.preventDefault();
+});
+addEventListener('blur', function(){ if (mode === 'hold') cancelHold(); });
+d.addEventListener('visibilitychange', function(){
+  if (d.hidden && mode === 'hold') cancelHold();
+});
+
+/* ── 键盘（焦点不在交互件时按住空格等价） ── */
+d.addEventListener('keydown', function(e){
+  if (e.code !== 'Space' || e.repeat) return;
+  var ae = d.activeElement;
+  if (ae instanceof Element && ae.closest(KBD_DENY)) return;
+  e.preventDefault();
+  if (src !== null) return;
+  stopDemo();
+  var kx = Math.round(innerWidth / 2), ky = Math.round(innerHeight * 0.45);
+  if (REDUCE){ rmArmed = true; rmX = kx; rmY = ky; rmT0 = performance.now(); return; }
+  beginHold(kx, ky, 'kb');
+});
+d.addEventListener('keyup', function(e){
+  if (e.code !== 'Space') return;
+  if (REDUCE){
+    if (rmArmed && performance.now() - rmT0 <= CLICK_MS) staticMark(rmX, rmY, false);
+    rmArmed = false;
+    return;
+  }
+  if (mode === 'hold' && src === 'kb') release();
+});
+
+/* ── 控制角 ── */
+d.getElementById('faceBtn').addEventListener('click', function(){
+  setFace(face === 'dream' ? 'wake' : 'dream');
+});
+var demoBtn = d.getElementById('demoBtn'), demoTag = d.getElementById('demoTag');
+demoBtn.addEventListener('click', function(){ demoOn ? stopDemo() : startDemo(); });
+
+/* ── 循环演示：在试按区空白处随机短按 ── */
+function bandPoint(fxr, fyr){
+  var r = d.getElementById('practice').getBoundingClientRect();
+  return [Math.round(r.left + r.width * fxr), Math.round(r.top + r.height * fyr)];
+}
+function demoTick(){
+  if (mode !== 'idle') return;
+  var pt = bandPoint(0.52 + Math.random() * 0.36, 0.3 + Math.random() * 0.55);
+  beginHold(pt[0], pt[1], 'demo');
+  demoHold = setTimeout(function(){
+    if (mode === 'hold' && src === 'demo') release();
+  }, 70 + Math.random() * 190);
+}
+function startDemo(){
+  if (REDUCE || demoOn) return;
+  demoOn = true;
+  demoBtn.textContent = '演示 · 停止';
+  demoTag.hidden = false;
+  demoTick();
+  demoTimer = setInterval(demoTick, 1600);
+}
+function stopDemo(){
+  if (!demoOn) return;
+  demoOn = false;
+  clearInterval(demoTimer);
+  clearTimeout(demoHold);
+  demoBtn.textContent = '演示 · 循环';
+  demoTag.hidden = true;
+  if (mode === 'hold' && src === 'demo') cancelHold();
+}
+if (qs.get('demo') === 'loop') startDemo();
+
+/* ── 调试接口 ── */
+function replay(x, y, opts){
+  opts = opts || {};
+  lastReplay = { x: x, y: y, opts: JSON.parse(JSON.stringify(opts)) };
+  if (opts.face) setFace(opts.face);
+  if (x == null || y == null){
+    var pt = bandPoint(0.68, 0.5);
+    if (x == null) x = pt[0];
+    if (y == null) y = pt[1];
+  }
+  var hold = opts.hold == null ? 140 : opts.hold;
+  var W = Math.min(fullW(x), hold / T_GO * fullW(x));
+  /* 只清冻结/常驻调试节点，不打断在播的连点特效（连点各自独立叠加） */
+  fx.querySelectorAll('.eff.fz,.rmark').forEach(function(n){ n.remove(); });
+  if (REDUCE){
+    staticMark(x, y, opts.freeze != null);
+    return 'rm-static' + (opts.freeze != null ? '(persist)' : '');
+  }
+  spawnEffect(x, y, W, face, opts.freeze != null ? opts.freeze : null);
+  return (opts.freeze != null ? 'frozen@' + opts.freeze + 'ms' : 'live') + ' W=' + Math.round(W);
+}
+window.__p10 = {
+  state: function(){
+    return JSON.stringify({
+      face: face, mode: mode, holdW: Math.round(holdW),
+      effects: fx.querySelectorAll('.eff').length,
+      demo: demoOn, reduce: REDUCE, note: noteOn,
+      err: window.__swarmErr
+    });
+  },
+  replay: replay,
+  freezeAt: function(ms){
+    if (!lastReplay) return 'no-last';
+    lastReplay.opts.freeze = ms;
+    return replay(lastReplay.x, lastReplay.y, lastReplay.opts);
+  },
+  press: function(x, y, ms){
+    /* 真实按压（长按示意）：按下→生长→ms 后松手；返回 Promise 供截图脚本等待 */
+    return new Promise(function(res){
+      if (x == null || y == null){
+        var pt = bandPoint(0.6, 0.5);
+        x = pt[0]; y = pt[1];
+      }
+      ms = ms == null ? 2400 : ms;
+      if (REDUCE){ res('rm-noop'); return; }
+      clearFx();
+      beginHold(x, y, 'kb');
+      setTimeout(function(){
+        if (mode === 'hold') release();
+        res('pressed ' + Math.round(holdW) + 'px');
+      }, ms);
+    });
+  },
+  clear: clearFx
+};
+
+setFace(face);
+d.querySelectorAll('a[data-dead]').forEach(function(a){
+  a.addEventListener('click', function(e){ e.preventDefault(); });
+});
+})();
+</script>
+</body>
+</html>
