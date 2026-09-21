@@ -10,8 +10,8 @@
    · 双文案走 morph 引擎（[data-morph][data-dream]，元素内文本＝醒面
      真值）；按住时文字随线到达换面，闩锁时全部对齐当前面。
    · 配色不与夜色系统（night.ts 拥有 --bg/--fg/--fg-soft/--line）抢
-     变量：双色由内容之下的一层固定暖/冷薄雾（透明度随进度插值）＋
-     morph 文字两面＋线结特效共同承担。
+     变量：双色由强调色插值（--amber/--umber/--ghost-ink 随醒度
+     暖↔冷）＋morph 文字两面＋线结特效共同承担，无全屏渐变层。
    · 无 JS：恒醒面真值（HTML 原文）。prefers-reduced-motion：不入梦，
      按压即瞬时两态切换。闩锁状态经 sessionStorage 跨页保持。
    · 调试：window.__fx.state() / __fx.clicks；性能：单 rAF 仅在
@@ -83,8 +83,6 @@ let sinkOn = false;
 let sinkT0 = 0;
 
 let fx: HTMLDivElement | null = null;
-let tintWarm: HTMLDivElement | null = null;
-let tintCool: HTMLDivElement | null = null;
 let thread: HTMLDivElement | null = null;
 let tCore: HTMLElement | null = null;
 let tBand: HTMLElement | null = null;
@@ -97,11 +95,6 @@ function buildFx() {
   const style = document.createElement('style');
   style.textContent = `
 .fx-reality{position:fixed;inset:0;z-index:210;pointer-events:none;overflow:hidden}
-.fx-reality .tint{position:absolute;inset:0;opacity:0}
-.fx-reality .tint.warm{background:radial-gradient(88vmax 58vmax at 74% 12%,rgba(214,176,124,.09),transparent 62%),
-  radial-gradient(70vmax 50vmax at 18% 86%,rgba(196,160,120,.06),transparent 62%)}
-.fx-reality .tint.cool{background:radial-gradient(84vmax 56vmax at 76% 8%,rgba(156,172,188,.10),transparent 62%),
-  radial-gradient(64vmax 46vmax at 20% 84%,rgba(150,168,186,.055),transparent 62%)}
 .fx-reality .thread{position:absolute;left:0;top:0;width:0;height:0;display:none;transform-origin:0 0}
 .fx-reality .t-core{position:absolute;top:-0.5px;left:0;width:0;height:1px;opacity:1}
 .fx-reality .t-band{position:absolute;top:-32px;left:0;width:0;height:64px;opacity:0;
@@ -151,10 +144,6 @@ body.reality-holding{user-select:none;-webkit-user-select:none;-webkit-touch-cal
   fx = document.createElement('div');
   fx.className = 'fx-reality';
   fx.setAttribute('aria-hidden', 'true');
-  tintWarm = document.createElement('div');
-  tintWarm.className = 'tint warm';
-  tintCool = document.createElement('div');
-  tintCool.className = 'tint cool';
   thread = document.createElement('div');
   thread.className = 'thread';
   const band = document.createElement('i');
@@ -187,8 +176,7 @@ function drawThread(W: number, ang: number, coreOp: number, bandOp: number) {
   tBand.style.opacity = `${bandOp}`;
 }
 function setTint(cc: number) {
-  if (tintWarm) tintWarm.style.opacity = `${((1 - cc) * 0.9).toFixed(3)}`;
-  if (tintCool) tintCool.style.opacity = `${(cc * 0.9).toFixed(3)}`;
+  // 双色由强调色插值（--amber/--umber/--ghost-ink）承担，不做全屏渐变层
   for (const k in ACCENT) {
     const [d, w] = ACCENT[k];
     docEl.style.setProperty(k, mixRgb(d, w, cc));
