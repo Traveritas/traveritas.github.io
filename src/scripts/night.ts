@@ -1,18 +1,17 @@
 /* ─────────────────────────────────────────────────────────────
-   主页 · 过夜：滚动 → 时刻 → 色板按停靠点阶跃 + 轨图描线 + 钟与分期。
+   主页 · 过夜：滚动 → 时刻 → 色板插值 + 轨图描线 + 钟与分期。
    段落位置取自真实 DOM（src/data/night.ts 的 SECTIONS）。
    ───────────────────────────────────────────────────────────── */
 
 import {
   SECTIONS,
   PALETTE,
-  STAGE_MS,
   NIGHT_LEN,
   STAGE_INFO,
   stageAt,
   fmtNightTime,
 } from '../data/night';
-import { onScrollRaf } from './lib';
+import { clamp, hexLerp, onScrollRaf } from './lib';
 
 interface Anchor {
   /** 段顶到达视口中心时的 scrollY */
@@ -52,14 +51,17 @@ function minuteAt(): number {
   return NIGHT_LEN;
 }
 
-/** 阶段式取色：m 落在哪个阶段区间，就用该区间锚站的整组三色——
-    「长段稳定＋少数几次快速换站」，杜绝连续插值的不可读过渡带，
-    也避免逐停靠点密集换站读起来像加速渐变 */
 function paletteAt(m: number): { bg: string; ink: string; soft: string } {
-  let i = STAGE_MS.length - 1;
-  while (i > 0 && m < STAGE_MS[i]) i--;
-  const target = STAGE_MS[i];
-  return PALETTE.find((p) => p.m === target) ?? PALETTE[0];
+  let i = 0;
+  while (i < PALETTE.length - 2 && m > PALETTE[i + 1].m) i++;
+  const a = PALETTE[i];
+  const b = PALETTE[i + 1] ?? a;
+  const t = clamp((m - a.m) / Math.max(b.m - a.m, 1), 0, 1);
+  return {
+    bg: hexLerp(a.bg, b.bg, t),
+    ink: hexLerp(a.ink, b.ink, t),
+    soft: hexLerp(a.soft, b.soft, t),
+  };
 }
 
 let railDot: HTMLElement | null = null;
