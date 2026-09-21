@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<!--
+  ================================================================
+  P8-I · 眨眼快门 — 长按特效机制稿（醒梦缝 · 一夜）
+  ================================================================
+  一句话：按住时两片眼睑自视口上下缘缓缓合拢、梦在退潮；按满的一瞬
+  完整眨一次眼——换字与换色都发生在全暗帧里，睁眼后没有任何过渡
+  痕迹，「本来就那样」的错觉是这个方案的灵魂。
+
+  按住渐进（进度 0→1 驱动睑位与滤镜）：
+    上下「眼睑」为纯黑软边弧缘 vignette（大圆角弧缘＋渐变软边），
+    自视口上下缘合拢；满进度睑位 c=0.63，中缝约剩 30% 高。
+    同时 #stage 整页轻微降饱和 / 收对比 / 微降亮度
+    （p=1 时 saturate .70 · contrast .88 · brightness .92，梦在退潮）。
+    按压点周围留一小圈微亮（gaze——你还在看着的地方）。
+    此阶段文字与配色一律不换面。
+
+  定格瞬间（梦→醒）：
+    双睑 ~180ms 完全合拢成全暗帧 → 保持 ~200ms 全暗。黑暗掩护下，
+    全部 data-morph 文案与 body[data-reality] 配色一次性直换
+    （无 crossfade、无 scramble）→ ~300ms 睁眼，中缝一道极细晨光
+    （醒灰高光）随睁眼生灭。睁眼完成即闩锁，无需继续按住。
+
+  回程（醒→梦）：更短促的一眨——合拢 ~150ms · 全暗 ~120ms ·
+    睁开 ~260ms，无晨光。
+
+  中途松手 / 移动超 20px / 开始滚动 / pointercancel：
+    ≤460ms 平滑退睑回原面，不换态。
+
+  时序常数：T_go = 2200ms（梦→醒）；T_back = 1300ms（醒→梦）。
+  无 JS / prefers-reduced-motion：恒显醒面真值；RM 用户按空白处或
+  按空格即瞬时切换，两态可达。键盘：焦点不在交互件时按住空格＝
+  指针长按（keydown 起表 / keyup 松手 / 忽略 repeat）。
+  URL：?wake=1 / ?dream=1 直达对应闩锁态（播放一次定格特效）。
+  调试：window.__fx.state() -> {reality, holding, progress}。
+  ================================================================
+-->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#171b24">
+<title>醒梦缝 · 一夜 — 机制稿 P8-I · 眨眼快门</title>
+<meta name="description" content="长按检验机制稿 P8-I：按住空白处，眼睑缓缓合拢；按满一瞬完整眨眼，黑暗中换面，睁眼后本来就是这样。">
+<link rel="preconnect" href="https://fastly.jsdelivr.net" crossorigin>
+<link rel="stylesheet" href="https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5.2.5/400.css">
+<link rel="stylesheet" href="https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5.2.5/600.css">
+<link rel="stylesheet" href="https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5.2.5/900.css">
+<style>
+/* ---------- tokens（与站内 tokens.css 一脉） ---------- */
+:root{
+  --amber:#d9a05b;            /* 全站唯一强调色：进度 / 定格微光 / 焦点 */
+  --serif:'Noto Serif SC','Palatino Linotype','Iowan Old Style',Palatino,Georgia,'Source Han Serif SC','Songti SC',SimSun,serif;
+  --mono:ui-monospace,'Cascadia Mono',Consolas,'JetBrains Mono',Menlo,monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  font-family:var(--serif);
+  color:var(--fg);
+  line-height:1.95;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+  touch-action:manipulation;
+  min-height:100vh;
+  /* —— 醒面（默认 / 无 JS / RM）—— */
+  background:#12161d;
+  --fg:#e6e2d6;
+  --soft:#b9b3a4;
+  --faint:#7d786e;
+  --accent:#a7b1ba;           /* 醒 · 冷灰 */
+  --line:rgba(229,224,210,.15);
+  --amb1:rgba(167,177,186,.05);
+  --amb2:rgba(194,163,130,.022);
+}
+/* —— 梦面（静息）—— 深夜基底，向暖浊微偏 */
+body[data-reality="dream"]{
+  background:#171b24;
+  --fg:#e5e0d2;
+  --soft:#b9b3a4;
+  --faint:#837d71;
+  --accent:#c2a382;           /* 梦 · 暖沙 */
+  --line:rgba(229,224,210,.13);
+  --amb1:rgba(194,163,130,.055);
+  --amb2:rgba(116,126,146,.05);
+}
+::selection{background:rgba(217,160,95,.26);color:var(--fg)}
+a{color:inherit;text-decoration:none}
+:focus-visible{outline:1px dashed rgba(217,160,95,.65);outline-offset:4px}
+::-webkit-scrollbar{width:10px}
+::-webkit-scrollbar-thumb{background:rgba(229,224,210,.13);border-radius:5px}
+::-webkit-scrollbar-track{background:transparent}
+
+/* ---------- 环境层 ---------- */
+body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(46vmax 38vmax at 84% 6%,var(--amb1),transparent 70%),
+    radial-gradient(50vmax 44vmax at 10% 92%,var(--amb2),transparent 72%);
+}
+.grain{position:fixed;inset:0;z-index:40;pointer-events:none;opacity:.045;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='180' height='180' filter='url(%23n)' opacity='0.6'/></svg>");
+}
+
+/* ---------- 眼睑 / 眨眼快门（本稿特效语言） ---------- */
+.lids{position:fixed;inset:0;z-index:60;pointer-events:none;--c:0}
+.lid{position:absolute;left:-4vw;width:108vw;height:58vh;will-change:transform}
+.lid-t{top:0;border-radius:0 0 50% 50%/0 0 8vh 8vh;
+  background:linear-gradient(to bottom,#000 0%,#000 76%,rgba(0,0,0,.96) 88%,rgba(0,0,0,.62) 95%,rgba(0,0,0,0) 100%);
+  transform:translateY(calc(var(--c)*58vh - 60vh));
+}
+.lid-b{bottom:0;border-radius:50% 50% 0 0/8vh 8vh 0 0;
+  background:linear-gradient(to top,#000 0%,#000 76%,rgba(0,0,0,.96) 88%,rgba(0,0,0,.62) 95%,rgba(0,0,0,0) 100%);
+  transform:translateY(calc(60vh - var(--c)*58vh));
+}
+/* 按压点微亮：你还在看着的地方（位于眼睑之上） */
+.gaze{position:absolute;left:0;top:0;z-index:2;width:min(340px,76vw);height:min(340px,76vw);
+  border-radius:50%;opacity:0;
+  background:radial-gradient(circle,rgba(233,226,209,.11) 0%,rgba(217,160,95,.055) 36%,rgba(217,160,95,.02) 55%,rgba(0,0,0,0) 70%);
+}
+/* 睁眼中缝的极细晨光（醒灰高光，随睁眼生灭） */
+.seam{position:absolute;left:50%;top:50%;z-index:3;width:0;height:1px;opacity:0;
+  transform:translate(-50%,-50%);
+  background:linear-gradient(90deg,rgba(206,216,226,0),rgba(210,220,229,.92) 50%,rgba(206,216,226,0));
+  box-shadow:0 0 12px rgba(176,192,208,.4);
+}
+
+/* ---------- 版面 ---------- */
+#stage{position:relative;z-index:1;max-width:760px;margin:0 auto;padding:0 28px;
+  transition:opacity .85s ease,transform .95s cubic-bezier(.2,.7,.2,1);
+}
+body.preparing #stage{opacity:0;transform:translateY(10px)}
+
+.hero{padding-top:clamp(64px,12vh,128px);min-height:76vh}
+.kicker{font-family:var(--mono);font-size:11px;letter-spacing:.32em;color:var(--soft)}
+.kicker b{font-weight:400;color:rgba(217,160,95,.82)}
+h1{margin:34px 0 0 -5px;font-size:clamp(88px,17vw,176px);font-weight:900;
+  line-height:1.04;letter-spacing:.045em;color:var(--fg)}
+body[data-reality="dream"] h1{letter-spacing:.1em}   /* 梦里字距松，醒时更定 */
+h1 .m{color:var(--accent)}
+.sub{margin-top:30px;max-width:31em;font-size:clamp(15.5px,2.1vw,18.5px);
+  color:var(--soft);letter-spacing:.03em}
+
+.howbox{margin-top:46px;max-width:560px;padding:20px 24px;
+  border:1px solid var(--line);border-left:2px solid rgba(217,160,95,.5);
+  background:rgba(229,224,210,.028)}
+.how-t{font-family:var(--mono);font-size:10px;letter-spacing:.3em;color:var(--faint);margin-bottom:10px}
+.howbox p{font-size:13.5px;line-height:2.15;color:var(--soft);letter-spacing:.02em}
+.howbox p+p{margin-top:8px}
+.howbox b{color:var(--fg);font-weight:600}
+
+.stitch{margin-top:clamp(56px,9vh,110px);width:min(340px,72%);border-top:1px dashed var(--line)}
+
+.prose{margin-top:clamp(48px,7vh,80px)}
+.essay{max-width:35em;font-size:16.5px;line-height:2.3;letter-spacing:.02em;color:var(--fg)}
+.essay .inl{border-bottom:1px dashed rgba(185,179,164,.34);padding-bottom:1px}
+.readout{margin-top:36px;font-family:var(--mono);font-size:12px;letter-spacing:.1em;color:var(--soft)}
+
+.cta{margin-top:48px;display:flex;flex-wrap:wrap;gap:14px 30px;align-items:center}
+.cta a,.cta button{font-family:var(--serif);font-size:15px;letter-spacing:.14em;color:var(--fg);
+  display:inline-flex;align-items:baseline;gap:.55em;cursor:pointer}
+.cta a{border-bottom:1px solid var(--line);padding-bottom:.35em;transition:border-color .3s}
+.cta a:hover{border-color:var(--amber)}
+.cta button{border:1px solid var(--line);padding:11px 20px;background:none;
+  transition:border-color .3s,background .3s}
+.cta button:hover{border-color:var(--accent);background:rgba(229,224,210,.045)}
+.cta .arr{font-family:var(--mono);font-size:12px;color:var(--soft)}
+.ctanote{margin-top:22px;font-family:var(--mono);font-size:10px;letter-spacing:.22em;color:var(--faint)}
+
+footer{margin-top:clamp(110px,18vh,190px);padding-bottom:64px;text-align:center}
+.foot-morph{font-size:13px;letter-spacing:.24em;color:var(--soft)}
+.foot-mono{margin-top:12px;font-family:var(--mono);font-size:9.5px;letter-spacing:.3em;color:var(--faint)}
+
+/* ---------- 按住期间 ---------- */
+body.holding{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+
+/* ---------- 错误盒 ---------- */
+#errbox{position:relative;z-index:5;max-width:700px;margin:34px auto 56px;padding:14px 18px;
+  border:1px dashed rgba(217,160,95,.5);background:rgba(217,160,95,.05);
+  font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--amber)}
+#errbox[hidden]{display:none}
+
+/* ---------- reduced motion ---------- */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+}
+
+/* ---------- 窄屏 ---------- */
+@media (max-width:640px){
+  #stage{padding:0 20px}
+  .hero{padding-top:54px;min-height:62vh}
+  .howbox{padding:16px 18px}
+  .essay{font-size:15.5px}
+  .lid{left:-8vw;width:116vw}
+}
+</style>
+</head>
+<body data-reality="wake">
+
+<!-- 无 JS：恒为醒面真值。有 JS 且非 RM：先进梦面（内容暂隐，
+     待主脚本换好梦面文案后再揭幕），避免醒面一闪而过。 -->
+<script>
+(function(){try{
+  if(!window.matchMedia||!matchMedia('(prefers-reduced-motion: reduce)').matches){
+    document.body.setAttribute('data-reality','dream');
+    document.body.classList.add('preparing');
+  }
+}catch(_){/* 出错则维持醒面 */}})();
+</script>
+
+<div class="grain" aria-hidden="true"></div>
+
+<div class="lids" id="lids" aria-hidden="true">
+  <div class="lid lid-t"></div>
+  <div class="lid lid-b"></div>
+  <div class="gaze" id="gaze"></div>
+  <div class="seam" id="seam"></div>
+</div>
+
+<main id="stage">
+
+  <header class="hero">
+    <p class="kicker">醒梦 · XINGMENG — 在空白处长按 · 做一次<b>现实检验</b></p>
+    <h1>醒<span class="m">梦</span></h1>
+    <p class="sub"><span data-morph data-true="这是它醒着的一面。日期归位，数字落回真值，句句可查。" data-dream="你现在看到的是它梦着的一面——日期会漂，钟会走错，数字会夸大。">这是它醒着的一面。日期归位，数字落回真值，句句可查。</span></p>
+    <div class="howbox">
+      <p class="how-t">手势 · 眨眼快门</p>
+      <p>在页面的空白处长按：上下眼睑缓缓合拢，视野向中缝收窄——<b>按满即闩锁</b>，一次完整的眨眼过后，页面已在醒面。中途松手，眼睑退开，仍在梦中。</p>
+      <p>醒面再长按（这一眨更短），眨回梦面。文字与链接不参与检验；键盘上，按住空格同样成立。</p>
+    </div>
+  </header>
+
+  <div class="stitch" aria-hidden="true"></div>
+
+  <section class="prose">
+    <p class="essay">浅睡的人写字最诚实——字还没醒，替我先说了。只是梦里抄录的东西总有些走样：<span class="inl" data-morph data-true="日期是 2026-09-19" data-dream="日期停在九月三十一日">日期是 2026-09-19</span>，连<span class="inl" data-morph data-true="那只是只走快了的普通钟" data-dream="钟走到过 25:61">那只是只走快了的普通钟</span>也算梦的破绽。要紧的话我写了两遍，一遍给梦，一遍给醒。</p>
+
+    <p class="readout" data-morph data-true="已收录 4 篇随笔 · 3 个项目 · 纯静态站 · 2026-09-19 上线 ✓ 已校准" data-dream="已收录 12 篇随笔 · 9 个项目 · 1 场进行中的梦 ⚠ 漂移">已收录 4 篇随笔 · 3 个项目 · 纯静态站 · 2026-09-19 上线 ✓ 已校准</p>
+
+    <p class="cta">
+      <a href="https://github.com/Traveritas" target="_blank" rel="noopener">GitHub <span class="arr">→</span></a>
+      <button type="button" title="示例稿 · 不接路由">全部随笔 <span class="arr">→</span></button>
+    </p>
+    <p class="ctanote">按住链接或按钮不会触发检验——它们醒着。</p>
+  </section>
+
+  <footer>
+    <p class="foot-morph" data-morph data-true="本页已通过一次现实检验" data-dream="本页在梦中建成">本页已通过一次现实检验</p>
+    <p class="foot-mono">醒梦 XINGMENG · 长按检验机制稿 P8-I · 方案：眨眼快门</p>
+  </footer>
+
+</main>
+
+<div id="errbox" hidden></div>
+
+<script>
+(function(){
+'use strict';
+var body=document.body;
+var stage=document.getElementById('stage');
+var lids=document.getElementById('lids');
+var gaze=document.getElementById('gaze');
+var seam=document.getElementById('seam');
+
+window.addEventListener('error',function(e){
+  window.__swarmErr=(e&&e.message)||String((e&&e.type)||'error');
+  var b=document.getElementById('errbox');
+  if(b){b.hidden=false;b.textContent='ERR: '+window.__swarmErr;}
+});
+
+var RM=matchMedia('(prefers-reduced-motion: reduce)').matches;
+var qs=new URLSearchParams(location.search);
+
+/* ---------- 双文案（API 与主站一致；本稿在黑暗中直换，无 scramble） ---------- */
+var morphs=[].slice.call(document.querySelectorAll('[data-morph]'));
+morphs.forEach(function(el){
+  var t=el.getAttribute('data-true')||el.textContent;
+  if(!el.getAttribute('aria-label'))el.setAttribute('aria-label',t); /* 读屏恒为真值 */
+});
+
+var reality='wake';
+function setFace(r){
+  reality=r;
+  body.setAttribute('data-reality',r);
+  morphs.forEach(function(el){
+    var v=(r==='wake')
+      ?(el.getAttribute('data-true')||el.textContent)
+      :(el.getAttribute('data-dream')||el.getAttribute('data-true')||el.textContent);
+    el.textContent=v;
+  });
+}
+
+/* ---------- 时序常数 ---------- */
+var T_GO=2200;        /* 梦→醒 */
+var T_BACK=1300;      /* 醒→梦（更短） */
+var SLIT=0.63;        /* 满进度睑位：中缝约剩 30% 高 */
+var RETREAT_MS=460;   /* 中途松手退睑（≤600ms） */
+
+/* ---------- 状态 ---------- */
+var mode='idle';      /* idle | hold | retreat | blink */
+var holdT0=0,T=T_GO,prog=0;
+var visC=0;           /* 当前睑位 0..1 */
+var holdX=0,holdY=0,activePtr=null,kbHold=false;
+var retT0=0,retC0=0;
+var blink=null;
+
+var NOFX='a,button,input,textarea,select,label,summary,[contenteditable],h1,h2,h3,h4,h5,h6,p,li,blockquote,figcaption,dt,dd,time,code,pre,[data-morph],[data-nofx]';
+
+function smooth(p){return p*p*(3-2*p)}
+function easeOutC(t){return 1-Math.pow(1-t,3)}
+function easeInQ(t){return t*t}
+
+var blockScroll=function(e){e.preventDefault();};
+var lastF='';
+function applyFilter(a){
+  var f='saturate('+(1-0.3*a).toFixed(3)+') contrast('+(1-0.12*a).toFixed(3)+') brightness('+(1-0.08*a).toFixed(3)+')';
+  if(f!==lastF){stage.style.filter=f;lastF=f;}
+}
+function clearFilter(){if(lastF){stage.style.filter='';lastF='';}}
+
+function holdStart(x,y){
+  mode='hold';holdT0=performance.now();
+  T=(reality==='dream')?T_GO:T_BACK;
+  holdX=x;holdY=y;
+  gaze.style.transform='translate('+x+'px,'+y+'px) translate(-50%,-50%)';
+  body.classList.add('holding');
+  document.addEventListener('touchmove',blockScroll,{passive:false});
+}
+function endHold(){                 /* 中途松手：退睑回原面，不换态 */
+  if(mode!=='hold')return;
+  body.classList.remove('holding');
+  document.removeEventListener('touchmove',blockScroll);
+  activePtr=null;kbHold=false;prog=0;
+  mode='retreat';retT0=performance.now();retC0=visC;
+}
+function latch(){                   /* 进度满：闩锁，播放定格眨眼 */
+  var target=(reality==='dream')?'wake':'dream';
+  body.classList.remove('holding');
+  document.removeEventListener('touchmove',blockScroll);
+  activePtr=null;kbHold=false;prog=0;
+  mode='blink';
+  blink={t0:performance.now(),target:target,
+    close:(target==='wake')?180:150,
+    dark:(target==='wake')?200:120,
+    open:(target==='wake')?300:260,
+    c0:visC,swapped:false};
+}
+function blinkTo(target){           /* 调试 / URL 直达 */
+  if(mode!=='idle')return;
+  mode='blink';
+  blink={t0:performance.now(),target:target,
+    close:(target==='wake')?180:150,
+    dark:(target==='wake')?200:120,
+    open:(target==='wake')?300:260,
+    c0:visC,swapped:false};
+}
+function seamDrive(o){              /* 睁眼时的中缝晨光（仅醒向） */
+  var w=easeOutC(Math.min(1,o/0.5));
+  var op=(o<0.22)?(o/0.22):Math.max(0,1-(o-0.22)/0.5);
+  seam.style.width=(w*46).toFixed(1)+'vw';
+  seam.style.opacity=(op*0.9).toFixed(3);
+}
+
+function frame(now){
+  if(mode==='hold'){
+    prog=Math.min(1,(now-holdT0)/T);
+    visC=SLIT*smooth(prog);
+    applyFilter(prog);
+    gaze.style.opacity=(Math.min(1,prog*1.7)*0.9).toFixed(3);
+    if(prog>=1)latch();
+  }else if(mode==='retreat'){
+    var t=Math.min(1,(now-retT0)/RETREAT_MS);
+    visC=retC0*(1-easeOutC(t));
+    applyFilter(Math.max(0,Math.min(1,visC/SLIT)));
+    gaze.style.opacity=Math.max(0,1-t*1.8).toFixed(3);
+    if(t>=1){mode='idle';visC=0;clearFilter();gaze.style.opacity=0;}
+  }else if(mode==='blink'&&blink){
+    var b=blink,el=now-b.t0;
+    if(el<b.close){
+      visC=b.c0+(1-b.c0)*easeInQ(el/b.close);
+    }else if(el<b.close+b.dark){
+      visC=1;
+      if(!b.swapped){                 /* 黑暗掩护：一次性直换 */
+        b.swapped=true;setFace(b.target);clearFilter();gaze.style.opacity=0;
+      }
+    }else if(el<b.close+b.dark+b.open){
+      visC=1-easeOutC((el-b.close-b.dark)/b.open);
+      if(b.target==='wake')seamDrive((el-b.close-b.dark)/b.open);
+      else seam.style.opacity=0;
+    }else{
+      visC=0;seam.style.opacity=0;mode='idle';blink=null;
+    }
+  }
+  lids.style.setProperty('--c',visC.toFixed(4));
+  requestAnimationFrame(frame);
+}
+
+/* ---------- 手势：空白处长按 ---------- */
+document.addEventListener('pointerdown',function(e){
+  if(e.button!==undefined&&e.button!==0)return;
+  var t=e.target;
+  if(!t||!t.closest)return;
+  if(t.closest(NOFX))return;                 /* 文字 / 链接 / 控件不触发 */
+  if(RM){setFace(reality==='dream'?'wake':'dream');return;}
+  if(mode!=='idle')return;
+  activePtr=e.pointerId;
+  holdStart(e.clientX,e.clientY);
+});
+document.addEventListener('pointermove',function(e){
+  if(mode!=='hold'||e.pointerId!==activePtr)return;
+  gaze.style.transform='translate('+e.clientX+'px,'+e.clientY+'px) translate(-50%,-50%)';
+  var dx=e.clientX-holdX,dy=e.clientY-holdY;
+  if(dx*dx+dy*dy>400)endHold();              /* 移动超 20px 取消 */
+});
+document.addEventListener('pointerup',function(e){
+  if(mode==='hold'&&e.pointerId===activePtr)endHold();
+});
+document.addEventListener('pointercancel',function(e){
+  if(mode==='hold'&&e.pointerId===activePtr)endHold();
+});
+window.addEventListener('scroll',function(){  /* 开始滚动即取消 */
+  if(mode==='hold')endHold();
+},{passive:true});
+document.addEventListener('contextmenu',function(e){
+  if(mode==='hold'||mode==='blink')e.preventDefault();
+});
+window.addEventListener('blur',function(){
+  if(mode==='hold')endHold();
+});
+
+/* ---------- 键盘：焦点不在交互件时按住空格 ---------- */
+function focusInteractive(){
+  var ae=document.activeElement;
+  return !!(ae&&ae.closest&&ae.closest('a,button,input,textarea,select,summary,[contenteditable]'));
+}
+document.addEventListener('keydown',function(e){
+  if(e.code!=='Space')return;
+  if(focusInteractive())return;
+  if(e.repeat){e.preventDefault();return;}
+  e.preventDefault();
+  if(RM){setFace(reality==='dream'?'wake':'dream');return;}
+  if(mode!=='idle')return;
+  kbHold=true;
+  holdStart(Math.round(innerWidth/2),Math.round(innerHeight/2));
+});
+document.addEventListener('keyup',function(e){
+  if(e.code!=='Space')return;
+  var was=kbHold;kbHold=false;
+  if(was&&mode==='hold')endHold();
+});
+
+/* ---------- 启动：JS 加载后进入梦面（静息） ---------- */
+if(RM){
+  setFace('wake');                           /* RM：恒醒面真值 */
+}else{
+  setFace('dream');
+}
+requestAnimationFrame(function(){requestAnimationFrame(function(){
+  body.classList.remove('preparing');        /* 揭幕 */
+});});
+requestAnimationFrame(frame);
+
+/* ---------- 调试接口 ---------- */
+window.__fx={
+  state:function(){
+    return {reality:reality,holding:(mode==='hold'),
+            progress:+(mode==='hold'?prog:0).toFixed(3)};
+  }
+};
+if(qs.get('wake')==='1'){
+  if(RM)setFace('wake');
+  else setTimeout(function(){blinkTo('wake');},650);
+}else if(qs.get('dream')==='1'){
+  if(RM)setFace('dream');
+  else setTimeout(function(){blinkTo('dream');},650);
+}
+})();
+</script>
+</body>
+</html>

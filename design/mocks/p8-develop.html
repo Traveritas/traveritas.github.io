@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<!--
+  醒梦缝 · 一夜 — 长按特效机制稿 P8 · 方案 J「显影定影」
+  · 一句话：长按空白处，醒面如相纸自按压点一圈圈「显影」，显影满幅的一瞬「定影」闩锁。
+  · 按住渐进（梦→醒 T_go=2200ms，easeOutQuad 驱动）：一个柔边圆形显影区（clip-path circle，
+    自按压点径向扩散，本稿选定径向版，未采用页底上涨）随进度扩大到覆盖全页；区内背景经
+    「药浴」层转冷，data-morph 文字按各自到按压点的距离、待显影前缘扫过时逐字从噪点解出
+    （scramble 与 src/scripts/morph.ts 同族，字符池一致）；显影边缘是一圈柔化的 1.5px 冷色
+    药水痕（SVG circle + non-scaling-stroke，外圈 7px 极淡晕）。
+  · 定格瞬间（进度=1，闩锁醒面）：细颗粒层（feTurbulence SVG 噪点，同 p7-doorcheck .grain
+    手法）自上而下横扫约 450ms，扫过处对比落定、梦面暖色残影彻底褪尽（.haze 同步降 opacity）；
+    扫线掠过读数行时 ⚠→✓ 翻定并亮一记琥珀微光；药水痕闪一记极淡琥珀后消隐。
+  · 回程（醒→梦 T_back=1300ms，easeInOutQuad）：同一圆自 Rmax 收缩到 0——冷色自四缘向
+    按压点退回未显影的梦面（相纸退显），文字反向回梦。中途松手：≤600ms 平滑退回原面，不换态。
+  · 状态机：body[data-reality="dream"|"wake"]；无 JS 与 prefers-reduced-motion 恒显醒面真值
+    （RM 用户空白处点按/空格即瞬时切换，两态直接可达，不做长动画）。
+  · 调试：window.__fx.state() → {reality,holding,progress}；?wake=1 / ?dream=1 直达对应
+    闩锁态并播放一次扫颗粒（wake 自上而下 + 琥珀；dream 自下而上，无琥珀）；
+    window.onerror → window.__swarmErr + 页底 #errbox。
+-->
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#171b24">
+<title>醒梦缝 · 一夜 — 长按机制稿 P8-J · 显影定影</title>
+<meta name="description" content="在空白处长按做一次现实检验：醒面自按压点显影，显满即定影。长按检验机制稿 P8 · 方案 J 显影定影。">
+<link rel="preconnect" href="https://fastly.jsdelivr.net" crossorigin>
+<link rel="stylesheet" href="https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5.2.5/400.css">
+<link rel="stylesheet" href="https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5.2.5/600.css">
+<link rel="stylesheet" href="https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5.2.5/900.css">
+<style>
+/* ---------- tokens（与 tokens.css 一脉：醒冷灰 / 梦暖沙 / 琥珀唯一异质） ---------- */
+:root{
+  --ink:#e5e0d2;
+  --soft:#b9b3a4;
+  --faint:#7d7870;
+  --dream:#c2a382;            /* 梦 · 暖沙 */
+  --wakec:#a7b1ba;            /* 醒 · 冷灰 */
+  --amber:#d9a05b;            /* 唯一强调色：进度 / 定格微光 */
+  --line:rgba(229,224,210,.13);
+  --bg-wake:#12161d;          /* 无 JS / RM / 醒面默认 */
+  --bg-dream:#171b24;         /* 梦面深夜基底（暖浊由 .haze 微偏） */
+  --serif:'Noto Serif SC','Source Han Serif SC','Songti SC','STSong',SimSun,serif;
+  --mono:ui-monospace,'IBM Plex Mono','Cascadia Mono',Consolas,'JetBrains Mono',Menlo,monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:auto}
+body{
+  font-family:var(--serif);
+  color:var(--ink);
+  background:var(--bg-wake);
+  line-height:1.95;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+  touch-action:manipulation;
+  min-height:100vh;
+  transition:background-color .7s ease;
+}
+body[data-reality="dream"]{background:var(--bg-dream)}
+body.holding{
+  user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;
+}
+::selection{background:rgba(217,160,95,.25)}
+:focus-visible{outline:1px dashed rgba(229,224,210,.5);outline-offset:4px}
+::-webkit-scrollbar{width:10px}
+::-webkit-scrollbar-thumb{background:rgba(229,224,210,.14);border-radius:5px}
+::-webkit-scrollbar-track{background:transparent}
+
+/* ---------- ambient layers ----------
+   层序：body 梦底 → .haze 暖浊气（梦面） → .bath 显影药浴（冷，clip 圆）
+        → main 内容 → 药水痕/药滴 → 颗粒 → 定影扫 → 错误盒                 */
+.haze{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.35;transition:opacity .8s ease;
+  background:
+    radial-gradient(56vmax 56vmax at 78% 72%, rgba(194,163,130,.07), transparent 66%),
+    radial-gradient(40vmax 40vmax at 12% 12%, rgba(194,163,130,.045), transparent 70%);
+}
+body[data-reality="dream"] .haze{opacity:1}
+.bath{position:fixed;inset:0;z-index:1;pointer-events:none;
+  clip-path:circle(0px at 50% 50%);will-change:clip-path;
+  background:
+    radial-gradient(58vmax 58vmax at 80% 82%, rgba(167,179,186,.05), transparent 66%),
+    radial-gradient(46vmax 46vmax at 14% 12%, rgba(167,179,186,.035), transparent 70%),
+    linear-gradient(160deg,#141924 0%,#11151c 55%,#12161d 100%);
+}
+.grain{position:fixed;inset:0;z-index:5;pointer-events:none;opacity:.05;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='180' height='180' filter='url(%23n)' opacity='0.6'/></svg>");
+}
+
+/* ---------- 药水痕（显影边缘） ---------- */
+.rim{position:fixed;inset:0;width:100%;height:100%;z-index:3;pointer-events:none;
+  opacity:0;transition:opacity .45s ease;filter:blur(.4px);will-change:opacity}
+.rim.on{opacity:.9}
+.rim .cA{fill:none;stroke:rgba(167,179,186,.42);stroke-width:1.5;transition:stroke .25s ease}
+.rim .cH{fill:none;stroke:rgba(167,179,186,.10);stroke-width:7}
+.rim.flash .cA{stroke:rgba(217,160,95,.55)}
+.rim.flash{opacity:0}
+
+/* ---------- 药滴（按压点 · 进度微光的琥珀，克制） ---------- */
+#drop{position:fixed;left:0;top:0;width:120px;height:120px;margin:-60px 0 0 -60px;
+  border-radius:50%;z-index:4;pointer-events:none;opacity:0;
+  transform:scale(.5);transition:opacity .5s ease,transform .6s cubic-bezier(.2,.7,.2,1);
+  background:radial-gradient(circle,rgba(217,160,95,.30),rgba(217,160,95,.07) 46%,transparent 68%);
+}
+#drop.on{opacity:.65;transform:scale(1)}
+
+/* ---------- 定影扫（颗粒横扫 + 扫线） ---------- */
+.fixer{position:fixed;inset:0;z-index:6;pointer-events:none;opacity:0;
+  transition:opacity .35s ease;clip-path:inset(0 0 100% 0);will-change:clip-path;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='180' height='180' filter='url(%23n)' opacity='0.6'/></svg>");
+  background-size:180px 180px;
+}
+.fixer.run{opacity:.5;transition:none}
+.fixline{position:fixed;left:0;right:0;top:0;height:1px;z-index:7;pointer-events:none;opacity:0;
+  transition:opacity .35s ease;
+  background:linear-gradient(90deg,transparent,rgba(190,203,212,.55) 20%,rgba(190,203,212,.55) 80%,transparent);
+}
+.fixline.run{opacity:.85;transition:none}
+
+/* ---------- 版式 ---------- */
+main{position:relative;z-index:2;max-width:720px;margin:0 auto;padding:0 26px 120px}
+.hero{min-height:84vh;display:flex;flex-direction:column;justify-content:center;padding:14vh 0 6vh}
+.kicker{font-family:var(--mono);font-size:11px;letter-spacing:.3em;color:var(--soft)}
+h1{margin-top:30px;font-size:clamp(84px,16vw,164px);font-weight:900;letter-spacing:.05em;line-height:1.06}
+h1 .m{color:var(--wakec)} /* 无 JS / 醒面；JS 按显影进度双色插值 */
+.sub{margin-top:26px;font-size:16.5px;line-height:2.1;letter-spacing:.04em;color:#cfc8b9;
+  max-width:36em;min-height:4.4em}
+.how{margin-top:38px;max-width:560px;padding:20px 24px;
+  border:1px solid var(--line);border-left:2px solid var(--wakec);
+  background:rgba(229,224,210,.025);
+  -webkit-backdrop-filter:blur(7px);backdrop-filter:blur(7px);
+}
+.how .how-k{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.3em;color:var(--faint);margin-bottom:10px}
+.how p{font-size:13.5px;line-height:2.15;color:var(--soft);letter-spacing:.02em}
+.how b{color:var(--ink);font-weight:600}
+
+.stitch{height:1px;width:min(560px,100%);margin:11vh auto 0;
+  background:repeating-linear-gradient(90deg,rgba(229,224,210,.17) 0 7px,transparent 7px 15px)}
+
+.essay{margin-top:11vh}
+.essay p{font-size:17px;line-height:2.25;letter-spacing:.03em;color:#dcd6c7;max-width:36em}
+.fxw{border-bottom:1px dashed rgba(229,224,210,.15);padding-bottom:1px}
+
+.readout{margin-top:44px;font-family:var(--mono);font-size:12px;letter-spacing:.12em;color:var(--wakec)}
+@keyframes amberlit{
+  0%{text-shadow:0 0 0 rgba(217,160,95,0)}
+  28%{color:#d9a05b;text-shadow:0 0 15px rgba(217,160,95,.38)}
+  100%{text-shadow:0 0 0 rgba(217,160,95,0)}
+}
+.readout.lit{animation:amberlit 1.05s ease}
+
+.actions{margin-top:46px;display:flex;flex-wrap:wrap;gap:14px;align-items:center}
+.act{display:inline-flex;align-items:baseline;gap:.55em;font-family:var(--serif);
+  font-size:15px;letter-spacing:.14em;color:var(--ink);
+  padding:11px 22px;border:1px solid var(--line);background:rgba(229,224,210,.02);
+  -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+  text-decoration:none;cursor:pointer;transition:border-color .3s,background .3s}
+.act:hover{border-color:rgba(217,160,95,.45)}
+.act .arr{font-family:var(--mono);font-size:12px;color:var(--soft);transition:transform .3s,color .3s}
+.act:hover .arr{transform:translateX(4px);color:var(--amber)}
+
+footer{margin-top:15vh;text-align:center}
+.f-main{font-size:13px;letter-spacing:.18em;color:var(--soft)}
+.f-mono{margin-top:10px;font-family:var(--mono);font-size:9.5px;letter-spacing:.3em;color:var(--faint)}
+
+#errbox{position:fixed;left:16px;bottom:16px;z-index:10;max-width:min(520px,84vw);
+  font-family:var(--mono);font-size:11px;line-height:1.7;letter-spacing:.04em;color:#e6b8a3;
+  background:rgba(24,15,12,.9);border:1px solid rgba(217,120,90,.45);padding:10px 14px}
+
+/* ---------- reduced motion ---------- */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+}
+
+/* ---------- responsive ---------- */
+@media (max-width:640px){
+  main{padding:0 22px 96px}
+  .hero{min-height:72vh;padding:12vh 0 5vh}
+  .sub{min-height:5em}
+  .essay p{font-size:16px}
+  .how{padding:16px 18px}
+}
+</style>
+</head>
+<body>
+
+<div class="haze" aria-hidden="true"></div>
+<div class="bath" id="bath" aria-hidden="true"></div>
+<svg id="rim" class="rim" aria-hidden="true">
+  <circle id="rimHalo" class="cH" cx="0" cy="0" r="0" vector-effect="non-scaling-stroke"></circle>
+  <circle id="rimMain" class="cA" cx="0" cy="0" r="0" vector-effect="non-scaling-stroke"></circle>
+</svg>
+<div id="drop" aria-hidden="true"></div>
+<div class="grain" aria-hidden="true"></div>
+<div class="fixer" id="fixer" aria-hidden="true"></div>
+<div class="fixline" id="fixline" aria-hidden="true"></div>
+
+<main>
+  <header class="hero">
+    <p class="kicker">醒梦 · XINGMENG — 在空白处长按 · 做一次现实检验</p>
+    <h1>醒<span class="m" id="mChar">梦</span></h1>
+    <p class="sub"><span data-morph data-dream="你现在看到的是它梦着的一面——日期会漂，钟会走错，数字会夸大。" data-true="这是它醒着的一面。日期归位，数字落回真值，句句可查。">这是它醒着的一面。日期归位，数字落回真值，句句可查。</span></p>
+    <div class="how" id="howBox">
+      <span class="how-k" data-nofx>手势 · THE GESTURE</span>
+      <p>在页面的空白处按下并保持：醒面会自按压点一圈圈<b>显影</b>——显影满幅的一瞬<b>定影</b>闩锁，此后松手，也停在醒面。</p>
+      <p>想回梦，就再长按一次——这次更短，约一秒三：相纸自四缘向按压点<b>退显</b>。中途松手，药水退回，停在原面。键盘等价：焦点不在任何控件上时，按住空格。</p>
+    </div>
+  </header>
+
+  <div class="stitch" aria-hidden="true"></div>
+
+  <section class="essay">
+    <p>浅睡的人写字最诚实——字还没醒，替我先说了。只是梦里抄录的东西总有些走样：<span class="fxw" data-morph data-dream="日期停在九月三十一日" data-true="日期是 2026-09-19">日期是 2026-09-19</span>，连<span class="fxw" data-morph data-dream="钟走到过 25:61" data-true="那只是只走快了的普通钟">那只是只走快了的普通钟</span>也算梦的破绽。要紧的话我写了两遍，一遍给梦，一遍给醒。</p>
+  </section>
+
+  <p class="readout" id="readout"><span data-morph data-dream="已收录 12 篇随笔 · 9 个项目 · 1 场进行中的梦 ⚠ 漂移" data-true="已收录 4 篇随笔 · 3 个项目 · 纯静态站 · 2026-09-19 上线 ✓ 已校准">已收录 4 篇随笔 · 3 个项目 · 纯静态站 · 2026-09-19 上线 ✓ 已校准</span></p>
+
+  <div class="actions">
+    <a class="act" href="https://github.com/Traveritas" target="_blank" rel="noopener">GitHub <span class="arr">→</span></a>
+    <button class="act" type="button" id="btnEssays" title="示例稿不接路由">全部随笔 <span class="arr">→</span></button>
+  </div>
+
+  <div class="stitch" aria-hidden="true"></div>
+
+  <footer>
+    <p class="f-main"><span data-morph data-dream="本页在梦中建成" data-true="本页已通过一次现实检验">本页已通过一次现实检验</span></p>
+    <p class="f-mono">醒梦 XINGMENG · 长按检验机制稿 P8-J · 方案：显影定影</p>
+  </footer>
+</main>
+
+<div id="errbox" hidden></div>
+
+<script>
+/* 错误捕获须先于主脚本注册（含主脚本自身的语法错误） */
+window.addEventListener('error', function(e){
+  window.__swarmErr = e.message || e.type;
+  var b = document.getElementById('errbox');
+  if(b){ b.hidden = false; b.textContent = 'ERR: ' + (e.message || e.type); }
+});
+</script>
+
+<script>
+(function(){
+'use strict';
+var body=document.body;
+var bath=document.getElementById('bath');
+var rim=document.getElementById('rim');
+var rimMain=document.getElementById('rimMain');
+var rimHalo=document.getElementById('rimHalo');
+var drop=document.getElementById('drop');
+var fixer=document.getElementById('fixer');
+var fixline=document.getElementById('fixline');
+var readout=document.getElementById('readout');
+var mChar=document.getElementById('mChar');
+var howBox=document.getElementById('howBox');
+
+var reduce=typeof matchMedia!=='undefined'&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+var qs=new URLSearchParams(location.search);
+
+/* ---------- 机制常量（文件头已注明） ---------- */
+var EXCLUDE='a,button,input,textarea,select,label,summary,[contenteditable],h1,h2,h3,h4,h5,h6,p,li,blockquote,figcaption,dt,dd,time,code,pre,[data-morph],[data-nofx]';
+var POOL='醒梦之间夜深空site0123456789abcdefghijklmnopqrstuvwxyz·—';
+var T_GO=2200, T_BACK=1300, CANCEL_MAX=600, MOVE_LIMIT=20;
+
+function pick(){ return POOL.charAt(Math.floor(Math.random()*POOL.length)); }
+function clamp01(v){ return v<0?0:(v>1?1:v); }
+function easeOutQ(p){ return 1-(1-p)*(1-p); }
+function easeInOutQ(p){ return p<.5 ? 2*p*p : 1-Math.pow(-2*p+2,2)/2; }
+
+/* ---------- 双文案 registry（API 与主站 morph.ts 对齐） ---------- */
+var texts=[];
+var morphEls=document.querySelectorAll('[data-morph]');
+for(var mi=0;mi<morphEls.length;mi++){
+  var mel=morphEls[mi];
+  var wakeS=(mel.getAttribute('data-true')||mel.textContent||'').trim();
+  var dreamS=(mel.getAttribute('data-dream')||wakeS).trim();
+  if(!mel.getAttribute('aria-label')) mel.setAttribute('aria-label',wakeS);
+  texts.push({el:mel,dreamS:dreamS,wakeS:wakeS,
+    dA:Array.from(dreamS),wA:Array.from(wakeS),
+    dist:0,cov:-1,busy:false,raf:0,wd:0});
+}
+
+/* ---------- 双色 registry：按显影进度插值（醒真值为 CSS 默认，无 JS 即醒面） ---------- */
+var tones=[];
+function C(r,g,b,a){ return [r,g,b,a]; }
+function lerpC(a,b,t){
+  var r=a[0]+(b[0]-a[0])*t, g=a[1]+(b[1]-a[1])*t, bl=a[2]+(b[2]-a[2])*t, al=a[3]+(b[3]-a[3])*t;
+  return 'rgba('+Math.round(r)+','+Math.round(g)+','+Math.round(bl)+','+(Math.round(al*1000)/1000)+')';
+}
+function regTone(el,prop,from,to){ if(el) tones.push({el:el,prop:prop,from:from,to:to,dist:0,cov:-1}); }
+regTone(mChar,'color',C(194,163,130,1),C(167,177,186,1));        /* 梦字：暖沙 → 冷灰 */
+regTone(readout,'color',C(181,175,163,1),C(167,177,186,1));      /* 读数：暖灰 → 冷灰 */
+regTone(howBox,'borderLeftColor',C(194,163,130,.62),C(167,177,186,.62));
+var fxwEls=document.querySelectorAll('.fxw');
+for(var fi=0;fi<fxwEls.length;fi++) regTone(fxwEls[fi],'color',C(219,199,170,1),C(196,205,212,1));
+
+/* cov = 「醒度」0..1；端点为确切真值，中间为同族乱码过渡 */
+function writeText(t,c){
+  if(c<=0.004){ t.el.textContent=t.dreamS; return; }
+  if(c>=0.996){ t.el.textContent=t.wakeS; return; }
+  var n=Math.floor(c*t.wA.length);
+  var L=Math.max(t.dA.length,t.wA.length);
+  var out='';
+  for(var i=0;i<L;i++){
+    if(i<n){ out+=t.wA[i]; }
+    else{ var ch=t.dA[i]; out+=(ch!==undefined&&Math.random()<0.45)?ch:pick(); }
+  }
+  t.el.textContent=out;
+}
+function applyTone(t,c){ t.el.style[t.prop]=lerpC(t.from,t.to,c); }
+
+/* ---------- 状态机 ---------- */
+var reality='dream', holding=false, dir='go', phase='idle';
+var R=0, Rmax=0, band=160, px=0, py=0, t0=0, raf=0;
+var cancelFrom=0, cancelTo=0, cancelT0=0, cancelDur=0;
+
+function rectDist(el,x,y){
+  var r=el.getBoundingClientRect();
+  var nx=Math.max(r.left,Math.min(x,r.right));
+  var ny=Math.max(r.top,Math.min(y,r.bottom));
+  return Math.sqrt((x-nx)*(x-nx)+(y-ny)*(y-ny));
+}
+function computeGeom(x,y){
+  var w=innerWidth,h=innerHeight;
+  var dx=Math.max(x,w-x), dy=Math.max(y,h-y);
+  Rmax=Math.sqrt(dx*dx+dy*dy)+10;
+  band=Math.max(130,Rmax*0.12);
+  px=x; py=y;
+  for(var i=0;i<texts.length;i++) texts[i].dist=rectDist(texts[i].el,x,y);
+  for(var j=0;j<tones.length;j++) tones[j].dist=rectDist(tones[j].el,x,y);
+}
+function render(){
+  bath.style.clipPath='circle('+R+'px at '+px+'px '+py+'px)';
+  var rr=Math.max(0,R);
+  rimMain.setAttribute('cx',px); rimMain.setAttribute('cy',py); rimMain.setAttribute('r',rr);
+  rimHalo.setAttribute('cx',px); rimHalo.setAttribute('cy',py); rimHalo.setAttribute('r',rr+9);
+  for(var i=0;i<texts.length;i++){
+    var t=texts[i];
+    var c=clamp01((R-t.dist)/band);
+    if(Math.abs(c-t.cov)>0.004){ t.cov=c; if(!t.busy) writeText(t,c); }
+  }
+  for(var j=0;j<tones.length;j++){
+    var q=tones[j];
+    var c2=clamp01((R-q.dist)/band);
+    if(Math.abs(c2-q.cov)>0.004){ q.cov=c2; applyTone(q,c2); }
+  }
+}
+function renderCovAll(v){
+  for(var i=0;i<texts.length;i++){ cancelJob(texts[i]); texts[i].cov=v; writeText(texts[i],v); }
+  for(var j=0;j<tones.length;j++){ tones[j].cov=v; applyTone(tones[j],v); }
+}
+
+function frame(now){
+  raf=0;
+  if(phase==='hold'){
+    var T=dir==='go'?T_GO:T_BACK;
+    var p=Math.min(1,(now-t0)/T);
+    var e=dir==='go'?easeOutQ(p):easeInOutQ(p);
+    R=dir==='go'?e*Rmax:(1-e)*Rmax;
+    if(p>=1){ latch(); return; }
+    render(); raf=requestAnimationFrame(frame);
+  }else if(phase==='cancel'){
+    var q=Math.min(1,(now-cancelT0)/cancelDur);
+    R=cancelFrom+(cancelTo-cancelFrom)*easeInOutQ(q);
+    if(q>=1){ settle(); return; }
+    render(); raf=requestAnimationFrame(frame);
+  }
+}
+function startLoop(){ if(!raf) raf=requestAnimationFrame(frame); }
+
+function latch(){
+  holding=false;
+  body.classList.remove('holding');
+  hideDrop();
+  if(dir==='go'){
+    reality='wake'; body.dataset.reality='wake';
+    R=Rmax; renderCovAll(1); render();
+    rim.classList.add('flash');
+    setTimeout(function(){ rim.classList.remove('on','flash'); },650);
+    phase='idle';
+    playFix(true); /* playFix 内部接管 phase='fix'，扫完自复位 */
+  }else{
+    reality='dream'; body.dataset.reality='dream';
+    R=0; renderCovAll(0); render();
+    rim.classList.remove('on');
+    bath.style.clipPath='circle(0px at '+px+'px '+py+'px)';
+    phase='idle';
+  }
+}
+function settle(){
+  phase='idle';
+  renderCovAll(reality==='wake'?1:0);
+  R=reality==='wake'?Rmax:0;
+  render();
+  if(reality==='dream') bath.style.clipPath='circle(0px at '+px+'px '+py+'px)';
+  rim.classList.remove('on');
+  hideDrop();
+}
+function startHold(x,y){
+  if(phase!=='idle'||holding) return;
+  holding=true; dir=reality==='dream'?'go':'back';
+  for(var i=0;i<texts.length;i++) cancelJob(texts[i]);
+  computeGeom(x,y);
+  R=dir==='go'?0:Rmax;
+  t0=performance.now();
+  phase='hold';
+  body.classList.add('holding');
+  rim.classList.remove('flash');
+  rim.classList.add('on');
+  showDrop(x,y);
+  startLoop();
+}
+function endHold(){
+  if(!holding) return;
+  holding=false;
+  phase='cancel';
+  cancelFrom=R;
+  cancelTo=dir==='go'?0:Rmax;
+  cancelDur=Math.min(CANCEL_MAX,Math.max(160,(performance.now()-t0)*0.55));
+  cancelT0=performance.now();
+  body.classList.remove('holding');
+  startLoop();
+}
+/* RM：不做长动画，点按即瞬时切换，两态可达 */
+function toggleInstant(){
+  reality=reality==='dream'?'wake':'dream';
+  body.dataset.reality=reality;
+  renderCovAll(reality==='wake'?1:0);
+}
+
+/* ---------- 定影扫 ---------- */
+function lightReadout(){
+  if(!readout) return;
+  readout.classList.remove('lit');
+  void readout.offsetWidth;
+  readout.classList.add('lit');
+  setTimeout(function(){ readout.classList.remove('lit'); },1300);
+}
+function playFix(down){
+  if(reduce) return;
+  phase='fix';
+  var H=innerHeight, st=performance.now(), D=450, marked=false;
+  var ro=readout?readout.getBoundingClientRect():null;
+  fixer.classList.add('run');
+  fixline.classList.add('run');
+  (function sw(){
+    var now=performance.now(), p=Math.min(1,(now-st)/D);
+    var y=H*p;
+    var lineY=down?y:(H-y);
+    if(down){ fixer.style.clipPath='inset(0 0 '+(H-y)+'px 0)'; }
+    else{ fixer.style.clipPath='inset('+(H-y)+'px 0 0 0)'; }
+    fixline.style.top=lineY+'px';
+    if(!marked&&ro&&ro.width>0&&ro.bottom>0&&ro.top<H){
+      var passed=down?lineY>ro.top:lineY<ro.top;
+      if(passed){ marked=true; lightReadout(); }
+    }
+    if(p<1){ requestAnimationFrame(sw); return; }
+    if(!marked) lightReadout();
+    fixer.classList.remove('run');
+    fixline.classList.remove('run');
+    setTimeout(function(){ fixer.style.clipPath='inset(0 0 100% 0)'; phase='idle'; },400);
+  })();
+}
+
+/* ---------- 药滴 ---------- */
+function showDrop(x,y){ drop.style.left=x+'px'; drop.style.top=y+'px'; drop.classList.add('on'); }
+function hideDrop(){ drop.classList.remove('on'); }
+
+/* ---------- 走神漂移（梦面静息；与 morph.ts ambientTick 同族） ---------- */
+function cancelJob(t){
+  t.busy=false;
+  if(t.wd){ clearTimeout(t.wd); t.wd=0; }
+  if(t.raf){ cancelAnimationFrame(t.raf); t.raf=0; }
+}
+function runJob(t,target,dur,done){
+  cancelJob(t); t.busy=true;
+  var arr=Array.from(target), st=performance.now();
+  function fin(){
+    if(!t.busy) return;
+    t.busy=false;
+    if(t.wd){ clearTimeout(t.wd); t.wd=0; }
+    if(t.raf){ cancelAnimationFrame(t.raf); t.raf=0; }
+    t.el.textContent=target;
+    if(done) done();
+  }
+  t.wd=setTimeout(fin,dur+420); /* 看门狗：绝不卡在半乱码 */
+  (function stp(now){
+    if(!t.busy) return;
+    var p=Math.min(1,(now-st)/dur), e=easeOutQ(p);
+    var n=Math.floor(e*arr.length), out='';
+    for(var i=0;i<arr.length;i++){ out+= i<n?arr[i]:(Math.random()<0.5?arr[i]:pick()); }
+    t.el.textContent=out;
+    if(p<1) t.raf=requestAnimationFrame(stp); else fin();
+  })(st);
+}
+function scrambleFace(s){
+  var o='';
+  for(var i=0;i<s.length;i++) o+=Math.random()<0.5?s.charAt(i):pick();
+  return o;
+}
+function ambient(){
+  setTimeout(ambient,9000+Math.random()*4500);
+  if(reduce||holding||phase!=='idle'||reality!=='dream'||document.hidden) return;
+  var vis=[];
+  for(var i=0;i<texts.length;i++){
+    var r=texts[i].el.getBoundingClientRect();
+    if(r.bottom>0&&r.top<innerHeight&&r.width>0) vis.push(texts[i]);
+  }
+  if(!vis.length) return;
+  var t=vis[Math.floor(Math.random()*vis.length)];
+  runJob(t,scrambleFace(t.dreamS),520,function(){
+    setTimeout(function(){
+      if(phase==='idle'&&!holding&&reality==='dream'&&!document.hidden) runJob(t,t.dreamS,640);
+    },950);
+  });
+}
+
+/* ---------- 手势：空白处长按（指针） ---------- */
+var pid=-1, sx=0, sy=0, kb=false;
+document.addEventListener('pointerdown',function(e){
+  if(e.button&&e.button!==0) return;
+  if(phase!=='idle'||holding) return;
+  var tgt=e.target;
+  if(tgt&&tgt.closest&&tgt.closest(EXCLUDE)) return;
+  if(reduce){ toggleInstant(); return; }
+  e.preventDefault();
+  kb=false;
+  pid=e.pointerId; sx=e.clientX; sy=e.clientY;
+  startHold(e.clientX,e.clientY);
+});
+document.addEventListener('pointermove',function(e){
+  if(!holding||e.pointerId!==pid) return;
+  if(Math.sqrt((e.clientX-sx)*(e.clientX-sx)+(e.clientY-sy)*(e.clientY-sy))>MOVE_LIMIT) endHold();
+});
+document.addEventListener('pointerup',function(e){
+  if(e.pointerId!==pid) return;
+  pid=-1; endHold();
+});
+document.addEventListener('pointercancel',function(e){
+  if(e.pointerId!==pid) return;
+  pid=-1; endHold();
+});
+addEventListener('scroll',function(){ if(holding) endHold(); },true);
+addEventListener('contextmenu',function(e){ if(holding) e.preventDefault(); });
+addEventListener('resize',function(){ if(holding) endHold(); });
+addEventListener('blur',function(){ if(holding) endHold(); });
+document.addEventListener('visibilitychange',function(){ if(document.hidden&&holding) endHold(); });
+
+/* ---------- 键盘等价：焦点不在交互件时按住空格 ---------- */
+addEventListener('keydown',function(e){
+  if(e.code!=='Space') return;
+  var ae=document.activeElement;
+  if(ae&&ae.closest&&ae.closest(EXCLUDE)) return;
+  if(e.repeat){ e.preventDefault(); return; }
+  e.preventDefault();
+  if(reduce){ toggleInstant(); return; }
+  kb=true;
+  startHold(innerWidth/2,innerHeight*0.45);
+});
+addEventListener('keyup',function(e){
+  if(e.code==='Space'&&kb){ kb=false; endHold(); }
+});
+
+/* ---------- 调试接口 ---------- */
+window.__fx={
+  state:function(){
+    var p;
+    if(phase==='hold'){
+      var u=Math.min(1,(performance.now()-t0)/(dir==='go'?T_GO:T_BACK));
+      p=dir==='go'?u:1-u;
+    }else{
+      p=reality==='wake'?1:0;
+    }
+    return {reality:reality,holding:holding,progress:Math.round(p*10000)/10000};
+  },
+  T:{go:T_GO,back:T_BACK}
+};
+
+/* 示例稿：按钮不接路由 */
+var btn=document.getElementById('btnEssays');
+if(btn) btn.addEventListener('click',function(){});
+
+/* ---------- 初始状态 ---------- */
+if(reduce){
+  reality='wake'; body.dataset.reality='wake';
+  renderCovAll(1);
+}else{
+  body.dataset.reality='dream';
+  renderCovAll(0);
+  setTimeout(ambient,4200+Math.random()*2500);
+}
+
+/* ---------- URL 直达闩锁态 ---------- */
+if(qs.get('wake')==='1'){
+  reality='wake'; body.dataset.reality='wake';
+  computeGeom(innerWidth/2,innerHeight/2);
+  R=Rmax; renderCovAll(1); render();
+  setTimeout(function(){ playFix(true); },450);
+}else if(qs.get('dream')==='1'&&!reduce){
+  setTimeout(function(){ playFix(false); },450);
+}
+})();
+</script>
+</body>
+</html>
