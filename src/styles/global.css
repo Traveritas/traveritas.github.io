@@ -31,7 +31,9 @@ body {
   font-size: 1.0625rem;
   line-height: 1.9;
   color: var(--fg);
-  background: var(--bg);
+  /* 大表面洗染：--wash 由 reality.ts 随醒度插值（梦暖褐 ↔ 醒冷灰），
+     --bg 的所有权仍在 night.ts——洗染只在消费侧混合 */
+  background: color-mix(in srgb, var(--bg) 93%, var(--wash));
   text-rendering: optimizeLegibility;
 }
 
@@ -64,13 +66,13 @@ a:hover {
 }
 
 :focus-visible {
-  outline: 2px solid var(--amber);
+  outline: 2px solid currentColor;
   outline-offset: 3px;
   border-radius: 1px;
 }
 
 ::selection {
-  background: rgba(217, 160, 91, 0.32);
+  background: color-mix(in srgb, var(--amber) 32%, transparent);
 }
 
 hr {
@@ -85,19 +87,25 @@ hr {
   letter-spacing: 0.04em;
 }
 
-/* ── 梦侧浮动：大幅、缓慢、随机相位（醒侧不用它） ── */
+/* ── 梦侧浮动：大幅、缓慢、随机相位（醒侧不用它）──
+   醒静梦动：振幅乘 --still（梦 1 → 醒 0），入梦检验按住时
+   页面随线生长逐渐静止，闩锁醒面全场归定 */
 @keyframes drift {
   0% {
-    transform: translate3d(0, calc(var(--d-amp, 7px) * -0.6), 0)
-      rotate(calc(var(--d-rot, 0.5deg) * -1));
+    transform: translate3d(0, calc(var(--d-amp, 7px) * var(--still, 0) * -0.6), 0)
+      rotate(calc(var(--d-rot, 0.5deg) * var(--still, 0) * -1));
   }
   50% {
-    transform: translate3d(calc(var(--d-x, 3px) * 0.6), var(--d-amp, 7px), 0)
-      rotate(var(--d-rot, 0.5deg));
+    transform: translate3d(
+        calc(var(--d-x, 3px) * var(--still, 0) * 0.6),
+        calc(var(--d-amp, 7px) * var(--still, 0)),
+        0
+      )
+      rotate(calc(var(--d-rot, 0.5deg) * var(--still, 0)));
   }
   100% {
-    transform: translate3d(0, calc(var(--d-amp, 7px) * -0.6), 0)
-      rotate(calc(var(--d-rot, 0.5deg) * -1));
+    transform: translate3d(0, calc(var(--d-amp, 7px) * var(--still, 0) * -0.6), 0)
+      rotate(calc(var(--d-rot, 0.5deg) * var(--still, 0) * -1));
   }
 }
 
@@ -126,9 +134,13 @@ hr {
   position: absolute;
   inset: 0;
   color: var(--ghost-ink);
-  opacity: 0.5;
+  /* 醒态叠影归零：醒着看什么都是一层；错位量＝echo × still */
+  opacity: calc(0.5 * var(--still, 0));
   pointer-events: none;
-  transform: translate(calc(var(--echo) * 11px), calc(var(--echo) * -4px));
+  transform: translate(
+    calc(var(--echo) * var(--still, 0) * 11px),
+    calc(var(--echo) * var(--still, 0) * -4px)
+  );
   filter: blur(0.4px);
 }
 
@@ -179,7 +191,7 @@ main {
   margin-top: var(--gap-v);
   padding-block: 1.6rem 2rem;
   font-size: 0.875rem;
-  color: var(--fg-faint);
+  color: var(--fg-soft);
   position: relative;
   z-index: 10;
 }
@@ -193,11 +205,11 @@ main {
 }
 
 .site-footer a {
-  color: var(--fg-faint);
+  color: var(--fg-soft);
 }
 
 .site-footer a:hover {
-  color: var(--fg-soft);
+  color: var(--fg);
 }
 
 .footer-clock {
@@ -229,7 +241,7 @@ main {
 }
 
 .ledger-date {
-  color: var(--fg-faint);
+  color: var(--fg-soft);
   font-variant-numeric: tabular-nums;
   font-size: 0.9rem;
   padding-top: 0.28em;
@@ -260,7 +272,7 @@ main {
   margin-left: 0.9rem;
   font-size: 0.82rem;
   font-family: var(--font-body);
-  color: var(--fg-faint);
+  color: var(--fg-soft);
 }
 
 /* 八针进度：一枚针脚一格 */
@@ -306,7 +318,7 @@ main {
 
 .prose-meta {
   margin: 1rem 0 0;
-  color: var(--fg-faint);
+  color: var(--fg-soft);
   font-size: 0.9rem;
   font-variant-numeric: tabular-nums;
   font-family: var(--font-mono);

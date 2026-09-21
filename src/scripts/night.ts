@@ -106,7 +106,8 @@ export function initNight() {
     root.style.setProperty('--line', `rgba(${ir},${ig},${ib},0.16)`);
 
     const st = stageAt(m);
-    document.body.dataset.stage = st;
+    // 分期选择器（index.astro）用小写 'n3'/'rem'，dataset 属性匹配大小写敏感
+    document.body.dataset.stage = st.toLowerCase();
 
     if (railDot) railDot.style.top = `${(6 + (m / NIGHT_LEN) * 84).toFixed(1)}%`;
     if (railTime) railTime.textContent = fmtNightTime(m);

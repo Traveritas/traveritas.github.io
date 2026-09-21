@@ -5,6 +5,7 @@
    ───────────────────────────────────────────────────────────── */
 
 import { clamp, onScrollRaf, reducedMotion } from './lib';
+import { wakeMix } from './reality';
 
 const DEG = (14 * Math.PI) / 180;
 const DX = Math.cos(DEG);
@@ -85,7 +86,8 @@ function applyAnchor() {
 }
 
 function anchorStep() {
-  const w = reducedMotion() ? 0 : wanderAt(performance.now() / 1000) * (WANDER * 100);
+  // 醒静梦动：游走幅度随醒度衰减，醒面锚点钉定在停靠处
+  const w = reducedMotion() ? 0 : wanderAt(performance.now() / 1000) * (WANDER * 100) * (1 - wakeMix());
   anchorT += (anchorTarget + w - anchorT) * 0.08;
   anchorMovedAt = performance.now();
   applyAnchor();

@@ -6,7 +6,8 @@
    · [data-morph][data-dream]：梦/醒双面元素（入梦检验机制用，
      见 reality.ts）。当前现实面由 setMorphReality 决定：
      梦态走神＝纯乱码扰动；醒态不参与走神。
-   · [data-clock]：钟。换分时有概率乱码一下——钟在梦里漂移。
+   · [data-clock]：钟。换分时梦态有概率乱码一下——钟在梦里漂移，
+     醒态稳定。
    无 JS / 读屏时始终呈现醒面真文案（aria-label 固定）。
    ───────────────────────────────────────────────────────────── */
 
@@ -159,13 +160,17 @@ function clockTick() {
   for (const el of document.querySelectorAll<HTMLElement>('[data-clock]')) {
     const d = new Date();
     const t = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    // 文本可能正处乱码漂移，读屏时刻以 aria-label 为准
+    const label = `当前时刻 ${t}`;
+    if (el.getAttribute('aria-label') !== label) el.setAttribute('aria-label', label);
     if (el.textContent.trim() === t) continue;
     const m = els.find((x) => x.el === el);
     if (!m || RM()) {
       el.textContent = t;
       continue;
     }
-    if (Math.random() < 0.4) animate(m, t, 420);
+    // 钟在梦里漂移：乱码换分只在梦态发生，醒态钟是稳的
+    if (realityFace === 'dream' && Math.random() < 0.4) animate(m, t, 420);
     else {
       m.cur = t;
       el.textContent = t;

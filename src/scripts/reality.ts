@@ -6,12 +6,14 @@
    · 同手势 1300ms 回梦：线反向生长，指下收拢成结、倒旋收起（环闪
      内收——落款的倒放），线抽走褪出，闩锁梦面。
    · 中途松手 ≤600ms 退回原面；短按（≤260ms）＝线头一弹的点击反馈，
-     无状态变化。键盘：焦点不在交互件时按住空格等价。
+     无状态变化。键盘：焦点不在交互件时按住 Shift＋空格 等价（裸空格保留给滚屏）。
    · 双文案走 morph 引擎（[data-morph][data-dream]，元素内文本＝醒面
      真值）；按住时文字随线到达换面，闩锁时全部对齐当前面。
    · 配色不与夜色系统（night.ts 拥有 --bg/--fg/--fg-soft/--line）抢
-     变量：双色由强调色插值（--amber/--umber/--ghost-ink 随醒度
-     暖↔冷）＋morph 文字两面＋线结特效共同承担，无全屏渐变层。
+     变量：双色由强调色插值（--amber/--umber/--ghost-ink/--dream/--wash
+     随醒度暖↔冷）＋morph 文字两面＋线结特效共同承担，无全屏渐变层。
+     --reality-mix（0=梦，1=醒）与 --still（动效倍率，醒静梦动）供
+     CSS 消费：漂移振幅、暗角/颗粒浓度、叠影错位、body 背景洗染。
    · 无 JS：恒醒面真值（HTML 原文）。prefers-reduced-motion：不入梦，
      按压即瞬时两态切换。闩锁状态经 sessionStorage 跨页保持。
    · 调试：window.__fx.state() / __fx.clicks；性能：单 rAF 仅在
@@ -24,11 +26,15 @@ import { getDuals, morphText, setMorphReality, setMorphPause } from './morph';
 const eo3 = easeOut;
 const eio3 = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
-/* 强调色双色（醒面=醒灰冷，doorcheck 语义）：梦端取 tokens 现值 */
+/* 强调色双色（醒面=醒灰冷，doorcheck 语义）：梦端取 tokens 现值。
+   --dream 醒端＝休眠的灰沙（缝线梦侧、药丸边、vtag 暖签随醒度褪暖）；
+   --wash 供 global.css body 混入 7% 的大表面洗染（梦暖褐 ↔ 醒冷灰） */
 const ACCENT: Record<string, [number[], number[]]> = {
   '--amber': [hexToRgb('#d9a05b'), hexToRgb('#a7b1ba')],
-  '--umber': [hexToRgb('#8a6a4f'), hexToRgb('#77828c')],
+  '--umber': [hexToRgb('#765640'), hexToRgb('#556270')],
   '--ghost-ink': [hexToRgb('#b98f74'), hexToRgb('#8e9aa6')],
+  '--dream': [hexToRgb('#c2a382'), hexToRgb('#a39c92')],
+  '--wash': [hexToRgb('#8a5a30'), hexToRgb('#556270')],
 };
 const mixRgb = (a: number[], b: number[], t: number) =>
   `rgb(${Math.round(a[0] + (b[0] - a[0]) * t)},${Math.round(a[1] + (b[1] - a[1]) * t)},${Math.round(
@@ -74,7 +80,7 @@ let startX = 0;
 let startY = 0;
 let clicks = 0;
 let rafId = 0;
-let watchdog = 0;
+let watchdog: ReturnType<typeof setTimeout> | 0 = 0;
 let knotShown = false;
 
 const RM = reducedMotion();
@@ -188,12 +194,17 @@ function drawThread(W: number, ang: number, coreOp: number, bandOp: number) {
   tBand.style.opacity = `${bandOp}`;
 }
 function setTint(cc: number) {
-  // 双色由强调色插值（--amber/--umber/--ghost-ink）承担，不做全屏渐变层
+  // 双色由强调色插值承担（含 --wash 大表面洗染），不做全屏渐变层
   for (const k in ACCENT) {
     const [d, w] = ACCENT[k];
     docEl.style.setProperty(k, mixRgb(d, w, cc));
   }
   docEl.style.setProperty('--reality-mix', cc.toFixed(4));
+}
+
+/** 当前醒度 0..1（chrome.ts 锚点游走等「醒静梦动」消费方使用） */
+export function wakeMix(): number {
+  return c;
 }
 function showKnot(pack: boolean) {
   if (!knot) return;
@@ -540,7 +551,7 @@ function wireGestures() {
   });
 
   document.addEventListener('keydown', (e) => {
-    if (e.code !== 'Space' || e.repeat) return;
+    if (e.code !== 'Space' || e.repeat || !e.shiftKey) return;
     const ae = document.activeElement;
     if (ae instanceof Element && ae.closest(KBD_DENY)) return;
     e.preventDefault();
@@ -639,7 +650,7 @@ declare global {
     __fx?: { state: () => { reality: Reality; holding: boolean; progress: number }; clicks: number };
   }
 }
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && import.meta.env.DEV) {
   window.__fx = {
     state: () => ({ reality, holding: mode === 'hold', progress: +p.toFixed(3) }),
     get clicks() {

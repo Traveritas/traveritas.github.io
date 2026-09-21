@@ -25,6 +25,8 @@ interface Props {
     station: string;
     en?: string;
     depthTarget?: string;
+    /* depth 模式夜内时钟（透传 Rail：阅读进度在 fromMin→fromMin+durMin 爬行） */
+    readout?: { fromMin: number; durMin: number; stage: string };
   };
 }
 
@@ -100,9 +102,11 @@ const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site).href : un
       initReality();
 
       // 进页停在页头之下（p11-h 终选）：页头恰好被遮住，上滚才露出；
-      // 浏览器还原了滚动位置或带锚点进入时不干预
+      // 浏览器还原了滚动位置或带锚点进入时不干预。
+      // 主页首屏（千层纸）例外：整幅视口构图 + 页头为叠压式（不占布局），
+      // 进页必须停在 scrollY=0，公式全部按视口坐标书写
       const siteHeader = document.querySelector('.site-header');
-      if (siteHeader) {
+      if (siteHeader && !document.getElementById('ns-hero')) {
         addEventListener('load', () => {
           if (scrollY === 0 && !location.hash) {
             scrollTo({

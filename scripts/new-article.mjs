@@ -39,7 +39,7 @@ if (existsSync(file)) {
 writeFileSync(
   file,
   `---
-title: ${title}
+title: "${title.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"
 date: ${date}
 tags: []
 draft: true
