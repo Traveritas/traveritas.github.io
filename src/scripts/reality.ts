@@ -114,17 +114,13 @@ function buildFx() {
   transform:translate(-100px,-100px) rotate(45deg)}
 .fx-reality .knot i{position:absolute;inset:-1px;display:block;border:1px solid rgba(167,177,186,.8);background:#4a525b}
 .fx-reality .knot.on,.fx-reality .knot.off,.fx-reality .knot.pack{display:block}
+/* 结身倒旋入场＋一记短促微光，随 dissolve 一起消失——页面无滞留；
+   不再放环闪（用户裁定删去四角扩散环） */
 .fx-reality .knot.on i{animation:xmKnotIn .3s cubic-bezier(.2,.8,.3,1) both;
   box-shadow:0 0 10px 1px rgba(217,160,91,.38)}
-.fx-reality .knot.on::after{content:'';position:absolute;inset:-3px;display:block;
-  border:1px solid rgba(217,160,91,.9);animation:xmKnotRing .55s cubic-bezier(.17,.67,.3,1) both}
 .fx-reality .knot.off i{animation:xmKnotOff .16s ease-in both}
 .fx-reality .knot.pack i{animation:xmKnotPack .36s cubic-bezier(.55,0,.85,.45) both}
-.fx-reality .knot.pack::after{content:'';position:absolute;inset:-3px;display:block;
-  border:1px solid rgba(217,160,91,.7);animation:xmKnotRingIn .44s cubic-bezier(.3,.6,.2,1) both}
 @keyframes xmKnotIn{from{transform:scale(.2) rotate(-120deg);opacity:0}to{transform:scale(1) rotate(0deg);opacity:1}}
-@keyframes xmKnotRing{from{transform:scale(.5) rotate(0deg);opacity:.95}to{transform:scale(3) rotate(90deg);opacity:0}}
-@keyframes xmKnotRingIn{from{transform:scale(2.4) rotate(40deg);opacity:.75}to{transform:scale(.35) rotate(-50deg);opacity:0}}
 @keyframes xmKnotPack{from{transform:scale(1.15) rotate(0deg);opacity:1}to{transform:scale(.1) rotate(-110deg);opacity:0}}
 @keyframes xmKnotOff{to{transform:scale(.15) rotate(60deg);opacity:0}}
 .fx-reality .flick{position:absolute;left:0;top:0;width:38px;height:1px;margin:0 0 0 -19px;display:none;
