@@ -157,7 +157,7 @@ body.reality-holding{user-select:none;-webkit-user-select:none;-webkit-touch-cal
   knot.appendChild(document.createElement('i'));
   flick = document.createElement('div');
   flick.className = 'flick';
-  fx.append(tintWarm, tintCool, thread, knot, flick);
+  fx.append(thread, knot, flick);
   body.appendChild(fx);
 }
 
