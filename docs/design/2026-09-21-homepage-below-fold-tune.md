@@ -2,6 +2,8 @@
 
 状态：三个 worktree 并行（`pw-tune-a` / `pw-tune-b` / `pw-tune-c`，分支 `tune/a-doorcheck-skeleton` / `tune/b-night-skeleton` / `tune/c-free-fusion`）；主线目录 4321 端口为当前基线，不动；各会话只改自己分支，用户终选后回 main 合并。
 
+> **终选（2026-09-21 晚）：F「形态即深度」胜出**——`tune/f-form-depth`（1ea9b5c）已合入 main，后续微调在 main 上进行、不再并行。D/E/G 保留于各自分支与 worktree（pw-tune-d/e/g），随时可回头对照；A/B/C 无产出。四会话的方向登记与结论见 worktree 外公共登记簿 `D:\Documents\HTA\My Projects\homepage-tune-swarm.md`；F 的验收截图已随 worktree 拷至 `design/_shots-tune/`。
+
 ## 任务
 
 调整**主页 hero 以下**的内容排版。参考稿：`design/mocks/p7-doorcheck.html`（醒梦 · 入梦检验——用户认定其下部排版目前最好）。目标：把当前实现的亮点与入梦检验的亮点**有机结合**，产出可直接上线的真实页面（真实数据、真实路由）。
