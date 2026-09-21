@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<!--
+  ═══════════════════════════════════════════════════════════════════
+  醒梦缝 · 一夜 — 长按检验机制稿 P8-LINE-A · 方案：弹墨（墨线弹印）
+  · 一句话：按住空白处，指下浮出一枚线轴，一根浸了墨的线自轴中向
+    两侧放出——微微下坠、轻轻摆动，墨色随放线渐深，醒面冷色沿线
+    渗开；按满后线被提起（70ms 屏息）、松手——「啪」，整条墨线拍
+    上页面：印出一条贯穿全页的琥珀基准直线，指下溅起三点墨，全页
+    真值随弹印一拍落定。木匠弹墨立线，页面弹墨立信。
+  · 按住渐进：放线长度 = 进度；线有垂弧与呼吸摆动（活线），墨量
+    （描边不透明度）随之加深；data-morph 文字按「线的前沿到达其
+    在线上的投影位置」逐个换面（短促 scramble，≤3 并发排队）。
+  · 定格瞬间（梦→醒）：提线 70ms（垂弧收直、反拱上抬，色彩屏息）
+    → 回弹 80ms 拍线 → 触页一拍：基准直线闪现（630ms 内淡尽）、
+    三点墨溅（≤460ms）、余下 8% 色值就位（120ms）→ 线自两侧
+    抖回线轴（240–520ms）。全部痕迹 ≤800ms 消失，无任何常驻。
+  · 回程（醒→梦，1300ms）：放出的是一根绷直的干线——虚线、无墨、
+    不垂不摆，与去程的湿线截然两感；按满后线被快速收回线轴
+    （320ms，静默无印，梦无痕），线轴一点微闪即灭；中途松手，
+    线原样卷回轴中、墨随线退回，面不改。
+  · 点击特效：轻点空白（≤240ms 按下即松）——线轴出现、一小段
+    线头轻弹出即刻弹回，线轴一次收拢脉冲后淡出，≤500ms 全部
+    消失，无状态变化，__fx.clicks 计数；与长按开头同一套起步，
+    自然衔接。
+  · 性能要点：动画只动 transform/opacity/SVG 属性/CSS 变量；每帧
+    变量写入 ≤11（9 个色变量 + 线的 d + stroke-opacity，且色值
+    无变化时跳写）；动画固定 DOM 节点 9 个（线/印痕/三墨点/线轴
+    两件）；几何只在按下时测；scramble ≤3 并发排队、dur+400ms
+    看门狗；各阶段墙钟 setTimeout 兜底；单 rAF 循环供 __fx.perf()。
+  · 无 JS / prefers-reduced-motion：恒醒面真值；RM 按满即瞬时换面，
+    ?wake=1 / ?dream=1 两态直达。
+  ═══════════════════════════════════════════════════════════════════
+-->
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#171b24">
+<title>醒梦 · 弹墨 — 长按机制稿 p8-line-a</title>
+<meta name="description" content="按住空白处，指下线轴放出一根浸墨的线；按满提线回弹，墨线拍上页面印出一条基准直线，闩锁在醒面。长按检验机制稿 P8-LINE-A · 方案：弹墨。">
+<link rel="preconnect" href="https://fastly.jsdelivr.net" crossorigin>
+<link rel="stylesheet" href="https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5.2.5/400.css">
+<link rel="stylesheet" href="https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5.2.5/600.css">
+<link rel="stylesheet" href="https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5.2.5/900.css">
+<style>
+/* ---------- 令牌：醒面真值为默认（无 JS / RM 恒醒）；html.pre-dream 为首绘入梦 ---------- */
+:root{
+  --bg-now:#12161d; --fg-now:#e9e5da; --soft-now:#aeb4ba; --faint-now:#77808a;
+  --acc-now:#a7b1ba; --line-now:rgba(169,179,190,.17); --morph-line:rgba(167,177,186,.42);
+  --warm-op:.014; --cool-op:.05;
+  --amber:#d9a05b;
+  --serif:'Noto Serif SC','Source Han Serif SC','Songti SC','STSong',SimSun,serif;
+  --mono:'IBM Plex Mono',ui-monospace,'Cascadia Mono',Consolas,'JetBrains Mono',Menlo,monospace;
+}
+html.pre-dream{
+  --bg-now:#171b24; --fg-now:#e5e0d2; --soft-now:#b9b3a4; --faint-now:#837d70;
+  --acc-now:#c2a382; --line-now:rgba(229,224,210,.13); --morph-line:rgba(194,163,130,.42);
+  --warm-op:.055; --cool-op:.012;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{background:var(--bg-now);scroll-behavior:auto}
+body{
+  font-family:var(--serif);color:var(--fg-now);line-height:1.95;
+  -webkit-font-smoothing:antialiased;overflow-x:hidden;touch-action:manipulation;
+  min-height:100vh;
+}
+body.holding{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+::selection{background:rgba(217,160,95,.26);color:var(--fg-now)}
+:focus-visible{outline:1px dashed var(--amber);outline-offset:4px}
+::-webkit-scrollbar{width:9px}
+::-webkit-scrollbar-thumb{background:rgba(233,229,218,.14)}
+::-webkit-scrollbar-track{background:transparent}
+
+/* ---------- 底色与颗粒 ---------- */
+.bg{position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:
+    radial-gradient(88vmax 58vmax at 76% 10%, rgba(214,176,124,var(--warm-op)), transparent 62%),
+    radial-gradient(76vmax 56vmax at 16% 88%, rgba(156,172,188,var(--cool-op)), transparent 62%),
+    var(--bg-now);
+}
+.grain{position:fixed;inset:0;z-index:80;pointer-events:none;opacity:.045;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='180' height='180' filter='url(%23n)' opacity='0.6'/></svg>");
+}
+
+/* ---------- 版面 ---------- */
+main{position:relative;z-index:2;max-width:720px;margin:0 auto;padding:0 28px 60px;
+  animation:rise .8s ease both}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.hero{min-height:82vh;display:flex;flex-direction:column;justify-content:center;padding:15vh 0 8vh}
+.kicker{font-family:var(--mono);font-size:11px;letter-spacing:.3em;color:var(--faint-now);margin-bottom:36px}
+h1{font-size:clamp(84px,15vw,160px);font-weight:900;line-height:1.05;letter-spacing:.06em;margin-left:-5px}
+h1 .m{color:var(--acc-now);letter-spacing:.14em;transition:letter-spacing .5s cubic-bezier(.3,.7,.3,1)}
+body[data-reality="wake"] h1 .m{letter-spacing:.02em}
+.sub{margin-top:30px;max-width:36em;font-size:clamp(15px,2.1vw,17.5px);letter-spacing:.04em;color:var(--soft-now);min-height:2em}
+.howto{margin-top:44px;max-width:560px;border:1px solid var(--line-now);border-left:2px solid var(--acc-now);
+  padding:20px 24px;font-size:13.5px;line-height:2.15;color:var(--soft-now);letter-spacing:.03em;
+  background:rgba(233,229,218,.02)}
+.howto p+p{margin-top:8px}
+.howto b{color:var(--fg-now);font-weight:600}
+.howto .mono{font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;color:var(--faint-now)}
+
+.seam{margin:10vh 0 9vh;overflow:hidden;pointer-events:none}
+.seam i{display:block;border-top:1px dashed var(--line-now);transform:rotate(-4deg) scale(1.04)}
+
+.essay .lead{display:block;font-family:var(--mono);font-size:10.5px;letter-spacing:.3em;color:var(--faint-now);margin-bottom:22px}
+.essay p{font-size:16.5px;line-height:2.25;letter-spacing:.03em;max-width:34em}
+[data-morph]{border-bottom:1px dashed var(--morph-line);padding-bottom:1px}
+
+.readout{margin-top:54px;padding:15px 2px;min-height:3.4em;
+  border-top:1px solid var(--line-now);border-bottom:1px solid var(--line-now);
+  font-family:var(--mono);font-size:12px;letter-spacing:.14em;color:var(--soft-now);line-height:2}
+
+.actions{margin-top:42px;display:flex;flex-wrap:wrap;gap:16px 32px;align-items:center}
+.actions a{display:inline-flex;align-items:baseline;gap:.55em;font-size:15px;letter-spacing:.14em;
+  color:var(--fg-now);text-decoration:none;border-bottom:1px solid var(--line-now);
+  padding-bottom:.35em;transition:border-color .3s}
+.actions a:hover{border-color:var(--acc-now)}
+.actions .ar{font-family:var(--mono);font-size:12px;color:var(--faint-now)}
+.actions button{font-family:var(--serif);font-size:14.5px;letter-spacing:.14em;line-height:1.6;
+  color:var(--fg-now);background:transparent;border:1px solid var(--line-now);border-radius:2px;
+  padding:10px 24px;cursor:pointer;display:inline-flex;align-items:baseline;gap:.55em;
+  transition:border-color .3s,background .3s}
+.actions button:hover{border-color:var(--acc-now);background:rgba(233,229,218,.03)}
+
+footer{margin-top:13vh;text-align:center;color:var(--soft-now)}
+footer .f-morph{font-size:13px;letter-spacing:.18em}
+footer .f-mono{margin-top:12px;font-family:var(--mono);font-size:9.5px;letter-spacing:.3em;color:var(--faint-now);line-height:2.2}
+
+/* ---------- 特效层：墨线 · 线轴 · 印痕 · 墨溅 ---------- */
+.fx{position:fixed;inset:0;z-index:60;pointer-events:none;overflow:hidden}
+#inkline{position:absolute;left:0;top:0;width:100%;height:100%;overflow:visible}
+#strand{fill:none;stroke-linecap:round;display:none}
+/* 弹印出的基准直线（位置与宽度在定格时一次性写入；动效在内层 i 上） */
+#print{position:absolute;left:0;top:0;height:2px;opacity:0;transform-origin:0 50%}
+#print i{position:absolute;inset:0;display:block;background:linear-gradient(90deg,
+  rgba(167,177,186,0),rgba(167,177,186,.30) 12%,rgba(217,160,91,.92) 50%,
+  rgba(167,177,186,.30) 88%,rgba(167,177,186,0))}
+#print.on{opacity:1}
+#print.on i{animation:printIn .63s cubic-bezier(.25,.6,.3,1) both}
+@keyframes printIn{
+  0%{transform:scaleY(.35);opacity:0}
+  7%{transform:scaleY(1.25);opacity:1}
+  16%{transform:scaleY(1);opacity:.95}
+  55%{transform:scaleY(.85);opacity:.5}
+  100%{transform:scaleY(.4);opacity:0}
+}
+/* 三点墨溅：仅在触页一拍出现，克制 */
+#splash{position:absolute;left:0;top:0;opacity:0}
+#splash i{position:absolute;border-radius:50%;background:rgba(217,160,91,.85);opacity:0}
+#splash i:nth-child(1){width:3px;height:3px;margin:-1.5px 0 0 -1.5px;--sx:-15px;--sy:-24px}
+#splash i:nth-child(2){width:2px;height:2px;margin:-1px 0 0 -1px;--sx:17px;--sy:-19px;background:rgba(201,208,215,.8)}
+#splash i:nth-child(3){width:2.5px;height:2.5px;margin:-1.25px 0 0 -1.25px;--sx:-3px;--sy:-29px}
+#splash.on{opacity:1}
+#splash.on i{animation:spl .34s cubic-bezier(.15,.65,.35,1) both}
+#splash.on i:nth-child(2){animation-delay:.03s}
+#splash.on i:nth-child(3){animation-delay:.06s}
+@keyframes spl{
+  0%{opacity:.95;transform:translate(0,0) scale(.55)}
+  100%{opacity:0;transform:translate(var(--sx,0px),var(--sy,0px)) scale(1)}
+}
+/* 线轴：按压点即时反馈（出现 / 轻点收拢 / 收线落座 / 微闪） */
+#reel{position:absolute;left:0;top:0;width:0;height:0;opacity:0}
+#reel i{position:absolute;left:0;top:0;display:block;border-radius:50%}
+#reel .rd{width:5px;height:5px;margin:-2.5px 0 0 -2.5px;background:rgba(217,160,91,.85)}
+#reel .rr{width:15px;height:15px;margin:-7.5px 0 0 -7.5px;border:1px solid rgba(167,177,186,.5)}
+#reel.on{opacity:1}
+#reel.on .rd{animation:rdIn .13s cubic-bezier(.2,.8,.3,1) both}
+#reel.on .rr{animation:rrIn .32s cubic-bezier(.2,.7,.3,1) both}
+@keyframes rdIn{from{transform:scale(.25)}to{transform:scale(1)}}
+@keyframes rrIn{from{transform:scale(.45);opacity:.85}to{transform:scale(1.28);opacity:0}}
+#reel.tick{animation:reelFade .24s .03s both}
+#reel.tick .rd{animation:rdTick .24s ease-out both}
+#reel.tick .rr{animation:rrTick .18s ease-in both}
+@keyframes rdTick{0%{transform:scale(1)}35%{transform:scale(1.55)}100%{transform:scale(.5);opacity:0}}
+@keyframes rrTick{from{transform:scale(1.28)}to{transform:scale(.4);opacity:0}}
+#reel.seat{animation:reelFade .3s .05s both}
+#reel.seat .rd{animation:rdSeat .3s ease-out both}
+#reel.seat .rr{animation:rrSeat .3s ease-out both}
+@keyframes rdSeat{0%{transform:scale(1)}30%{transform:scale(1.35)}100%{transform:scale(.55);opacity:0}}
+@keyframes rrSeat{from{transform:scale(1);opacity:.5}to{transform:scale(.72);opacity:0}}
+#reel.blink{animation:reelFade .26s .05s both}
+#reel.blink .rd{animation:rdBlink .26s ease-out both}
+@keyframes rdBlink{0%{transform:scale(1)}40%{transform:scale(1.4);background:rgba(217,160,91,1)}100%{transform:scale(.6);opacity:0}}
+#reel.fade{animation:reelFade .2s both}
+@keyframes reelFade{from{opacity:1}to{opacity:0}}
+/* 打断冻结时的快速淡出 */
+#print.out i,#splash.out i{animation:fadeOut .12s linear both}
+@keyframes fadeOut{to{opacity:0}}
+
+/* ---------- 错误盒 ---------- */
+#errbox{position:fixed;left:0;right:0;bottom:0;z-index:120;pointer-events:none;
+  font-family:var(--mono);font-size:11px;letter-spacing:.06em;line-height:1.6;
+  color:#e3b990;background:rgba(22,15,10,.94);border-top:1px solid rgba(217,160,91,.45);
+  padding:8px 16px}
+
+/* ---------- reduced motion ---------- */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+}
+
+/* ---------- 响应式（390px 不破） ---------- */
+@media (max-width:640px){
+  main{padding:0 22px 40px}
+  .hero{min-height:76vh;padding-top:12vh}
+  .kicker{letter-spacing:.22em}
+  .howto{padding:16px 18px}
+  .essay p{font-size:15.5px}
+  .actions{gap:14px 22px}
+}
+</style>
+<script>
+/* 首绘前入梦：非 RM 且非 ?wake=1 时先把配色令牌切到梦面（正文真值保持醒面，
+   页末主脚本随后接管；此脚本只为防首帧闪醒） */
+(function(){try{
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+  if(new URLSearchParams(location.search).get('wake')==='1')return;
+  document.documentElement.classList.add('pre-dream');
+}catch(e){}})();
+</script>
+</head>
+<body data-reality="wake">
+
+<div class="bg" aria-hidden="true"></div>
+
+<main>
+  <header class="hero">
+    <p class="kicker">醒梦 · XINGMENG — 在空白处长按 · 做一次现实检验</p>
+    <h1>醒<span class="m">梦</span></h1>
+    <p class="sub"><span data-morph data-true="这是它醒着的一面。日期归位，数字落回真值，句句可查。" data-dream="你现在看到的是它梦着的一面——日期会漂，钟会走错，数字会夸大。">这是它醒着的一面。日期归位，数字落回真值，句句可查。</span></p>
+    <div class="howto">
+      <p>在空白处按下并保持：指下浮出一枚<b>线轴</b>，一根<b>浸墨的线</b>自轴中向两侧放出，垂出浅浅弧度，醒面冷色随放线渗开，句子随线走到哪儿、换到哪儿。按满 <span class="mono">2200ms</span>，线被提起、松开——<b>弹墨</b>：整条墨线拍上页面，印出一条琥珀基准直线、溅起三点墨，全页真值落定，<b>闩锁在醒面</b>。</p>
+      <p>再按一次（<span class="mono">1300ms</span>，更短）：这次放出的是一根绷直的<b>干线</b>（虚线、无墨），按满即被收回线轴，梦面无痕落定；半途松手，线原样卷回轴中，面不改。轻点一下空白，线头轻弹即回，只算一次按压。键盘：焦点不在任何控件上时，<b>按住空格</b>同样成立。</p>
+    </div>
+  </header>
+
+  <div class="seam" aria-hidden="true"><i></i></div>
+
+  <section class="essay">
+    <span class="lead">随笔 · 其一</span>
+    <p>浅睡的人写字最诚实——字还没醒，替我先说了。只是梦里抄录的东西总有些走样：<span data-morph data-true="日期是 2026-09-19" data-dream="日期停在九月三十一日">日期是 2026-09-19</span>，连<span data-morph data-true="那只是只走快了的普通钟" data-dream="钟走到过 25:61">那只是只走快了的普通钟</span>也算梦的破绽。要紧的话我写了两遍，一遍给梦，一遍给醒。</p>
+  </section>
+
+  <p class="readout"><span data-morph data-true="已收录 4 篇随笔 · 3 个项目 · 纯静态站 · 2026-09-19 上线 ✓ 已校准" data-dream="已收录 12 篇随笔 · 9 个项目 · 1 场进行中的梦 ⚠ 漂移">已收录 4 篇随笔 · 3 个项目 · 纯静态站 · 2026-09-19 上线 ✓ 已校准</span></p>
+
+  <div class="actions">
+    <a href="https://github.com/Traveritas" target="_blank" rel="noopener">GitHub <span class="ar">→</span></a>
+    <button type="button">全部随笔 <span class="ar">→</span></button>
+  </div>
+
+  <div class="seam" aria-hidden="true"><i></i></div>
+
+  <footer>
+    <p class="f-morph"><span data-morph data-true="本页已通过一次现实检验" data-dream="本页在梦中建成">本页已通过一次现实检验</span></p>
+    <p class="f-mono">醒梦 XINGMENG · 长按检验机制稿 P8-LINE-A · 方案：弹墨</p>
+  </footer>
+</main>
+
+<!-- 特效层：墨线（SVG）· 印痕 · 墨溅 · 线轴 -->
+<div class="fx" aria-hidden="true">
+  <svg id="inkline">
+    <defs>
+      <linearGradient id="gGo" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="100" y2="0">
+        <stop offset="0" stop-color="#a7b1ba" stop-opacity="0"/>
+        <stop offset=".1" stop-color="#a7b1ba" stop-opacity=".42"/>
+        <stop offset=".5" stop-color="#d9a05b" stop-opacity=".95"/>
+        <stop offset=".9" stop-color="#a7b1ba" stop-opacity=".42"/>
+        <stop offset="1" stop-color="#a7b1ba" stop-opacity="0"/>
+      </linearGradient>
+      <linearGradient id="gBack" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="100" y2="0">
+        <stop offset="0" stop-color="#c2a382" stop-opacity="0"/>
+        <stop offset=".12" stop-color="#c2a382" stop-opacity=".26"/>
+        <stop offset=".5" stop-color="#d9a05b" stop-opacity=".55"/>
+        <stop offset=".88" stop-color="#c2a382" stop-opacity=".26"/>
+        <stop offset="1" stop-color="#c2a382" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+    <path id="strand" d=""/>
+  </svg>
+  <div id="print"><i></i></div>
+  <div id="splash"><i></i><i></i><i></i></div>
+  <div id="reel"><i class="rd"></i><i class="rr"></i></div>
+</div>
+
+<div class="grain" aria-hidden="true"></div>
+<div id="errbox" hidden></div>
+
+<script>
+(function(){
+'use strict';
+/* ---------- 错误捕获（最先注册） ---------- */
+window.addEventListener('error',function(e){
+  window.__swarmErr=(e&&e.message)||((e&&e.type)||'unknown');
+  var b=document.getElementById('errbox');
+  if(b){b.hidden=false;b.textContent='ERR '+window.__swarmErr;}
+});
+
+var docEl=document.documentElement,body=document.body;
+var RM=matchMedia('(prefers-reduced-motion: reduce)').matches;
+var qs=new URLSearchParams(location.search);
+
+/* ---------- 双色（c：0 = 梦面，1 = 醒面；lastC 门控：色值无变化则跳写） ---------- */
+function hx(h){return[parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)]}
+var F={
+  dream:{bg:hx('#171b24'),fg:hx('#e5e0d2'),soft:hx('#b9b3a4'),faint:hx('#837d70'),acc:hx('#c2a382'),ln:[229,224,210,.13],warm:.055,cool:.012},
+  wake:{bg:hx('#12161d'),fg:hx('#e9e5da'),soft:hx('#aeb4ba'),faint:hx('#77808a'),acc:hx('#a7b1ba'),ln:[169,179,190,.17],warm:.014,cool:.05}
+};
+function mx(a,b,t){return a+(b-a)*t}
+function mix3(a,b,t){return[Math.round(mx(a[0],b[0],t)),Math.round(mx(a[1],b[1],t)),Math.round(mx(a[2],b[2],t))]}
+function rgba(v,a){return'rgba('+v[0]+','+v[1]+','+v[2]+','+(a===undefined?1:a).toFixed(3)+')'}
+var lastC=-1;
+function setColors(cc){
+  if(Math.abs(cc-lastC)<.0004)return;
+  lastC=cc;
+  var d=F.dream,w=F.wake,s=docEl.style;
+  s.setProperty('--bg-now',rgba(mix3(d.bg,w.bg,cc)));
+  s.setProperty('--fg-now',rgba(mix3(d.fg,w.fg,cc)));
+  s.setProperty('--soft-now',rgba(mix3(d.soft,w.soft,cc)));
+  s.setProperty('--faint-now',rgba(mix3(d.faint,w.faint,cc)));
+  var acc=mix3(d.acc,w.acc,cc);
+  s.setProperty('--acc-now',rgba(acc));
+  s.setProperty('--morph-line',rgba(acc,.42));
+  s.setProperty('--line-now',rgba(mix3(d.ln,w.ln,cc),mx(d.ln[3],w.ln[3],cc)));
+  s.setProperty('--warm-op',mx(d.warm,w.warm,cc).toFixed(4));
+  s.setProperty('--cool-op',mx(d.cool,w.cool,cc).toFixed(4));
+}
+function forceColors(cc){lastC=-1;setColors(cc)}
+
+/* ---------- 乱码字（与 morph.ts 同族：渐进解出 + 看门狗；≤3 并发排队） ---------- */
+var POOL='醒梦之间夜深空site0123456789abcdefghijklmnopqrstuvwxyz·—';
+function eo3(t){return 1-Math.pow(1-t,3)}
+function eic(t){return t*t*t}
+function rnd(n){return Math.floor(Math.random()*n)}
+function renderStr(target,pp){
+  var n=Math.floor(pp*target.length),out='',i;
+  for(i=0;i<target.length;i++){
+    out+=i<n?target[i]:(Math.random()<.55?target[i]:POOL[rnd(POOL.length)]);
+  }
+  return out;
+}
+var scActive=0,scQ=[];
+function killScramble(el){if(el._kill)el._kill(true)}
+function morphTo(el,target,dur){
+  if(RM||dur<=0){killScramble(el);el.textContent=target;return}
+  scQ.push({el:el,target:target,dur:dur});
+  pumpScramble();
+}
+function pumpScramble(){
+  var guard=0;
+  while(scActive<3&&scQ.length&&guard++<64){
+    var job=scQ.shift();
+    startScramble(job.el,job.target,job.dur);
+  }
+}
+function startScramble(el,target,dur){
+  killScramble(el);
+  scActive++;
+  var done=false,t0=performance.now();
+  function fin(silent){
+    if(done)return;done=true;
+    if(el._raf){cancelAnimationFrame(el._raf);el._raf=0}
+    if(el._to){clearTimeout(el._to);el._to=0}
+    if(el._kill===fin)el._kill=null;
+    scActive--;
+    if(!silent)el.textContent=target;
+    pumpScramble();
+  }
+  el._kill=fin;
+  function step(now){
+    if(done)return;
+    var pp=Math.min(1,(now-t0)/dur);
+    el.textContent=renderStr(target,eo3(pp));
+    if(pp<1){el._raf=requestAnimationFrame(step)}else{fin()}
+  }
+  el._raf=requestAnimationFrame(step);
+  el._to=setTimeout(fin,dur+400); /* 看门狗：rAF 停转时按时落定 */
+}
+
+var morphs=[],nodes=document.querySelectorAll('[data-morph]'),i,el;
+for(i=0;i<nodes.length;i++){
+  el=nodes[i];
+  var tt=el.getAttribute('data-true')||el.textContent.trim();
+  var dd=el.getAttribute('data-dream')||tt;
+  if(!el.getAttribute('aria-label'))el.setAttribute('aria-label',tt);
+  morphs.push({el:el,t:tt,d:dd,flipped:false,dx:1e4});
+}
+function targetFace(){return dir==='go'?'t':'d'}
+function originFace(){return dir==='go'?'d':'t'}
+
+/* ---------- 墨线 / 线轴 / 印痕 / 墨溅 ---------- */
+var inkline=document.getElementById('inkline');
+var strand=document.getElementById('strand');
+var gGo=document.getElementById('gGo'),gBack=document.getElementById('gBack');
+var printEl=document.getElementById('print');
+var splash=document.getElementById('splash');
+var reel=document.getElementById('reel');
+var TH=-2*Math.PI/180,COS=Math.cos(TH),SIN=Math.sin(TH),TAN=Math.tan(TH);
+var px=Math.round(innerWidth/2),py=Math.round(innerHeight/2),hFull=600;
+
+function computeHFull(){
+  var hl=px/COS,hr=(innerWidth-px)/COS;
+  return Math.max(hl,hr)+80;
+}
+function setupStrand(){
+  inkline.setAttribute('width',String(innerWidth));
+  inkline.setAttribute('height',String(innerHeight));
+  var go=dir==='go',g=go?gGo:gBack;
+  g.setAttribute('x1',String(px-hFull));g.setAttribute('y1',String(py));
+  g.setAttribute('x2',String(px+hFull));g.setAttribute('y2',String(py));
+  strand.setAttribute('stroke',go?'url(#gGo)':'url(#gBack)');
+  strand.setAttribute('stroke-width',go?'1.5':'1.2');
+  if(go)strand.removeAttribute('stroke-dasharray');
+  else strand.setAttribute('stroke-dasharray','7 6');
+  strand.style.display='block';
+}
+/* 一根活线：三次贝塞尔近似垂弧（sag 为中点垂深，向下为正；提线时为负） */
+function drawStrand(h,sag,op,now,sway){
+  if(h<.5){strand.setAttribute('d','');return}
+  var xl=px-h*COS,yl=py-h*SIN,xr=px+h*COS,yr=py+h*SIN;
+  var d34=h*.62,D=sag*1.34,sw=sway||0;
+  var cy1=yl+d34*TAN+D,cy2=yr-d34*TAN+D;
+  strand.setAttribute('d',
+    'M'+xl.toFixed(1)+' '+yl.toFixed(1)+
+    ' C'+(xl+d34+sw).toFixed(1)+' '+cy1.toFixed(1)+
+    ' '+(xr-d34+sw).toFixed(1)+' '+cy2.toFixed(1)+
+    ' '+xr.toFixed(1)+' '+yr.toFixed(1));
+  strand.setAttribute('stroke-opacity',Math.max(0,Math.min(1,op)).toFixed(3));
+}
+function sagNow(h,now){
+  var m=Math.min(26,Math.max(10,innerHeight*.03)),k=h/hFull;
+  return (1.5+m*Math.pow(k,1.3))*(1+.06*Math.sin(now*.0021));
+}
+var toReel=0;
+function setReel(cls){
+  if(RM)return;
+  clearTimeout(toReel);
+  reel.style.transform='translate('+px+'px,'+py+'px)';
+  reel.className=cls?('on '+cls):'';
+  toReel=setTimeout(function(){reel.className=''},480);
+}
+function positionPrint(){
+  printEl.style.width=(hFull*2)+'px';
+  printEl.style.left=(px-hFull*COS)+'px';
+  printEl.style.top=(py-hFull*SIN-1)+'px';
+  printEl.style.transform='rotate(-2deg)';
+  splash.style.left=px+'px';
+  splash.style.top=py+'px';
+}
+var toFxReset=0;
+function fireContact(){
+  if(printedFired)return;printedFired=true;
+  if(dir==='go'){
+    printEl.className='on';
+    splash.className='on';
+    setReel('fade');
+    clearTimeout(toFxReset);
+    toFxReset=setTimeout(function(){printEl.className='';splash.className=''},840);
+  }
+}
+
+/* ---------- 状态机 ---------- */
+var T_GO=2200,T_BACK=1300,CLICK_MS=240,RETRACT_MS=520,CGATE=.92;
+var reality='wake',mode='boot',dir='go',src=null,pid=null,p=0,c=1,clicks=0;
+var holdT0=0,pressT0=0,scrollMark=0;
+var retractT0=0,retractFrom=0,retractDur=0;
+var clickT0=0,clickFrom=0;
+var freezeT0=0,printedFired=false,settleFrom=1,settleTo=1;
+var toHold=0,toRetract=0,toClick=0,toClean=0,toFire=0;
+
+function measureMorphs(){
+  for(var k=0;k<morphs.length;k++){
+    var m=morphs[k],r=m.el.getBoundingClientRect();
+    m.dx=Math.max(14,Math.abs((r.left+r.width/2-px)*COS+(r.top+r.height/2-py)*SIN));
+    m.flipped=false;
+  }
+}
+function tickMorphs(h){
+  var tf=targetFace(),of=originFace();
+  for(var k=0;k<morphs.length;k++){
+    var m=morphs[k];
+    if(!m.flipped&&h>=m.dx){m.flipped=true;morphTo(m.el,m[tf],320)}
+    else if(m.flipped&&h<m.dx-8){m.flipped=false;morphTo(m.el,m[of],240)}
+  }
+}
+function flipToTargetFace(instant){
+  var tf=targetFace();
+  for(var k=0;k<morphs.length;k++){
+    var m=morphs[k];
+    if(m.flipped&&!instant)continue;
+    m.flipped=true;
+    morphTo(m.el,m[tf],instant?0:340);
+  }
+}
+function restoreOriginFace(){
+  var of=originFace();
+  for(var k=0;k<morphs.length;k++){
+    var m=morphs[k];
+    if(m.flipped){m.flipped=false;morphTo(m.el,m[of],180)}
+  }
+}
+
+function beginHold(x,y,fromSrc){
+  var now=performance.now();
+  if(mode!=='idle'){
+    /* 定格收尾 480ms 后可被打断（印痕已在淡出途中） */
+    if(mode==='freeze'&&now-freezeT0>480){forceClean()}
+    else{return}
+  }
+  mode='hold';src=fromSrc;
+  dir=reality==='dream'?'go':'back';
+  px=x;py=y;p=0;holdT0=now;pressT0=now;scrollMark=scrollY;
+  for(var k=0;k<morphs.length;k++){
+    var m=morphs[k];
+    if(m.el._enterT){clearTimeout(m.el._enterT);m.el._enterT=0}
+  }
+  measureMorphs(); /* 几何只在按下时测 */
+  hFull=computeHFull();
+  body.classList.add('holding');
+  if(!RM){
+    setupStrand();
+    setReel('on');
+    drawStrand(0,0,0,now,0);
+  }
+  clearTimeout(toHold);
+  toHold=setTimeout(function(){if(mode==='hold')latch()},(dir==='go'?T_GO:T_BACK)+100);
+}
+function releaseHold(){
+  if(mode!=='hold')return;
+  clearTimeout(toHold);
+  mode='retract';src=null;pid=null;
+  body.classList.remove('holding');
+  retractT0=performance.now();
+  retractFrom=p;
+  retractDur=Math.min(RETRACT_MS,180+p*360);
+  if(RM){finishRetract();return}
+  clearTimeout(toRetract);
+  toRetract=setTimeout(function(){if(mode==='retract')finishRetract()},retractDur+140);
+}
+function doClick(){
+  if(mode!=='hold')return;
+  clearTimeout(toHold);
+  clicks++;
+  mode='click';src=null;pid=null;
+  body.classList.remove('holding');
+  clickT0=performance.now();
+  clickFrom=p;
+  setReel('tick');
+  if(RM){finishClick();return}
+  clearTimeout(toClick);
+  toClick=setTimeout(function(){if(mode==='click')finishClick()},260);
+}
+function latch(){
+  if(mode!=='hold')return;
+  clearTimeout(toHold);
+  mode='freeze';src=null;pid=null;
+  body.classList.remove('holding');
+  reality=dir==='go'?'wake':'dream';
+  body.setAttribute('data-reality',reality);
+  flipToTargetFace(RM);
+  settleFrom=dir==='go'?CGATE:1-CGATE;
+  settleTo=dir==='go'?1:0;
+  freezeT0=performance.now();
+  printedFired=false;
+  if(RM){
+    c=settleTo;forceColors(c);
+    strand.style.display='none';
+    mode='idle';p=0;
+    return;
+  }
+  if(dir==='go')positionPrint();
+  clearTimeout(toClean);clearTimeout(toFire);
+  toFire=setTimeout(function(){if(mode==='freeze')fireContact()},170);
+  toClean=setTimeout(function(){if(mode==='freeze')forceClean()},dir==='go'?920:700);
+}
+function finishRetract(){
+  mode='idle';p=0;
+  clearTimeout(toRetract);
+  strand.style.display='none';
+  restoreOriginFace();
+  setReel('seat');
+}
+function finishClick(){
+  mode='idle';p=0;
+  clearTimeout(toClick);
+  strand.style.display='none';
+  tickMorphs(0);
+  c=dir==='go'?0:1;forceColors(c);
+}
+function forceClean(){
+  mode='idle';p=0;
+  clearTimeout(toClean);clearTimeout(toFire);
+  c=settleTo;forceColors(c);
+  strand.style.display='none';
+  if(printedFired&&dir==='go'&&(printEl.className==='on'||splash.className==='on')){
+    printEl.className='out';splash.className='out';
+    clearTimeout(toFxReset);
+    toFxReset=setTimeout(function(){printEl.className='';splash.className=''},160);
+  }else{
+    printEl.className='';splash.className='';
+  }
+  if(reel.className==='on'||reel.className==='on fade')setReel('fade');
+}
+
+/* ---------- 帧循环（单 rAF；每帧变量写入 ≤11） ---------- */
+function frameHold(now){
+  var T=dir==='go'?T_GO:T_BACK;
+  p=Math.min(1,(now-holdT0)/T);
+  if(RM){if(p>=1)latch();return}
+  c=dir==='go'?p*CGATE:1-p*CGATE;
+  setColors(c);
+  var go=dir==='go',h=p*hFull;
+  drawStrand(h,go?sagNow(h,now):0,go?(.35+.6*p):(.5+.15*p),now,go?2.5:0);
+  tickMorphs(h);
+  if(p>=1)latch();
+}
+function frameRetract(now){
+  var kk=Math.min(1,(now-retractT0)/retractDur);
+  p=retractFrom*(1-eo3(kk));
+  c=dir==='go'?p*CGATE:1-p*CGATE;
+  setColors(c);
+  var go=dir==='go',h=p*hFull;
+  drawStrand(h,go?sagNow(h,now):0,(go?(.35+.6*p):(.5+.15*p))*(.25+.75*p),now,go?2.5:0);
+  tickMorphs(h);
+  if(kk>=1)finishRetract();
+}
+function frameClick(now){
+  var kk=Math.min(1,(now-clickT0)/130);
+  p=clickFrom*(1-eo3(kk));
+  c=dir==='go'?p*CGATE:1-p*CGATE;
+  setColors(c);
+  var go=dir==='go',h=p*hFull;
+  drawStrand(h,go?sagNow(h,now)*.6:0,(go?.6:.5)*(1-kk),now,1.5);
+  tickMorphs(h);
+  if(kk>=1)finishClick();
+}
+function frameFreeze(now){
+  var ft=now-freezeT0;
+  if(dir==='go'){
+    /* 提线 70ms → 回弹 80ms 拍线（触页 150ms）→ 抖回线轴（240–520ms） */
+    if(ft<150)c=settleFrom;
+    else c=settleFrom+(settleTo-settleFrom)*eo3(Math.min(1,(ft-150)/120));
+    setColors(c);
+    var lift=Math.min(10,py-6),sag,h=hFull,op;
+    if(ft<70){sag=-lift*eo3(ft/70);op=.55+.4*(ft/70)}
+    else if(ft<150){sag=-lift*(1-eic((ft-70)/80));op=.95}
+    else{
+      if(!printedFired)fireContact();
+      var t2=(ft-150)/1000;
+      sag=2.6*Math.exp(-5.5*t2)*Math.sin(13*t2);
+      op=.95;
+    }
+    if(ft>=240){
+      var w=eic(Math.min(1,(ft-240)/280));
+      h=hFull*(1-w);op=.95*(1-w);
+    }
+    drawStrand(h,sag,op,now,0);
+    if(ft>=520&&strand.style.display!=='none')strand.style.display='none';
+    if(ft>=860)forceClean();
+  }else{
+    /* 回梦：干线静默收卷，无印无溅 */
+    if(ft<60){
+      c=settleFrom;setColors(c);
+      drawStrand(hFull,0,.55+.15*(ft/60),now,0);
+    }else{
+      c=settleFrom+(settleTo-settleFrom)*eo3(Math.min(1,(ft-60)/240));
+      setColors(c);
+      var w2=eic(Math.min(1,(ft-60)/320));
+      drawStrand(hFull*(1-w2),0,Math.max(0,.65*(1-w2*.9)),now,0);
+      if(!printedFired&&ft>=380){printedFired=true;setReel('blink')}
+      if(ft>=420&&strand.style.display!=='none')strand.style.display='none';
+    }
+    if(ft>=640)forceClean();
+  }
+}
+var dts=[],costs=[],lastLoop=0;
+function loop(now){
+  var w0=performance.now();
+  if(lastLoop)dts.push(now-lastLoop);
+  if(dts.length>90)dts.shift();
+  lastLoop=now;
+  if(mode==='hold')frameHold(now);
+  else if(mode==='retract')frameRetract(now);
+  else if(mode==='click')frameClick(now);
+  else if(mode==='freeze'&&!RM)frameFreeze(now);
+  costs.push(performance.now()-w0);
+  if(costs.length>90)costs.shift();
+  requestAnimationFrame(loop);
+}
+
+/* ---------- 手势：空白处长按（指针） ---------- */
+var EXCLUDE='a,button,input,textarea,select,label,summary,[contenteditable],h1,h2,h3,h4,h5,h6,p,li,blockquote,figcaption,dt,dd,time,code,pre,[data-morph],[data-nofx]';
+var startX=0,startY=0;
+document.addEventListener('pointerdown',function(e){
+  if(e.button!==undefined&&e.button!==0)return;
+  var t=e.target;
+  if(t&&t.closest&&t.closest(EXCLUDE))return;
+  if(src!==null)return;
+  pid=e.pointerId;
+  startX=e.clientX;startY=e.clientY;
+  beginHold(e.clientX,e.clientY,'ptr');
+});
+document.addEventListener('pointermove',function(e){
+  if(mode!=='hold'||src!=='ptr'||e.pointerId!==pid)return;
+  if(Math.hypot(e.clientX-startX,e.clientY-startY)>20)releaseHold();
+});
+function onPtrEnd(e){
+  if(mode!=='hold'||src!=='ptr'||e.pointerId!==pid)return;
+  if(performance.now()-pressT0<=CLICK_MS)doClick();
+  else releaseHold();
+}
+document.addEventListener('pointerup',onPtrEnd);
+document.addEventListener('pointercancel',function(e){
+  if(mode!=='hold'||src!=='ptr'||e.pointerId!==pid)return;
+  releaseHold();
+});
+addEventListener('scroll',function(){
+  if(mode==='hold'&&Math.abs(scrollY-scrollMark)>4)releaseHold();
+},{passive:true});
+addEventListener('resize',function(){if(mode==='hold')releaseHold()});
+document.addEventListener('visibilitychange',function(){
+  if(document.hidden&&mode==='hold')releaseHold();
+});
+document.addEventListener('contextmenu',function(e){
+  if(body.classList.contains('holding'))e.preventDefault();
+});
+addEventListener('blur',function(){if(mode==='hold')releaseHold()});
+
+/* ---------- 手势：键盘空格（焦点不在交互件时） ---------- */
+var KBD_DENY='a,button,input,textarea,select,summary,[contenteditable],[data-nofx]';
+document.addEventListener('keydown',function(e){
+  if(e.code!=='Space'||e.repeat)return;
+  var ae=document.activeElement;
+  if(ae&&ae.closest&&ae.closest(KBD_DENY))return;
+  e.preventDefault();
+  if(src!==null)return;
+  beginHold(Math.round(innerWidth/2),Math.round(innerHeight/2),'kb');
+});
+document.addEventListener('keyup',function(e){
+  if(e.code!=='Space'||mode!=='hold'||src!=='kb')return;
+  if(performance.now()-pressT0<=CLICK_MS)doClick();
+  else releaseHold();
+});
+
+/* ---------- 启动 ---------- */
+function setTexts(faceKey){
+  for(var k=0;k<morphs.length;k++){
+    var m=morphs[k];
+    m.flipped=(faceKey==='t');
+    m.el.textContent=faceKey==='t'?m.t:m.d;
+  }
+}
+function armFreezeFallbacks(){
+  clearTimeout(toFire);clearTimeout(toClean);
+  toFire=setTimeout(function(){if(mode==='freeze')fireContact()},170);
+  toClean=setTimeout(function(){if(mode==='freeze')forceClean()},dir==='go'?920:700);
+}
+function boot(){
+  var q=qs.get('wake')==='1'?'wake':(qs.get('dream')==='1'?'dream':null);
+  if(q){
+    var isWake=q==='wake';
+    reality=q;dir=isWake?'go':'back';
+    px=Math.round(innerWidth/2);py=Math.round(innerHeight/2);
+    hFull=computeHFull();
+    /* 先置闩锁态（真值文字 + data-reality + 配色就位），再播一遍定格 */
+    setTexts(isWake?'t':'d');
+    body.setAttribute('data-reality',reality);
+    p=1;
+    if(!RM){
+      c=isWake?CGATE:1-CGATE;
+      forceColors(c);
+      setupStrand();
+      if(isWake)positionPrint();
+      freezeT0=performance.now();printedFired=false;
+      settleFrom=c;settleTo=isWake?1:0;
+      mode='freeze';
+      armFreezeFallbacks();
+    }else{
+      c=isWake?1:0;forceColors(c);
+      mode='idle';p=0;
+    }
+  }else if(RM){
+    reality='wake';c=1;forceColors(1);
+    setTexts('t');
+    mode='idle';
+  }else{
+    reality='dream';c=0;forceColors(0);
+    setTexts('d');
+    for(var k=0;k<morphs.length;k++){
+      (function(m,j){
+        m.el._enterT=setTimeout(function(){morphTo(m.el,m.d,460)},140+j*70);
+      })(morphs[k],k);
+    }
+    mode='idle';
+  }
+  body.setAttribute('data-reality',reality);
+}
+boot();
+requestAnimationFrame(loop);
+
+/* ---------- 调试接口 ---------- */
+window.__fx={
+  state:function(){
+    return{reality:reality,holding:mode==='hold',progress:+p.toFixed(3)};
+  },
+  perf:function(){
+    var s=0,i;
+    if(dts.length){for(i=0;i<dts.length;i++)s+=dts[i];s/=dts.length}
+    var ms=0;
+    if(costs.length){for(i=0;i<costs.length;i++)ms+=costs[i];ms/=costs.length}
+    return{fps:s>0?Math.min(121,Math.round(1000/s)):0,avgMs:+ms.toFixed(3)};
+  },
+  get clicks(){return clicks}
+};
+})();
+</script>
+</body>
+</html>
