@@ -260,10 +260,10 @@ function flipDualsByThread(half: number) {
   for (const d of getDuals()) {
     if (!d.flipped && half >= d.dx) {
       d.flipped = true;
-      morphText(d.el, targetFace() === 'wake' ? d.wake : d.dream, 320);
+      morphText(d.el, targetFace() === 'wake' ? d.wake : d.dream, 660);
     } else if (d.flipped && half < d.dx - 8) {
       d.flipped = false;
-      morphText(d.el, targetFace() === 'wake' ? d.dream : d.wake, 240);
+      morphText(d.el, targetFace() === 'wake' ? d.dream : d.wake, 480);
     }
   }
 }
@@ -279,7 +279,7 @@ function flipAllDuals(instant: boolean) {
       // 可见的乱码过渡；屏外的直接落定（省 rAF）
       const r = d.el.getBoundingClientRect();
       const onscreen = r.bottom > 0 && r.top < innerHeight && r.width > 0;
-      morphText(d.el, face === 'wake' ? d.wake : d.dream, onscreen ? 340 : 0);
+      morphText(d.el, face === 'wake' ? d.wake : d.dream, onscreen ? 700 : 0);
     }
   }
 }
@@ -288,7 +288,7 @@ function restoreDuals() {
   for (const d of getDuals()) {
     if (d.flipped) {
       d.flipped = false;
-      morphText(d.el, face === 'wake' ? d.wake : d.dream, 180);
+      morphText(d.el, face === 'wake' ? d.wake : d.dream, 400);
     }
   }
 }
@@ -568,7 +568,7 @@ function enterDream() {
     if (r.bottom > 0 && r.top < innerHeight && r.width > 0) vis.push(d);
   }
   vis.forEach((d, j) => {
-    setTimeout(() => morphText(d.el, d.dream, 460), 260 + j * 90);
+    setTimeout(() => morphText(d.el, d.dream, 820), 260 + j * 120);
   });
   const visSet = new Set(vis);
   for (const d of duals) if (!visSet.has(d)) morphText(d.el, d.dream, 0);
