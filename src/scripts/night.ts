@@ -6,6 +6,7 @@
 import {
   SECTIONS,
   PALETTE,
+  STAGE_MS,
   NIGHT_LEN,
   STAGE_INFO,
   stageAt,
@@ -51,12 +52,14 @@ function minuteAt(): number {
   return NIGHT_LEN;
 }
 
-/** 阶段式取色：m 落在哪一格就用哪一站的整组三色——睡眠分期本就离散；
-    连续插值会在过渡带出现深墨配灰底的不可读瞬间（成对设计的对比被稀释） */
+/** 阶段式取色：m 落在哪个阶段区间，就用该区间锚站的整组三色——
+    「长段稳定＋少数几次快速换站」，杜绝连续插值的不可读过渡带，
+    也避免逐停靠点密集换站读起来像加速渐变 */
 function paletteAt(m: number): { bg: string; ink: string; soft: string } {
-  let i = 0;
-  while (i < PALETTE.length - 1 && m >= PALETTE[i + 1].m) i++;
-  return PALETTE[i];
+  let i = STAGE_MS.length - 1;
+  while (i > 0 && m < STAGE_MS[i]) i--;
+  const target = STAGE_MS[i];
+  return PALETTE.find((p) => p.m === target) ?? PALETTE[0];
 }
 
 let railDot: HTMLElement | null = null;

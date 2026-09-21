@@ -59,7 +59,7 @@ export const PALETTE = [
   { m: 16, bg: '#c9ced4', ink: '#2c333b', soft: '#5d6670' },
   { m: 34, bg: '#99a1ab', ink: '#333b43', soft: '#6a737c' },
   { m: 48, bg: '#525a66', ink: '#d9d4c8', soft: '#b4ae9f' },
-  { m: 62, bg: '#414a58', ink: '#d9d4c8', soft: '#b4ae9f' },
+  { m: 62, bg: '#414a58', ink: '#d9d4c8', soft: '#b9b3a4' },
   { m: 78, bg: '#22272f', ink: '#e5e0d2', soft: '#b9b3a4' },
   { m: 100, bg: '#171b24', ink: '#e5e0d2', soft: '#b9b3a4' },
   { m: 330, bg: '#171b24', ink: '#e5e0d2', soft: '#b9b3a4' },
@@ -70,6 +70,11 @@ export const PALETTE = [
   { m: 424, bg: '#cbc4b6', ink: '#5d564a', soft: '#7a7364' },
   { m: 444, bg: '#efe9dd', ink: '#55503f', soft: '#7a7364' },
 ];
+
+/** 阶段锚站：阶跃只在这些整站之间发生，其余停靠点弃用——
+    滚动节奏为「长段稳定＋少数几次快速换站」：入夜三站（昼→暮灰→夜蓝）
+    → 深夜一长站（随笔尾＋项目＋异相全程）→ 黎明三站（暖暗→灰白→纸色） */
+export const STAGE_MS = [0, 34, 62, 100, 394, 412, 424, 444];
 
 /* ── 轨图几何（SVG viewBox 48 × 300；时间向下） ── */
 export const HY_W = 48;
