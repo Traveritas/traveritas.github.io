@@ -11,7 +11,7 @@ const DEG = (14 * Math.PI) / 180;
 const DX = Math.cos(DEG);
 const DY = Math.sin(DEG);
 
-/** 每站沿线的增量：针脚越走越远 */
+/** 每站沿线的增量：刻度锚点越走越远 */
 const SPREAD = 0.115;
 /** 停靠点附近沿线游走的幅度（线宽分数） */
 const WANDER = 0.05;

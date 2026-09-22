@@ -5,8 +5,8 @@ date: 2026-09-19
 status: 进行中
 cover: https://picsum.photos/seed/xingmeng-site/800/500
 note:
-  awake: 深眠里的项目不浮动——它只是很慢地成为自己。此案缝到第五针，其余三针等天亮再缝。
-  dream: 深眠里的项目不浮动——它只是还没醒。第五针之后，针脚会自己走进梦里。
+  awake: 沉在深处的事物并不浮躁，它只是很慢地聚集成形。已至第五阶，余下的等天亮后再予确证。
+  dream: “如果不能描述一个世界，那就建造一个——越过第五层浅滩之后，代码会自己变成透明的落雪。”
 links:
   - label: GitHub 仓库
     href: https://github.com/Traveritas/traveritas.github.io

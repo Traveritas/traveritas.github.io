@@ -1,9 +1,9 @@
 /* ─────────────────────────────────────────────────────────────
-   开屏 · 校准·穿针（两档最短停留）
-   · 首次进入（每会话一次）：全套校准·穿针，揭幕前至少停留 3s
-     （方波 1.5s → 收线 → 落针 → 揭幕）。
-   · 站内切换（同会话后续页面）：快版穿针，至少停留 1s
-     （方波压缩到 0.5s，直接进穿针段）。
+   开屏 · 意识调频（两档最短停留）
+   · 首次进入（每会话一次）：全套基线校准，揭幕前至少停留 3s
+     （方波 1.5s → 聚合基线 → 坐标落定 → 揭幕）。
+   · 站内切换（同会话后续页面）：快版调频，至少停留 1s
+     （方波压缩到 0.5s，直接进基线校准段）。
    · 两档都不可跳过；reduced-motion / 无 JS 直接进页
      （无 JS 时靠 CSS 兜底动画自动揭幕）。
    ───────────────────────────────────────────────────────────── */
@@ -65,7 +65,7 @@ export function initBoot() {
   };
 
   if (seen) {
-    // 站内切换：快版穿针，≥1s
+    // 站内切换：快版调频，≥1s
     veil.classList.add('ph-fast');
     runCount(900);
     setTimeout(() => veil.classList.add('ph-thread'), 430);
@@ -73,7 +73,7 @@ export function initBoot() {
     setTimeout(() => veil.classList.add('ph-stitch'), 820);
     settle(900, 1050);
   } else {
-    // 首次进入：全套校准·穿针，≥3s
+    // 首次进入：全套基准校准，≥3s
     runCount(1500);
     setTimeout(() => veil.classList.add('ph-thread'), 1500);
     setTimeout(() => veil.classList.add('ph-needle'), 1950);
