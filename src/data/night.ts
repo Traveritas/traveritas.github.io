@@ -1,7 +1,7 @@
 /* ─────────────────────────────────────────────────────────────
-   一夜的数据源（服务端渲染轨图与客户端插值共用）
+   一夜的数据源（服务端渲染轨图与客户端推进时钟共用）
    23:07 入睡 → 06:31 天亮，共 444 分钟。
-   主页滚动即过夜：段落按睡眠深度驻扎。
+   主页滚动即过夜：段落按睡眠深度驻扎，底色分三段平台。
    ───────────────────────────────────────────────────────────── */
 
 export const NIGHT_START_MIN = 23 * 60 + 7; // 1387
@@ -53,25 +53,71 @@ export const SECTIONS = [
   { id: 'ns-dawn', from: 352, to: 444 },
 ] as const;
 
-/** 昼夜色板停靠点（分钟 → 页面三色）
-   约定：每一站 ink/soft 对（7% 洗染后）bg ≥4.5:1——可停留位置必须可读。
-   两个换面窗（m34→41 熄天开灯、m388→395 关灯见晨）内 ink 从深翻浅，
-   必然途经与 bg 亮度重合的瞬间，由 night.ts 的对比度护栏兜底 ≥3.4。 */
-export const PALETTE = [
-  { m: 0, bg: '#e9ecef', ink: '#262c33', soft: '#59626c' },
-  { m: 16, bg: '#c9ced4', ink: '#262c33', soft: '#4a525c' },
-  { m: 34, bg: '#99a1ab', ink: '#262c33', soft: '#2a3037' },
-  { m: 41, bg: '#1d222c', ink: '#ece7d9', soft: '#c8c2b4' },
-  { m: 100, bg: '#171b24', ink: '#e5e0d2', soft: '#b9b3a4' },
-  { m: 330, bg: '#171b24', ink: '#e5e0d2', soft: '#b9b3a4' },
-  { m: 352, bg: '#231e26', ink: '#e5e0d2', soft: '#b9b3a4' },
-  { m: 373, bg: '#3a3340', ink: '#e5e0d2', soft: '#b9b3a4' },
-  { m: 388, bg: '#453c42', ink: '#e5e0d2', soft: '#b9b3a4' },
-  { m: 395, bg: '#a39a8b', ink: '#2e2a22', soft: '#332f27' },
-  { m: 412, bg: '#b3aa9a', ink: '#2e2a22', soft: '#403a30' },
-  { m: 424, bg: '#cbc4b6', ink: '#2e2a22', soft: '#403a30' },
-  { m: 444, bg: '#efe9dd', ink: '#55503f', soft: '#665f50' },
+/* ── 过夜色板：三段平台 ──────────────────────────────────────
+   页面底色不再随滚动连续漂移：全程只有三个稳定状态，颜色只在两次
+   换面（熄灯 / 见晨）时改变。三段落位：光面＝入夜·初刻（首屏千层纸的
+   上半程）；夜面＝首屏下半程 → 浅梦·随笔 → 深眠·项目 → 异相·试验场；
+   纸面＝晨醒·关于后半程。首屏横跨两段，故「千层纸」有昼/夜两套外观，
+   两套都须可读（普查槽位：首屏顶、首屏腰·暗面）。
+   三次取色都取自上一版 13 站色板中已校准的站点，故每段的 ink/soft 对
+   （7% 洗染后、梦/醒两态取小）bg 均 ≥4.5:1——平台是读者会久留的地方，
+   必须整段可读。校验：design/.calib-night.cjs
+   两次换面由全屏幕布盖住（components/chrome/NightVeil.astro）：四色在
+   「全遮」的那一拍里一次换掉，所以不存在 bg 与 ink 亮度交错、半途
+   谁也读不清的过渡态。 */
+
+type SectionId = (typeof SECTIONS)[number]['id'];
+
+export interface Zone {
+  name: 'light' | 'deep' | 'paper';
+  bg: string;
+  ink: string;
+  soft: string;
+  /** 与 ink 同色、0.16 的器线（--line） */
+  line: string;
+  /** 进入本段的时机：enter.section 的段顶到达视口 enter.vh 处即换面。
+      正值＝还没进场（如 0.85：段顶在视口下缘）——比 SECTIONS 的锚点
+      （段顶到视口中心）早，免得换面正压在段首 StitchHeader 上；
+      负值＝段顶已越过视口顶端（如 -0.12：上一屏彻底离场后才换）。
+      首段为 null。 */
+  enter: { section: SectionId; vh: number } | null;
+}
+
+export const ZONES: Zone[] = [
+  {
+    name: 'light',
+    bg: '#e9ecef',
+    ink: '#262c33',
+    soft: '#59626c',
+    line: 'rgba(38, 44, 51, 0.16)',
+    enter: null,
+  },
+  {
+    name: 'deep',
+    bg: '#171b24',
+    ink: '#e5e0d2',
+    soft: '#b9b3a4',
+    line: 'rgba(229, 224, 210, 0.16)',
+    // 熄灯在「随笔段顶走到视口 38%」处（比首屏完全离场早约半屏）：
+    // 此时 hero 的千层纸仍有大半在屏，纸面（color-mix(--bg …) 派生）与
+    // 纸上文字会一起翻到夜面——首屏因此也有一套「夜面版」需要可读
+    // （普查槽位「首屏腰·暗面」就是守它的）。
+    enter: { section: 'ns-essays', vh: 0.38 },
+  },
+  {
+    name: 'paper',
+    bg: '#efe9dd',
+    ink: '#55503f',
+    soft: '#665f50',
+    line: 'rgba(85, 80, 63, 0.16)',
+    // 见晨在「关于段顶走到视口中央」——正是 SECTIONS 的段锚点、
+    // StitchHeader 所在，比原先的 85% 滞后约 1/3 屏
+    enter: { section: 'ns-dawn', vh: 0.5 },
+  },
 ];
+
+/** 换面滞回（滚动像素）：读者停在边界上来回蹭时不反复重放淡变 */
+export const ZONE_HYSTERESIS = 120;
 
 /* ── 轨图几何（SVG viewBox 48 × 300；时间向下） ── */
 export const HY_W = 48;

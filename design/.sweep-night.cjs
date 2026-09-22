@@ -1,7 +1,10 @@
-// 夜读性活体扫描：token 密集扫 + 逐段全量元素普查（含透明背景合成）
+// 夜读性活体扫描：token 密集扫 + 换面两侧静稳态 + 逐段全量元素普查（含透明背景合成）
+// 换面已改为全屏幕布（NightVeil）下瞬时换色，A 段正常情况下不该再有任何低值带：
+// 出现带＝有元素在某处沉底，回 B/C 定位。
 // 用法：node design/.sweep-night.cjs [port]
 const { spawn } = require('child_process');
 const http = require('http');
+const fs = require('fs');
 const path = require('path');
 const PORT_ARG = process.argv[2] || '4416';
 const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
@@ -119,7 +122,7 @@ const getJSON = (u) =>
       return bg;
     };
     const opMul = (el) => { let o = 1; for (let n = el; n && n !== document.body; n = n.parentElement) o *= getComputedStyle(n).opacity; return o; };
-    return { parse, lum, ratio, effBg, opMul };
+    return { parse, lum, ratio, effBg, opMul, over };
   })();`);
 
   // ── A. token 密集扫描（--fg/--fg-soft 对 body 实底）──
@@ -148,35 +151,39 @@ const getJSON = (u) =>
   const fmtB = (bs) => bs.map((b) => `步${b.to}(≈${b.pct}%)↓${b.min.toFixed(2)}`).join(' ');
   if (tokenSweep.fgBands.length) console.log('   fg<4.5 带: ' + fmtB(tokenSweep.fgBands));
   if (tokenSweep.softBands.length) console.log('   soft<4.5 带: ' + fmtB(tokenSweep.softBands));
+  if (tokenSweep.fgBands.length || tokenSweep.softBands.length)
+    console.log('   （换面是全屏幕布下瞬时换色，没有过渡态；出现低值带即真有元素沉底，看 B/C 定位）');
 
-  // ── B. 换面窗中点护栏验证（m≈36.5 与 m≈391.5 的 scrollY）──
-  const guardProbe = await ev(`(async () => {
-    const secs = ['ns-hero','ns-essays','ns-projects','ns-rem','ns-dawn'];
+  // ── B. 换面两侧静稳态：触发点前/后各停一次，等淡变落定 ──
+  // 换面边界从 src/data/night.ts 的 ZONES 解析（别手抄，会随设计漂移）
+  const nightSrc = fs.readFileSync(path.join(__dirname, '../src/data/night.ts'), 'utf8');
+  const ZBLOCK = /ZONES[^=]*=\s*\[([\s\S]*?)\]\s*;/.exec(nightSrc);
+  const CROSSINGS = [
+    ...(ZBLOCK ? ZBLOCK[1].matchAll(/enter:\s*\{\s*section:\s*'([a-z-]+)',\s*vh:\s*(-?[\d.]+)\s*\}/g) : []),
+  ].map((m) => ({ section: m[1], vh: +m[2] }));
+  const zoneProbe = await ev(`(async () => {
     const vh = innerHeight;
-    const anchors = [];
-    for (const id of secs) { const el = document.getElementById(id); if (el) anchors.push({ x: el.getBoundingClientRect().top + scrollY - vh / 2, m: +id === 0 ? 0 : 0 }); }
-    // 用 SECTIONS 的 from：hero=0, essays=12, projects=124, rem=181, dawn=352
-    const from = [0, 12, 124, 181, 352];
-    anchors.forEach((a, i) => (a.m = from[i]));
-    anchors.push({ x: Math.max(document.documentElement.scrollHeight - vh, 1), m: 444 });
-    anchors.sort((a, b) => a.x - b.x);
-    const yAt = (m) => { for (let i = 0; i < anchors.length - 1; i++) { const a = anchors[i], b = anchors[i + 1]; if (m >= a.m && m <= b.m) return a.x + (b.x - a.x) * (m - a.m) / Math.max(b.m - a.m, 1); } return anchors[anchors.length - 1].x; };
+    const crossings = ${JSON.stringify(CROSSINGS)};
+    const trig = crossings.map((c) => document.getElementById(c.section).getBoundingClientRect().top + scrollY - vh * c.vh);
     const out = [];
-    for (const m of [33, 35, 36.5, 38, 40, 386, 389, 391.5, 394]) {
-      scrollTo({ top: yAt(m), behavior: 'instant' });
-      await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 60)));
-      const cs = getComputedStyle(document.documentElement);
-      const bgr = __tools.parse(getComputedStyle(document.body).backgroundColor);
-      const fg = __tools.parse(getComputedStyle(document.body).color), soft = __tools.parse(cs.getPropertyValue('--fg-soft'));
-      out.push('m' + m + ': fg ' + __tools.ratio(fg, bgr).toFixed(2) + ' soft ' + __tools.ratio(soft, bgr).toFixed(2) + ' bg ' + getComputedStyle(document.body).backgroundColor);
+    for (const t of trig) {
+      for (const d of [-250, 250]) {
+        scrollTo({ top: Math.max(t + d, 0), behavior: 'instant' });
+        await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 450)));
+        const cs = getComputedStyle(document.documentElement);
+        const bgr = __tools.parse(getComputedStyle(document.body).backgroundColor);
+        const fg = __tools.parse(getComputedStyle(document.body).color), soft = __tools.parse(cs.getPropertyValue('--fg-soft'));
+        out.push((d < 0 ? '前' : '后') + ' y' + Math.round(t + d) + ' [' + document.body.dataset.zone + ']' +
+          ' fg ' + __tools.ratio(fg, bgr).toFixed(2) + ' soft ' + __tools.ratio(soft, bgr).toFixed(2));
+      }
     }
     return out.join('\\n   ');
   })()`);
-  console.log('B. 换面窗护栏点位:\n   ' + guardProbe);
+  console.log('B. 换面两侧静稳态（淡变落定后）:\n   ' + zoneProbe);
 
   // ── C. 逐段元素普查（全量可见文本元素，含祖先透明合成与 opacity）──
   const SLOTS = [
-    ['首屏顶', 0], ['随笔段', 0.28], ['台账段', 0.45], ['试验场', 0.62], ['晨醒段', 0.86], ['深夜', 0.5],
+    ['首屏顶', 0], ['首屏腰·暗面', 0.13], ['随笔段', 0.28], ['台账段', 0.45], ['试验场', 0.62], ['晨醒段', 0.86], ['深夜', 0.5],
   ];
   for (const [name, pct] of SLOTS) {
     const res = await ev(`(async () => {
@@ -196,10 +203,11 @@ const getJSON = (u) =>
         if (r.bottom < 60 || r.top > innerHeight - 60 || r.width < 4) continue;
         const f = __tools.parse(cs.color);
         if (!f) continue;
-        const fEff = { ...f };
         const o = __tools.opMul(el);
-        if (o < 0.98) continue; // 近隐层跳过（漂移装饰）
+        if (o < 0.15) continue; // 真·隐形才跳过；半隐（纸面墨字/漂移装饰）按合成后的实际对比度算
         const bg = __tools.effBg(el);
+        // 祖先链上的不透明度会同时削弱字色——必须合成进去，否则半隐文本会被高估
+        const fEff = o < 0.999 ? __tools.over({ ...f, a: (f.a ?? 1) * o }, bg) : f;
         const cr = __tools.ratio(fEff, bg);
         const fs = parseFloat(cs.fontSize);
         const big = fs >= 24 || (fs >= 18.66 && parseInt(cs.fontWeight) >= 700);
@@ -207,7 +215,7 @@ const getJSON = (u) =>
         if (cr < bar) {
           const cls = (el.className && el.className.baseVal !== undefined ? el.className.baseVal : el.className || '').toString().split(' ').filter(Boolean).slice(0, 2).join('.');
           const key = el.tagName.toLowerCase() + (cls ? '.' + cls : '') + '|' + el.textContent.trim().slice(0, 10);
-          if (!seen.has(key)) { seen.set(key, 1); bad.push(key.split('|')[0] + ' 「' + el.textContent.trim().slice(0, 14) + '」 ' + cr.toFixed(2) + (big ? '(大)' : '') + ' fs' + fs.toFixed(0)); }
+          if (!seen.has(key)) { seen.set(key, 1); bad.push(key.split('|')[0] + ' 「' + el.textContent.trim().slice(0, 14) + '」 ' + cr.toFixed(2) + (big ? '(大)' : '') + ' op' + o.toFixed(2) + ' fs' + fs.toFixed(0)); }
         }
       }
       return bad.slice(0, 14);
