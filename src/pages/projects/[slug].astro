@@ -10,7 +10,9 @@ const pinsOf = (status: string) => ({ 构想中: 2, 进行中: 5, 已完成: 8 }
 export async function getStaticPaths() {
   const projects = await getCollection('projects', (p) => !p.data.draft);
   // 案号与列表页同一规则：按立项先后编（最旧为 PRJ-01）
-  const sorted = [...projects].sort((a, b) => a.data.date.valueOf() - b.data.date.valueOf());
+  const sorted = [...projects].sort(
+    (a, b) => a.data.date.valueOf() - b.data.date.valueOf() || a.id.localeCompare(b.id),
+  );
   const codeOf = new Map<string, string>();
   sorted.forEach((p, i) => codeOf.set(p.id, `PRJ-${String(i + 1).padStart(2, '0')}`));
   return projects.map((p) => ({
