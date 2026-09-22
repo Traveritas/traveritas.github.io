@@ -1,0 +1,642 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>醒梦 · 左上角 Brand 变体实验台 (p12-brand-variants)</title>
+  <style>
+    :root {
+      --bg: #171b24;
+      --fg: #e5e0d2;
+      --fg-soft: #b9b3a4;
+      --fg-faint: #727a85;
+      --line: rgba(229, 224, 210, 0.16);
+      --amber: #d9a05b;
+      --dream: #c2a382;
+      --wash: #556270;
+      --font-display: "Noto Serif SC", Georgia, "Songti SC", serif;
+      --font-mono: "IBM Plex Mono", Consolas, monospace;
+      --font-pixel: "Silkscreen", "Press Start 2P", "Courier New", monospace;
+    }
+
+    /* 亮色模式支持 */
+    body.theme-light {
+      --bg: #e9ecef;
+      --fg: #262c33;
+      --fg-soft: #59626c;
+      --fg-faint: #8a929b;
+      --line: rgba(38, 44, 51, 0.16);
+    }
+    body.theme-paper {
+      --bg: #efe9dd;
+      --fg: #55503f;
+      --fg-soft: #665f50;
+      --fg-faint: #9c9584;
+      --line: rgba(85, 80, 63, 0.16);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg);
+      color: var(--fg);
+      font-family: system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+      padding: 2rem 1.5rem 4rem;
+      transition: background-color 0.3s ease, color 0.3s ease;
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+    }
+
+    header.meta-header {
+      margin-bottom: 2.5rem;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 1.5rem;
+    }
+    .meta-title {
+      font-family: var(--font-display);
+      font-size: 1.6rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+    }
+    .meta-badge {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      letter-spacing: 0.08em;
+      padding: 0.15rem 0.6rem;
+      border-radius: 999px;
+      border: 1px solid var(--amber);
+      color: var(--amber);
+      text-transform: uppercase;
+    }
+    .meta-desc {
+      color: var(--fg-soft);
+      font-size: 0.88rem;
+      max-width: 48em;
+    }
+
+    /* 控制面板 */
+    .controls-panel {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 2.5rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.5rem 2.5rem;
+      align-items: center;
+    }
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+    .control-label {
+      font-size: 0.75rem;
+      font-family: var(--font-mono);
+      color: var(--fg-faint);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .btn-group {
+      display: inline-flex;
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 2px;
+      gap: 2px;
+    }
+    .ctrl-btn {
+      background: transparent;
+      border: none;
+      color: var(--fg-soft);
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      padding: 0.35rem 0.8rem;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .ctrl-btn:hover {
+      color: var(--fg);
+    }
+    .ctrl-btn.active {
+      background: rgba(217, 160, 91, 0.18);
+      color: var(--amber);
+      font-weight: 600;
+    }
+
+    /* 变体卡片 */
+    .variants-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+    }
+    .variant-card {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.015);
+      overflow: hidden;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+      transition: border-color 0.2s ease;
+    }
+    .variant-card:hover {
+      border-color: rgba(217, 160, 91, 0.35);
+    }
+
+    .variant-header {
+      padding: 1rem 1.4rem;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(0, 0, 0, 0.08);
+    }
+    .variant-name {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--fg);
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+    .variant-tag {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: var(--fg-faint);
+    }
+    .variant-desc {
+      font-size: 0.82rem;
+      color: var(--fg-soft);
+    }
+
+    /* 模拟真实的站点页头 */
+    .mock-viewport {
+      padding: 1.5rem 2rem;
+      background: var(--bg);
+      position: relative;
+    }
+    .mock-site-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1.5rem;
+      padding-block: 0.8rem;
+      border-bottom: 1px dashed var(--line);
+    }
+
+    /* 模拟原版导航 */
+    .mock-nav {
+      display: flex;
+      align-items: center;
+      gap: 1.15rem;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--fg-soft);
+      user-select: none;
+    }
+    .mock-nav-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--fg-soft);
+      text-decoration: none;
+    }
+    .mock-stitch {
+      display: inline-block;
+      width: 10px;
+      height: 2px;
+      border-radius: 2px;
+      background: var(--fg-faint);
+      transform: rotate(8deg);
+      opacity: 0.4;
+    }
+    .mock-nav-item.is-current {
+      color: var(--fg);
+    }
+    .mock-nav-item.is-current .mock-stitch {
+      background: var(--amber);
+      opacity: 1;
+    }
+
+    /* 核心：品牌名容器 */
+    .brand-frame {
+      display: inline-flex;
+      align-items: baseline;
+      font-weight: 600;
+      font-size: 1.25rem;
+      letter-spacing: 0.03em;
+      min-width: 140px; /* 防布局微颤 */
+      cursor: pointer;
+      user-select: none;
+      position: relative;
+    }
+
+    /* 字母包装容器 */
+    .char-slot {
+      display: inline-block;
+      position: relative;
+      transform-origin: center bottom;
+      will-change: transform;
+    }
+
+    /* -------------------------------------------------------------
+       变体 1：知觉抽帧（经典展示衬线 + steps(4) 离散量化浮动）
+       ------------------------------------------------------------- */
+    .v1-serif {
+      font-family: var(--font-display);
+    }
+    .v1-serif .char-slot {
+      animation: v1-quant-float 2.4s steps(4, jump-none) infinite alternate;
+      animation-delay: calc(var(--i) * -0.32s);
+    }
+    @keyframes v1-quant-float {
+      0%   { transform: translateY(0px); }
+      33%  { transform: translateY(-1.5px); }
+      66%  { transform: translateY(-3px); }
+      100% { transform: translateY(-4.5px); }
+    }
+
+    /* -------------------------------------------------------------
+       变体 2：复古像素/点阵（Pixel Font + 8-bit 量化跳跃）
+       ------------------------------------------------------------- */
+    .v2-pixel {
+      font-family: var(--font-pixel);
+      font-size: 1.05rem;
+      letter-spacing: 0.12em;
+      text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.4);
+    }
+    .v2-pixel .char-slot {
+      animation: v2-pixel-jump 1.6s steps(3, jump-none) infinite alternate;
+      animation-delay: calc(var(--i) * -0.22s);
+    }
+    @keyframes v2-pixel-jump {
+      0%   { transform: translateY(0px); }
+      50%  { transform: translateY(-2px); }
+      100% { transform: translateY(-4px); }
+    }
+
+    /* -------------------------------------------------------------
+       变体 3：磨砂树脂微光 + 呼吸间歇轮转（柔和微晕与色散）
+       ------------------------------------------------------------- */
+    .v3-frosted {
+      font-family: var(--font-display);
+      text-shadow: 0 0 8px rgba(217, 160, 91, 0.3), 0 0 1px rgba(255, 255, 255, 0.6);
+    }
+    .v3-frosted .char-slot {
+      animation: v3-stepped-drift 3.2s steps(5, jump-none) infinite alternate;
+      animation-delay: calc(var(--i) * -0.4s);
+    }
+    @keyframes v3-stepped-drift {
+      0%   { transform: translateY(0) scale(1); opacity: 0.92; }
+      50%  { transform: translateY(-2px) scale(1.02); opacity: 1; text-shadow: 0 0 12px rgba(217, 160, 91, 0.5); }
+      100% { transform: translateY(-3.5px) scale(0.99); opacity: 0.88; }
+    }
+
+    /* -------------------------------------------------------------
+       变体 4：冷调等宽 + 量子微扰动（IBM Plex Mono + 抽帧）
+       ------------------------------------------------------------- */
+    .v4-mono {
+      font-family: var(--font-mono);
+      font-size: 1.15rem;
+      letter-spacing: 0.08em;
+      font-weight: 500;
+    }
+    .v4-mono .char-slot {
+      animation: v4-mono-step 2.0s steps(4, jump-none) infinite alternate;
+      animation-delay: calc(var(--i) * -0.25s);
+    }
+    @keyframes v4-mono-step {
+      0%   { transform: translateY(0px); color: var(--fg); }
+      50%  { transform: translateY(-2px); color: var(--fg-soft); }
+      100% { transform: translateY(-3px); color: var(--amber); }
+    }
+
+    /* 醒态下关闭动画，恢复纯静态 */
+    .state-wake .char-slot {
+      animation: none !important;
+      transform: none !important;
+      text-shadow: none !important;
+      color: var(--fg) !important;
+    }
+
+    /* 瞬时量化闪烁残影（换字那一拍的微小阶梯过渡） */
+    .char-slot.step-morph {
+      animation: flash-morph 0.12s steps(2) !important;
+    }
+    @keyframes flash-morph {
+      0% { opacity: 0.3; transform: translateY(1px); filter: blur(1px); }
+      100% { opacity: 1; transform: translateY(0); filter: none; }
+    }
+
+    /* 底部评测建议栏 */
+    .verdict-box {
+      margin-top: 2.5rem;
+      padding: 1.5rem;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(217, 160, 91, 0.04);
+    }
+    .verdict-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--amber);
+      margin-bottom: 0.6rem;
+      font-family: var(--font-mono);
+    }
+    .verdict-text {
+      font-size: 0.86rem;
+      color: var(--fg-soft);
+      line-height: 1.7;
+    }
+  </style>
+</head>
+<body class="theme-deep">
+  <div class="container">
+    <header class="meta-header">
+      <h1 class="meta-title">
+        左上角 Brand 醒/梦双态变体实验台
+        <span class="meta-badge">p12-mock</span>
+      </h1>
+      <p class="meta-desc">
+        探索《醒梦》在梦态下的认知异变（<code>Traveritas</code> ↔ <code>AveritA</code>）。对比精修字形、像素点阵、量化阶跃抽帧浮动与字符轮转节奏在全站导航栏环境下的真实视觉表现。
+      </p>
+    </header>
+
+    <!-- 交互控制面板 -->
+    <section class="controls-panel" aria-label="交互控制器">
+      <!-- 现实面状态 -->
+      <div class="control-group">
+        <span class="control-label">现实面状态 (Reality State)</span>
+        <div class="btn-group">
+          <button class="ctrl-btn" id="btn-wake" onclick="setReality('wake')">醒 · Traveritas (静止)</button>
+          <button class="ctrl-btn active" id="btn-dream" onclick="setReality('dream')">梦 · AveritA (轮转+浮动)</button>
+        </div>
+      </div>
+
+      <!-- 轮转节奏 -->
+      <div class="control-group">
+        <span class="control-label">轮转速度 (Cadence)</span>
+        <div class="btn-group">
+          <button class="ctrl-btn active" id="spd-1000" onclick="setSpeed(1000, false)">1.0s (设想原速)</button>
+          <button class="ctrl-btn" id="spd-1800" onclick="setSpeed(1800, false)">1.8s (从容步进)</button>
+          <button class="ctrl-btn" id="spd-breath" onclick="setSpeed(1000, true)">7步+呼吸停歇 (推荐)</button>
+        </div>
+      </div>
+
+      <!-- 夜色底色平台 -->
+      <div class="control-group">
+        <span class="control-label">环境色板 (Night Zones)</span>
+        <div class="btn-group">
+          <button class="ctrl-btn active" id="theme-deep" onclick="setTheme('deep')">夜面 (Deep #171b24)</button>
+          <button class="ctrl-btn" id="theme-light" onclick="setTheme('light')">光面 (Light #e9ecef)</button>
+          <button class="ctrl-btn" id="theme-paper" onclick="setTheme('paper')">纸面 (Paper #efe9dd)</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4 大变体陈列 -->
+    <main class="variants-grid">
+      <!-- 变体 1 -->
+      <article class="variant-card">
+        <div class="variant-header">
+          <div>
+            <div class="variant-name">
+              <span>变体 A · 「知觉抽帧」展示衬线 + 阶梯量化浮动</span>
+              <span class="variant-tag">STEPS(4) QUANTIZED FLOAT</span>
+            </div>
+            <div class="variant-desc">字形保持古典典雅的展示衬线，字符垂直漂移不做平滑曲线，而是以 steps(4) 产生离散抽帧定格感。</div>
+          </div>
+        </div>
+        <div class="mock-viewport">
+          <div class="mock-site-header">
+            <a class="brand-frame v1-serif" href="javascript:void(0)" aria-label="Traveritas">
+              <!-- 动态字符槽 -->
+            </a>
+            <nav class="mock-nav">
+              <span class="mock-nav-item is-current"><i class="mock-stitch"></i><span class="nav-label">随笔</span></span>
+              <span class="mock-nav-item"><i class="mock-stitch"></i><span class="nav-label">项目</span></span>
+              <span class="mock-nav-item"><i class="mock-stitch"></i><span class="nav-label">关于</span></span>
+            </nav>
+          </div>
+        </div>
+      </article>
+
+      <!-- 变体 2 -->
+      <article class="variant-card">
+        <div class="variant-header">
+          <div>
+            <div class="variant-name">
+              <span>变体 B · 「复古点阵」纯像素风字体 + 8-bit 硬跳格</span>
+              <span class="variant-tag">PIXEL BITMAP + 2PX STEP</span>
+            </div>
+            <div class="variant-desc">直接将字形转为点阵像素字体，验证“文字加上像素化后是否美观”，带有较强的街机/FC复古游戏既视感。</div>
+          </div>
+        </div>
+        <div class="mock-viewport">
+          <div class="mock-site-header">
+            <a class="brand-frame v2-pixel" href="javascript:void(0)" aria-label="Traveritas">
+              <!-- 动态字符槽 -->
+            </a>
+            <nav class="mock-nav">
+              <span class="mock-nav-item is-current"><i class="mock-stitch"></i><span class="nav-label">随笔</span></span>
+              <span class="mock-nav-item"><i class="mock-stitch"></i><span class="nav-label">项目</span></span>
+              <span class="mock-nav-item"><i class="mock-stitch"></i><span class="nav-label">关于</span></span>
+            </nav>
+          </div>
+        </div>
+      </article>
+
+      <!-- 变体 3 -->
+      <article class="variant-card">
+        <div class="variant-header">
+          <div>
+            <div class="variant-name">
+              <span>变体 C · 「磨砂树脂」微晕发光 + 呼吸间歇步进</span>
+              <span class="variant-tag">FROSTED GLOW + SUBTLE ABERRATION</span>
+            </div>
+            <div class="variant-desc">衬线字形叠加琥珀与冷白的双层磨砂微光，浮动幅度更克制，与站内的磨砂玻璃质感完美融为一体。</div>
+          </div>
+        </div>
+        <div class="mock-viewport">
+          <div class="mock-site-header">
+            <a class="brand-frame v3-frosted" href="javascript:void(0)" aria-label="Traveritas">
+              <!-- 动态字符槽 -->
+            </a>
+            <nav class="mock-nav">
+              <span class="mock-nav-item is-current"><i class="mock-stitch"></i><span class="nav-label">随笔</span></span>
+              <span class="mock-nav-item"><i class="mock-stitch"></i><span class="nav-label">项目</span></span>
+              <span class="mock-nav-item"><i class="mock-stitch"></i><span class="nav-label">关于</span></span>
+            </nav>
+          </div>
+        </div>
+      </article>
+
+      <!-- 变体 4 -->
+      <article class="variant-card">
+        <div class="variant-header">
+          <div>
+            <div class="variant-name">
+              <span>变体 D · 「冷调等宽」IBM Plex Mono + 琥珀微扰</span>
+              <span class="variant-tag">MONO OBSERVER + AMBER SHIFT</span>
+            </div>
+            <div class="variant-desc">采用全站技术标签专用的等宽字体，轮转时字符在顶点产生微弱的琥珀色相偏移，契合“意识观测仪”感。</div>
+          </div>
+        </div>
+        <div class="mock-viewport">
+          <div class="mock-site-header">
+            <a class="brand-frame v4-mono" href="javascript:void(0)" aria-label="Traveritas">
+              <!-- 动态字符槽 -->
+            </a>
+            <nav class="mock-nav">
+              <span class="mock-nav-item is-current"><i class="mock-stitch"></i><span class="nav-label">随笔</span></span>
+              <span class="mock-nav-item"><i class="mock-stitch"></i><span class="nav-label">项目</span></span>
+              <span class="mock-nav-item"><i class="mock-stitch"></i><span class="nav-label">关于</span></span>
+            </nav>
+          </div>
+        </div>
+      </article>
+    </main>
+
+    <!-- 审美品评与结论 -->
+    <footer class="verdict-box">
+      <div class="verdict-title">/// 智能体审美观察与比对分析</div>
+      <p class="verdict-text">
+        <strong>1. 像素化字形（变体 B）的局限：</strong> 点阵像素字虽然带有趣味，但其“游戏玩具感”非常明显，与右侧极度精致克制的细线、琥珀缝线及 Noto Serif 标题并列时，产生强烈的降维割裂感。<br />
+        <strong>2. 运动量化（变体 A 与 C）的惊艳之处：</strong> 保持优雅字形不变，仅将漂移轨线做 <code>steps(4)</code> 的抽帧步进，既拥有老式显示器与失序机械的“量化失真感”，又丝毫没有破坏页面的高级感与空灵沉静。<br />
+        <strong>3. 轮转节奏：</strong> 当连续看 1.0s 纯轮转超过 10 秒后，周边视力确实会感到紧迫；而开启“7步一轮 + 呼吸停歇 3 秒”时，会感觉整座页头宛如在安静入定。
+      </p>
+    </footer>
+  </div>
+
+  <script>
+    // 基础字符序列
+    const WAKE_WORD = "Traveritas";
+    // 梦态 7 字符环形序列：
+    // AveritA -> VeritaA -> EritaAV -> RitaAVe -> ItaAVer -> TaAVeri -> AAVerit
+    const DREAM_BASE = "AveritA";
+    
+    // 生成标准的环形轮转候选：首尾始终大写，中间全部小写
+    function generateCycle(base) {
+      const list = [];
+      const len = base.length;
+      const raw = base.toLowerCase();
+      for (let i = 0; i < len; i++) {
+        const chs = raw.split('');
+        const shifted = chs.slice(i).concat(chs.slice(0, i)).join('');
+        const formatted =
+          shifted.charAt(0).toUpperCase() +
+          shifted.slice(1, -1).toLowerCase() +
+          shifted.charAt(shifted.length - 1).toUpperCase();
+        list.push(formatted);
+      }
+      return list;
+    }
+
+    const CYCLE = generateCycle(DREAM_BASE);
+
+    let currentReality = 'dream'; // 'wake' | 'dream'
+    let stepIndex = 0;
+    let timer = null;
+    let currentSpeed = 1000;
+    let isBreathingMode = false;
+    let isPausedInBreath = false;
+
+    const brandFrames = document.querySelectorAll('.brand-frame');
+    const navLabels = document.querySelectorAll('.nav-label');
+
+    // 渲染指定文本到 DOM
+    function renderWord(el, word, isMorphed) {
+      el.innerHTML = '';
+      for (let i = 0; i < word.length; i++) {
+        const span = document.createElement('span');
+        span.className = 'char-slot' + (isMorphed ? ' step-morph' : '');
+        span.style.setProperty('--i', i);
+        span.textContent = word[i];
+        el.appendChild(span);
+      }
+    }
+
+    // 推动一拍轮转
+    function tick() {
+      if (currentReality !== 'dream') return;
+
+      stepIndex = (stepIndex + 1) % CYCLE.length;
+      const word = CYCLE[stepIndex];
+
+      brandFrames.forEach(frame => {
+        renderWord(frame, word, true);
+      });
+
+      // 呼吸模式：如果完成了一整轮 (stepIndex === 0)，停顿 3 秒再继续
+      if (isBreathingMode && stepIndex === 0) {
+        clearTimeout(timer);
+        timer = setTimeout(tick, 3000);
+      } else {
+        clearTimeout(timer);
+        timer = setTimeout(tick, currentSpeed);
+      }
+    }
+
+    function startCycle() {
+      clearTimeout(timer);
+      if (currentReality === 'dream') {
+        const word = CYCLE[stepIndex];
+        brandFrames.forEach(frame => renderWord(frame, word, false));
+        timer = setTimeout(tick, currentSpeed);
+      } else {
+        brandFrames.forEach(frame => renderWord(frame, WAKE_WORD, false));
+      }
+    }
+
+    // 切换现实面
+    function setReality(r) {
+      currentReality = r;
+      document.getElementById('btn-wake').classList.toggle('active', r === 'wake');
+      document.getElementById('btn-dream').classList.toggle('active', r === 'dream');
+      
+      document.querySelectorAll('.variant-card').forEach(c => {
+        c.classList.toggle('state-wake', r === 'wake');
+      });
+
+      // 同步右侧导航字
+      const navWords = r === 'wake' ? ['随笔', '项目', '关于'] : ['断章', '造物', '此身'];
+      navLabels.forEach((el, idx) => {
+        el.textContent = navWords[idx % 3];
+      });
+
+      stepIndex = 0;
+      startCycle();
+    }
+
+    // 切换速度
+    function setSpeed(ms, breath) {
+      currentSpeed = ms;
+      isBreathingMode = breath;
+      document.getElementById('spd-1000').classList.toggle('active', ms === 1000 && !breath);
+      document.getElementById('spd-1800').classList.toggle('active', ms === 1800 && !breath);
+      document.getElementById('spd-breath').classList.toggle('active', breath);
+      startCycle();
+    }
+
+    // 切换主题
+    function setTheme(t) {
+      document.body.className = 'theme-' + t;
+      document.getElementById('theme-deep').classList.toggle('active', t === 'deep');
+      document.getElementById('theme-light').classList.toggle('active', t === 'light');
+      document.getElementById('theme-paper').classList.toggle('active', t === 'paper');
+    }
+
+    // 初始化运行
+    startCycle();
+  </script>
+</body>
+</html>

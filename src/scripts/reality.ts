@@ -54,8 +54,27 @@ let ptrExclude = EXCLUDE;
 const KBD_DENY = 'a,button,input,textarea,select,summary,[contenteditable],[data-nofx]';
 const STORE_KEY = 'xm-reality';
 
-type Reality = 'dream' | 'wake';
+export type Reality = 'dream' | 'wake';
 type Mode = 'idle' | 'hold' | 'retract' | 'freeze';
+
+export type RealityListener = (r: Reality) => void;
+const realityListeners: RealityListener[] = [];
+
+export function onRealityChange(fn: RealityListener) {
+  realityListeners.push(fn);
+  fn(reality);
+}
+
+export function getReality(): Reality {
+  return reality;
+}
+
+function notifyReality(r: Reality) {
+  for (const fn of realityListeners) fn(r);
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('xm:reality', { detail: { reality: r } }));
+  }
+}
 
 let reality: Reality = 'wake';
 let mode: Mode = 'idle';
@@ -380,6 +399,7 @@ function latch() {
   body.classList.remove('reality-holding');
   reality = dir === 'go' ? 'wake' : 'dream';
   body.dataset.reality = reality;
+  notifyReality(reality);
   try {
     sessionStorage.setItem(STORE_KEY, reality);
   } catch {
@@ -428,6 +448,7 @@ function toggleInstant() {
   dir = reality === 'dream' ? 'go' : 'back';
   reality = dir === 'go' ? 'wake' : 'dream';
   body.dataset.reality = reality;
+  notifyReality(reality);
   try {
     sessionStorage.setItem(STORE_KEY, reality);
   } catch {
@@ -617,6 +638,7 @@ export function initReality() {
     reality = 'wake';
     body.dataset.reality = 'wake';
     setMorphReality('wake');
+    notifyReality(reality);
     c = 1;
     setTint(1);
     wireGestures();
@@ -630,6 +652,7 @@ export function initReality() {
     reality = 'wake';
     body.dataset.reality = 'wake';
     setMorphReality('wake');
+    notifyReality(reality);
     for (const d of getDuals()) morphText(d.el, d.wake, 0);
     c = 1;
     setTint(1);
@@ -638,6 +661,7 @@ export function initReality() {
 
   reality = 'dream';
   body.dataset.reality = 'dream';
+  notifyReality(reality);
   c = 0;
   setTint(0);
   // 等开屏校准揭幕后入梦（无开屏/已看过则立即）

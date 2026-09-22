@@ -6,7 +6,7 @@ const isCurrent = (href: string) =>
 <!-- 页头 · 导航：当前项琥珀标尺——随入梦检验的醒度插值自动换色 -->
 <header class="site-header">
   <div class="container header-row">
-    <a class="brand" href="/">Traveritas</a>
+    <a class="brand is-wake" href="/" aria-label="Traveritas">Traveritas</a>
     <nav class="site-nav" aria-label="主导航">
       <a class:list={[{ 'is-current': isCurrent('/articles/') }]} href="/articles/" aria-current={isCurrent('/articles/') ? 'page' : undefined}>
         <i class="stitch" aria-hidden="true"></i><span data-morph data-true="随笔" data-dream="断章">随笔</span>
@@ -32,12 +32,109 @@ const isCurrent = (href: string) =>
 
   .brand {
     color: var(--fg);
-    text-decoration: none;
+    text-decoration: none !important;
     font-family: var(--font-display);
     font-weight: 600;
     font-size: 1.05rem;
     letter-spacing: 0.02em;
     white-space: nowrap;
+    display: inline-flex;
+    align-items: baseline;
+    min-width: 6.8em;
+    outline: none;
+    border: none;
+    transition:
+      opacity 0.18s cubic-bezier(0.2, 0.8, 0.3, 1),
+      filter 0.18s cubic-bezier(0.2, 0.8, 0.3, 1),
+      transform 0.18s cubic-bezier(0.2, 0.8, 0.3, 1),
+      color 0.16s ease;
+  }
+
+  .brand:hover,
+  .brand:focus,
+  .brand:focus-visible,
+  .brand:active,
+  .brand:visited {
+    color: var(--fg);
+    text-decoration: none !important;
+  }
+
+  /* 双态切换溶变过渡态（如水汽融散重聚） */
+  .brand.is-morphing {
+    opacity: 0;
+    filter: blur(2.5px);
+    transform: translateY(-1px) scale(0.98);
+  }
+
+  /* 梦态衬线字形 */
+  .brand.is-dream {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 1.05rem;
+    letter-spacing: 0.03em;
+  }
+
+  /* 醒态标准衬线字形 */
+  .brand.is-wake {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 1.05rem;
+    letter-spacing: 0.02em;
+  }
+
+  :global(.brand-char) {
+    display: inline-block;
+    will-change: transform, color;
+    text-decoration: none !important;
+    transition: none !important;
+  }
+
+  :global(.brand-char:nth-child(even)) {
+    --drift-x: -1;
+  }
+  :global(.brand-char:nth-child(odd)) {
+    --drift-x: 1;
+  }
+
+  /* 梦态下每个字符纯阶跃量化浮动（严格零 tween 瞬切，单步 1.4px，横向极微漂 ±0.25px，琥珀微光淡雅） */
+  :global(.brand.is-dream .brand-char) {
+    animation: brand-pixel-float 2.4s step-end infinite alternate;
+    animation-delay: calc(var(--i) * -0.32s);
+  }
+
+  @keyframes brand-pixel-float {
+    0% {
+      transform: translate(0px, 0px);
+      color: var(--fg);
+    }
+    33% {
+      transform: translate(calc(0.25px * var(--drift-x, 1)), -1.4px);
+      color: var(--fg);
+    }
+    66% {
+      transform: translate(calc(-0.2px * var(--drift-x, 1)), -2.8px);
+      color: color-mix(in srgb, var(--amber) 16%, var(--fg));
+    }
+    100% {
+      transform: translate(calc(0.15px * var(--drift-x, 1)), -4.2px);
+      color: color-mix(in srgb, var(--amber) 36%, var(--fg));
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .brand {
+      transition: color 0.16s ease !important;
+    }
+    .brand.is-morphing {
+      opacity: 1 !important;
+      filter: none !important;
+      transform: none !important;
+    }
+    :global(.brand-char) {
+      animation: none !important;
+      transform: none !important;
+      color: var(--fg) !important;
+    }
   }
 
   .site-nav {
