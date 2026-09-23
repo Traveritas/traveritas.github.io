@@ -1,0 +1,807 @@
+---
+/* 构块场：一片由方块拼接成的背景场，全站常驻（落地自 design/mocks/p18-constructs-and-echo.html
+   的 BG SLOT，几何与参数逐字搬来，实测见 design/mocks/p18-notes.md）。
+   两态差不是「换一件东西」，而是同一片流动被两种速率读出：
+     · 醒 ＝ 整片场沿 14° 朝右下连续匀速流动（三档视差 104/84/66s ＝ 23–36px/s），
+            块与块之间恒留 1–2px 缝，读得出「拼接」；
+     · 梦 ＝ 同一片场**停在当前进度**（animation-play-state: paused，不归位到生成原点），
+            只剩原地整数像素阶跃浮动、接缝裂开、交叠处留 1px 琥珀细边；
+            整片场朝 14° 反方向恒退 260px —— 定距回溯，与已经漂了多久无关。
+   钩子只有两个，全部由 reality.ts 维护，本组件不新增任何 JS 状态：
+     body.reality-holding（长按中）/ body[data-reality='dream'] ⇒ 漂移暂停；
+     --reality-mix 与 --still（逐帧写入的醒度与动效倍率）⇒ 拼合↔错开、回溯幅度。
+   性能纪律：几何在装载期一次性烘焙（固定种子 LCG ⇒ 每次加载完全一致），
+   之后只剩 transform/opacity 的 CSS 动画——无 rAF、无滚动/尺寸监听、不 resize 重算；
+   两态共用同一套尺寸，过渡只动 transform，不会逐帧改 width/height 触发重排。
+   样式非 scoped：整片场是生成器运行时建的节点，拿不到 Astro 的组件 scope 属性，
+   故一律用 .fld- 前缀做命名空间。 */
+interface Props {
+  /* through = z −2：在首页千层纸(−3)之上、缝线(−1)之下，与脑电同为 −2
+     （BaseLayout 里挂在本组件之后 ⇒ DOM 在后 ⇒ 脑电压在它上面）。
+     below  = z −3：被首页千层纸完全遮住，只有滚过首屏才出现。 */
+  layer?: 'through' | 'below';
+}
+const { layer = 'through' } = Astro.props;
+---
+
+<div class="fld-bg" id="fld-bg" data-layer={layer} aria-hidden="true">
+  <div class="fld-field" id="fld-field"></div>
+</div>
+
+<style is:global>
+  /* ═══════════════════════════════════════════════════════════════════════
+     ★ 调参总闸 · 三处旋钮都在这里，改一行就够
+     ───────────────────────────────────────────────────────────────────────
+       --fld-rewind  定距回溯距离（px）。梦态整片场朝 14° 反方向（左上）恒退
+                     这一个距离，与已经漂了多久无关。只改这一个数即可 —— 
+                     --rw-x / --rw-y 由生成器按 260×cos14° / sin14° 取整分解后
+                     写回本元素（默认 252px / 63px），也可 ?rw=NNN 覆盖（同样自动分解）。
+       --fld-sdur / --fld-sdel
+                     方块抽帧节拍（**方块唯一的那一个旋钮**，写在生成器顶部的
+                     BANDS 表里，一行三档）：12.5 / 11.0 / 9.5s + 各档错相
+                     −1.5 / −4.0 / −6.5s ＝ 8 站里每站 10%（7 档 + 30% 停歇，
+                     与 brand.ts 同拍）。想让方块也「每拍一跳、三档齐拍」：
+                     把三档 sdur 全改 10、sdel 全改 0。
+       --fld-gap     边缝（px）：醒态相邻两块之间的缝隙（远档 1 / 中近档 2）。
+                     ⚠ 边缝在**生成期**就烘焙进 left/top/width/height 里，一条
+                     CSS 变量改不动已经生成好的几何 —— 真源是生成器顶部的 GAP
+                     表（一行），另可用 ?gap=N 覆盖。这里只是把它记在明面上。
+     ═══════════════════════════════════════════════════════════════════════ */
+  .fld-bg {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+    z-index: -2;
+    --fld-rewind: 260px;
+    --rw-x: 252px; /* = 260×cos14° 取整（生成器启动时按 --fld-rewind 重算） */
+    --rw-y: 63px; /* = 260×sin14° 取整 */
+    /* 一个漂移周期的向量：2400px 沿 14° ⇒ (2329, 581)。两份副本按它错开 */
+    --fld-pan-x: 2329px;
+    --fld-pan-y: 581px;
+    /* 交叠窗的填充：**空**。原稿在这里填了「--bg 93% + --wash」的不透明底色，
+       梦态读成一枚挖出来的亮色块（用户原话「重叠处的白色色块」）。去掉填充后
+       交叠处只剩「浓度叠加 + 一圈琥珀细边」，不再是一枚亮洞。
+       要连那圈描边也去掉，删掉 .fld-cut 的 box-shadow 即可。 */
+    --fld-cut-fill: transparent;
+    /* 两个 smoothstep：tk 管「拼合 ↔ 错开」（醒 1 → 梦 0），
+       rk 管「回溯」（醒 0 → 梦 1）。两端导数都为 0 ⇒ 按下/闩锁那两下不顿。 */
+    --fld-tk: calc(var(--reality-mix) * var(--reality-mix) * (3 - 2 * var(--reality-mix)));
+    --rw-k: calc(var(--still) * var(--still) * (3 - 2 * var(--still)));
+  }
+
+  .fld-bg[data-layer='below'] {
+    z-index: -3;
+  }
+
+  /* ── 场：.fld-field > .fld-rewind > 三档 .fld-pan > .fld-step → .fld-cell ×2 ── */
+  .fld-field {
+    position: absolute;
+    inset: 0;
+  }
+
+  /* 定距回溯。原版把漂移**幅度**乘了 σ(醒度)（梦态幅度 0 ⇒ 场被拉回生成原点），
+     于是回溯距离＝已经漂过的累积位移（实测最多 2329px = 一整个周期）；
+     用户的原话是「随着醒状态经过的位移越长，每次回溯看起来经过的距离就越长」。
+     这里把两者解耦：回溯由这一层独立承担，恒为 --fld-rewind（260px），
+     漂 20s 再按还是 260px。中途松手：--rw-k 随 --still 连续退回，按比例落回。 */
+  .fld-rewind {
+    position: absolute;
+    inset: 0;
+    transform: translate3d(calc(-1 * var(--rw-x) * var(--rw-k)), calc(-1 * var(--rw-y) * var(--rw-k)), 0);
+  }
+
+  /* 单向匀速漂移：整片场沿 14° 朝右下（+DX, +DY）恒速走一个周期。
+     ★★ 这一条永远连续运行，**绝不乘 --reality-mix / --still** ★★
+     一旦乘上幅度，梦态就会归零 ⇒ 回溯距离重新绑回「已经漂了多久」。
+     它是本层唯一在醒态生效的动画。 */
+  .fld-pan {
+    position: absolute;
+    inset: 0;
+    opacity: var(--fld-o, 1);
+    animation: fld-pan var(--fld-dur, 84s) linear infinite;
+    /* 整档提成独立合成层：漂移只让这一层位移，不再逐帧重栅格化几百块板片 */
+    will-change: transform;
+  }
+
+  @keyframes fld-pan {
+    from {
+      transform: translate3d(0, 0, 0);
+    }
+    to {
+      transform: translate3d(var(--fld-pan-x), var(--fld-pan-y), 0);
+    }
+  }
+
+  /* 梦态（含按下到闩锁的整段长按）把漂移**停在当前进度**上。
+     用 paused 而不是「把幅度缩到 0」：paused 冻结的是动画的当前时间——
+       · 不归位到生成原点（那正是「回溯越漂越远」的病根）；
+       · 回醒时从暂停处**继续**，位置连续、没有跳变；
+       · 按下的一瞬速度从 23–36px/s 变成 0，一帧只差 ~0.5px，肉眼不可察。
+     顺带的好处：漂移一停，切换期间的位移就**精确等于** .fld-rewind 的 260px。
+     两个类都由 reality.ts 维护：reality-holding = 长按中，data-reality='dream' = 梦面。
+     三态：醒＝连续流动 / 切换＝精确 ∓260px 的滑移 / 梦＝原地浮动（只剩 .fld-step）。 */
+  body.reality-holding .fld-pan,
+  body[data-reality='dream'] .fld-pan {
+    animation-play-state: paused;
+  }
+
+  /* 方块抽帧：梦态原地整数像素阶跃（净位移 0），幅度全部乘 --still ⇒ 醒态恒等变换。 */
+  .fld-step {
+    position: absolute;
+    inset: 0;
+    animation: fld-step var(--fld-sdur, 10s) steps(1, end) infinite;
+    animation-delay: var(--fld-sdel, 0s);
+  }
+
+  @keyframes fld-step {
+    0% {
+      transform: translate3d(0, 0, 0);
+    }
+    10% {
+      transform: translate3d(calc(-1px * var(--fld-amp, 2) * var(--still, 0)), calc(-2px * var(--fld-amp, 2) * var(--still, 0)), 0);
+    }
+    20% {
+      transform: translate3d(calc(1px * var(--fld-amp, 2) * var(--still, 0)), calc(-3px * var(--fld-amp, 2) * var(--still, 0)), 0);
+    }
+    30% {
+      transform: translate3d(0px, calc(-1px * var(--fld-amp, 2) * var(--still, 0)), 0);
+    }
+    40% {
+      transform: translate3d(calc(2px * var(--fld-amp, 2) * var(--still, 0)), 0px, 0);
+    }
+    50% {
+      transform: translate3d(calc(1px * var(--fld-amp, 2) * var(--still, 0)), calc(2px * var(--fld-amp, 2) * var(--still, 0)), 0);
+    }
+    60% {
+      transform: translate3d(calc(-1px * var(--fld-amp, 2) * var(--still, 0)), calc(1px * var(--fld-amp, 2) * var(--still, 0)), 0);
+    }
+    70%,
+    100% {
+      transform: translate3d(0, 0, 0);
+    }
+  }
+
+  .fld-cell {
+    position: absolute;
+    inset: 0;
+  }
+
+  /* 一个构造体：原点在它的屏幕锚点，板片相对它定位 */
+  .fld-cl {
+    position: absolute;
+    width: 0;
+    height: 0;
+  }
+
+  /* 一枚正方形：left/top 停在**梦态（loose）**位置，用 transform 滑到醒态（tiled）。
+     醒态是「相邻边之间空出 1–2px」的拼接：渲染尺寸 = 格距 m − 缝宽 g，
+     两档同一套尺寸 ⇒ 过渡只动 transform（不会逐帧改 width/height）。
+     7% 面 / 13% 边线：缝两侧各一条 1px 边线，中间留 1–2px 底色 ⇒ 读得出「拼接」。 */
+  .fld-sq {
+    position: absolute;
+    background: color-mix(in srgb, var(--ghost-ink) 7%, transparent);
+    border: 1px solid color-mix(in srgb, var(--ghost-ink) 13%, transparent);
+    transform: translate3d(calc(var(--fld-tx, 0px) * var(--fld-tk, 1)), calc(var(--fld-ty, 0px) * var(--fld-tk, 1)), 0);
+  }
+
+  /* 交叠窗：整档一个 opacity 组（逐帧只改这一个元素），窗内是「浓度叠加 + 一圈
+     1px 琥珀框」；醒态 alpha=0（醒态零重叠 ⇒ 一枚窗都没有） */
+  .fld-cutl {
+    position: absolute;
+    inset: 0;
+    opacity: calc(var(--still, 0) * 0.9);
+  }
+
+  .fld-cut {
+    position: absolute;
+    background: var(--fld-cut-fill, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--amber) 40%, transparent);
+  }
+
+  /* 减动效：整层停在醒面构图上（静止的拼接）。
+     站点的 global.css 没有「全部动画停摆」的兜底规则（mock 外壳有），
+     所以这一条必须由本组件自己给；reality.ts 在 RM 下恒醒面 ⇒ 场就是 tiled 那一态。 */
+  @media (prefers-reduced-motion: reduce) {
+    .fld-pan,
+    .fld-step {
+      animation: none !important;
+    }
+  }
+</style>
+
+<script>
+  /* ═══════════════════════════════════════════════════════════════════════
+     构造场生成器（只跑一次；生成之后只剩 CSS 动画，零运行时成本）
+     · 固定种子 LCG（不用 Math.random）⇒ 每次加载 / 每次截图完全一致
+     · 无缝环回：每档内容只生成一份、复制成两份，第二份整体位移 −(DX,DY)
+       ＝ (−2329, −581)px（＝ 一个 2400px 周期沿 14°）；平移量取同一个向量
+       ⇒ 走出一画面的那份正是候在屏外的那份，首尾逐帧同帧、不跳回、不要 JS。
+     · 内容在 u（14° 方向）上被约束在 ±1150 内 ⇒ 两份副本的 u 区间不相交
+       ⇒ 醒态跨副本也不会重叠。
+     · 无 rAF、无滚动/尺寸监听、无 resize 重算；只在启动时读一次 --fld-rewind
+       （读的是 CSS 变量，不是 DOM 尺寸）。
+     · ?fld=off 连生成一起跳过（QA 做「有层 / 无层」对照用，此时本层零节点）；
+       ?seed=N 换一批；?gap=N 覆盖边缝；?rw=NNN 覆盖回溯距离。
+     · import.meta.env.DEV 下把生成期读数写进 window.__fld（几何断言 / 耗时 /
+       块数）；生产构建里整块被 DCE 掉，不占一个字节。
+     ═══════════════════════════════════════════════════════════════════════ */
+  const fldRoot = document.getElementById('fld-bg');
+  const fldField = document.getElementById('fld-field');
+  const fldQ = new URLSearchParams(location.search);
+
+  if (fldRoot && fldField && fldQ.get('fld') !== 'off') {
+    const T0 = performance.now();
+    const SEED = (parseInt(fldQ.get('seed') || '', 10) >>> 0) || 20260925;
+    let S = SEED;
+    const rnd = () => ((S = (Math.imul(S, 1664525) + 1013904223) >>> 0) / 4294967296);
+
+    const COS = 0.9702957,
+      SIN = 0.2419219; // 14°：与 --seam-angle 同向
+    const PERIOD = 2400; // u 方向一个周期（px）
+    const DX = Math.round(PERIOD * COS); // 2329
+    const DY = Math.round(PERIOD * SIN); // 581
+
+    /* ★ 一行调：--fld-rewind（写在 .fld-bg 上，默认 260px）或 ?rw=NNN。
+       这里按 14° 把它分解成整数像素写回 --rw-x / --rw-y（260 ⇒ 252 / 63），
+       于是 CSS 里只需要维护 --fld-rewind 这一个数。 */
+    const rwQ = parseFloat(fldQ.get('rw') || '');
+    const rwPx =
+      rwQ > 0 && isFinite(rwQ)
+        ? Math.min(2000, rwQ)
+        : parseFloat(getComputedStyle(fldRoot).getPropertyValue('--fld-rewind')) || 260;
+    const RWX = Math.round(rwPx * COS),
+      RWY = Math.round(rwPx * SIN);
+    fldRoot.style.setProperty('--fld-rewind', rwPx + 'px');
+    fldRoot.style.setProperty('--rw-x', RWX + 'px');
+    fldRoot.style.setProperty('--rw-y', RWY + 'px');
+
+    /* ★ 一行调：GAP / sdur / sdel 表（远 1px / 中近 2px，按档递增）；?gap=N 覆盖全部三档。
+       span ＝ 边长带：整体比上一稿加大 ~30%，每档数量 8 → 6（整片不再变吵），
+       m（格距）的上限随之 118 → 146、下界 34 → 44。
+       sdur / sdel ＝ 方块的抽帧节拍（8 站里每站 10%：7 档 + 30% 停歇，三档错相）。
+       **方块抽帧的旋钮就只有这一行的 sdur / sdel 两个数**：想回到「每拍一跳（三档
+       齐拍）」⇒ 三档 sdur 全写 10、sdel 全写 0（10 站 × 10%，一站=一拍）。 */
+    const GAPQ = parseInt(fldQ.get('gap') || '', 10);
+    const BANDS = [
+      { n: 6, span: [225, 280], o: 0.66, dur: 104, amp: 2, gap: 1, gapU: 300, sdur: 12.5, sdel: -1.5 },
+      { n: 6, span: [250, 320], o: 0.84, dur: 84, amp: 2, gap: 2, gapU: 330, sdur: 11.0, sdel: -4.0 },
+      { n: 6, span: [295, 380], o: 1.0, dur: 66, amp: 3, gap: 2, gapU: 360, sdur: 9.5, sdel: -6.5 },
+    ];
+    if (GAPQ >= 0 && GAPQ <= 4) for (const b of BANDS) b.gap = GAPQ;
+
+    /* 生成区（u,v 是 14° 的正交系 ⇒ 这里的距离就是屏幕距离）与「副本不相交」的 u 边界 */
+    const UMAX = 830,
+      VMAX = 760,
+      UEDGE = 1180;
+
+    type Cell = [number, number];
+    interface Rect {
+      x: number;
+      y: number;
+      w: number;
+      h: number;
+    }
+    interface Cluster {
+      m: number;
+      sz: number;
+      gap: number;
+      tiled: Rect[];
+      loose: Rect[];
+      cuts: Rect[];
+      bb: Rect;
+      span: number;
+      depth: number;
+      bad: number;
+    }
+    interface Placed {
+      band: (typeof BANDS)[number];
+      u: number;
+      v: number;
+      X: number;
+      Y: number;
+      m: number;
+      sz: number;
+      tiled: Rect[];
+      loose: Rect[];
+      cuts: Rect[];
+      bb: Rect;
+      span: number;
+      box: Rect;
+      nr: Rect[];
+    }
+
+    const idx = (i: number, j: number) => i + ',' + j;
+    const NB = [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ];
+    const has = (cs: Cell[], i: number, j: number) => cs.some((c) => c[0] === i && c[1] === j);
+    function nbCount(c: Cell, cs: Cell[]) {
+      let n = 0;
+      for (const [di, dj] of NB) if (has(cs, c[0] + di, c[1] + dj)) n++;
+      return n;
+    }
+    function connected(cs: Cell[]) {
+      if (!cs.length) return false;
+      const seen = new Set([idx(cs[0][0], cs[0][1])]);
+      const q: Cell[] = [cs[0]];
+      while (q.length) {
+        const [i, j] = q.pop()!;
+        for (const [di, dj] of NB) {
+          const k = idx(i + di, j + dj);
+          if (seen.has(k) || !has(cs, i + di, j + dj)) continue;
+          seen.add(k);
+          q.push([i + di, j + dj]);
+        }
+      }
+      return seen.size === cs.length;
+    }
+
+    /* ── 形状：从 2×2 / 2×3 / 3×3 的矩形里挖角，剩下的格必须连通、每格至少一个共边邻居 ── */
+    const SHAPES = [
+      { w: 2, h: 2, n: 4 },
+      { w: 3, h: 2, n: 4 },
+      { w: 3, h: 2, n: 5 },
+      { w: 2, h: 3, n: 4 },
+      { w: 2, h: 3, n: 5 },
+      { w: 3, h: 3, n: 5 },
+      { w: 3, h: 3, n: 6 },
+      { w: 3, h: 3, n: 7 },
+    ];
+    function mkShape(spec: { w: number; h: number; n: number }) {
+      const { w, h, n } = spec;
+      let out: Cell[] = [];
+      for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) out.push([i, j]);
+      const corner = new Set([idx(0, 0), idx(w - 1, 0), idx(0, h - 1), idx(w - 1, h - 1)]);
+      let guard = 0;
+      while (out.length > n && guard++ < 60) {
+        const cs = out.filter((c) => corner.has(idx(c[0], c[1])));
+        const es = out.filter(
+          (c) => (c[0] === 0 || c[1] === 0 || c[0] === w - 1 || c[1] === h - 1) && !corner.has(idx(c[0], c[1])),
+        );
+        const pool = cs.length && (rnd() < 0.6 || !es.length) ? cs : es.length ? es : out;
+        const pick = pool[Math.floor(rnd() * pool.length)];
+        const rest = out.filter((c) => c !== pick);
+        if (connected(rest) && rest.every((c) => nbCount(c, rest) >= 1)) out = rest;
+      }
+      const mi = Math.min(...out.map((c) => c[0])),
+        mj = Math.min(...out.map((c) => c[1]));
+      return out.map((c) => [c[0] - mi, c[1] - mj] as Cell);
+    }
+
+    /* ── 解析求交：轴对齐矩形的两两交 ── */
+    function pairOverlaps(rs: Rect[]) {
+      const res: Rect[] = [];
+      for (let i = 0; i < rs.length; i++) {
+        for (let j = i + 1; j < rs.length; j++) {
+          const a = rs[i],
+            b = rs[j];
+          const x1 = Math.max(a.x, b.x),
+            x2 = Math.min(a.x + a.w, b.x + b.w);
+          const y1 = Math.max(a.y, b.y),
+            y2 = Math.min(a.y + a.h, b.y + b.h);
+          if (x2 > x1 && y2 > y1) res.push({ x: x1, y: y1, w: x2 - x1, h: y2 - y1 });
+        }
+      }
+      return res;
+    }
+    function maxDepth(rs: Rect[]) {
+      let mx = 1;
+      for (const o of pairOverlaps(rs)) {
+        for (let y = o.y + 0.5; y < o.y + o.h; y += 3) {
+          for (let x = o.x + 0.5; x < o.x + o.w; x += 3) {
+            let d = 0;
+            for (const r of rs) if (x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) d++;
+            if (d > mx) mx = d;
+          }
+        }
+      }
+      return mx;
+    }
+    function depthWith(nr: Rect[], others: Rect[]) {
+      let mx = 1;
+      for (const a of nr) {
+        for (const b of others) {
+          const x1 = Math.max(a.x, b.x),
+            x2 = Math.min(a.x + a.w, b.x + b.w);
+          const y1 = Math.max(a.y, b.y),
+            y2 = Math.min(a.y + a.h, b.y + b.h);
+          if (x2 <= x1 || y2 <= y1) continue;
+          for (let y = y1 + 0.5; y < y2; y += 3) {
+            for (let x = x1 + 0.5; x < x2; x += 3) {
+              let d = 0;
+              for (const r of nr) if (x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) d++;
+              for (const r of others) if (x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) d++;
+              if (d > mx) mx = d;
+            }
+          }
+        }
+      }
+      return mx;
+    }
+    const bbox = (rs: Rect[]) => {
+      let x0 = 1e9,
+        y0 = 1e9,
+        x1 = -1e9,
+        y1 = -1e9;
+      for (const r of rs) {
+        x0 = Math.min(x0, r.x);
+        y0 = Math.min(y0, r.y);
+        x1 = Math.max(x1, r.x + r.w);
+        y1 = Math.max(y1, r.y + r.h);
+      }
+      return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+    };
+    /* 一组矩形在 u 轴（14° 方向）上的投影区间：用来把内容约束在半周期内 */
+    function uRange(rs: Rect[]) {
+      let lo = 1e9,
+        hi = -1e9;
+      for (const r of rs) {
+        const ps = [
+          [r.x, r.y],
+          [r.x + r.w, r.y],
+          [r.x, r.y + r.h],
+          [r.x + r.w, r.y + r.h],
+        ];
+        for (const p of ps) {
+          const uu = p[0] * COS + p[1] * SIN;
+          if (uu < lo) lo = uu;
+          if (uu > hi) hi = uu;
+        }
+      }
+      return { lo, hi };
+    }
+
+    /* ── 一个构造体：tiled（边边相重合 + 相邻边留缝）+ loose（接缝错开）+ 交叠窗 ──
+       关键：**两档同一套尺寸**。渲染尺寸 = 格距 m − 缝宽 g，网格间距仍是 m，
+       醒态每块落在 i*m+g 上 ⇒ 相邻两块的间隙恒为 g（整数像素，1 或 2）。
+       于是 tiled ↔ loose 只是位置差 ⇒ 过渡只需 transform，不会逐帧改 width。 */
+    let tries = 0,
+      firstTry = 0;
+    function mkCluster(band: (typeof BANDS)[number]): Cluster {
+      const g = band.gap;
+      let best: Cluster | null = null;
+      for (let k = 0; k < 40; k++) {
+        tries++;
+        const spec = SHAPES[Math.floor(rnd() * SHAPES.length)];
+        const cells = mkShape(spec);
+        const ext = Math.max(spec.w, spec.h);
+        const m = Math.min(146, Math.max(44, Math.round((band.span[0] + rnd() * (band.span[1] - band.span[0])) / ext)));
+        const s = m - g;
+        const tiled = cells.map(([i, j]) => ({ x: i * m + g, y: j * m + g, w: s, h: s }));
+        /* loose：每格挑一条它自己的共边（那个邻居），沿该边的法向滑开 0.30–0.52 格距，
+           68% 真的「脱离」（离开那条边 ⇒ 接缝张开），32% 朝那条边滑（叠出一枚窗）；
+           再带 ±0.12 格距的切向错开。尺寸不变 ⇒ 只有 transform 在动。 */
+        const loose = tiled.map((t, n) => {
+          const c = cells[n];
+          const nbs = NB.filter(([di, dj]) => has(cells, c[0] + di, c[1] + dj));
+          const nb = nbs[Math.floor(rnd() * nbs.length)];
+          const away = rnd() < 0.68 ? 1 : -1;
+          const mag = m * (0.3 + rnd() * 0.22);
+          const tan = Math.round((rnd() - 0.5) * 0.24 * m);
+          const ox = nb[0] !== 0 ? -nb[0] * away * mag : tan;
+          const oy = nb[1] !== 0 ? -nb[1] * away * mag : tan;
+          return { x: Math.round(t.x + ox), y: Math.round(t.y + oy), w: s, h: s };
+        });
+        const cuts = pairOverlaps(loose)
+          .filter((o) => o.w >= 12 && o.h >= 12)
+          .sort((p, q) => q.w * q.h - p.w * p.h)
+          .slice(0, 5);
+        const depth = maxDepth(loose);
+        /* 占位框 = 醒态 bbox ∪ 梦态 bbox：过渡是两态之间的插值，
+           所以「这个构造体的足迹」必须两个态都包住（不然跨构造体会撞上） */
+        const bbT = bbox(tiled),
+          bbL = bbox(loose);
+        const x0 = Math.min(bbT.x, bbL.x),
+          y0 = Math.min(bbT.y, bbL.y);
+        const x1 = Math.max(bbT.x + bbT.w, bbL.x + bbL.w),
+          y1 = Math.max(bbT.y + bbT.h, bbL.y + bbL.h);
+        const bb = { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+        const span = Math.max(bbL.w, bbL.h);
+        const bad = (depth > 3 ? 1 : 0) + (cuts.length ? 0 : 8) + (span > 420 ? 1 : 0) + (span < 160 ? 1 : 0);
+        if (!best || bad < best.bad) best = { m, sz: s, gap: g, tiled, loose, cuts, bb, span, depth, bad };
+        if (!bad) break;
+      }
+      // 循环至少跑一轮 ⇒ best 必有值
+      const win = best!;
+      if (win.bad === 0) firstTry++;
+      return win;
+    }
+
+    const placed: Placed[] = []; // 已落位构造体（跨档共享）：醒态外接框必须互不相交
+    const tiledAll: Rect[] = []; // 全部板片的醒态矩形（屏幕坐标，只记第一份副本）
+    const looseAll: Rect[] = []; // 全部板片的梦态矩形（屏幕坐标，只记第一份副本）
+    let retryPlace = 0,
+      depthClip = 0,
+      failPlace = 0,
+      uClip = 0;
+
+    function tryPlace(band: (typeof BANDS)[number]): Placed | null {
+      for (let a = 0; a < 260; a++) {
+        const g = mkCluster(band);
+        const ut = uRange(g.tiled),
+          ul = uRange(g.loose);
+        const ext = Math.max(Math.abs(ut.lo), Math.abs(ut.hi), Math.abs(ul.lo), Math.abs(ul.hi));
+        const u = Math.round((rnd() * 2 - 1) * UMAX);
+        const v = Math.round((rnd() * 2 - 1) * VMAX);
+        /* 副本不相交：内容（tiled 与 loose 一起算）在 u 上不许越过 ±UEDGE */
+        if (Math.abs(u) + ext > UEDGE) {
+          uClip++;
+          continue;
+        }
+        let ok = true;
+        for (const it of placed)
+          if (it.band === band && Math.hypot(it.u - u, it.v - v) < band.gapU) {
+            ok = false;
+            break;
+          }
+        if (!ok) {
+          retryPlace++;
+          continue;
+        }
+        const X = Math.round(u * COS - v * SIN),
+          Y = Math.round(u * SIN + v * COS);
+        const box = { x: X + g.bb.x, y: Y + g.bb.y, w: g.bb.w, h: g.bb.h };
+        ok = true;
+        for (const p of placed) {
+          if (
+            box.x < p.box.x + p.box.w + 26 &&
+            box.x + box.w + 26 > p.box.x &&
+            box.y < p.box.y + p.box.h + 26 &&
+            box.y + box.h + 26 > p.box.y
+          ) {
+            ok = false;
+            break;
+          }
+        }
+        if (!ok) {
+          retryPlace++;
+          continue;
+        }
+        const nr = g.loose.map((r) => ({ x: X + r.x, y: Y + r.y, w: r.w, h: r.h }));
+        if (depthWith(nr, looseAll) > 3) {
+          depthClip++;
+          continue;
+        }
+        return {
+          band,
+          u,
+          v,
+          X,
+          Y,
+          m: g.m,
+          sz: g.sz,
+          tiled: g.tiled,
+          loose: g.loose,
+          cuts: g.cuts,
+          bb: g.bb,
+          span: g.span,
+          box,
+          nr,
+        };
+      }
+      failPlace++;
+      return null;
+    }
+
+    /* ── 生成 + 落 DOM（三档容器：.fld-pan > .fld-step > .fld-cell ×2）── */
+    const frag = document.createDocumentFragment();
+    /* 定距回溯层：三档共用一个位移（写在一个祖先上，整片场一起退） */
+    const rewind = document.createElement('div');
+    rewind.className = 'fld-rewind';
+    let nSq = 0,
+      nCut = 0,
+      nCl = 0;
+
+    for (const band of BANDS) {
+      const items: Placed[] = [];
+      let guard = 0;
+      while (items.length < band.n && guard++ < 60) {
+        const g = tryPlace(band);
+        if (!g) break;
+        for (const r of g.tiled) tiledAll.push({ x: g.X + r.x, y: g.Y + r.y, w: r.w, h: r.h });
+        for (const r of g.nr) looseAll.push(r);
+        placed.push(g);
+        items.push(g);
+      }
+      const pan = document.createElement('div');
+      pan.className = 'fld-pan';
+      pan.style.setProperty('--fld-o', String(band.o));
+      pan.style.setProperty('--fld-dur', band.dur + 's');
+      const beat = document.createElement('div');
+      beat.className = 'fld-step';
+      beat.style.setProperty('--fld-sdur', band.sdur + 's');
+      beat.style.setProperty('--fld-sdel', band.sdel + 's');
+      beat.style.setProperty('--fld-amp', String(band.amp));
+      for (let c = 0; c < 2; c++) {
+        const cell = document.createElement('div');
+        cell.className = 'fld-cell';
+        /* 第二份＝第一份整体位移 −(DX,DY)：与 .fld-pan 的平移量严格相等 ⇒ 无缝环回 */
+        if (c) cell.style.transform = 'translate3d(' + -DX + 'px,' + -DY + 'px,0)';
+        const cutl = document.createElement('div');
+        cutl.className = 'fld-cutl';
+        for (const g of items) {
+          const cl = document.createElement('div');
+          cl.className = 'fld-cl';
+          cl.style.cssText = 'left:calc(50% + ' + g.X + 'px);top:calc(50% + ' + g.Y + 'px)';
+          cl.dataset.c = g.X + ',' + g.Y; // 供自验脚本从 DOM 复核几何
+          for (let n = 0; n < g.loose.length; n++) {
+            const lo = g.loose[n],
+              ti = g.tiled[n];
+            const d = document.createElement('div');
+            d.className = 'fld-sq';
+            d.style.cssText =
+              'left:' +
+              lo.x +
+              'px;top:' +
+              lo.y +
+              'px;width:' +
+              g.sz +
+              'px;height:' +
+              g.sz +
+              'px;' +
+              '--fld-tx:' +
+              (ti.x - lo.x) +
+              'px;--fld-ty:' +
+              (ti.y - lo.y) +
+              'px';
+            d.dataset.b = ti.x + ',' + ti.y + ',' + g.sz; // 醒态（tiled）局部位置 + 边长
+            d.dataset.l = lo.x + ',' + lo.y; // 梦态（loose）局部位置
+            cl.appendChild(d);
+            nSq++;
+          }
+          for (const ct of g.cuts) {
+            const d = document.createElement('div');
+            d.className = 'fld-cut';
+            d.style.cssText =
+              'left:calc(50% + ' +
+              (g.X + ct.x) +
+              'px);top:calc(50% + ' +
+              (g.Y + ct.y) +
+              'px);' +
+              'width:' +
+              ct.w +
+              'px;height:' +
+              ct.h +
+              'px';
+            cutl.appendChild(d);
+            nCut++;
+          }
+          cell.appendChild(cl);
+          nCl++;
+        }
+        cell.appendChild(cutl);
+        beat.appendChild(cell);
+      }
+      pan.appendChild(beat);
+      frag.appendChild(pan);
+    }
+    rewind.appendChild(frag);
+    fldField.appendChild(rewind);
+
+    /* ── 生成期断言：只在 dev 下跑（生产构建整块 DCE）。读数写进 window.__fld。
+       ①醒态任意两块零重叠 ②相邻平行边间隙 ∈ [1,2]px ③跨副本零重叠
+       ④梦态叠深 ≤3 ⑤构体错开后整体尺寸 160–420px ───────────────────────── */
+    if (import.meta.env.DEV) {
+      let badPairs = 0,
+        worstOverlap = 0;
+      for (let i = 0; i < tiledAll.length; i++) {
+        for (let j = i + 1; j < tiledAll.length; j++) {
+          const a = tiledAll[i],
+            b = tiledAll[j];
+          const w = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
+          const h = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+          if (w > 0 && h > 0) {
+            badPairs++;
+            worstOverlap = Math.max(worstOverlap, w * h);
+          }
+        }
+      }
+      let copyPairs = 0,
+        copyWorst = 0;
+      for (const a of tiledAll) {
+        for (const b of tiledAll) {
+          const bx = b.x - DX,
+            by = b.y - DY;
+          const w = Math.min(a.x + a.w, bx + b.w) - Math.max(a.x, bx);
+          const h = Math.min(a.y + a.h, by + b.h) - Math.max(a.y, by);
+          if (w > 0 && h > 0) {
+            copyPairs++;
+            copyWorst = Math.max(copyWorst, w * h);
+          }
+        }
+      }
+      const gapDist: Record<number, number> = {};
+      let gapPairs = 0,
+        gapMin = 0,
+        gapMax = 0;
+      const touched = new Set<number>();
+      for (let i = 0; i < tiledAll.length; i++) {
+        for (let j = 0; j < tiledAll.length; j++) {
+          if (i === j) continue;
+          const a = tiledAll[i],
+            b = tiledAll[j];
+          const yOv = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+          const xOv = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
+          let d = -1,
+            t = 0;
+          if (yOv > 0) {
+            t = b.x - (a.x + a.w);
+            if (t >= 0 && t <= 3) d = t;
+          }
+          if (d < 0 && xOv > 0) {
+            t = b.y - (a.y + a.h);
+            if (t >= 0 && t <= 3) d = t;
+          }
+          if (d < 0 && yOv > 0) {
+            t = a.x - (b.x + b.w);
+            if (t >= 0 && t <= 3) d = t;
+          }
+          if (d < 0 && xOv > 0) {
+            t = a.y - (b.y + b.h);
+            if (t >= 0 && t <= 3) d = t;
+          }
+          if (d < 0) continue;
+          touched.add(i);
+          touched.add(j);
+          if (i < j) {
+            gapPairs++;
+            gapDist[d] = (gapDist[d] || 0) + 1;
+            if (!gapMin || d < gapMin) gapMin = d;
+            if (d > gapMax) gapMax = d;
+          }
+        }
+      }
+      const depthAll = maxDepth(looseAll);
+      const spans = placed.map((p) => p.span);
+      const side = (arr: number[]) => {
+        const v = arr.slice().sort((a, b) => a - b);
+        return {
+          n: v.length,
+          min: v[0],
+          max: v[v.length - 1],
+          mean: Math.round((v.reduce((a, b) => a + b, 0) / v.length) * 10) / 10,
+          median: v[Math.floor(v.length / 2)],
+        };
+      };
+      Object.assign(window, {
+        __fld: {
+          seed: SEED,
+          clusters: nCl,
+          clustersPerCopy: nCl / 2,
+          squares: nSq,
+          cuts: nCut,
+          nodes: fldField.querySelectorAll('*').length,
+          ms: Math.round((performance.now() - T0) * 10) / 10,
+          rewindPx: rwPx,
+          rwX: RWX,
+          rwY: RWY,
+          gaps: BANDS.map((b) => b.gap),
+          a_tiledOverlapPairs: badPairs,
+          a_tiledWorstOverlapPx: worstOverlap,
+          b_gapPairs: gapPairs,
+          b_gapMinPx: gapMin,
+          b_gapMaxPx: gapMax,
+          b_gapDist: gapDist,
+          b_isolated: tiledAll.length - touched.size,
+          c_copyOverlapPairs: copyPairs,
+          c_copyWorstPx: copyWorst,
+          d_looseDepthMax: depthAll,
+          e_looseSpanMin: Math.round(Math.min(...spans)),
+          e_looseSpanMax: Math.round(Math.max(...spans)),
+          g_clusterTries: tries,
+          g_firstTry: firstTry,
+          h_placeRetry: retryPlace,
+          h_uClip: uClip,
+          h_depthClip: depthClip,
+          h_failPlace: failPlace,
+          i_sideAll: side(placed.map((p) => p.sz)),
+          i_sideByBand: BANDS.map((b) => side(placed.filter((p) => p.band === b).map((p) => p.sz))),
+        },
+      });
+    }
+  }
+</script>

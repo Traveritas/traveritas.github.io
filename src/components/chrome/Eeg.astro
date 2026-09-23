@@ -1,40 +1,319 @@
 ---
-/* 缝线上的脑电纹理（var1 移植，全站常驻）：
-   fixed 视口层，波轴心恒为视口 50vh——与全局缝线同轴锁定，
-   滚动零滞后。波形不挂任何状态：自有恒定的缓慢波动。 */
+/* 缝线上的脑电群（全站常驻）：主波 + 三道谐波残影，同轴 14°、视口 50vh。
+   一条波被两种采样率读出，就是这一件东西的两态：
+     · 醒 ＝ 四条都塌回缝线上**重合**（主波逐帧连续流动，仍是线上原样：AMP 3.6 / FREQ .5 /
+            SPD 2.6 / 26px 步长 / 14° 轴心视口 50vh，与线上逐字一致；残影的 dy 与
+            不透明度都乘 --still ⇒ 位移 0、不可见）—— 醒面「什么都没多」，逐像素与线上相同。
+     · 梦 ＝ 同一条波分四种读法，四道各错开一点点（主波留在轴线上，三道残影 dy −8 / −4 / +4，
+            相位错到波周期的 26% / 54% / 82%）且**四道的摆幅同时翻倍**（`GAIN_D` 4.8 ＝
+            醒态增益的两倍，梦态振幅 ＝ AMP × GAIN_D × 各道 gain，两道阶梯波再各自收两成；
+            d=0 时 A 恒为 AMP，与 GAIN_D / gain 无关 ⇒ 醒态不受影响），主波按**每 0.25 秒
+            采一次样**并零阶保持（连续插值：phUsed = floor(ph/T)·T + (1−f)·frac，f ＝ 梦度
+            ⇒ 醒态与今天逐字一样连续，梦态每拍一采，长按过程里采样率连续收紧，不是开关）。
+     四道不是复制，是三种读法（冷暖分层、步长 ×2/×3/×5）：**相位延迟、步长、量化各不同，
+     位置只错开一点点**，四道因此在轴周围互相穿插，越远的一条滞后越多、起伏越浅。
+       · 灰调两道（主波 / wake 残影）＝ 同一种读法：零阶保持的阶梯路径 +
+         **跟拍钟**（位置每一格跳一次，一格 ＝ 0.25s）+ 阶跃游走；灰道的采样格与游走
+         都**落后半格** ⇒ 两个阶梯波交错运动（这一格主线跳、下一格灰道跳）；
+       · 有色两道（琥珀 / 暖沙）＝ 不采样、不量化、也不跟拍钟（JS 的 smooth）
+         ⇒ 连续曲线 + 连续游走，不随节拍跳；最淡的暖沙一道作虚线。
+         dy 是唯一的位置旋钮：要哪一道离开轴线单独展开，只改它自己的 dy（乘梦度，
+         醒态照样塌回轴上）。
+     残影延迟按拍长绑定（beats × --fld-beat ≥ 1 拍）：采样一拍一停之后，小于一拍的
+     延迟会让三道残影在同一拍里与主波重合、合唱闪烁，所以延迟一律 ≥1 拍（≈0.6/1.3/2.0s，
+     带微差避免三声部同相）——合唱因此比不加约束时更「展开」。
+   钩子只有一个：--reality-mix / --still（reality.ts 逐帧写）与 wakeMix()（同一份醒度的
+   JS 侧读数，chrome.ts 也是这么取的）。本组件不新增任何状态、不加监听。
+   性能纪律：只写 path 的 d 与一个 rotate；两个阶梯波各自只在自己那一格走动的帧里重写
+   （梦态各每秒 4 次，两格错开后合计仍是每秒 8 次），有色两道逐帧重写（连续流动的代价，
+   单条路径 14–35 个点）；复用全站那一条 30fps rAF，不新开循环。
+   减动效：只画一帧静态（残影的 CSS 游走同时停摆，见下方 media 块）。 */
 ---
 
-<svg class="eeg" id="site-eeg" aria-hidden="true">
-  <g>
-    <path class="eeg-main" />
-  </g>
-</svg>
+<div class="eeg-group" id="site-eeg-group" aria-hidden="true">
+  <svg class="eeg" id="site-eeg">
+    <g>
+      <!-- 残影插在主波之前 ⇒ 主波永远压在最上 -->
+      <path class="eeg-echo eeg-echo-1" />
+      <path class="eeg-echo eeg-echo-2" />
+      <path class="eeg-echo eeg-echo-3" />
+      <path class="eeg-main" />
+    </g>
+  </svg>
+</div>
+
+<style>
+  /* 群：fixed 视口层，与缝线同轴锁定、滚动零滞后；--fld-beat 是它唯一的拍长旋钮
+     （＝阶梯波的重采样间隔：梦态「每拍采一次样」，0.25s 走一格；灰道的阶跃游走
+     与残影延迟都从它派生） */
+  .eeg-group {
+    position: fixed;
+    inset: 0;
+    /* 负 z：沉到内容之下（缝线之下、构块场之上——BaseLayout 里本组件在它之后） */
+    z-index: -2;
+    pointer-events: none;
+    overflow: hidden;
+    --fld-beat: 0.25s;
+  }
+
+  .eeg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    /* 路径两端伸出视口（沿 14° 铺满全幅），不要裁在自身盒子上 */
+    overflow: visible;
+  }
+
+  .eeg .eeg-main {
+    stroke: var(--umber);
+    stroke-width: 1.2;
+    fill: none;
+    opacity: 0.62;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  /* ── 三道谐波残影 ──────────────────────────────────────────────────────
+     路径由脚本每帧重写（醒态 d 为空、不透明度为 0 ⇒ 与线上逐像素一致）；
+     这里只管色、光量与游走，按「读法」分成两组：
+       · 灰调 .eeg-echo-2 ＝ 与主波同一种读法：路径带零阶保持的阶梯、且跟拍钟
+         （位置每一格跳一次，一格 ＝ --fld-beat），游走也是阶跃的（5 档 × 1 拍 = 1.25s）；
+       · 有色 .eeg-echo-1 / .eeg-echo-3 ＝ 不跟拍钟：路径是连续曲线、每帧推进，
+         游走也是连续插值（16 档 × 1 拍 = 4s，无 steps）；最淡的暖沙一道作虚线。
+     三道的位移都乘 --still ⇒ 醒态恒等变换（动画在跑、位移为 0）。 */
+  .eeg .eeg-echo-1 {
+    stroke: var(--amber);
+    stroke-width: 1.15;
+  }
+  .eeg .eeg-echo-2 {
+    stroke: var(--wake);
+    stroke-width: 1.05;
+  }
+  .eeg .eeg-echo-3 {
+    stroke: var(--dream);
+    stroke-width: 0.95;
+    stroke-dasharray: 5 7;
+  }
+  .eeg .eeg-echo {
+    fill: none;
+    stroke-linecap: butt;
+    stroke-linejoin: miter;
+    opacity: calc(var(--echo-op, 0.34) * var(--still));
+  }
+  /* 灰道：阶跃游走（与主波的采样读法同拍，但**落后半格** —— 与它自己那条路径的
+     半格偏移对齐，于是两个阶梯波交错地动：这一格主线跳、下一格这道跳） */
+  .eeg .eeg-echo-2 {
+    --echo-op: 0.26;
+    animation: echo-walk calc(var(--fld-beat) * 5) steps(1, end) infinite;
+    animation-delay: calc(var(--fld-beat) * 0.5);
+  }
+  /* 有色两道：连续游走，没有阶跃（16 × 0.25s = 4s，与上一版同速） */
+  .eeg .eeg-echo-1,
+  .eeg .eeg-echo-3 {
+    animation: echo-drift calc(var(--fld-beat) * 16) linear infinite;
+    animation-delay: 0s;
+  }
+  .eeg .eeg-echo-3 {
+    --echo-op: 0.19;
+  }
+
+  @keyframes echo-walk {
+    0% {
+      transform: translateY(0);
+    }
+    20% {
+      transform: translateY(calc(-1px * var(--still, 0)));
+    }
+    40% {
+      transform: translateY(calc(-2px * var(--still, 0)));
+    }
+    60% {
+      transform: translateY(calc(-1px * var(--still, 0)));
+    }
+    80% {
+      transform: translateY(calc(-3px * var(--still, 0)));
+    }
+    100% {
+      transform: translateY(0);
+    }
+  }
+
+  /* 连续游走：0 → −3px → 0 的线性往返，一路插值没有台阶 */
+  @keyframes echo-drift {
+    0% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(calc(-3px * var(--still, 0)));
+    }
+    100% {
+      transform: translateY(0);
+    }
+  }
+
+  /* 减动效：残影的游走一并停摆（脚本那边只画一帧静态）。
+     global.css 没有「全部动画停摆」的兜底规则，这一条必须本组件自己给。 */
+  @media (prefers-reduced-motion: reduce) {
+    .eeg .eeg-echo {
+      animation: none !important;
+    }
+  }
+</style>
 
 <script>
+  import { wakeMix } from '../../scripts/reality';
+
   const svg = document.getElementById('site-eeg');
-  if (svg) {
+  const group = document.getElementById('site-eeg-group');
+  if (svg && group) {
     const g = svg.querySelector('g');
     const main = svg.querySelector<SVGPathElement>('.eeg-main');
     const TAU = Math.PI * 2;
-    // 自有的缓慢波动：两层正弦叠出的呼吸感，参数恒定
+    // 线上主波的四个原始参数：醒态必须与今天逐字一致
     const AMP = 3.6;
     const FREQ = 0.5;
     const SPD = 2.6;
-    const draw = (ph: number) => {
+    const STEP = 26;
+    /* 梦态增益（梦态振幅 ＝ AMP × GAIN_D × 各道 gain）：不给增益，4px 格就没有级数可数
+       （p14-B 实测）。GAIN_D 4.8 ＝ 醒态增益的两倍；两道**阶梯波**在各自的 gain 上再收
+       两成（主波 0.8、灰道 0.5）—— 摆得太大时阶梯的级数会糊成一片。醒态不受影响
+       （d=0 时 A 恒为 AMP，与 GAIN_D / gain 无关）。 */
+    const GAIN_D = 4.8;
+    const Q_MAIN = 4;
+    const STEP_LV = [0.75, 1, 1.25]; // 格的 3 秒分级跳变（与 brand.ts 的 3 秒呼吸同源）
+    /* 拍长：与 CSS 同一个源（.eeg-group 上的 --fld-beat ＝ 0.25s），阶梯波每拍采一次样、
+       残影延迟也由它派生。采样一拍一停之后，延迟小于一拍 ⇒ 三道残影会在同一拍里与主波
+       重合、合唱闪烁；所以延迟一律 ≥1 拍，并留一点微差免得三声部同相。 */
+    const BEAT = parseFloat(getComputedStyle(group).getPropertyValue('--fld-beat')) || 0.25;
+    /* 三道残影声部：step ＝ 采样步长倍率 / beats ＝ 延迟（单位：拍）/ dy ＝ 满梦时的
+       法向分离(px) / gain ＝ 相对振幅 / q ＝ 量化基准格 / cls ＝ 样式钩子 /
+       grid ＝ 自己的采样格相对基准格的偏移（单位：拍）/ smooth ＝ 不采样也不量化
+       （路径退化成连续曲线，两道有色的走这条）
+       grid：只有灰道给半格（0.5）—— 它与主波是同一套阶梯读法，半个格错开之后
+       **两个阶梯波交错运动**（这一格主波跳、下一格灰道跳）；有色两道不跟拍钟，给 0。
+       dy 只给一点小偏移（−8 / −4 / 0 / +4，主波仍留在轴线上）＝ 一道一条小车道：
+       束主要仍靠读法（相位延迟、步长、量化、虚线）撑开，位置只错开一点点；
+       beats 取 2.5 / 5.2 / 7.8 拍（0.625 / 1.3 / 1.95s ＝ 一个波周期的 26% / 54% / 82%，
+       一拍收紧到 0.25s 后重编过号，绝对秒数与上一版逐数相同）—— 三道错开摆，不与主波
+       同相。dy 乘梦度 ⇒ 醒态四道照样精确重合回轴上。 */
+    const VOICES = [
+      { step: 2, beats: 2.5, dy: -4, gain: 0.9, q: 4, grid: 0, cls: 'eeg-echo-1', smooth: true },
+      { step: 3, beats: 5.2, dy: 4, gain: 0.5, q: 5, grid: 0.5, cls: 'eeg-echo-2', smooth: false },
+      { step: 5, beats: 7.8, dy: -8, gain: 0.42, q: 6, grid: 0, cls: 'eeg-echo-3', smooth: true },
+    ];
+    const echoPaths = VOICES.map((v) => svg.querySelector<SVGPathElement>('.' + v.cls));
+
+    const waveAt = (u: number, ph: number, A: number) =>
+      Math.sin(u * FREQ * TAU + ph * SPD) * A + Math.sin(u * FREQ * 2.7 + ph * 1.3) * A * 0.4;
+
+    /* 单个声部的路径。主波 ＝ {step:1, beats:0, dy:0, gain:.8, q:Q_MAIN}（gain 收两成）；
+       梦度 0 时恒等退化成线上那一行（同一套算式与 toFixed）。 */
+    function voicePath(
+      ph: number,
+      d: number,
+      v: { step: number; beats: number; dy: number; gain: number; q: number; smooth?: boolean },
+    ) {
       const W = innerWidth;
       const H = innerHeight;
-      const cy = H * 0.5; // 与 fixed 缝线同轴
+      const cy = H * 0.5;
       const half = Math.sqrt(W * W + H * H) / 2 + 60;
-      let d = '';
+      const step = STEP * v.step;
+      const lvl = STEP_LV[Math.min(2, Math.floor(((ph % 3) / 3) * 3))];
+      /* 阶梯由两件事合起来：hold 决定「横段＋竖阶」的画法，q 把 y 吸到格上让横段
+         更长、台阶更高。smooth 的声部两样都关掉 ⇒ 一路 L 的普通折线（连续曲线）。 */
+      const q = v.smooth ? 0 : v.q * lvl * Math.max(0, Math.min(1, (d - 0.1) / 0.9)); // 格随梦度连续长出
+      const hold = v.smooth ? 0 : step * d; // 零阶保持
+      const A = AMP * (1 + (GAIN_D * v.gain - 1) * d); // 分级振幅
+      const phv = ph - v.beats * BEAT * d; // 声部延迟（时间轴，≥1 拍）
+      const dy = v.dy * d; // 法向分离（四道都是 0，留在算式里当作单独展开某一道的旋钮）
+      const full = hold >= step - 0.6; // 满保持＝直角阶梯
+      let s = '';
       let first = true;
-      for (let x = -half; x <= half; x += 26) {
+      let px = 0;
+      let py = 0;
+      let lastY = 0;
+      for (let x = -half; x <= half; x += step) {
         const u = x / 600;
-        const y = Math.sin(u * FREQ * TAU + ph * SPD) * AMP + Math.sin(u * FREQ * 2.7 + ph * 1.3) * AMP * 0.4;
-        d += (first ? 'M' : 'L') + (W / 2 + x).toFixed(1) + ' ' + (cy + y).toFixed(1);
-        first = false;
+        let y = waveAt(u, phv, A);
+        if (q > 0.05) y = Math.round(y / q) * q;
+        const X = W / 2 + x;
+        const Y = cy + y + dy;
+        if (first) {
+          s = 'M' + X.toFixed(1) + ' ' + Y.toFixed(1);
+          lastY = Y;
+          first = false;
+        } else if (full && Math.abs(Y - lastY) < 0.05) s += 'H' + X.toFixed(1); // 同级平台并成一条 H
+        else if (full) {
+          s += 'H' + X.toFixed(1) + 'V' + Y.toFixed(1); // 直角阶梯
+          lastY = Y;
+        } else {
+          if (hold > 0.5) s += 'L' + (px + hold).toFixed(1) + ' ' + py.toFixed(1); // 半保持：折线∪阶梯的中间态
+          s += 'L' + X.toFixed(1) + ' ' + Y.toFixed(1);
+          lastY = Y;
+        }
+        px = X;
+        py = Y;
       }
-      main?.setAttribute('d', d);
-      g?.setAttribute('transform', `rotate(14 ${W / 2} ${cy})`);
+      return s;
+    }
+    // 主波：dy 留在 0（轴线上那一条）、grid 0（基准格，灰道才带半格偏移），gain 收两成
+    const MAIN_V = { step: 1, beats: 0, dy: 0, gain: 0.8, q: Q_MAIN, grid: 0 };
+
+    /* 某个声部的拍钟读数：把采样格整体挪 off 拍再取 floor（off 乘梦度 ⇒ 醒态 off=0，
+       与「不做 floor+frac 再求和」的醒态口径一致）。主波用 off=0 的基准格；灰道给半格
+       （grid 0.5）⇒ **两个阶梯波交错运动**：这一格主波跳、下一格灰道跳，不再同时抽动。 */
+    const gridAt = (v: { grid?: number }, d: number, ph: number) => {
+      const off = (v.grid ?? 0) * BEAT * d;
+      const g = Math.floor((ph - off) / BEAT) * BEAT + off;
+      return d === 0 ? ph : g + (1 - d) * (ph - g);
+    };
+
+    let lastMainGrid = NaN;
+    const lastGrid = VOICES.map(() => NaN);
+    let lastPh = NaN;
+    let lastD = NaN;
+    let lastRot = '';
+    const draw = (ph: number) => {
+      const d = 1 - wakeMix();
+      const rot = `rotate(14 ${innerWidth / 2} ${innerHeight * 0.5})`;
+      if (rot !== lastRot) {
+        g?.setAttribute('transform', rot);
+        lastRot = rot;
+      }
+      const dChanged = d !== lastD;
+      // 同一时刻的重复调用（rAF 与兜底定时器撞上）直接早退；梦度变了必须往下走
+      if (!dChanged && ph === lastPh) return;
+      lastPh = ph;
+      lastD = d;
+      /* 两个时钟：
+         · 拍钟 gridAt() ＝ 每 0.25s 采一次样并零阶保持 —— 两个阶梯波（主波与灰道）跟它走，
+           各自的格位分开记，谁走格谁重写（灰道带半格偏移 ⇒ 与主波交错）；
+         · 秒针 ph ＝ 逐帧推进 —— 有色两道（smooth）不受拍钟影响，连续流动。
+         醒态（d=0）直接取 ph：不做 floor+frac 的再求和，否则浮点重结合会让最后几位
+         变化，醒态就不是「与今天逐字一致」了。中间态是解析的：采样率连续收紧。 */
+      const mainGrid = gridAt(MAIN_V, d, ph);
+      if (dChanged || mainGrid !== lastMainGrid) {
+        lastMainGrid = mainGrid;
+        main?.setAttribute('d', voicePath(mainGrid, d, MAIN_V));
+      }
+      if (d > 0.02) {
+        // 醒态跳过全部残影：不比重写主波多一次循环
+        for (let i = 0; i < VOICES.length; i++) {
+          const v = VOICES[i];
+          if (v.smooth) {
+            // 有色两道跟秒针：每帧都重写，一直流动
+            echoPaths[i]?.setAttribute('d', voicePath(ph, d, v));
+            continue;
+          }
+          // 灰道跟拍钟：只在它自己那一格走动的帧里重写
+          const gv = gridAt(v, d, ph);
+          if (dChanged || gv !== lastGrid[i]) {
+            lastGrid[i] = gv;
+            echoPaths[i]?.setAttribute('d', voicePath(gv, d, v));
+          }
+        }
+      }
     };
     // 立即画一帧（不等 rAF），再用 rAF 驱动流动；
     // rAF 被节流/停转的环境里由低频定时器兜底补帧
@@ -44,6 +323,7 @@
       draw(ph);
     };
     tickDraw(0);
+    // 减动效：只留上面那一帧静态（残影的游走在 CSS 里同时停摆）
     if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
       let last = 0;
       (function loop(ts: number) {
@@ -60,25 +340,3 @@
     }
   }
 </script>
-
-<style>
-  .eeg {
-    position: fixed;
-    inset: 0;
-    width: 100vw;
-    height: 100vh;
-    /* 负 z：沉到内容之下（缝线之下、背景之上） */
-    z-index: -2;
-    pointer-events: none;
-    overflow: visible;
-  }
-
-  .eeg .eeg-main {
-    stroke: var(--umber);
-    stroke-width: 1.2;
-    fill: none;
-    opacity: 0.62;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-  }
-</style>
