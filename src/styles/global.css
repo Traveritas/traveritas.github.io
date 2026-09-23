@@ -31,10 +31,43 @@ body {
   font-size: 1.0625rem;
   line-height: 1.9;
   color: var(--fg);
-  /* 大表面洗染：--wash 由 reality.ts 随醒度插值（梦暖褐 ↔ 醒冷灰），
-     --bg 的所有权仍在 night.ts——洗染只在消费侧混合 */
-  background: color-mix(in srgb, var(--bg) 93%, var(--wash));
+  /* 根底色纯净静态，不随醒度逐帧修改，彻底杜绝全局重绘；
+     大表面洗染由 GPU 独立的 .wash-backdrop 承担 */
+  background: var(--bg);
   text-rendering: optimizeLegibility;
+}
+
+/* ── 大表面洗染层（GPU 独立合成，0 次根画布重绘）──
+   7% 混入：梦端暖褐(#8a5a30) ↔ 醒端冷灰(#556270)，
+   由 --reality-mix（0=梦，1=醒）驱动透明度淡入淡出 */
+.wash-backdrop {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -5;
+  overflow: hidden;
+  transform: translateZ(0);
+}
+
+.wash-backdrop::before,
+.wash-backdrop::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  will-change: opacity;
+  transform: translateZ(0);
+}
+
+/* 梦端暖褐洗染 */
+.wash-backdrop::before {
+  background-color: #8a5a30;
+  opacity: calc((1 - var(--reality-mix, 1)) * 0.07);
+}
+
+/* 醒端冷灰洗染 */
+.wash-backdrop::after {
+  background-color: #556270;
+  opacity: calc(var(--reality-mix, 1) * 0.07);
 }
 
 img,

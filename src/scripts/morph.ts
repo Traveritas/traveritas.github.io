@@ -72,12 +72,24 @@ function animate(m: MEl, target: string, dur: number, done?: () => void) {
     m.cur = target;
     done?.();
   };
+  if (dur <= 0) {
+    finish();
+    return;
+  }
   const t0 = performance.now();
+  let lastTick = 0;
   const step = (now: number) => {
     const p = Math.min((now - t0) / dur, 1);
-    m.el.textContent = render(target, easeOut(p));
-    if (p < 1 && !finished) m.raf = requestAnimationFrame(step);
-    else finish();
+    if (p >= 1) {
+      finish();
+      return;
+    }
+    // 节流至 ~30fps（约 32ms 间隔）：大幅削减 DOM 文本高频重排，且走神字符跳变更加清晰有节奏
+    if (now - lastTick >= 32) {
+      lastTick = now;
+      m.el.textContent = render(target, easeOut(p));
+    }
+    if (!finished) m.raf = requestAnimationFrame(step);
   };
   m.raf = requestAnimationFrame(step);
   // 看门狗：rAF 被节流/停转时按时落定，绝不卡在半乱码

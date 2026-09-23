@@ -28,13 +28,12 @@ const eio3 = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 
 
 /* 强调色双色（醒面=醒灰冷，doorcheck 语义）：梦端取 tokens 现值。
    --dream 醒端＝休眠的灰沙（缝线梦侧、药丸边、vtag 暖签随醒度褪暖）；
-   --wash 供 global.css body 混入 7% 的大表面洗染（梦暖褐 ↔ 醒冷灰） */
+   大表面洗染由 GPU 独立的 .wash-backdrop 承担（梦暖褐 ↔ 醒冷灰），不在根节点逐帧重写 */
 const ACCENT: Record<string, [number[], number[]]> = {
   '--amber': [hexToRgb('#d9a05b'), hexToRgb('#a7b1ba')],
   '--umber': [hexToRgb('#765640'), hexToRgb('#556270')],
   '--ghost-ink': [hexToRgb('#b98f74'), hexToRgb('#8e9aa6')],
   '--dream': [hexToRgb('#c2a382'), hexToRgb('#a39c92')],
-  '--wash': [hexToRgb('#8a5a30'), hexToRgb('#556270')],
 };
 const mixRgb = (a: number[], b: number[], t: number) =>
   `rgb(${Math.round(a[0] + (b[0] - a[0]) * t)},${Math.round(a[1] + (b[1] - a[1]) * t)},${Math.round(
@@ -123,8 +122,8 @@ function buildFx() {
   if (fx) return;
   const style = document.createElement('style');
   style.textContent = `
-.fx-reality{position:fixed;inset:0;z-index:210;pointer-events:none;overflow:hidden}
-.fx-reality .thread{position:absolute;left:0;top:0;width:0;height:0;display:none;transform-origin:0 0}
+.fx-reality{position:fixed;inset:0;z-index:210;pointer-events:none;overflow:hidden;transform:translateZ(0)}
+.fx-reality .thread{position:absolute;left:0;top:0;width:0;height:0;display:none;transform-origin:0 0;will-change:transform}
 .fx-reality .t-core{position:absolute;top:-0.5px;left:0;width:0;height:1px;opacity:1}
 .fx-reality .t-band{position:absolute;top:-32px;left:0;width:0;height:64px;opacity:0;
   -webkit-mask-image:linear-gradient(90deg,transparent,#000 14%,#000 86%,transparent);
@@ -203,23 +202,39 @@ body.reality-holding{user-select:none;-webkit-user-select:none;-webkit-touch-cal
 function fullW() {
   return 2 * Math.max(px, innerWidth - px) + 80;
 }
+
+let threadBaseW = 0;
+function initThreadBase(forceW?: number) {
+  threadBaseW = forceW ?? fullW();
+  if (tCore && tBand) {
+    tCore.style.width = `${threadBaseW}px`;
+    tCore.style.left = `${-threadBaseW / 2}px`;
+    tBand.style.width = `${threadBaseW}px`;
+    tBand.style.left = `${-threadBaseW / 2}px`;
+  }
+}
+
 function drawThread(W: number, ang: number, coreOp: number, bandOp: number) {
   if (!thread || !tCore || !tBand) return;
-  thread.style.transform = `translate(${px}px,${py}px) rotate(${ang}deg)`;
-  tCore.style.width = `${W}px`;
-  tCore.style.left = `${-W / 2}px`;
-  tBand.style.width = `${W}px`;
-  tBand.style.left = `${-W / 2}px`;
+  if (threadBaseW <= 0 || W > threadBaseW * 1.05) {
+    initThreadBase(Math.max(fullW(), W));
+  }
+  const sx = threadBaseW > 0 ? W / threadBaseW : 0;
+  thread.style.transform = `translate3d(${px}px,${py}px,0) rotate(${ang}deg) scaleX(${sx.toFixed(4)})`;
   tCore.style.opacity = `${coreOp}`;
   tBand.style.opacity = `${bandOp}`;
 }
+
+let lastMix = -1;
 function setTint(cc: number) {
-  // 双色由强调色插值承担（含 --wash 大表面洗染），不做全屏渐变层
+  const rounded = Math.round(cc * 1000) / 1000;
+  if (rounded === lastMix) return;
+  lastMix = rounded;
   for (const k in ACCENT) {
     const [d, w] = ACCENT[k];
-    docEl.style.setProperty(k, mixRgb(d, w, cc));
+    docEl.style.setProperty(k, mixRgb(d, w, rounded));
   }
-  docEl.style.setProperty('--reality-mix', cc.toFixed(4));
+  docEl.style.setProperty('--reality-mix', rounded.toFixed(3));
 }
 
 /** 当前醒度 0..1（chrome.ts 锚点游走等「醒静梦动」消费方使用） */
@@ -352,6 +367,7 @@ function beginHold(x: number, y: number, fromSrc: 'ptr' | 'kb') {
   dir = reality === 'dream' ? 'go' : 'back';
   px = x;
   py = y;
+  initThreadBase();
   p = 0;
   holdT0 = now;
   holdActive = false;
