@@ -1,0 +1,1806 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>方案 3：浮动磨砂晶面与光线折射 · Frosted Strata & Optical Prisms (p13-c)</title>
+  
+  <!-- Web Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&family=Noto+Serif+SC:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+
+  <style>
+    /* ═══════════════════════════════════════════════════════════════════
+       《醒梦》设计令牌 · Tokens (与 tokens.css 及 night.ts 对齐)
+       审美核心：神秘 / 朦胧 / 安静 / 磨砂玻璃 / 半透明树脂 / 大面积留白 / 低饱和微温
+       ─────────────────────────────────────────────────────────────────── */
+    :root {
+      color-scheme: dark;
+
+      /* 默认平台：夜色 Deep #171b24 (夜间核心平台) */
+      --bg: #171b24;
+      --bg-sunken: #11141b;
+      --fg: #e5e0d2;
+      --fg-soft: #b9b3a4;
+      --fg-faint: #727a85;
+      --line: rgba(229, 224, 210, 0.16);
+
+      /* 醒梦双色域与异质锚点 */
+      --wake: #a7b1ba;       /* 醒 · 冷灰 */
+      --dream: #c2a382;      /* 梦 · 暖沙 */
+      --umber: #765640;      /* 沉褐 */
+      --amber: #d9a05b;      /* 全站唯一异质色：焦点、标尺高亮与棱镜折射光 */
+      --axis-angle: 14deg;   /* 全站 14° 倾角轴线 */
+      --ghost-ink: #b98f74;
+
+      /* 醒梦双态总闸：
+         --reality-mix: 0 = 梦态 (Dream · AveritA)，1 = 醒态 (Wake · Traveritas)
+         --still: 0 = 醒态 (收束、纯净静止)，1 = 梦态 (浮现、抽帧浮动) */
+      --reality-mix: 0;
+      --still: calc(1 - var(--reality-mix));
+      
+      /* 晶面动态派生变量（亦由 JS 逐帧或拖动实时注入确保跨浏览器兼容） */
+      --prism-blur: 20px;
+      --prism-opacity: 0.96;
+      --prism-scale: 1;
+
+      /* 字体体系 */
+      --font-display: "Noto Serif SC", "Palatino Linotype", Georgia, "Songti SC", serif;
+      --font-body: system-ui, -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      --font-mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+
+      /* 尺寸度量 */
+      --measure: 40em;
+      --content-w: 980px;
+    }
+
+    /* 光面平台 (Light #e9ecef) */
+    body.theme-light {
+      color-scheme: light;
+      --bg: #e9ecef;
+      --bg-sunken: #e1e5ea;
+      --fg: #262c33;
+      --fg-soft: #59626c;
+      --fg-faint: #8a929b;
+      --line: rgba(38, 44, 51, 0.14);
+      --ghost-ink: #9a765d;
+    }
+
+    /* 纸面平台 (Paper #efe9dd) */
+    body.theme-paper {
+      color-scheme: light;
+      --bg: #efe9dd;
+      --bg-sunken: #e5ded0;
+      --fg: #55503f;
+      --fg-soft: #665f50;
+      --fg-faint: #9c9584;
+      --line: rgba(85, 80, 63, 0.16);
+      --ghost-ink: #8c6a51;
+    }
+
+    /* 全局重置与基础排版 */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      -webkit-text-size-adjust: 100%;
+      scroll-behavior: smooth;
+      background-color: var(--bg);
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--fg);
+      font-family: var(--font-body);
+      line-height: 1.8;
+      min-height: 100vh;
+      overflow-x: clip;
+      position: relative;
+      transition: background-color 0.4s ease, color 0.4s ease;
+      text-rendering: optimizeLegibility;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+      transition: color 0.2s ease;
+    }
+
+    .mono {
+      font-family: var(--font-mono);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       顶部交互控制台 · Interactive Control Station (试验原型专用)
+       ─────────────────────────────────────────────────────────────────── */
+    .control-deck {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: color-mix(in srgb, var(--bg) 88%, transparent);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--line);
+      padding: 0.75rem 1.5rem;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      color: var(--fg-soft);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+      transition: background-color 0.3s ease, border-color 0.3s ease;
+    }
+
+    .deck-inner {
+      max-width: var(--content-w);
+      margin: 0 auto;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem 1.8rem;
+    }
+
+    .deck-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-weight: 600;
+      color: var(--fg);
+      letter-spacing: 0.05em;
+    }
+
+    .deck-pill {
+      display: inline-block;
+      padding: 0.1rem 0.5rem;
+      border-radius: 999px;
+      font-size: 0.68rem;
+      background: rgba(217, 160, 91, 0.15);
+      border: 1px solid rgba(217, 160, 91, 0.4);
+      color: var(--amber);
+      text-transform: uppercase;
+    }
+
+    .deck-controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 1.25rem 2rem;
+    }
+
+    .control-cluster {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+
+    .control-tag {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--fg-faint);
+    }
+
+    .btn-segmented {
+      display: inline-flex;
+      background: rgba(0, 0, 0, 0.22);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 2px;
+      gap: 2px;
+    }
+
+    .deck-btn {
+      background: transparent;
+      border: none;
+      color: var(--fg-soft);
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      padding: 0.28rem 0.65rem;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      user-select: none;
+    }
+
+    .deck-btn:hover {
+      color: var(--fg);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .deck-btn.active {
+      background: rgba(217, 160, 91, 0.18);
+      color: var(--amber);
+      font-weight: 600;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    }
+
+    /* 连续滑动条组 */
+    .slider-wrap {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      min-width: 250px;
+    }
+
+    .reality-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      flex: 1;
+      height: 4px;
+      background: linear-gradient(90deg, var(--amber) 0%, rgba(229, 224, 210, 0.2) 100%);
+      border-radius: 2px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .reality-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--fg);
+      border: 2px solid var(--amber);
+      cursor: ew-resize;
+      box-shadow: 0 0 8px rgba(217, 160, 91, 0.6);
+      transition: transform 0.15s ease;
+    }
+
+    .reality-slider::-webkit-slider-thumb:hover {
+      transform: scale(1.2);
+    }
+
+    .slider-val {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--amber);
+      min-width: 48px;
+      text-align: right;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       背景层与光学标尺 · Background, Axis Hairline & Optical Matrix
+       ─────────────────────────────────────────────────────────────────── */
+    .viewport-canvas {
+      position: relative;
+      width: 100%;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+
+    /* 全局 14° 发丝轴线 */
+    .axis-hairline {
+      position: fixed;
+      left: 50%;
+      top: 50%;
+      width: 200vmax;
+      height: 1px;
+      z-index: 1;
+      pointer-events: none;
+      background: linear-gradient(
+        90deg,
+        rgba(167, 177, 186, 0) 0%,
+        rgba(167, 177, 186, 0.2) 20%,
+        rgba(217, 160, 91, 0.35) 50%,
+        rgba(194, 163, 130, 0.25) 80%,
+        rgba(194, 163, 130, 0) 100%
+      );
+      transform: translate(-50%, -50%) rotate(var(--axis-angle));
+      opacity: 0.7;
+    }
+
+    /* 背景脑电波形与坐标微网格 */
+    .bg-optical-grid {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      opacity: 0.05;
+      background-image: 
+        radial-gradient(circle at 50% 50%, var(--fg) 0.5px, transparent 0.6px),
+        linear-gradient(to right, var(--fg) 1px, transparent 1px),
+        linear-gradient(to bottom, var(--fg) 1px, transparent 1px);
+      background-size: 48px 48px, 144px 144px, 144px 144px;
+    }
+
+    /* 纸纹噪点质感 */
+    .grain-veil {
+      position: fixed;
+      inset: 0;
+      z-index: 30;
+      pointer-events: none;
+      opacity: 0.04;
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='160' height='160' filter='url(%23n)' opacity='.6'/></svg>");
+    }
+
+    /* 幽灵描边水印（沉在背景底色与磨砂晶面之后） */
+    .ghost-plane {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+      overflow: hidden;
+    }
+
+    .ghost-glyph {
+      position: absolute;
+      font-family: var(--font-display);
+      font-size: clamp(14rem, 28vw, 24rem);
+      font-weight: 900;
+      line-height: 1;
+      color: transparent;
+      -webkit-text-stroke: 1px color-mix(in srgb, var(--ghost-ink) 22%, transparent);
+      user-select: none;
+      transition: transform 1.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.8s ease;
+    }
+
+    .ghost-wake {
+      top: 8%;
+      right: 4%;
+      transform: translate3d(calc(var(--reality-mix) * 20px), 0, 0);
+      opacity: calc(0.3 + var(--reality-mix) * 0.4);
+    }
+
+    .ghost-dream {
+      top: 36%;
+      left: 2%;
+      transform: translate3d(calc(var(--still) * -20px), 0, 0);
+      opacity: calc(0.2 + var(--still) * 0.5);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       核心亮点：浮动磨砂晶面层 · Frosted Strata & Optical Prisms
+       沉浸在正文与底色之间，具备真实毛玻璃质感、steps(5) 抽帧微位移
+       ─────────────────────────────────────────────────────────────────── */
+    .strata-stage {
+      position: absolute;
+      inset: 0;
+      z-index: 5; /* 位于背景水印 (z:1) 与正文卡片 (z:10) 之间 */
+      pointer-events: none;
+      overflow: hidden;
+    }
+
+    .strata-prism {
+      position: absolute;
+      border-radius: 32px;
+      overflow: hidden;
+      will-change: transform, opacity, backdrop-filter;
+      
+      /* 核心毛玻璃与半透明树脂质感 */
+      backdrop-filter: blur(var(--prism-blur)) saturate(125%);
+      -webkit-backdrop-filter: blur(var(--prism-blur)) saturate(125%);
+      
+      /* 琥珀与暖沙微弱渐变光晕与 0.5px 发丝边缘 */
+      border: 0.5px solid rgba(217, 160, 91, calc(0.28 * var(--still)));
+      background: linear-gradient(
+        138deg,
+        rgba(255, 255, 255, calc(0.045 * var(--still))) 0%,
+        rgba(217, 160, 91, calc(0.035 * var(--still))) 38%,
+        rgba(194, 163, 130, calc(0.015 * var(--still))) 70%,
+        rgba(15, 18, 26, calc(0.35 * var(--still))) 100%
+      );
+      
+      box-shadow: 
+        0 24px 70px -16px rgba(0, 0, 0, calc(0.55 * var(--still))),
+        inset 0 1px 1px rgba(255, 255, 255, calc(0.18 * var(--still))),
+        inset 0 -1px 1px rgba(217, 160, 91, calc(0.12 * var(--still))),
+        0 0 45px -10px rgba(217, 160, 91, calc(0.14 * var(--still)));
+      
+      opacity: var(--prism-opacity);
+      transform-origin: center center;
+      transition: 
+        border-color 0.8s cubic-bezier(0.16, 1, 0.3, 1),
+        box-shadow 0.8s cubic-bezier(0.16, 1, 0.3, 1),
+        background 0.8s ease;
+    }
+
+    /* 棱镜折射顶缘微光斑 (Optical Refraction Highlight) */
+    .strata-prism::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 1.5px;
+      background: linear-gradient(
+        90deg,
+        rgba(167, 177, 186, calc(0.1 * var(--still))) 0%,
+        rgba(217, 160, 91, calc(0.7 * var(--still))) 30%,
+        rgba(255, 245, 230, calc(0.9 * var(--still))) 50%,
+        rgba(194, 163, 130, calc(0.5 * var(--still))) 75%,
+        rgba(120, 160, 200, calc(0.15 * var(--still))) 100%
+      );
+      filter: blur(0.5px);
+      pointer-events: none;
+    }
+
+    /* 树脂内部微反光漫射 (Caustic Sheen) */
+    .strata-prism::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      background: radial-gradient(
+        circle at 25% 20%,
+        rgba(217, 160, 91, calc(0.1 * var(--still))) 0%,
+        rgba(255, 255, 255, calc(0.02 * var(--still))) 45%,
+        transparent 75%
+      );
+      pointer-events: none;
+    }
+
+    /* 晶面几何与位点分布：2~3 个非对称的巨大半透明磨砂晶面 */
+    
+    /* 晶面 1：初相 · 浮光晶阶 (Prism Alpha · 位于首屏右上，斜掠过题头与随笔) */
+    .strata-prism-1 {
+      top: 140px;
+      right: max(2vw, calc(50% - 560px));
+      width: clamp(380px, 42vw, 540px);
+      height: clamp(320px, 36vw, 440px);
+      border-radius: 42px 24px 56px 28px;
+      transform: 
+        translate3d(calc(var(--reality-mix) * 60px), calc(var(--reality-mix) * -30px), 0)
+        rotate(calc(12deg + var(--reality-mix) * 4deg))
+        scale(var(--prism-scale));
+      animation: strata-step-drift-1 18s steps(5, jump-none) infinite alternate;
+    }
+
+    /* 晶面 2：深流 · 偏振棱板 (Prism Beta · 位于中段左侧，承托项目与深眠账目) */
+    .strata-prism-2 {
+      top: 760px;
+      left: max(1vw, calc(50% - 620px));
+      width: clamp(420px, 46vw, 580px);
+      height: clamp(340px, 38vw, 460px);
+      border-radius: 28px 48px 24px 44px;
+      transform: 
+        translate3d(calc(var(--reality-mix) * -50px), calc(var(--reality-mix) * 20px), 0)
+        rotate(calc(-6deg + var(--reality-mix) * -3deg))
+        scale(var(--prism-scale));
+      animation: strata-step-drift-2 22s steps(5, jump-none) infinite alternate;
+      animation-delay: -4s;
+    }
+
+    /* 晶面 3：未明 · 悬浮透镜 (Prism Gamma · 位于试验场底部，折射母题种子) */
+    .strata-prism-3 {
+      top: 1440px;
+      right: max(4vw, calc(50% - 520px));
+      width: clamp(360px, 38vw, 480px);
+      height: clamp(300px, 32vw, 380px);
+      border-radius: 48px 20px 40px 30px;
+      transform: 
+        translate3d(calc(var(--reality-mix) * 40px), calc(var(--reality-mix) * 40px), 0)
+        rotate(calc(9deg + var(--reality-mix) * -5deg))
+        scale(var(--prism-scale));
+      animation: strata-step-drift-3 16s steps(5, jump-none) infinite alternate;
+      animation-delay: -8s;
+    }
+
+    /* ─────────────────────────────────────────────────────────────
+       知觉抽帧核心：steps(5) 极缓慢阶跃位移，如同微型机构推进
+       ───────────────────────────────────────────────────────────── */
+    @keyframes strata-step-drift-1 {
+      0%   { transform: translate3d(0, 0, 0) rotate(12deg); }
+      25%  { transform: translate3d(-10px, 8px, 0) rotate(12.6deg); }
+      50%  { transform: translate3d(-20px, -4px, 0) rotate(11.4deg); }
+      75%  { transform: translate3d(-8px, -14px, 0) rotate(12.8deg); }
+      100% { transform: translate3d(6px, -6px, 0) rotate(11.6deg); }
+    }
+
+    @keyframes strata-step-drift-2 {
+      0%   { transform: translate3d(0, 0, 0) rotate(-6deg); }
+      20%  { transform: translate3d(12px, -8px, 0) rotate(-5.4deg); }
+      40%  { transform: translate3d(22px, 6px, 0) rotate(-6.5deg); }
+      70%  { transform: translate3d(8px, 16px, 0) rotate(-5.2deg); }
+      100% { transform: translate3d(-10px, 4px, 0) rotate(-6.4deg); }
+    }
+
+    @keyframes strata-step-drift-3 {
+      0%   { transform: translate3d(0, 0, 0) rotate(9deg); }
+      30%  { transform: translate3d(-12px, -10px, 0) rotate(8.4deg); }
+      60%  { transform: translate3d(-4px, 12px, 0) rotate(9.6deg); }
+      100% { transform: translate3d(10px, 4px, 0) rotate(8.6deg); }
+    }
+
+    /* 醒态下（或静止状态）：晶面收束隐退，完全停用动画 */
+    .state-wake .strata-prism {
+      animation: none !important;
+      opacity: 0 !important;
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+    }
+
+    /* 水汽溶变效果 (Frosted Dissolve) */
+    .vapor-dissolving .strata-prism {
+      filter: blur(6px);
+      transition: filter 0.65s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.65s ease;
+    }
+
+    /* 晶面标尺线调试高亮模式 */
+    body.show-wireframe .strata-prism {
+      border: 1px dashed var(--amber) !important;
+      box-shadow: 0 0 0 1px rgba(217, 160, 91, 0.3) !important;
+    }
+    body.show-wireframe .strata-prism::after {
+      content: attr(data-prism-tag);
+      position: absolute;
+      top: 16px;
+      left: 20px;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--amber);
+      background: rgba(0, 0, 0, 0.65);
+      padding: 0.2rem 0.6rem;
+      border-radius: 4px;
+      border: 1px solid var(--amber);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       正文排版层 · Foreground Content Layout (z-index: 10)
+       ─────────────────────────────────────────────────────────────────── */
+    .content-shell {
+      position: relative;
+      z-index: 10;
+      max-width: var(--content-w);
+      margin: 0 auto;
+      padding: 2.5rem 1.5rem 8rem;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       站点页头 · SiteHeader (Brand "AveritA" 醒梦转换引擎 + 导航)
+       ─────────────────────────────────────────────────────────────────── */
+    .site-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1.5rem;
+      padding-block: 1rem 1.6rem;
+      border-bottom: 1px dashed var(--line);
+      margin-bottom: 3.5rem;
+    }
+
+    /* 品牌引擎容器 */
+    .brand-engine {
+      display: inline-flex;
+      align-items: baseline;
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 1.45rem;
+      letter-spacing: 0.04em;
+      min-width: 160px;
+      cursor: pointer;
+      user-select: none;
+      position: relative;
+      color: var(--fg);
+    }
+
+    .brand-slot {
+      display: inline-block;
+      position: relative;
+      transform-origin: center bottom;
+      will-change: transform, opacity;
+      transition: color 0.3s ease;
+    }
+
+    /* 梦态下 AveritA 的知觉抽帧量化阶跃浮动与琥珀微温漫射 */
+    .state-dream .brand-slot {
+      animation: averita-quant-float 3.0s steps(5, jump-none) infinite alternate;
+      animation-delay: calc(var(--i) * -0.36s);
+      text-shadow: 0 0 10px rgba(217, 160, 91, 0.45), 0 0 1px rgba(255, 255, 255, 0.7);
+    }
+
+    @keyframes averita-quant-float {
+      0%   { transform: translateY(0px) scale(1); opacity: 0.92; }
+      33%  { transform: translateY(-1.5px) scale(1.01); opacity: 0.97; }
+      66%  { transform: translateY(-3.2px) scale(1.02); opacity: 1; text-shadow: 0 0 12px rgba(217, 160, 91, 0.55); }
+      100% { transform: translateY(-4.5px) scale(0.99); opacity: 0.88; }
+    }
+
+    /* 醒态下关闭动画，恢复纯净静态展示衬线 */
+    .state-wake .brand-slot {
+      animation: none !important;
+      transform: none !important;
+      text-shadow: none !important;
+      opacity: 1 !important;
+      color: var(--fg) !important;
+    }
+
+    /* 字符瞬时阶梯过渡残影 (Step Morph Flash) */
+    .brand-slot.step-morph {
+      animation: brand-flash-morph 0.15s steps(2) !important;
+    }
+    @keyframes brand-flash-morph {
+      0%   { opacity: 0.25; transform: translateY(1.5px); filter: blur(1px); }
+      100% { opacity: 1; transform: translateY(0); filter: none; }
+    }
+
+    /* 导航栏 */
+    .site-nav {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--fg-soft);
+    }
+
+    .nav-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--fg-soft);
+      padding: 0.3rem 0.2rem;
+      position: relative;
+    }
+
+    .nav-link:hover {
+      color: var(--fg);
+    }
+
+    .nav-link.is-current {
+      color: var(--fg);
+      font-weight: 500;
+    }
+
+    /* 14° 轴线微标尺 (代替手工作坊针脚) */
+    .nav-axis-pip {
+      display: inline-block;
+      width: 10px;
+      height: 1.8px;
+      background: var(--fg-faint);
+      transform: rotate(var(--axis-angle));
+      opacity: 0.45;
+      border-radius: 1px;
+      transition: background-color 0.2s ease, opacity 0.2s ease;
+    }
+
+    .nav-link.is-current .nav-axis-pip {
+      background: var(--amber);
+      opacity: 1;
+      box-shadow: 0 0 6px rgba(217, 160, 91, 0.5);
+    }
+
+    /* 刻度指示器 */
+    .nav-station-tag {
+      font-size: 0.72rem;
+      color: var(--fg-faint);
+      border-left: 1px solid var(--line);
+      padding-left: 1rem;
+      display: none;
+    }
+    @media (min-width: 768px) {
+      .nav-station-tag { display: inline-block; }
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       首屏沉浸宣言 · Hero Ingress
+       ─────────────────────────────────────────────────────────────────── */
+    .hero-ingress {
+      margin-bottom: 5.5rem;
+      position: relative;
+    }
+
+    .hero-meta {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--fg-faint);
+      margin-bottom: 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+    }
+
+    .hero-time-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      color: var(--amber);
+    }
+    .hero-time-indicator::before {
+      content: '';
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--amber);
+      box-shadow: 0 0 8px var(--amber);
+    }
+
+    .hero-title {
+      font-family: var(--font-display);
+      font-size: clamp(1.85rem, 4.2vw, 2.75rem);
+      font-weight: 600;
+      line-height: 1.35;
+      letter-spacing: 0.02em;
+      margin-bottom: 1.8rem;
+      color: var(--fg);
+      max-width: 24em;
+    }
+
+    .hero-manifesto {
+      font-size: 1.05rem;
+      line-height: 1.9;
+      color: var(--fg-soft);
+      max-width: 36em;
+      position: relative;
+    }
+
+    .hero-scroll-cue {
+      margin-top: 2.5rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.6rem;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--fg-faint);
+    }
+
+    .cue-axis-line {
+      display: inline-block;
+      width: 24px;
+      height: 1px;
+      background: var(--line);
+      position: relative;
+    }
+    .cue-axis-line::after {
+      content: '';
+      position: absolute;
+      right: 0;
+      top: -2px;
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--amber);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       版块公共题头与徽标体系 (维特根斯坦命题边界)
+       ─────────────────────────────────────────────────────────────────── */
+    .section-head {
+      margin-bottom: 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 1rem;
+    }
+
+    .section-head-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .section-title-wrap {
+      display: flex;
+      align-items: baseline;
+      gap: 0.8rem;
+    }
+
+    .section-title {
+      font-family: var(--font-display);
+      font-size: 1.4rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+    }
+
+    .section-stage {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--fg-faint);
+    }
+
+    .section-verdict {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+      font-size: 0.85rem;
+    }
+
+    /* 维特根斯坦命题边界小徽标 */
+    .witt-badge {
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      padding: 0.15rem 0.55rem;
+      border-radius: 4px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    .witt-badge.warm {
+      background: rgba(217, 160, 91, 0.12);
+      border: 1px solid rgba(217, 160, 91, 0.35);
+      color: var(--amber);
+    }
+
+    .witt-badge.cool {
+      background: rgba(167, 177, 186, 0.12);
+      border: 1px solid rgba(167, 177, 186, 0.35);
+      color: var(--wake);
+    }
+
+    .verdict-voice {
+      color: var(--fg-soft);
+      font-size: 0.84rem;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       版块 1：随笔 / 断章 · 可言说的 · SAYABLE
+       (毛玻璃晶片 GlassChips 错位层叠，检验磨砂晶面划过正文时的透光感)
+       ─────────────────────────────────────────────────────────────────── */
+    .essays-band {
+      margin-bottom: 6rem;
+    }
+
+    .essays-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.5rem;
+      margin-top: 1.5rem;
+    }
+
+    .glass-card {
+      position: relative;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 1.6rem 1.6rem 1.8rem;
+      transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: 220px;
+    }
+
+    .glass-card:hover {
+      background: rgba(255, 255, 255, 0.045);
+      border-color: rgba(217, 160, 91, 0.45);
+      transform: translateY(-3px);
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25), 0 0 20px rgba(217, 160, 91, 0.1);
+    }
+
+    .card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.9rem;
+    }
+
+    .card-index {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: var(--amber);
+      letter-spacing: 0.08em;
+    }
+
+    .card-date {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--fg-faint);
+    }
+
+    .card-title {
+      font-family: var(--font-display);
+      font-size: 1.15rem;
+      font-weight: 600;
+      line-height: 1.45;
+      margin-bottom: 0.75rem;
+      color: var(--fg);
+    }
+
+    .card-excerpt {
+      font-size: 0.88rem;
+      color: var(--fg-soft);
+      line-height: 1.7;
+    }
+
+    .card-foot {
+      margin-top: 1.4rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--fg-faint);
+      border-top: 1px dashed var(--line);
+      padding-top: 0.75rem;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       版块 2：项目 / 造物 · 可构造的 · BUILDABLE
+       (严格遵守八阶成形度 Eight Depths 与克制温和公开标识，严禁裁缝审计黑话)
+       ─────────────────────────────────────────────────────────────────── */
+    .projects-band {
+      margin-bottom: 6rem;
+    }
+
+    .ledger-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      margin-top: 1.5rem;
+    }
+
+    .ledger-item {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.015);
+      transition: all 0.25s ease;
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+    }
+
+    .ledger-item:hover {
+      border-color: rgba(217, 160, 91, 0.35);
+      background: rgba(255, 255, 255, 0.035);
+    }
+
+    .ledger-link {
+      display: grid;
+      grid-template-columns: 90px 1fr auto;
+      align-items: center;
+      padding: 1.1rem 1.4rem;
+      gap: 1.25rem;
+    }
+    @media (max-width: 680px) {
+      .ledger-link {
+        grid-template-columns: 1fr;
+        gap: 0.6rem;
+      }
+    }
+
+    .ledger-date {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--fg-faint);
+    }
+
+    .ledger-main {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+
+    .ledger-head-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.75rem 1.25rem;
+    }
+
+    .ledger-name {
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 1.05rem;
+      color: var(--fg);
+    }
+
+    /* 八阶成形 / 浮现度 (Eight Depths) 指示器 */
+    .depth-gauge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--fg-faint);
+    }
+
+    .gauge-pips {
+      display: inline-flex;
+      gap: 3px;
+    }
+
+    .gauge-pip {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: rgba(229, 224, 210, 0.18);
+    }
+    .gauge-pip.on {
+      background: var(--amber);
+      box-shadow: 0 0 5px rgba(217, 160, 91, 0.6);
+    }
+
+    .ledger-desc {
+      font-size: 0.84rem;
+      color: var(--fg-soft);
+      line-height: 1.6;
+    }
+
+    /* 仓库公开标识 (克制温和，拒绝官僚审计黑话) */
+    .repo-pill {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      padding: 0.25rem 0.65rem;
+      border-radius: 999px;
+      white-space: nowrap;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    .repo-pill.public {
+      background: rgba(217, 160, 91, 0.1);
+      border: 1px solid rgba(217, 160, 91, 0.3);
+      color: var(--amber);
+    }
+
+    .repo-pill.private {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--line);
+      color: var(--fg-faint);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       版块 3：试验场 · 未命名的 · UNNAMED
+       (种子药丸浮于场内，折射晶面划过时呈现多重虚实)
+       ─────────────────────────────────────────────────────────────────── */
+    .rem-band {
+      margin-bottom: 6rem;
+    }
+
+    .seeds-field {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-top: 1.5rem;
+    }
+
+    .seed-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.65rem;
+      padding: 0.55rem 1.1rem;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.025);
+      border: 1px solid var(--line);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      font-size: 0.86rem;
+      color: var(--fg);
+      transition: all 0.25s ease;
+      cursor: default;
+    }
+
+    .seed-pill:hover {
+      border-color: rgba(217, 160, 91, 0.45);
+      background: rgba(217, 160, 91, 0.08);
+      transform: translateY(-2px);
+    }
+
+    .seed-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--amber);
+      opacity: 0.7;
+    }
+
+    .seed-desc {
+      font-size: 0.75rem;
+      color: var(--fg-soft);
+      font-family: var(--font-mono);
+    }
+
+    .seed-pill.is-active {
+      border-color: var(--amber);
+      background: rgba(217, 160, 91, 0.15);
+    }
+    .seed-pill.is-active .seed-dot {
+      box-shadow: 0 0 6px var(--amber);
+      opacity: 1;
+    }
+
+    .seed-pill.is-dead {
+      opacity: 0.45;
+      text-decoration: line-through;
+      border-style: dashed;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       页脚 · Footer
+       ─────────────────────────────────────────────────────────────────── */
+    .site-footer {
+      border-top: 1px solid var(--line);
+      padding-top: 2rem;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1.25rem;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--fg-faint);
+    }
+
+    .footer-left {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+    }
+
+    .footer-links {
+      display: flex;
+      align-items: center;
+      gap: 1.25rem;
+    }
+    .footer-links a:hover {
+      color: var(--amber);
+    }
+
+    /* 减弱动画适配 */
+    @media (prefers-reduced-motion: reduce) {
+      .strata-prism, .brand-slot {
+        animation: none !important;
+      }
+    }
+    body.reduced-motion .strata-prism,
+    body.reduced-motion .brand-slot {
+      animation: none !important;
+      transition: none !important;
+    }
+  </style>
+</head>
+<body class="theme-deep state-dream">
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       顶部交互控制台 (Top Interactive Deck)
+       ─────────────────────────────────────────────────────────────────── -->
+  <header class="control-deck" aria-label="原型控制面板">
+    <div class="deck-inner">
+      <div class="deck-badge">
+        <span>方案 3 · 浮动磨砂晶面与光线折射</span>
+        <span class="deck-pill">Frosted Strata & Optical Prisms</span>
+      </div>
+
+      <div class="deck-controls">
+        <!-- 醒 / 梦 两态切换 -->
+        <div class="control-cluster">
+          <span class="control-tag">两态切换</span>
+          <div class="btn-segmented">
+            <button class="deck-btn" id="btn-wake" onclick="setRealityDirect('wake')">醒 · Traveritas (静止)</button>
+            <button class="deck-btn active" id="btn-dream" onclick="setRealityDirect('dream')">梦 · AveritA (晶面浮现)</button>
+          </div>
+        </div>
+
+        <!-- --reality-mix 连续滑动条 -->
+        <div class="control-cluster">
+          <span class="control-tag">--reality-mix</span>
+          <div class="slider-wrap">
+            <span style="font-size:0.68rem; color:var(--amber);">0.0 梦</span>
+            <input 
+              type="range" 
+              class="reality-slider" 
+              id="slider-reality" 
+              min="0" 
+              max="1" 
+              step="0.01" 
+              value="0"
+              oninput="onSliderChange(this.value)"
+              title="滑动调整现实混合度：0.0为完全入梦浮现，1.0为完全清醒收束"
+            />
+            <span style="font-size:0.68rem; color:var(--fg-faint);">1.0 醒</span>
+            <span class="slider-val" id="val-reality">0.00</span>
+          </div>
+        </div>
+
+        <!-- 昼夜环境色板切换 -->
+        <div class="control-cluster">
+          <span class="control-tag">环境色板</span>
+          <div class="btn-segmented">
+            <button class="deck-btn active" id="btn-deep" onclick="setTheme('deep')">夜面 #171b24</button>
+            <button class="deck-btn" id="btn-light" onclick="setTheme('light')">光面 #e9ecef</button>
+            <button class="deck-btn" id="btn-paper" onclick="setTheme('paper')">纸面 #efe9dd</button>
+          </div>
+        </div>
+
+        <!-- 辅助开关：减弱动画 / 晶面刻度线 -->
+        <div class="control-cluster">
+          <div class="btn-segmented">
+            <button class="deck-btn" id="btn-motion" onclick="toggleMotion()">减弱动画: 关</button>
+            <button class="deck-btn" id="btn-wireframe" onclick="toggleWireframe()">标尺网格: 关</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       视口大布画布：发丝轴线、背景微网格与幽灵描边
+       ─────────────────────────────────────────────────────────────────── -->
+  <div class="viewport-canvas">
+    
+    <!-- 全局 14° 发丝轴线 -->
+    <div class="axis-hairline" aria-hidden="true"></div>
+    
+    <!-- 坐标微网格 -->
+    <div class="bg-optical-grid" aria-hidden="true"></div>
+
+    <!-- 纸纹噪点薄膜 -->
+    <div class="grain-veil" aria-hidden="true"></div>
+
+    <!-- 幽灵描边字符（沉在晶面之后，受晶面模糊折射） -->
+    <div class="ghost-plane" aria-hidden="true">
+      <div class="ghost-glyph ghost-wake">醒</div>
+      <div class="ghost-glyph ghost-dream">梦</div>
+    </div>
+
+    <!-- ═════════════════════════════════════════════════════════════════
+         核心层：2~3 个非对称的巨大半透明磨砂晶面 (Frosted Strata)
+         沉浸在正文与底色之间，具备真实毛玻璃质感与 steps(5) 抽帧微位移
+         ───────────────────────────────────────────────────────────────── -->
+    <div class="strata-stage" id="strata-stage" aria-hidden="true">
+      <!-- 晶面 1：初相 · 浮光晶阶 (右上) -->
+      <div class="strata-prism strata-prism-1" id="prism-1" data-prism-tag="PRISM-α · 浮光晶阶 (14°斜掠)"></div>
+      
+      <!-- 晶面 2：深流 · 偏振棱板 (左中) -->
+      <div class="strata-prism strata-prism-2" id="prism-2" data-prism-tag="PRISM-β · 偏振棱板 (-6°深流)"></div>
+      
+      <!-- 晶面 3：未明 · 悬浮透镜 (右下) -->
+      <div class="strata-prism strata-prism-3" id="prism-3" data-prism-tag="PRISM-γ · 悬浮透镜 (9°微浮)"></div>
+    </div>
+
+    <!-- ═════════════════════════════════════════════════════════════════
+         正文排版骨架 (Content Skeleton)
+         ───────────────────────────────────────────────────────────────── -->
+    <div class="content-shell">
+
+      <!-- 站点页头：Brand "AveritA" 醒梦转换引擎 + 导航 -->
+      <header class="site-header">
+        <a class="brand-engine" id="brand-engine" href="javascript:void(0)" onclick="toggleRealityFromBrand()" title="点击切换 醒/梦 状态">
+          <!-- 动态字符槽插入于此 -->
+        </a>
+
+        <nav class="site-nav">
+          <a class="nav-link is-current" href="#essays">
+            <i class="nav-axis-pip"></i>
+            <span class="nav-text" data-morph data-true="随笔" data-dream="断章">断章</span>
+          </a>
+          <a class="nav-link" href="#projects">
+            <i class="nav-axis-pip"></i>
+            <span class="nav-text" data-morph data-true="项目" data-dream="造物">造物</span>
+          </a>
+          <a class="nav-link" href="#unnamed">
+            <i class="nav-axis-pip"></i>
+            <span class="nav-text" data-morph data-true="关于" data-dream="此身">此身</span>
+          </a>
+
+          <span class="nav-station-tag mono">
+            [ 界面刻度 · 深眠 03:42 · N3 δ ]
+          </span>
+        </nav>
+      </header>
+
+      <!-- 首屏沉浸宣言 -->
+      <section class="hero-ingress">
+        <div class="hero-meta">
+          <span class="hero-time-indicator mono">23:07 → 06:31</span>
+          <span class="mono">HYPNOGRAM · AXIS 2026-09</span>
+          <span class="mono" id="hero-state-tag" style="color:var(--amber);">[ 梦态 · 晶面浮现中 ]</span>
+        </div>
+
+        <h1 class="hero-title" data-morph 
+            data-true="在即将醒来的那一瞬，世界究竟是在成形，还是正在融化？" 
+            data-dream="在即将醒来的那一瞬，世界究竟是在成形，还是正在融化？">
+          在即将醒来的那一瞬，世界究竟是在成形，还是正在融化？
+        </h1>
+
+        <p class="hero-manifesto" data-morph 
+           data-true="世界在此停留片刻。它并非虚妄，亦非确凿之物。只是人在睁眼之前，最后一眼看见的明亮倒影。" 
+           data-dream="思绪如薄雾聚散，语言尚未落定，影子先有了形状。凡不可测量的，皆在光芒中微浮。">
+          思绪如薄雾聚散，语言尚未落定，影子先有了形状。凡不可测量的，皆在光芒中微浮。
+        </p>
+
+        <div class="hero-scroll-cue">
+          <i class="cue-axis-line"></i>
+          <span data-morph data-true="向下轻移 · 穿行于清透界面" data-dream="沿着晶面轴线向深处潜行">沿着晶面轴线向深处潜行</span>
+        </div>
+      </section>
+
+      <!-- 版块 1：随笔 / 断章 · 可言说的 · SAYABLE -->
+      <section class="essays-band" id="essays">
+        <div class="section-head">
+          <div class="section-head-top">
+            <div class="section-title-wrap">
+              <h2 class="section-title" data-morph data-true="随笔" data-dream="断章">断章</h2>
+              <span class="section-stage mono">浅梦 · LIGHT · N1–N2</span>
+            </div>
+            <span class="witt-badge warm">可言说的 · SAYABLE</span>
+          </div>
+          <div class="section-verdict">
+            <span class="verdict-voice" data-morph data-true="写下时很笃定，字句边界清晰。" data-dream="重读时散作微光。词语在晨光未至的界面上漂移。">
+              重读时散作微光。词语在晨光未至的界面上漂移。
+            </span>
+          </div>
+        </div>
+
+        <div class="essays-grid">
+          <!-- 卡片 1 -->
+          <article class="glass-card">
+            <div>
+              <div class="card-top">
+                <span class="card-index mono">01 / REFRACTION</span>
+                <time class="card-date">2026.08.14</time>
+              </div>
+              <h3 class="card-title">《语言的界限与静默之物》</h3>
+              <p class="card-excerpt">
+                凡能够说出的，都应当说得清晰；而凡不可言说的，则以大面积的留白相赠。在命题穷尽之处，世界并没有结束，只是安静地退回了未着色的晶面。
+              </p>
+            </div>
+            <div class="card-foot">
+              <span>随笔 · 认识论</span>
+              <span style="color:var(--amber);">阅读完整记录 →</span>
+            </div>
+          </article>
+
+          <!-- 卡片 2 -->
+          <article class="glass-card">
+            <div>
+              <div class="card-top">
+                <span class="card-index mono">02 / INTERFACE</span>
+                <time class="card-date">2026.06.29</time>
+              </div>
+              <h3 class="card-title">《关于知觉留白的三个观察》</h3>
+              <p class="card-excerpt">
+                留白不是空白，而是光线得以折射的介质。当界面的密度降至最低，字句便不再压迫视觉，如同悬在磨砂树脂深处的静止刻度。
+              </p>
+            </div>
+            <div class="card-foot">
+              <span>随笔 · 空间度量</span>
+              <span style="color:var(--amber);">阅读完整记录 →</span>
+            </div>
+          </article>
+
+          <!-- 卡片 3 -->
+          <article class="glass-card">
+            <div>
+              <div class="card-top">
+                <span class="card-index mono">03 / TRANSLUCENCE</span>
+                <time class="card-date">2026.04.18</time>
+              </div>
+              <h3 class="card-title">《在晨光抵达玻璃窗之前》</h3>
+              <p class="card-excerpt">
+                四点十七分，夜色在深蓝与微温之间保持着长达数十分钟的均势。所有尚未命名的思绪，都借由这层薄霜得到了容身之所。
+              </p>
+            </div>
+            <div class="card-foot">
+              <span>随笔 · 时间平台</span>
+              <span style="color:var(--amber);">阅读完整记录 →</span>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <!-- 版块 2：项目 / 造物 · 可构造的 · BUILDABLE -->
+      <section class="projects-band" id="projects">
+        <div class="section-head">
+          <div class="section-head-top">
+            <div class="section-title-wrap">
+              <h2 class="section-title" data-morph data-true="项目" data-dream="造物">造物</h2>
+              <span class="section-stage mono">深眠 · DEEP · N3 δ</span>
+            </div>
+            <span class="witt-badge cool">可构造的 · BUILDABLE</span>
+          </div>
+          <div class="section-verdict">
+            <span class="verdict-voice" data-morph data-true="夜到最深处，万物反而最沉静。结构静默，等待光线穿透。" data-dream="凡可构造的，皆具其严密的阶律——在意识降落的深处，造物正在自发凝聚。">
+              凡可构造的，皆具其严密的阶律——在意识降落的深处，造物正在自发凝聚。
+            </span>
+          </div>
+        </div>
+
+        <ul class="ledger-list">
+          <!-- 项目 1 -->
+          <li class="ledger-item">
+            <a class="ledger-link" href="javascript:void(0)">
+              <span class="ledger-date">2026.09.20</span>
+              <div class="ledger-main">
+                <div class="ledger-head-row">
+                  <span class="ledger-name">AveritA / 醒梦双态引擎</span>
+                  <div class="depth-gauge" title="成形度第 6 阶 / 八阶 (N3 显影态)">
+                    <span>浮现度 6/8</span>
+                    <div class="gauge-pips">
+                      <i class="gauge-pip on"></i><i class="gauge-pip on"></i><i class="gauge-pip on"></i><i class="gauge-pip on"></i>
+                      <i class="gauge-pip on"></i><i class="gauge-pip on"></i><i class="gauge-pip"></i><i class="gauge-pip"></i>
+                    </div>
+                  </div>
+                </div>
+                <p class="ledger-desc">
+                  基于知觉抽帧与双态语义映射的轻量静态排印核心，为全站提供无客户端 JS 负担的高性能体验。
+                </p>
+              </div>
+              <span class="repo-pill public">✓ 公开仓库</span>
+            </a>
+          </li>
+
+          <!-- 项目 2 -->
+          <li class="ledger-item">
+            <a class="ledger-link" href="javascript:void(0)">
+              <span class="ledger-date">2026.09.22</span>
+              <div class="ledger-main">
+                <div class="ledger-head-row">
+                  <span class="ledger-name">Prismata / 浮动磨砂晶面与光线折射核</span>
+                  <div class="depth-gauge" title="成形度第 4 阶 / 八阶 (偏振初凝)">
+                    <span>浮现度 4/8</span>
+                    <div class="gauge-pips">
+                      <i class="gauge-pip on"></i><i class="gauge-pip on"></i><i class="gauge-pip on"></i><i class="gauge-pip on"></i>
+                      <i class="gauge-pip"></i><i class="gauge-pip"></i><i class="gauge-pip"></i><i class="gauge-pip"></i>
+                    </div>
+                  </div>
+                </div>
+                <p class="ledger-desc">
+                  探索非对称树脂晶面在不同现实混合度（--reality-mix）下的光学折射与消散机制。
+                </p>
+              </div>
+              <span class="repo-pill public">✓ 公开仓库</span>
+            </a>
+          </li>
+
+          <!-- 项目 3 -->
+          <li class="ledger-item">
+            <a class="ledger-link" href="javascript:void(0)">
+              <span class="ledger-date">2026.08.05</span>
+              <div class="ledger-main">
+                <div class="ledger-head-row">
+                  <span class="ledger-name">Chronos / 昼夜平台光度插值器</span>
+                  <div class="depth-gauge" title="成形度第 8 阶 / 八阶 (完形凝固)">
+                    <span>浮现度 8/8</span>
+                    <div class="gauge-pips">
+                      <i class="gauge-pip on"></i><i class="gauge-pip on"></i><i class="gauge-pip on"></i><i class="gauge-pip on"></i>
+                      <i class="gauge-pip on"></i><i class="gauge-pip on"></i><i class="gauge-pip on"></i><i class="gauge-pip on"></i>
+                    </div>
+                  </div>
+                </div>
+                <p class="ledger-desc">
+                  以 444 分钟过夜时间轴驱动三段色板平台跃迁，确保任何时刻文本对比度严格大于 4.5:1。
+                </p>
+              </div>
+              <span class="repo-pill public">✓ 公开仓库</span>
+            </a>
+          </li>
+
+          <!-- 项目 4 -->
+          <li class="ledger-item">
+            <a class="ledger-link" href="javascript:void(0)">
+              <span class="ledger-date">2026.07.12</span>
+              <div class="ledger-main">
+                <div class="ledger-head-row">
+                  <span class="ledger-name">Hypnos / 脑电轴线与微位移场</span>
+                  <div class="depth-gauge" title="成形度第 2 阶 / 八阶 (微觉醒草案)">
+                    <span>浮现度 2/8</span>
+                    <div class="gauge-pips">
+                      <i class="gauge-pip on"></i><i class="gauge-pip on"></i><i class="gauge-pip"></i><i class="gauge-pip"></i>
+                      <i class="gauge-pip"></i><i class="gauge-pip"></i><i class="gauge-pip"></i><i class="gauge-pip"></i>
+                    </div>
+                  </div>
+                </div>
+                <p class="ledger-desc">
+                  将脑电波形转化为低调的背景空间纹理与频段标尺，拒绝繁琐的医学说教。
+                </p>
+              </div>
+              <span class="repo-pill private">○ 暂无公开</span>
+            </a>
+          </li>
+        </ul>
+      </section>
+
+      <!-- 版块 3：试验场 · 未命名的 · UNNAMED -->
+      <section class="rem-band" id="unnamed">
+        <div class="section-head">
+          <div class="section-head-top">
+            <div class="section-title-wrap">
+              <h2 class="section-title">试验场</h2>
+              <span class="section-stage mono">异相 · REM · 眼动</span>
+            </div>
+            <span class="witt-badge warm">未命名的 · UNNAMED</span>
+          </div>
+          <div class="section-verdict">
+            <span class="verdict-voice" data-morph data-true="在更辽阔的留白处，母题的种子还在半空悬浮。" data-dream="世界是由事实构成的，而非事物——那些尚未命名的可能，仍在半空微浮。">
+              世界是由事实构成的，而非事物——那些尚未命名的可能，仍在半空微浮。
+            </span>
+          </div>
+        </div>
+
+        <div class="seeds-field">
+          <div class="seed-pill">
+            <i class="seed-dot"></i>
+            <span>水面</span>
+            <span class="seed-desc">连续域扭曲的光学漫射</span>
+          </div>
+          <div class="seed-pill">
+            <i class="seed-dot"></i>
+            <span>细线</span>
+            <span class="seed-desc">微光与轮廓的边界轴线</span>
+          </div>
+          <div class="seed-pill">
+            <i class="seed-dot"></i>
+            <span>帷幕</span>
+            <span class="seed-desc">遮蔽与展露之间的半透明界面</span>
+          </div>
+          <div class="seed-pill is-active">
+            <i class="seed-dot"></i>
+            <span>晶面</span>
+            <span class="seed-desc" style="color:var(--amber);">【当前原型 · 方案 3】折射棱镜与毛玻璃层叠</span>
+          </div>
+          <div class="seed-pill">
+            <i class="seed-dot"></i>
+            <span>花</span>
+            <span class="seed-desc">简约百合几何罗塞特，待成形</span>
+          </div>
+          <div class="seed-pill is-dead" title="形态过于规整，已归档由晶面方案取代">
+            <i class="seed-dot" style="background:var(--fg-faint)"></i>
+            <span>碎块</span>
+            <span class="seed-desc">已归档 · 规整几何碎块</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 站点页脚 -->
+      <footer class="site-footer">
+        <div class="footer-left">
+          <span>Traveritas 2026 · 《醒梦》视觉研发台</span>
+          <span>14° 轴线刻度</span>
+        </div>
+        <div class="footer-links">
+          <a href="https://github.com/Traveritas" target="_blank" rel="noopener">GitHub</a>
+          <a href="/rss.xml">RSS</a>
+          <span style="color:var(--amber);">存在于此 · PRESENCE</span>
+        </div>
+      </footer>
+
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       交互驱动引擎 · Interactive Script Engine
+       1. AveritA 7步循环 + 3秒呼吸节律 + steps(5) 知觉抽帧
+       2. --reality-mix 连续滑动条驱动晶面模糊、不透明度与位移
+       3. 醒/梦双态平滑过渡与水汽溶变动画
+       4. 昼夜色板与动效无障碍支持
+       ─────────────────────────────────────────────────────────────────── -->
+  <script>
+    // 基础词汇
+    const WAKE_WORD = "Traveritas";
+    const DREAM_BASE = "AveritA";
+
+    // 梦态 7 步环形循环序列 (首尾大写，中间小写，对齐 Brand 规范)
+    const CYCLE = [
+      "AveritA",
+      "VeritaA",
+      "EritaAV",
+      "RitaAVe",
+      "ItaAVer",
+      "TaAVeri",
+      "AAVerit"
+    ];
+
+    // 状态机
+    let currentReality = 'dream'; // 'wake' | 'dream'
+    let stepIndex = 0;
+    let cycleTimer = null;
+    let isBreathing = true;
+    let isReducedMotion = false;
+    let isWireframe = false;
+
+    const brandEngine = document.getElementById('brand-engine');
+    const heroStateTag = document.getElementById('hero-state-tag');
+    const morphElements = document.querySelectorAll('[data-morph]');
+    const sliderReality = document.getElementById('slider-reality');
+    const valReality = document.getElementById('val-reality');
+
+    // 渲染单词槽位到 Brand
+    function renderBrandSlots(word, isStepMorph) {
+      if (!brandEngine) return;
+      brandEngine.innerHTML = '';
+      for (let i = 0; i < word.length; i++) {
+        const span = document.createElement('span');
+        span.className = 'brand-slot' + (isStepMorph ? ' step-morph' : '');
+        span.style.setProperty('--i', i);
+        span.textContent = word[i];
+        brandEngine.appendChild(span);
+      }
+    }
+
+    // 驱动一拍 AveritA 轮转 (含 3 秒呼吸节律)
+    function tickAverita() {
+      if (currentReality !== 'dream' || isReducedMotion) return;
+
+      stepIndex = (stepIndex + 1) % CYCLE.length;
+      const nextWord = CYCLE[stepIndex];
+      renderBrandSlots(nextWord, true);
+
+      // 呼吸模式：完成一轮 (重新回到 AveritA 时)，驻留 3 秒呼吸
+      if (isBreathing && stepIndex === 0) {
+        clearTimeout(cycleTimer);
+        cycleTimer = setTimeout(tickAverita, 3000);
+      } else {
+        clearTimeout(cycleTimer);
+        cycleTimer = setTimeout(tickAverita, 1200);
+      }
+    }
+
+    function startAveritaLoop() {
+      clearTimeout(cycleTimer);
+      if (currentReality === 'dream' && !isReducedMotion) {
+        renderBrandSlots(CYCLE[stepIndex], false);
+        cycleTimer = setTimeout(tickAverita, 1200);
+      } else {
+        renderBrandSlots(WAKE_WORD, false);
+      }
+    }
+
+    // 更新 DOM 双声轨文字 (醒 data-true ↔ 梦 data-dream)
+    function updateDualVoices(realityMix) {
+      const isCloserToWake = realityMix >= 0.5;
+      morphElements.forEach(el => {
+        const text = isCloserToWake ? el.getAttribute('data-true') : el.getAttribute('data-dream');
+        if (text && el.textContent !== text) {
+          el.textContent = text;
+        }
+      });
+
+      if (heroStateTag) {
+        if (realityMix <= 0.15) {
+          heroStateTag.textContent = "[ 梦态 · 晶面完全浮现 · 光学折射 ]";
+          heroStateTag.style.color = "var(--amber)";
+        } else if (realityMix >= 0.85) {
+          heroStateTag.textContent = "[ 醒态 · 纯净留白 · 晶面收束隐退 ]";
+          heroStateTag.style.color = "var(--wake)";
+        } else {
+          heroStateTag.textContent = `[ 醒梦交界 · 混合度 ${(realityMix * 100).toFixed(0)}% ]`;
+          heroStateTag.style.color = "var(--dream)";
+        }
+      }
+    }
+
+    // 更新 CSS 变量与晶面动态参数
+    function applyRealityMix(val) {
+      const num = parseFloat(val);
+      const still = 1 - num;
+
+      document.documentElement.style.setProperty('--reality-mix', num);
+      document.documentElement.style.setProperty('--still', still);
+
+      // 计算晶面具体参数以确保全浏览器硬件加速渲染
+      const blurPx = (still * 22).toFixed(1) + 'px';
+      const opacity = (still * 0.96).toFixed(3);
+      const scale = (0.92 + still * 0.08).toFixed(3);
+
+      document.documentElement.style.setProperty('--prism-blur', blurPx);
+      document.documentElement.style.setProperty('--prism-opacity', opacity);
+      document.documentElement.style.setProperty('--prism-scale', scale);
+
+      valReality.textContent = num.toFixed(2);
+      sliderReality.value = num;
+      sliderReality.style.background = `linear-gradient(90deg, rgba(229, 224, 210, 0.25) ${num * 100}%, var(--amber) ${num * 100}%)`;
+
+      // 同步 body 状态类
+      if (num >= 0.95) {
+        document.body.classList.remove('state-dream');
+        document.body.classList.add('state-wake');
+        currentReality = 'wake';
+      } else {
+        document.body.classList.remove('state-wake');
+        document.body.classList.add('state-dream');
+        currentReality = 'dream';
+      }
+
+      document.getElementById('btn-wake').classList.toggle('active', num >= 0.5);
+      document.getElementById('btn-dream').classList.toggle('active', num < 0.5);
+
+      updateDualVoices(num);
+    }
+
+    // 滑动条拖拽连续驱动
+    function onSliderChange(val) {
+      applyRealityMix(val);
+      if (parseFloat(val) >= 0.8 && currentReality === 'wake') {
+        startAveritaLoop();
+      } else if (parseFloat(val) < 0.8 && currentReality === 'dream') {
+        startAveritaLoop();
+      }
+    }
+
+    // 点击按钮进行带水汽溶变动画的平滑两态切换
+    function setRealityDirect(target) {
+      const targetVal = target === 'wake' ? 1.0 : 0.0;
+      const startVal = parseFloat(sliderReality.value);
+      if (Math.abs(startVal - targetVal) < 0.01) return;
+
+      // 触发水汽溶变效果 (Frosted Dissolve)
+      document.body.classList.add('vapor-dissolving');
+
+      const startTime = performance.now();
+      const duration = 650; // 0.65 秒水汽漫射平滑过渡
+
+      function step(now) {
+        const elapsed = now - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        // easeInOutCubic 缓动曲线
+        const ease = progress < 0.5 
+          ? 4 * progress * progress * progress 
+          : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+        
+        const currentVal = startVal + (targetVal - startVal) * ease;
+        applyRealityMix(currentVal);
+
+        if (progress < 1) {
+          requestAnimationFrame(step);
+        } else {
+          applyRealityMix(targetVal);
+          document.body.classList.remove('vapor-dissolving');
+          currentReality = target;
+          stepIndex = 0;
+          startAveritaLoop();
+        }
+      }
+
+      requestAnimationFrame(step);
+    }
+
+    // 点击 Brand 也可以快速切换两态
+    function toggleRealityFromBrand() {
+      const next = currentReality === 'wake' ? 'dream' : 'wake';
+      setRealityDirect(next);
+    }
+
+    // 色板平台切换
+    function setTheme(theme) {
+      document.body.classList.remove('theme-deep', 'theme-light', 'theme-paper');
+      document.body.classList.add('theme-' + theme);
+
+      document.getElementById('btn-deep').classList.toggle('active', theme === 'deep');
+      document.getElementById('btn-light').classList.toggle('active', theme === 'light');
+      document.getElementById('btn-paper').classList.toggle('active', theme === 'paper');
+    }
+
+    // 减弱动效开关
+    function toggleMotion() {
+      isReducedMotion = !isReducedMotion;
+      document.body.classList.toggle('reduced-motion', isReducedMotion);
+      const btn = document.getElementById('btn-motion');
+      btn.textContent = '减弱动画: ' + (isReducedMotion ? '开' : '关');
+      btn.classList.toggle('active', isReducedMotion);
+      startAveritaLoop();
+    }
+
+    // 晶面标尺线高亮开关
+    function toggleWireframe() {
+      isWireframe = !isWireframe;
+      document.body.classList.toggle('show-wireframe', isWireframe);
+      const btn = document.getElementById('btn-wireframe');
+      btn.textContent = '标尺网格: ' + (isWireframe ? '开' : '关');
+      btn.classList.toggle('active', isWireframe);
+    }
+
+    // 初始化启动
+    applyRealityMix(0.0);
+    startAveritaLoop();
+  </script>
+</body>
+</html>

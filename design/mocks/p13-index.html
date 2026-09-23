@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>醒梦 · Phase 13 背景双态无缝变换原型汇总 (p13-index)</title>
+  <style>
+    :root {
+      --bg: #13161c;
+      --card-bg: #1a1e27;
+      --card-border: rgba(229, 224, 210, 0.12);
+      --fg: #e5e0d2;
+      --fg-soft: #b9b3a4;
+      --fg-faint: #727a85;
+      --amber: #d9a05b;
+      --dream: #c2a382;
+      --wake: #a7b1ba;
+      --font-display: 'Noto Serif SC', 'Songti SC', SimSun, serif;
+      --font-mono: 'IBM Plex Mono', Consolas, monospace;
+      --font-sans: system-ui, -apple-system, sans-serif;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg);
+      color: var(--fg);
+      font-family: var(--font-sans);
+      line-height: 1.7;
+      padding: 3rem 2rem 5rem;
+      min-height: 100vh;
+    }
+    .wrap {
+      max-width: 1040px;
+      margin: 0 auto;
+    }
+    header.header {
+      margin-bottom: 2.8rem;
+      border-bottom: 1px solid var(--card-border);
+      padding-bottom: 1.8rem;
+    }
+    .badge {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      letter-spacing: 0.12em;
+      color: var(--amber);
+      border: 1px solid rgba(217, 160, 91, 0.4);
+      padding: 0.2rem 0.65rem;
+      border-radius: 999px;
+      text-transform: uppercase;
+      margin-bottom: 0.8rem;
+    }
+    h1 {
+      font-family: var(--font-display);
+      font-size: 2rem;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      margin-bottom: 0.6rem;
+    }
+    p.lead {
+      color: var(--fg-soft);
+      font-size: 1rem;
+      max-width: 52em;
+      line-height: 1.8;
+    }
+
+    .schemes-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
+      gap: 1.6rem;
+      margin-bottom: 3.5rem;
+    }
+    .scheme-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 1.8rem 1.6rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: border-color 0.2s ease, transform 0.2s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    .scheme-card:hover {
+      border-color: rgba(217, 160, 91, 0.45);
+      transform: translateY(-2px);
+    }
+    .card-top {
+      margin-bottom: 1.5rem;
+    }
+    .scheme-num {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--amber);
+      margin-bottom: 0.4rem;
+      letter-spacing: 0.08em;
+    }
+    .scheme-title {
+      font-family: var(--font-display);
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--fg);
+      margin-bottom: 0.4rem;
+    }
+    .scheme-en {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--fg-faint);
+      margin-bottom: 1rem;
+      text-transform: uppercase;
+    }
+    .scheme-desc {
+      font-size: 0.88rem;
+      color: var(--fg-soft);
+      line-height: 1.75;
+      margin-bottom: 1.2rem;
+    }
+    .traits {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      margin-bottom: 1rem;
+    }
+    .trait-pill {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(229, 224, 210, 0.08);
+      padding: 0.15rem 0.55rem;
+      border-radius: 4px;
+      color: var(--fg-soft);
+    }
+    .card-action {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      color: var(--amber);
+      text-decoration: none;
+      font-weight: 500;
+      padding-top: 0.8rem;
+      border-top: 1px dashed var(--card-border);
+    }
+    .card-action:hover {
+      text-decoration: underline;
+    }
+
+    .preview-box {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      overflow: hidden;
+      margin-top: 2rem;
+    }
+    .preview-nav {
+      background: rgba(0, 0, 0, 0.3);
+      padding: 0.8rem 1.4rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      border-bottom: 1px solid var(--card-border);
+    }
+    .tab-group {
+      display: flex;
+      gap: 0.5rem;
+    }
+    .tab-btn {
+      background: transparent;
+      border: 1px solid var(--card-border);
+      color: var(--fg-soft);
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      padding: 0.35rem 0.9rem;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.16s ease;
+    }
+    .tab-btn.active {
+      background: rgba(217, 160, 91, 0.14);
+      color: var(--amber);
+      border-color: var(--amber);
+    }
+    .open-direct {
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      color: var(--fg-soft);
+      text-decoration: none;
+    }
+    .open-direct:hover {
+      color: var(--amber);
+    }
+    iframe#viewer {
+      width: 100%;
+      height: 780px;
+      border: none;
+      display: block;
+      background: #171b24;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="header">
+      <span class="badge">AveritA 双态背景探索 · Phase 13</span>
+      <h1>《醒梦》背景双态无缝变换 · 方案原型集</h1>
+      <p class="lead">
+        根据《醒梦》核心世界观与 Brand「AveritA」的设计语言，三个子智能体已分别构建了高完成度的交互原型。
+        所有原型均内置完整的醒梦无缝切换引擎（含 <code>--reality-mix</code> 连续滑动控制台、AveritA 7步字符轮转阶跃浮动），并完全遵循《AGENTS.md》的红线与命题边界。
+      </p>
+    </header>
+
+    <div class="schemes-grid">
+      <!-- 方案 1 -->
+      <div class="scheme-card">
+        <div class="card-top">
+          <div class="scheme-num">方案一 · SCHEME A</div>
+          <h2 class="scheme-title">知觉星野与抽帧标尺</h2>
+          <div class="scheme-en">Quantized Reticle & Luminous Amber Caustics</div>
+          <p class="scheme-desc">
+            醒态呈现极淡理性的清晨精密观测坐标网格，绝对静止；
+            入梦后坐标发生 steps(4) 阶跃抽帧微漂移，交汇节点浮现琥珀色呼吸光斑，深处漫散柔和树脂微温。
+          </p>
+          <div class="traits">
+            <span class="trait-pill">维特根斯坦命题坐标</span>
+            <span class="trait-pill">steps(4) 抽帧漂移</span>
+            <span class="trait-pill">琥珀呼吸光斑</span>
+          </div>
+        </div>
+        <a class="card-action" href="p13-a-reticle.html" target="_blank">在新标签页独立打开 ↗</a>
+      </div>
+
+      <!-- 方案 2 -->
+      <div class="scheme-card">
+        <div class="card-top">
+          <div class="scheme-num">方案二 · SCHEME B</div>
+          <h2 class="scheme-title">双相波场与量子谐波</h2>
+          <div class="scheme-en">Harmonic Echo Waves & Quantum Calipers</div>
+          <p class="scheme-desc">
+            彻底激活常驻中央的 EEG 与发丝轴线：醒态平息为一条高度专注的纯净单轨基线；
+            入梦后受潜意识扰动激发出 2 轨谐波残影（一轨延迟暖沙、一轨量子阶梯折线），锚点衍生双层光环。
+          </p>
+          <div class="traits">
+            <span class="trait-pill">三轨谐波分裂</span>
+            <span class="trait-pill">量子阶梯量化波</span>
+            <span class="trait-pill">双层呼吸光环</span>
+          </div>
+        </div>
+        <a class="card-action" href="p13-b-harmonic-eeg.html" target="_blank">在新标签页独立打开 ↗</a>
+      </div>
+
+      <!-- 方案 3 -->
+      <div class="scheme-card">
+        <div class="card-top">
+          <div class="scheme-num">方案三 · SCHEME C</div>
+          <h2 class="scheme-title">浮动磨砂晶面与光线折射</h2>
+          <div class="scheme-en">Frosted Strata & Optical Prisms</div>
+          <p class="scheme-desc">
+            在正文与底色之间沉入 3 枚非对称的巨大半透明磨砂树脂晶面：醒态收束隐退保留纯净留白；
+            入梦后毛玻璃晶面柔和浮现，以 steps(5) 极缓慢周期阶跃游走，正文划过时呈现优雅虚实折射。
+          </p>
+          <div class="traits">
+            <span class="trait-pill">backdrop-filter 磨砂</span>
+            <span class="trait-pill">半透明树脂板</span>
+            <span class="trait-pill">steps(5) 机构步进</span>
+          </div>
+        </div>
+        <a class="card-action" href="p13-c-frosted-strata.html" target="_blank">在新标签页独立打开 ↗</a>
+      </div>
+    </div>
+
+    <div class="preview-box">
+      <div class="preview-nav">
+        <div class="tab-group">
+          <button class="tab-btn active" onclick="loadFrame('p13-a-reticle.html', this)">方案 1 · 知觉星野标尺</button>
+          <button class="tab-btn" onclick="loadFrame('p13-b-harmonic-eeg.html', this)">方案 2 · 双相波场谐波</button>
+          <button class="tab-btn" onclick="loadFrame('p13-c-frosted-strata.html', this)">方案 3 · 浮动磨砂晶面</button>
+        </div>
+        <a id="ext-link" class="open-direct" href="p13-a-reticle.html" target="_blank">在新窗口全屏检视 ↗</a>
+      </div>
+      <iframe id="viewer" src="p13-a-reticle.html"></iframe>
+    </div>
+  </div>
+
+  <script>
+    function loadFrame(url, btn) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('viewer').src = url;
+      document.getElementById('ext-link').href = url;
+    }
+  </script>
+</body>
+</html>

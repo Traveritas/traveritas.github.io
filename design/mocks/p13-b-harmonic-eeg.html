@@ -1,0 +1,1400 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>醒梦 · 双相波场与量子谐波 (Harmonic Echo Waves & Quantum Calipers)</title>
+  <style>
+    /* ─────────────────────────────────────────────────────────────
+       醒梦之界 · 设计令牌与全站色板
+       基于 docs/design/aesthetic-direction.md 与 AGENTS.md
+       ───────────────────────────────────────────────────────────── */
+    :root {
+      /* 夜面 (默认深色 #171b24) */
+      --bg: #171b24;
+      --bg-surface: rgba(255, 255, 255, 0.025);
+      --bg-surface-elevated: rgba(255, 255, 255, 0.045);
+      --fg: #e5e0d2;
+      --fg-soft: #b9b3a4;
+      --fg-faint: #727a85;
+      --line: rgba(229, 224, 210, 0.16);
+      --line-subtle: rgba(229, 224, 210, 0.08);
+
+      /* 醒梦双态轴线与异质色 */
+      --wake: #a7b1ba;       /* 醒 · 冷灰基线 */
+      --dream: #c2a382;      /* 梦 · 暖沙谐波 */
+      --amber: #d9a05b;      /* 琥珀微光 · 全站唯一异质色与锚点 */
+      --ghost-ink: #b98f74;  /* 叠影残影 */
+      --cyan-echo: #6ba3b8;  /* 量子色散微弱副频 */
+      --wash: #556270;
+      --seam-angle: 14deg;   /* 发丝界面轴线倾角 */
+
+      /* 连续态插值参数：0=梦，1=醒 */
+      --reality-mix: 0;
+
+      /* 字体族 */
+      --font-display: "Noto Serif SC", "Songti SC", "Source Han Serif SC", SimSun, serif;
+      --font-body: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+      --font-mono: "IBM Plex Mono", Consolas, "JetBrains Mono", monospace;
+    }
+
+    /* 光面 (Light #e9ecef) */
+    body.theme-light {
+      --bg: #e9ecef;
+      --bg-surface: rgba(38, 44, 51, 0.035);
+      --bg-surface-elevated: rgba(38, 44, 51, 0.065);
+      --fg: #262c33;
+      --fg-soft: #59626c;
+      --fg-faint: #8a929b;
+      --line: rgba(38, 44, 51, 0.16);
+      --line-subtle: rgba(38, 44, 51, 0.08);
+      --wake: #7a8694;
+      --dream: #a8825c;
+      --amber: #c48638;
+      --ghost-ink: #9e7557;
+    }
+
+    /* 纸面 (Paper #efe9dd) */
+    body.theme-paper {
+      --bg: #efe9dd;
+      --bg-surface: rgba(85, 80, 63, 0.04);
+      --bg-surface-elevated: rgba(85, 80, 63, 0.075);
+      --fg: #55503f;
+      --fg-soft: #665f50;
+      --fg-faint: #9c9584;
+      --line: rgba(85, 80, 63, 0.16);
+      --line-subtle: rgba(85, 80, 63, 0.08);
+      --wake: #888276;
+      --dream: #9e7f5f;
+      --amber: #b87c32;
+      --ghost-ink: #8f6c4d;
+    }
+
+    /* 基础重置 */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--fg);
+      font-family: var(--font-body);
+      min-height: 100vh;
+      line-height: 1.6;
+      overflow-x: hidden;
+      position: relative;
+      transition: background-color 0.4s ease, color 0.4s ease;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* ─────────────────────────────────────────────────────────────
+       全屏波场渲染层 (Canvas)
+       置于背景，层级在内容之下，穿过磨砂玻璃时呈现微光渗析
+       ───────────────────────────────────────────────────────────── */
+    #waveCanvas {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 1;
+      pointer-events: none;
+      display: block;
+    }
+
+    /* 页面内容容器 */
+    .page-wrapper {
+      position: relative;
+      z-index: 10;
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 1.25rem 2rem 5rem;
+    }
+
+    /* ─────────────────────────────────────────────────────────────
+       顶部交互控制面板 (Sticky Caliper Controls)
+       用于直观验证【--reality-mix】从 0 到 1 连续分裂与收敛
+       ───────────────────────────────────────────────────────────── */
+    .control-hud {
+      position: sticky;
+      top: 1rem;
+      z-index: 100;
+      background: rgba(23, 27, 36, 0.72);
+      backdrop-filter: blur(20px) saturate(160%);
+      -webkit-backdrop-filter: blur(20px) saturate(160%);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 1rem 1.4rem;
+      margin-bottom: 2.5rem;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.22);
+      transition: background-color 0.3s ease, border-color 0.3s ease;
+    }
+
+    body.theme-light .control-hud {
+      background: rgba(233, 236, 239, 0.78);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+    }
+    body.theme-paper .control-hud {
+      background: rgba(239, 233, 221, 0.82);
+      box-shadow: 0 8px 32px rgba(85, 80, 63, 0.1);
+    }
+
+    .hud-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.8rem;
+      padding-bottom: 0.8rem;
+      border-bottom: 1px solid var(--line-subtle);
+      margin-bottom: 0.9rem;
+    }
+
+    .hud-title-group {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+    }
+    .hud-title {
+      font-family: var(--font-display);
+      font-size: 1.05rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      color: var(--fg);
+    }
+    .hud-badge {
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      letter-spacing: 0.08em;
+      padding: 0.15rem 0.55rem;
+      border-radius: 999px;
+      border: 1px solid var(--amber);
+      color: var(--amber);
+      background: rgba(217, 160, 91, 0.08);
+      text-transform: uppercase;
+    }
+
+    .hud-telemetry-pill {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--fg-soft);
+      display: flex;
+      align-items: center;
+      gap: 1.2rem;
+    }
+    .hud-telemetry-pill span {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+    .hud-telemetry-pill .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--amber);
+      box-shadow: 0 0 6px var(--amber);
+    }
+
+    .hud-grid {
+      display: grid;
+      grid-template-columns: auto 1fr auto auto;
+      align-items: center;
+      gap: 1.5rem;
+    }
+
+    @media (max-width: 860px) {
+      .hud-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+      }
+    }
+
+    .hud-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+    .hud-label {
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      color: var(--fg-faint);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .btn-segmented {
+      display: inline-flex;
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 2px;
+      gap: 2px;
+    }
+    body.theme-light .btn-segmented,
+    body.theme-paper .btn-segmented {
+      background: rgba(0, 0, 0, 0.05);
+    }
+
+    .seg-btn {
+      background: transparent;
+      border: none;
+      color: var(--fg-soft);
+      font-family: var(--font-mono);
+      font-size: 0.76rem;
+      padding: 0.35rem 0.8rem;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+    .seg-btn:hover {
+      color: var(--fg);
+    }
+    .seg-btn.active {
+      background: rgba(217, 160, 91, 0.2);
+      color: var(--amber);
+      font-weight: 600;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+    }
+
+    /* 连续滑动条 */
+    .slider-container {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+    }
+    .caliper-slider {
+      flex: 1;
+      -webkit-appearance: none;
+      appearance: none;
+      height: 6px;
+      border-radius: 3px;
+      background: linear-gradient(90deg, rgba(217, 160, 91, 0.5) 0%, rgba(167, 177, 186, 0.3) 100%);
+      outline: none;
+      cursor: pointer;
+      border: 1px solid var(--line);
+    }
+    .caliper-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--amber);
+      box-shadow: 0 0 10px rgba(217, 160, 91, 0.8);
+      cursor: pointer;
+      border: 2px solid var(--bg);
+      transition: transform 0.1s ease;
+    }
+    .caliper-slider::-webkit-slider-thumb:hover {
+      transform: scale(1.2);
+    }
+    .slider-val {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--amber);
+      min-width: 3.2rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* ─────────────────────────────────────────────────────────────
+       站点头部 (SiteHeader)
+       左侧 AveritA 醒梦转换引擎，右侧双态导航
+       ───────────────────────────────────────────────────────────── */
+    .site-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 2rem;
+      padding: 1.2rem 0;
+      border-bottom: 1px dashed var(--line);
+      margin-bottom: 3.5rem;
+    }
+
+    /* Brand 容器 */
+    .brand-slot {
+      display: inline-flex;
+      align-items: baseline;
+      text-decoration: none;
+      color: var(--fg);
+      cursor: pointer;
+      user-select: none;
+      min-width: 150px;
+    }
+
+    .brand-frame {
+      font-family: var(--font-display);
+      font-size: 1.45rem;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      display: inline-flex;
+      align-items: baseline;
+      position: relative;
+    }
+
+    /* AveritA 字符插槽与 steps(4) 抽帧浮动 */
+    .char-slot {
+      display: inline-block;
+      position: relative;
+      transform-origin: center bottom;
+      will-change: transform, opacity, filter;
+      transition: color 0.3s ease;
+    }
+
+    /* 梦态知觉抽帧浮动 */
+    body.is-dream .char-slot {
+      animation: averita-quant-float 2.8s steps(4, jump-none) infinite alternate;
+      animation-delay: calc(var(--i) * -0.36s);
+      text-shadow: 0 0 10px rgba(217, 160, 91, 0.4);
+    }
+
+    @keyframes averita-quant-float {
+      0%   { transform: translateY(0px); }
+      33%  { transform: translateY(-1.5px); }
+      66%  { transform: translateY(-3.2px); }
+      100% { transform: translateY(-5px); color: var(--amber); }
+    }
+
+    /* 醒态下关闭动画，恢复纯静态冷灰与自然衬线 */
+    body.is-wake .char-slot {
+      animation: none !important;
+      transform: none !important;
+      text-shadow: none !important;
+      color: var(--fg) !important;
+    }
+
+    /* 字符换拍瞬间的磨砂水汽溶变 (Frosted Dissolve) */
+    .char-slot.step-morph {
+      animation: frosted-dissolve 0.22s steps(3, jump-none) !important;
+    }
+    @keyframes frosted-dissolve {
+      0%   { opacity: 0.25; filter: blur(2.5px); transform: translateY(1.5px); }
+      50%  { opacity: 0.7;  filter: blur(1.2px); transform: translateY(-0.8px); }
+      100% { opacity: 1;    filter: blur(0px);   transform: translateY(0); }
+    }
+
+    /* 头部中央：维特根斯坦命题边界徽标 */
+    .header-center-mark {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      letter-spacing: 0.1em;
+      color: var(--fg-faint);
+    }
+    .header-center-mark .axis-indicator {
+      display: inline-block;
+      width: 14px;
+      height: 1px;
+      background: var(--amber);
+      transform: rotate(var(--seam-angle));
+    }
+
+    /* 导航栏 */
+    .site-nav {
+      display: flex;
+      align-items: center;
+      gap: 1.6rem;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+    }
+    .nav-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--fg-soft);
+      text-decoration: none;
+      transition: color 0.2s ease;
+      cursor: pointer;
+    }
+    .nav-link:hover {
+      color: var(--fg);
+    }
+    .nav-link.is-active {
+      color: var(--fg);
+      font-weight: 500;
+    }
+    /* 刻度卡尺指示标 (替代生活化缝线针脚，严格遵守规范) */
+    .caliper-tick-mark {
+      display: inline-block;
+      width: 9px;
+      height: 2px;
+      border-radius: 1px;
+      background: var(--fg-faint);
+      transform: rotate(var(--seam-angle));
+      opacity: 0.35;
+      transition: all 0.25s ease;
+    }
+    .nav-link.is-active .caliper-tick-mark {
+      background: var(--amber);
+      opacity: 1;
+      box-shadow: 0 0 6px rgba(217, 160, 91, 0.6);
+    }
+
+    /* ─────────────────────────────────────────────────────────────
+       主视觉区域 (Hero & Philosophy Question)
+       ───────────────────────────────────────────────────────────── */
+    .hero-section {
+      margin-bottom: 4.5rem;
+      position: relative;
+    }
+
+    .hero-pretitle {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      letter-spacing: 0.12em;
+      color: var(--amber);
+      margin-bottom: 1.2rem;
+      text-transform: uppercase;
+    }
+    .hero-pretitle::before {
+      content: "";
+      display: inline-block;
+      width: 24px;
+      height: 1px;
+      background: var(--amber);
+      opacity: 0.7;
+    }
+
+    /* 核心主张问句化（符合规范：在即将醒来的那一瞬...） */
+    .hero-title {
+      font-family: var(--font-display);
+      font-size: clamp(1.8rem, 4vw, 2.7rem);
+      font-weight: 500;
+      line-height: 1.35;
+      letter-spacing: 0.02em;
+      color: var(--fg);
+      max-width: 26em;
+      margin-bottom: 1.6rem;
+    }
+
+    .hero-desc {
+      font-size: 1rem;
+      color: var(--fg-soft);
+      max-width: 38em;
+      line-height: 1.75;
+      margin-bottom: 2rem;
+    }
+
+    /* 波场遥测参数读数带 (Wave Telemetry Bar) */
+    .telemetry-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.8rem 2.5rem;
+      padding: 1.1rem 1.4rem;
+      background: var(--bg-surface);
+      border: 1px solid var(--line-subtle);
+      border-left: 3px solid var(--amber);
+      border-radius: 8px;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+    }
+    .telemetry-item {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+    .telemetry-k {
+      color: var(--fg-faint);
+      text-transform: uppercase;
+      font-size: 0.68rem;
+      letter-spacing: 0.05em;
+    }
+    .telemetry-v {
+      color: var(--fg);
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+    }
+    .telemetry-v.amber {
+      color: var(--amber);
+    }
+
+    /* ─────────────────────────────────────────────────────────────
+       正文卡片网络 (Card Grid & Frosted Glass Layer)
+       检验波形从磨砂半透明卡片后穿过时的可读性与通透深度
+       ───────────────────────────────────────────────────────────── */
+    .cards-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
+      margin-bottom: 4.5rem;
+    }
+    @media (max-width: 768px) {
+      .cards-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: var(--bg-surface);
+      backdrop-filter: blur(16px) saturate(140%);
+      -webkit-backdrop-filter: blur(16px) saturate(140%);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 1.8rem 2rem;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+      transition: border-color 0.3s ease, transform 0.3s ease;
+    }
+    .card:hover {
+      border-color: rgba(217, 160, 91, 0.35);
+      transform: translateY(-2px);
+    }
+
+    /* 维特根斯坦命题边界徽章 */
+    .card-badge-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.2rem;
+    }
+    .wittgenstein-badge {
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      letter-spacing: 0.1em;
+      color: var(--amber);
+      background: rgba(217, 160, 91, 0.09);
+      padding: 0.2rem 0.65rem;
+      border-radius: 4px;
+      border: 1px solid rgba(217, 160, 91, 0.25);
+      text-transform: uppercase;
+    }
+    .repo-status {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--fg-soft);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .card-title {
+      font-family: var(--font-display);
+      font-size: 1.3rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      margin-bottom: 0.8rem;
+      color: var(--fg);
+    }
+
+    .card-body {
+      font-size: 0.88rem;
+      color: var(--fg-soft);
+      line-height: 1.7;
+      margin-bottom: 1.5rem;
+    }
+
+    /* 八阶成形 / 浮现度 (Eight Depths) 进度展示器 */
+    .depths-container {
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--line-subtle);
+    }
+    .depths-header {
+      display: flex;
+      justify-content: space-between;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--fg-faint);
+      margin-bottom: 0.5rem;
+    }
+    .depths-meter {
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      gap: 4px;
+      height: 6px;
+      background: rgba(0, 0, 0, 0.15);
+      border-radius: 3px;
+      overflow: hidden;
+      padding: 1px;
+    }
+    .depth-segment {
+      border-radius: 2px;
+      background: var(--line-subtle);
+      transition: background-color 0.3s ease, box-shadow 0.3s ease;
+    }
+    .depth-segment.active {
+      background: var(--amber);
+      box-shadow: 0 0 6px rgba(217, 160, 91, 0.5);
+    }
+
+    /* 试验场交互卡片 */
+    .lab-preview-box {
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid var(--line-subtle);
+      border-radius: 8px;
+      padding: 1rem;
+      margin-top: 1rem;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--fg-soft);
+    }
+    .lab-track-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+      margin-top: 0.5rem;
+    }
+    .lab-track-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.3rem 0;
+      border-bottom: 1px dashed var(--line-subtle);
+    }
+    .track-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .track-color-pill {
+      width: 14px;
+      height: 3px;
+      border-radius: 2px;
+    }
+
+    /* ─────────────────────────────────────────────────────────────
+       底部审美分析与研发手记 (Verdict & R&D Notes)
+       ───────────────────────────────────────────────────────────── */
+    .rd-verdict-box {
+      background: rgba(217, 160, 91, 0.035);
+      border: 1px solid rgba(217, 160, 91, 0.28);
+      border-radius: 12px;
+      padding: 2rem 2.2rem;
+      margin-top: 3.5rem;
+    }
+    .rd-verdict-title {
+      font-family: var(--font-mono);
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--amber);
+      letter-spacing: 0.05em;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+    .rd-verdict-text {
+      font-size: 0.88rem;
+      color: var(--fg-soft);
+      line-height: 1.8;
+    }
+    .rd-verdict-text p + p {
+      margin-top: 0.8rem;
+    }
+    .rd-verdict-text strong {
+      color: var(--fg);
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body class="theme-deep is-dream">
+
+  <!-- 全屏发丝轴线与双相量子谐波波场 (Canvas Layer) -->
+  <canvas id="waveCanvas" aria-hidden="true"></canvas>
+
+  <div class="page-wrapper">
+
+    <!-- 顶部 HUD 交互控制台 -->
+    <aside class="control-hud" aria-label="双相波场与量子谐波调试台">
+      <div class="hud-header">
+        <div class="hud-title-group">
+          <h2 class="hud-title">双相波场与量子谐波</h2>
+          <span class="hud-badge">方案 2 · 原型实验</span>
+        </div>
+        <div class="hud-telemetry-pill">
+          <span><i class="dot"></i> 谐波相干度: <strong id="val-coherence">94.8%</strong></span>
+          <span>频段: <strong id="val-band">7.8 Hz (θ/α)</strong></span>
+          <span>采样刻度: <strong id="val-calipers">steps(4)</strong></span>
+        </div>
+      </div>
+
+      <div class="hud-grid">
+        <!-- 现实面状态按钮 -->
+        <div class="hud-group">
+          <div class="hud-label">
+            <span>现实面定格</span>
+          </div>
+          <div class="btn-segmented">
+            <button class="seg-btn" id="btn-snap-wake" onclick="setRealityDirect(1)">醒 · WAKE (基准收敛)</button>
+            <button class="seg-btn active" id="btn-snap-dream" onclick="setRealityDirect(0)">梦 · DREAM (三轨分裂)</button>
+          </div>
+        </div>
+
+        <!-- 连续态插值滑动条 -->
+        <div class="hud-group">
+          <div class="hud-label">
+            <span>--reality-mix 连续波场裂变度</span>
+            <span class="slider-val" id="sliderValDisplay">0.00 (梦态)</span>
+          </div>
+          <div class="slider-container">
+            <input type="range" min="0" max="1" step="0.01" value="0" class="caliper-slider" id="realitySlider" oninput="onSliderInput(this.value)">
+          </div>
+        </div>
+
+        <!-- 环境色板 -->
+        <div class="hud-group">
+          <div class="hud-label">
+            <span>夜色平台</span>
+          </div>
+          <div class="btn-segmented">
+            <button class="seg-btn active" id="btn-theme-deep" onclick="setTheme('deep')">夜面 #171b24</button>
+            <button class="seg-btn" id="btn-theme-light" onclick="setTheme('light')">光面 #e9ecef</button>
+            <button class="seg-btn" id="btn-theme-paper" onclick="setTheme('paper')">纸面 #efe9dd</button>
+          </div>
+        </div>
+
+        <!-- 减弱动画开关 -->
+        <div class="hud-group">
+          <div class="hud-label">
+            <span>动效抑制</span>
+          </div>
+          <button class="seg-btn" id="btn-motion-toggle" onclick="toggleMotion()">定格单帧 (OFF)</button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- 站点头部 (SiteHeader) -->
+    <header class="site-header">
+      <div class="brand-slot" id="brandSlot" onclick="toggleRealityState()" title="点击切换醒/梦状态">
+        <div class="brand-frame" id="brandFrame" aria-label="Traveritas">
+          <!-- 动态字符槽插入点 -->
+        </div>
+      </div>
+
+      <div class="header-center-mark">
+        <i class="axis-indicator"></i>
+        <span>界面轴线 · 14° CALIPER AXIS</span>
+      </div>
+
+      <nav class="site-nav" aria-label="主站导航">
+        <a class="nav-link is-active" href="javascript:void(0)">
+          <i class="caliper-tick-mark"></i>
+          <span class="nav-text" data-wake="随笔" data-dream="断章">断章</span>
+        </a>
+        <a class="nav-link" href="javascript:void(0)">
+          <i class="caliper-tick-mark"></i>
+          <span class="nav-text" data-wake="项目" data-dream="造物">造物</span>
+        </a>
+        <a class="nav-link" href="javascript:void(0)">
+          <i class="caliper-tick-mark"></i>
+          <span class="nav-text" data-wake="关于" data-dream="此身">此身</span>
+        </a>
+      </nav>
+    </header>
+
+    <!-- 主视觉区域 (Hero) -->
+    <section class="hero-section">
+      <div class="hero-pretitle">
+        <span>QUANTUM CALIPERS & BIPHASIC HARMONICS</span>
+      </div>
+      <h1 class="hero-title">
+        在即将醒来的那一瞬，<br />世界究竟是在成形，还是正在融化？
+      </h1>
+      <p class="hero-desc">
+        世界是现实经过记忆、意识与感知重组后留下的内部风景。发丝界面轴线横亘于 14° 的知觉倾角，醒态收敛为单轨冷灰基线，梦态则受意识扰动分裂出双相量子谐波与抽帧残影。
+      </p>
+
+      <div class="telemetry-strip">
+        <div class="telemetry-item">
+          <span class="telemetry-k">基线振幅 (Amplitude)</span>
+          <span class="telemetry-v" id="tlm-amp">14.0 px</span>
+        </div>
+        <div class="telemetry-item">
+          <span class="telemetry-k">谐波残影间距 (Ghost Split)</span>
+          <span class="telemetry-v amber" id="tlm-split">16.0 px</span>
+        </div>
+        <div class="telemetry-item">
+          <span class="telemetry-k">量化抽帧状态 (Quantization)</span>
+          <span class="telemetry-v" id="tlm-quant">Active · steps(4)</span>
+        </div>
+        <div class="telemetry-item">
+          <span class="telemetry-k">中央锚点呼吸 (Resonance Cadence)</span>
+          <span class="telemetry-v amber" id="tlm-cadence">3.0s · 双层光环</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 骨架卡片矩阵 (检验背景波场在穿过磨砂玻璃时的透射表现) -->
+    <main class="cards-grid">
+
+      <!-- 卡片 1：可构造的 · BUILDABLE -->
+      <article class="card">
+        <div class="card-badge-row">
+          <span class="wittgenstein-badge">可构造的 · BUILDABLE</span>
+          <span class="repo-status">✓ 公开仓库</span>
+        </div>
+        <h2 class="card-title">几何晶面构筑体</h2>
+        <p class="card-body">
+          跨相界面与微光折射的物理原型。摒弃所有传统机械与手工作坊隐喻，采用八阶成形阶律，探索半透明树脂与磨砂玻璃在不同视线夹角下的光学显影。
+        </p>
+        <div class="depths-container">
+          <div class="depths-header">
+            <span>八阶成形 · 浮现度 (Eight Depths)</span>
+            <span style="color: var(--amber);">五阶 · 透光硬化 (5/7)</span>
+          </div>
+          <div class="depths-meter" aria-label="八阶成形进度条">
+            <div class="depth-segment active"></div>
+            <div class="depth-segment active"></div>
+            <div class="depth-segment active"></div>
+            <div class="depth-segment active"></div>
+            <div class="depth-segment active"></div>
+            <div class="depth-segment active"></div>
+            <div class="depth-segment"></div>
+            <div class="depth-segment"></div>
+          </div>
+        </div>
+      </article>
+
+      <!-- 卡片 2：可言说的 · SAYABLE -->
+      <article class="card">
+        <div class="card-badge-row">
+          <span class="wittgenstein-badge">可言说的 · SAYABLE</span>
+          <span class="repo-status">8.4 Hz α</span>
+        </div>
+        <h2 class="card-title">《波形在穿过意识时发生的偏折》</h2>
+        <p class="card-body">
+          当理性专注时，脑电收敛为一条平缓单轨；而当知觉沉入微温的梦境，残影便分道扬镳——一轨化作延迟游走的暖沙波，另一轨则以离散的量子阶跃抽帧前行。
+        </p>
+        <div class="depths-container">
+          <div class="depths-header">
+            <span>知觉刻度标尺</span>
+            <span>维特根斯坦命题边界</span>
+          </div>
+          <div class="lab-preview-box">
+            “凡能够说的，都能够说清楚；凡不能谈的，就应该保持沉默。”
+          </div>
+        </div>
+      </article>
+
+      <!-- 卡片 3：未命名的 · UNNAMED -->
+      <article class="card">
+        <div class="card-badge-row">
+          <span class="wittgenstein-badge">未命名的 · UNNAMED</span>
+          <span class="repo-status">实时谐波示波</span>
+        </div>
+        <h2 class="card-title">双相谐波场轨道分解</h2>
+        <p class="card-body">
+          背景层实时运行的量子测标系统，将脑电纹理从静态摆设升维为动态感应器：
+        </p>
+        <div class="lab-preview-box">
+          <div class="lab-track-list">
+            <div class="lab-track-item">
+              <span class="track-indicator">
+                <i class="track-color-pill" style="background: var(--wake);"></i>
+                <strong>基线波 (Base Track)</strong>
+              </span>
+              <span>平缓单轨 · 冷灰</span>
+            </div>
+            <div class="lab-track-item">
+              <span class="track-indicator">
+                <i class="track-color-pill" style="background: var(--dream);"></i>
+                <strong>残影波 I (Warm Echo)</strong>
+              </span>
+              <span>0.45s 延迟 · 暖沙色散</span>
+            </div>
+            <div class="lab-track-item">
+              <span class="track-indicator">
+                <i class="track-color-pill" style="background: var(--amber);"></i>
+                <strong>残影波 II (Quantum Steps)</strong>
+              </span>
+              <span>steps(4) 离散量化折线</span>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <!-- 卡片 4：存在于此 · PRESENCE -->
+      <article class="card">
+        <div class="card-badge-row">
+          <span class="wittgenstein-badge">存在于此 · PRESENCE</span>
+          <span class="repo-status">锚点共振中</span>
+        </div>
+        <h2 class="card-title">发丝轴线与意识锚点</h2>
+        <p class="card-body">
+          发丝轴线以 14° 斜率穿透视口正中心。在醒态下，它是精确笃定的几何基准；在梦态下，它在中心激发出双层呼吸微光环，以 3 秒呼吸周期向外荡漾。
+        </p>
+        <div class="depths-container">
+          <div class="depths-header">
+            <span>共振周期模式</span>
+            <span style="color: var(--amber);">7 步字符循环 + 3s 呼吸停顿</span>
+          </div>
+          <div class="depths-meter">
+            <div class="depth-segment active"></div>
+            <div class="depth-segment active"></div>
+            <div class="depth-segment active"></div>
+            <div class="depth-segment active"></div>
+            <div class="depth-segment active"></div>
+            <div class="depth-segment active"></div>
+            <div class="depth-segment active"></div>
+            <div class="depth-segment"></div>
+          </div>
+        </div>
+      </article>
+
+    </main>
+
+    <!-- 底部研发分析与审美备忘 -->
+    <footer class="rd-verdict-box">
+      <div class="rd-verdict-title">
+        <span>/// 视觉研发手记 · 方案 2 落地评估</span>
+      </div>
+      <div class="rd-verdict-text">
+        <p>
+          <strong>1. 告别单调的正弦曲线：</strong> 此前原型的 EEG 仅为单条正弦波，在页面背后容易沦为乏味的装饰线条。而升级为「双相波场与量子谐波」后，醒态的单轨极度克制静谧，梦态的分裂三轨则富有深邃的物理与知觉层级。
+        </p>
+        <p>
+          <strong>2. AveritA 风格的知觉统一：</strong> 品牌名 AveritA 的 <code>steps(4)</code> 阶跃浮动与背景第三轨谐波的阶梯量化折线完美呼应，二者共用 3 秒呼吸节律（Cadence & Breath），彻底消除了平滑补间动画常有的“油腻感”，呈现纯粹、安静、带有老式示波器微光的高级美感。
+        </p>
+        <p>
+          <strong>3. 磨砂玻璃穿透层级：</strong> 拖动上方的 <code>--reality-mix</code> 滑动条，可以观察三轨波形从卡片背后游走穿过的效果。卡片的 <code>backdrop-filter: blur(16px)</code> 将琥珀色与暖沙色的残影柔化为大面积的朦胧光晕，完全不干扰前景正文阅读。
+        </p>
+      </div>
+    </footer>
+
+  </div>
+
+  <script>
+    /* ─────────────────────────────────────────────────────────────
+       双相波场与量子谐波 (Harmonic Echo Waves & Quantum Calipers)
+       动态数学引擎与交互控制器
+       ───────────────────────────────────────────────────────────── */
+
+    const canvas = document.getElementById('waveCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // 状态参数
+    let realityMix = 0.0; // 0.0 = 纯梦态 (三轨分裂), 1.0 = 纯醒态 (单轨收敛)
+    let targetRealityMix = 0.0;
+    let isReducedMotion = false;
+    let currentTheme = 'deep';
+
+    // 遥测读数 DOM
+    const tlmAmp = document.getElementById('tlm-amp');
+    const tlmSplit = document.getElementById('tlm-split');
+    const tlmQuant = document.getElementById('tlm-quant');
+    const tlmCadence = document.getElementById('tlm-cadence');
+    const sliderValDisplay = document.getElementById('sliderValDisplay');
+    const realitySlider = document.getElementById('realitySlider');
+
+    // 尺寸与高分辨率缩放
+    let W = window.innerWidth;
+    let H = window.innerHeight;
+    let dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+    function resizeCanvas() {
+      W = window.innerWidth;
+      H = window.innerHeight;
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = W * dpr;
+      canvas.height = H * dpr;
+      ctx.resetTransform();
+      ctx.scale(dpr, dpr);
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    /* ─────────────────────────────────────────────────────────────
+       AveritA Brand 7 步循环与 3 秒呼吸节律引擎
+       ───────────────────────────────────────────────────────────── */
+    const WAKE_WORD = "Traveritas";
+    const DREAM_BASE = "AveritA";
+
+    function generateCycle(base) {
+      const list = [];
+      const len = base.length;
+      const raw = base.toLowerCase();
+      for (let i = 0; i < len; i++) {
+        const chs = raw.split('');
+        const shifted = chs.slice(i).concat(chs.slice(0, i)).join('');
+        const formatted =
+          shifted.charAt(0).toUpperCase() +
+          shifted.slice(1, -1).toLowerCase() +
+          shifted.charAt(shifted.length - 1).toUpperCase();
+        list.push(formatted);
+      }
+      return list;
+    }
+    const CYCLE = generateCycle(DREAM_BASE);
+
+    let brandStepIndex = 0;
+    let brandTimer = null;
+    const brandFrame = document.getElementById('brandFrame');
+    const navTexts = document.querySelectorAll('.nav-text');
+
+    function renderBrandWord(word, isMorphed) {
+      brandFrame.innerHTML = '';
+      for (let i = 0; i < word.length; i++) {
+        const span = document.createElement('span');
+        span.className = 'char-slot' + (isMorphed ? ' step-morph' : '');
+        span.style.setProperty('--i', i);
+        span.textContent = word[i];
+        brandFrame.appendChild(span);
+      }
+    }
+
+    function tickBrand() {
+      if (realityMix > 0.5) {
+        // 醒态停留在 Traveritas
+        renderBrandWord(WAKE_WORD, false);
+        return;
+      }
+
+      brandStepIndex = (brandStepIndex + 1) % CYCLE.length;
+      const word = CYCLE[brandStepIndex];
+      renderBrandWord(word, true);
+
+      // 7 步一轮结束后，停顿 3.0 秒呼吸（Cadence & Breath）
+      if (brandStepIndex === 0) {
+        clearTimeout(brandTimer);
+        brandTimer = setTimeout(tickBrand, 3000);
+      } else {
+        clearTimeout(brandTimer);
+        brandTimer = setTimeout(tickBrand, 1100);
+      }
+    }
+
+    function initBrand() {
+      clearTimeout(brandTimer);
+      if (realityMix <= 0.5) {
+        renderBrandWord(CYCLE[brandStepIndex], false);
+        brandTimer = setTimeout(tickBrand, 1100);
+      } else {
+        renderBrandWord(WAKE_WORD, false);
+      }
+    }
+
+    /* ─────────────────────────────────────────────────────────────
+       发丝轴线与双相量子谐波数学渲染循环
+       ───────────────────────────────────────────────────────────── */
+    let startTime = performance.now();
+    let animFrameId = 0;
+
+    function drawWaveField(timestamp) {
+      const elapsed = (timestamp - startTime) * 0.001; // 秒
+      const t = isReducedMotion ? 1.8 : elapsed;
+
+      // 平滑插值 realityMix
+      realityMix += (targetRealityMix - realityMix) * 0.1;
+
+      // 清除画布
+      ctx.clearRect(0, 0, W, H);
+
+      const cx = W * 0.5;
+      const cy = H * 0.5;
+      const seamAngleRad = 14 * Math.PI / 180; // 14° 发丝轴线倾角
+
+      // 保存上下文并旋转至 14° 发丝坐标系
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(seamAngleRad);
+
+      // 沿 14° 轴线的绘制跨度
+      const span = Math.sqrt(W * W + H * H) * 0.5 + 120;
+
+      // 获取当前主题下的颜色取值
+      const isNight = currentTheme === 'deep';
+      const isPaper = currentTheme === 'paper';
+      const colorWake = isNight ? 'rgba(167, 177, 186, 0.65)' : (isPaper ? 'rgba(136, 130, 118, 0.7)' : 'rgba(122, 134, 148, 0.7)');
+      const colorDream = isNight ? 'rgba(194, 163, 130, 0.75)' : (isPaper ? 'rgba(158, 127, 95, 0.8)' : 'rgba(168, 130, 92, 0.8)');
+      const colorAmber = isNight ? '#d9a05b' : (isPaper ? '#b87c32' : '#c48638');
+      const colorLineFaint = isNight ? 'rgba(229, 224, 210, 0.12)' : (isPaper ? 'rgba(85, 80, 63, 0.15)' : 'rgba(38, 44, 51, 0.12)');
+
+      // ─────────────────────────────────────────────────────────
+      // 1. 发丝界面轴线 (Hairline Caliper Axis & 刻度标尺)
+      // ─────────────────────────────────────────────────────────
+      ctx.beginPath();
+      ctx.strokeStyle = colorLineFaint;
+      ctx.lineWidth = 1;
+      ctx.moveTo(-span, 0);
+      ctx.lineTo(span, 0);
+      ctx.stroke();
+
+      // 标尺刻度与量子测标节点 (Quantum Calipers Ticks)
+      const caliperStep = 80;
+      ctx.lineWidth = 1;
+      for (let x = -Math.floor(span / caliperStep) * caliperStep; x <= span; x += caliperStep) {
+        if (Math.abs(x) < 20) continue; // 中心留给锚点
+        const tickLen = (Math.abs(x) % (caliperStep * 2) === 0) ? 6 : 3.5;
+        const tickAlpha = (1 - Math.abs(x) / span) * 0.45;
+        ctx.strokeStyle = isNight ? `rgba(217, 160, 91, ${tickAlpha})` : `rgba(196, 134, 56, ${tickAlpha})`;
+        ctx.beginPath();
+        ctx.moveTo(x, -tickLen);
+        ctx.lineTo(x, tickLen);
+        ctx.stroke();
+      }
+
+      // ─────────────────────────────────────────────────────────
+      // 2. 动态参数计算 (随 realityMix 平滑插值)
+      // ─────────────────────────────────────────────────────────
+      // c: 1 = 醒 (收敛), 0 = 梦 (分裂)
+      const c = realityMix;
+      const dreamFactor = 1 - c;
+
+      // 振幅：醒态微弱平缓 (3.5px)，梦态张力展开 (14.5px)
+      const baseAmp = 3.5 * c + 14.5 * dreamFactor;
+      // 谐波分裂间距
+      const splitDist = dreamFactor * 16.0;
+
+      // ─────────────────────────────────────────────────────────
+      // 3. 轨线 I：基准波 (Base Wave - 冷灰到暖沙单轨)
+      // ─────────────────────────────────────────────────────────
+      ctx.beginPath();
+      ctx.lineWidth = 1.25;
+      // 颜色在冷灰与暖沙之间插值
+      ctx.strokeStyle = dreamFactor > 0.4 ? colorDream : colorWake;
+
+      for (let x = -span; x <= span; x += 6) {
+        const u = x / 520;
+        // 平滑复合成形波
+        const y = Math.sin(u * 3.14 + t * 1.5) * baseAmp +
+                  Math.sin(u * 7.28 + t * 0.8) * (baseAmp * 0.28);
+        if (x === -span) {
+          ctx.moveTo(x, y);
+        } else {
+          ctx.lineTo(x, y);
+        }
+      }
+      ctx.stroke();
+
+      // ─────────────────────────────────────────────────────────
+      // 4. 轨线 II (梦态谐波残影 · 延时暖沙波)
+      // ─────────────────────────────────────────────────────────
+      if (dreamFactor > 0.01) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.lineWidth = 1.1;
+        ctx.strokeStyle = isNight ? `rgba(217, 160, 91, ${dreamFactor * 0.55})` : `rgba(196, 134, 56, ${dreamFactor * 0.65})`;
+        ctx.setLineDash([8, 4]);
+
+        const tLag = t - 0.45; // 0.45 秒知觉延时
+        for (let x = -span; x <= span; x += 8) {
+          const u = x / 480;
+          const y = Math.sin(u * 3.8 + tLag * 1.6) * (baseAmp * 0.95) +
+                    Math.sin(u * 8.6 + tLag * 0.9) * (baseAmp * 0.32) +
+                    splitDist * Math.cos(u * 1.4 + t * 0.6);
+          if (x === -span) {
+            ctx.moveTo(x, y);
+          } else {
+            ctx.lineTo(x, y);
+          }
+        }
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // ─────────────────────────────────────────────────────────
+      // 5. 轨线 III (梦态量子阶跃折线波 · steps(4) 抽帧离散采样)
+      // ─────────────────────────────────────────────────────────
+      if (dreamFactor > 0.01) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.lineWidth = 1.35;
+        ctx.strokeStyle = isNight ? `rgba(217, 160, 91, ${dreamFactor * 0.85})` : `rgba(196, 134, 56, ${dreamFactor * 0.9})`;
+
+        // steps(4) 时间抽帧量化：每秒 4 次离散跳动
+        const tQuant = isReducedMotion ? 1.0 : (Math.floor(t * 4) / 4);
+        const stepWidth = 18; // 空间步长
+        const stepLevels = 5;  // 纵向阶梯层级
+
+        let prevX = -span;
+        let prevY = 0;
+
+        for (let x = -span; x <= span; x += stepWidth) {
+          const u = x / 500;
+          const rawY = Math.sin(u * 2.9 + tQuant * 2.0) * baseAmp -
+                       splitDist * 1.15;
+          // 纵向离散阶跃量化
+          const quantizedY = Math.round(rawY / stepLevels) * stepLevels;
+          // 与基准波平滑混合
+          const blendedY = quantizedY * dreamFactor + (rawY * 0.3) * c;
+
+          if (x === -span) {
+            ctx.moveTo(x, blendedY);
+          } else {
+            // 正交折线前进 (示波器阶梯式量化波形)
+            ctx.lineTo(x, prevY);
+            ctx.lineTo(x, blendedY);
+          }
+          prevX = x;
+          prevY = blendedY;
+        }
+        ctx.stroke();
+
+        // 弱青色量子色散残影 (Chromatic dispersion trace)
+        if (isNight && dreamFactor > 0.3) {
+          ctx.beginPath();
+          ctx.lineWidth = 0.8;
+          ctx.strokeStyle = `rgba(107, 163, 184, ${dreamFactor * 0.28})`;
+          prevX = -span;
+          prevY = 0;
+          for (let x = -span; x <= span; x += stepWidth) {
+            const u = x / 500;
+            const rawY = Math.sin(u * 2.9 + tQuant * 2.0) * baseAmp - splitDist * 1.15;
+            const quantizedY = Math.round(rawY / stepLevels) * stepLevels;
+            const dispersedY = (quantizedY - 2.5) * dreamFactor;
+            if (x === -span) {
+              ctx.moveTo(x, dispersedY);
+            } else {
+              ctx.lineTo(x, prevY);
+              ctx.lineTo(x, dispersedY);
+            }
+            prevX = x;
+            prevY = dispersedY;
+          }
+          ctx.stroke();
+        }
+
+        ctx.restore();
+      }
+
+      // ─────────────────────────────────────────────────────────
+      // 6. 意识锚点与双层呼吸微光环 (Center Resonance Halo)
+      // ─────────────────────────────────────────────────────────
+      // 3 秒呼吸韵律：Math.sin(2 * PI * t / 3.0)
+      const breathPhase = (t % 3.0) / 3.0;
+      const breathPulse = Math.sin(breathPhase * Math.PI * 2);
+
+      // 内层微光环
+      if (dreamFactor > 0.05) {
+        const ring1R = 14 + breathPulse * 3;
+        ctx.beginPath();
+        ctx.arc(0, 0, Math.max(1, ring1R), 0, Math.PI * 2);
+        ctx.strokeStyle = isNight ? `rgba(217, 160, 91, ${dreamFactor * (0.35 + breathPulse * 0.15)})` : `rgba(196, 134, 56, ${dreamFactor * 0.4})`;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // 外层呼吸微晕 (3秒扩张后隐没)
+        const ring2R = 26 + breathPulse * 7;
+        ctx.beginPath();
+        ctx.arc(0, 0, Math.max(1, ring2R), 0, Math.PI * 2);
+        ctx.strokeStyle = isNight ? `rgba(217, 160, 91, ${dreamFactor * (0.15 + breathPulse * 0.08)})` : `rgba(196, 134, 56, ${dreamFactor * 0.2})`;
+        ctx.setLineDash([3, 5]);
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      // 核心物理锚点实心圆
+      ctx.beginPath();
+      const dotRadius = 3.5 + dreamFactor * 1.5;
+      ctx.arc(0, 0, dotRadius, 0, Math.PI * 2);
+      ctx.fillStyle = colorAmber;
+      ctx.shadowColor = colorAmber;
+      ctx.shadowBlur = 8 * (1 + breathPulse * 0.4);
+      ctx.fill();
+      ctx.shadowBlur = 0; // 重置阴影
+
+      ctx.restore();
+
+      // ─────────────────────────────────────────────────────────
+      // 7. 更新 HUD 读数与 DOM
+      // ─────────────────────────────────────────────────────────
+      tlmAmp.textContent = (baseAmp).toFixed(1) + ' px';
+      tlmSplit.textContent = (splitDist).toFixed(1) + ' px';
+      tlmQuant.textContent = dreamFactor > 0.3 ? 'Active · steps(4)' : (dreamFactor > 0.05 ? 'Attenuating' : 'Zero · Static');
+      sliderValDisplay.textContent = realityMix.toFixed(2) + (realityMix < 0.2 ? ' (梦态)' : (realityMix > 0.8 ? ' (醒态)' : ' (过渡)'));
+
+      if (!isReducedMotion) {
+        animFrameId = requestAnimationFrame(drawWaveField);
+      }
+    }
+
+    /* ─────────────────────────────────────────────────────────────
+       交互控制方法 (Reality Controls & Themes)
+       ───────────────────────────────────────────────────────────── */
+
+    function setRealityDirect(val) {
+      targetRealityMix = val;
+      realitySlider.value = val;
+      syncRealityClasses(val);
+      if (isReducedMotion) {
+        realityMix = val;
+        drawWaveField(performance.now());
+      }
+    }
+
+    function onSliderInput(val) {
+      const num = parseFloat(val);
+      targetRealityMix = num;
+      syncRealityClasses(num);
+      if (isReducedMotion) {
+        realityMix = num;
+        drawWaveField(performance.now());
+      }
+    }
+
+    function syncRealityClasses(val) {
+      const isWake = val >= 0.5;
+      document.body.classList.toggle('is-wake', isWake);
+      document.body.classList.toggle('is-dream', !isWake);
+
+      document.getElementById('btn-snap-wake').classList.toggle('active', val >= 0.95);
+      document.getElementById('btn-snap-dream').classList.toggle('active', val <= 0.05);
+
+      // 同步右侧双态导航文字
+      navTexts.forEach(el => {
+        el.textContent = isWake ? el.dataset.wake : el.dataset.dream;
+      });
+
+      // 同步 Brand AveritA 状态
+      initBrand();
+    }
+
+    function toggleRealityState() {
+      const next = targetRealityMix < 0.5 ? 1.0 : 0.0;
+      setRealityDirect(next);
+    }
+
+    function setTheme(theme) {
+      currentTheme = theme;
+      document.body.className = `theme-${theme} ${targetRealityMix >= 0.5 ? 'is-wake' : 'is-dream'}`;
+      document.getElementById('btn-theme-deep').classList.toggle('active', theme === 'deep');
+      document.getElementById('btn-theme-light').classList.toggle('active', theme === 'light');
+      document.getElementById('btn-theme-paper').classList.toggle('active', theme === 'paper');
+      if (isReducedMotion) {
+        drawWaveField(performance.now());
+      }
+    }
+
+    function toggleMotion() {
+      isReducedMotion = !isReducedMotion;
+      const btn = document.getElementById('btn-motion-toggle');
+      btn.textContent = isReducedMotion ? '定格单帧 (ON)' : '定格单帧 (OFF)';
+      btn.classList.toggle('active', isReducedMotion);
+
+      if (!isReducedMotion) {
+        startTime = performance.now();
+        animFrameId = requestAnimationFrame(drawWaveField);
+      }
+    }
+
+    // 响应 URL 参数 (例如 ?mix=1 或 ?theme=light)
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('mix')) {
+      const pMix = parseFloat(urlParams.get('mix'));
+      targetRealityMix = realityMix = pMix;
+      realitySlider.value = pMix;
+    }
+    if (urlParams.has('theme')) {
+      currentTheme = urlParams.get('theme');
+    }
+
+    // 初始化启动
+    setTheme(currentTheme);
+    syncRealityClasses(realityMix);
+    initBrand();
+    animFrameId = requestAnimationFrame(drawWaveField);
+
+  </script>
+</body>
+</html>

@@ -1,0 +1,1523 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>醒梦 · 方案 1：知觉星野与抽帧坐标标尺 (Quantized Reticle & Luminous Amber Caustics)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;0,600;1,400&family=Noto+Serif+SC:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* ═══════════════════════════════════════════════════════════════════
+       《醒梦》设计令牌体系 (Design Tokens)
+       严守 AGENTS.md：无裁缝/手工隐喻，无打破第四面墙标签
+       气质：神秘 / 朦胧 / 安静 / 磨砂玻璃 / 半透明树脂 / 大面积留白 / 低饱和微温
+       ═══════════════════════════════════════════════════════════════════ */
+    :root {
+      color-scheme: dark;
+
+      /* 基础昼夜基底色（默认夜色） */
+      --bg: #171b24;
+      --bg-sunken: #12151c;
+      --fg: #e5e0d2;
+      --fg-soft: #b9b3a4;
+      --fg-faint: #727a85;
+      --line: rgba(229, 224, 210, 0.14);
+      --line-subtle: rgba(229, 224, 210, 0.07);
+
+      /* 醒梦双态轴线色 */
+      --wake: #a7b1ba;       /* 醒 · 理性冷灰 */
+      --dream: #c2a382;      /* 梦 · 悬浮暖沙 */
+      --umber: #765640;      /* 泥褐深息 */
+      --amber: #d9a05b;      /* 核心异质色：琥珀微光与节点发光 */
+      --amber-soft: rgba(217, 160, 91, 0.32);
+      --amber-glow: rgba(217, 160, 91, 0.55);
+      --caustic-halo: rgba(217, 160, 91, 0.15);
+
+      /* 标尺与星野专用色（随 reality-mix 插值） */
+      --reticle-wake: rgba(167, 177, 186, 0.14);
+      --reticle-dream: rgba(217, 160, 91, 0.35);
+      --halo-opacity: 0.08;
+
+      /* 醒梦双态驱动变量：
+         --reality-mix: 1.0 (纯醒) → 0.0 (纯梦)
+         --still: 0.0 (醒静) → 1.0 (梦动 · 浮现度激活) */
+      --reality-mix: 1;
+      --still: calc(1 - var(--reality-mix));
+
+      /* 字体族 */
+      --font-display: "Noto Serif SC", "Songti SC", "SimSun", Georgia, serif;
+      --font-mono: "IBM Plex Mono", "SF Mono", Consolas, "Courier New", monospace;
+      --font-body: system-ui, -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+
+      /* 布局度量 */
+      --max-width: 1040px;
+      --header-height: 64px;
+    }
+
+    /* 亮色（日色）主题适配 */
+    body.theme-light {
+      color-scheme: light;
+      --bg: #e9ecef;
+      --bg-sunken: #e1e5ea;
+      --fg: #262c33;
+      --fg-soft: #59626c;
+      --fg-faint: #8a929b;
+      --line: rgba(38, 44, 51, 0.14);
+      --line-subtle: rgba(38, 44, 51, 0.06);
+      --reticle-wake: rgba(38, 44, 51, 0.12);
+      --reticle-dream: rgba(184, 126, 55, 0.32);
+      --halo-opacity: 0.04;
+    }
+
+    /* 纸色主题适配 */
+    body.theme-paper {
+      color-scheme: light;
+      --bg: #efe9dd;
+      --bg-sunken: #e5dfd2;
+      --fg: #55503f;
+      --fg-soft: #665f50;
+      --fg-faint: #9c9584;
+      --line: rgba(85, 80, 63, 0.15);
+      --line-subtle: rgba(85, 80, 63, 0.07);
+      --reticle-wake: rgba(85, 80, 63, 0.13);
+      --reticle-dream: rgba(180, 115, 45, 0.35);
+      --halo-opacity: 0.05;
+    }
+
+    /* 全局重置与排版规范 */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      min-height: 100vh;
+      background-color: var(--bg);
+      color: var(--fg);
+      font-family: var(--font-body);
+      line-height: 1.68;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      transition: background-color 0.4s ease, color 0.4s ease;
+      overflow-x: hidden;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       磨砂水汽溶变 (Frosted Dissolve)
+       状态切变时瞬时产生 180ms 轻微水汽雾化与解离感，随后恢复明澈
+       ═══════════════════════════════════════════════════════════════════ */
+    .page-root {
+      min-height: 100vh;
+      position: relative;
+      transition: filter 180ms cubic-bezier(0.16, 1, 0.3, 1), opacity 180ms ease;
+      will-change: filter, opacity;
+    }
+    .page-root.is-dissolving {
+      filter: blur(4px) contrast(0.96) brightness(1.05);
+      opacity: 0.86;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       背景层：超柔磨砂微温光晕 (Deep Resin Halos)
+       ═══════════════════════════════════════════════════════════════════ */
+    .ambient-halos-layer {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      overflow: hidden;
+    }
+    .resin-halo {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(85px);
+      transition: opacity 0.6s ease, transform 0.6s ease;
+      will-change: transform, opacity;
+    }
+    .resin-halo.halo-top-right {
+      width: 520px;
+      height: 520px;
+      top: -120px;
+      right: -80px;
+      background: radial-gradient(circle, rgba(217, 160, 91, 0.45) 0%, rgba(194, 163, 130, 0.15) 45%, transparent 75%);
+      opacity: calc((var(--still) * 0.12 + 0.02) * (1 + var(--inspect-gain, 0)));
+    }
+    .resin-halo.halo-bottom-left {
+      width: 480px;
+      height: 480px;
+      bottom: 5%;
+      left: -100px;
+      background: radial-gradient(circle, rgba(167, 177, 186, 0.35) 0%, rgba(118, 86, 64, 0.12) 50%, transparent 75%);
+      opacity: calc((var(--still) * 0.10 + 0.02) * (1 + var(--inspect-gain, 0)));
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       核心背景：知觉星野与抽帧坐标标尺 (Quantized Reticle Starfield)
+       SVG 全幅覆盖，兼具微细线、微刻度、维特根斯坦命题符号与琥珀焦散点
+       ═══════════════════════════════════════════════════════════════════ */
+    .reticle-starfield-svg {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      pointer-events: none;
+      z-index: 1;
+      overflow: visible;
+    }
+
+    /* 细网格轴线 */
+    .reticle-grid-line {
+      stroke: var(--reticle-wake);
+      stroke-width: 0.5px;
+      transition: stroke 0.4s ease, opacity 0.4s ease;
+    }
+    .reticle-grid-line.is-dashed {
+      stroke-dasharray: 2 6;
+      opacity: 0.8;
+    }
+    .reticle-grid-line.is-major {
+      stroke-width: 0.75px;
+      opacity: 0.9;
+    }
+
+    /* 坐标标尺十字微单元 (Crosshairs) */
+    .reticle-crosshair {
+      color: var(--wake);
+      transition: color 0.4s ease, opacity 0.4s ease;
+      will-change: transform;
+    }
+    .reticle-crosshair path {
+      stroke: currentColor;
+      stroke-width: 0.8px;
+      fill: none;
+    }
+
+    /* 维特根斯坦命题与度量文字标签 */
+    .reticle-text-label {
+      font-family: var(--font-mono);
+      font-size: 8.5px;
+      letter-spacing: 0.08em;
+      fill: var(--fg-faint);
+      opacity: calc(0.5 + var(--still) * 0.4);
+      user-select: none;
+      transition: opacity 0.3s ease, fill 0.3s ease;
+    }
+    .reticle-prop-badge {
+      font-family: var(--font-mono);
+      font-size: 8px;
+      letter-spacing: 0.12em;
+      fill: var(--amber);
+      opacity: calc(var(--still) * 0.85);
+      user-select: none;
+      transition: opacity 0.3s ease;
+    }
+
+    /* 琥珀焦散微粒点 (Amber Caustic Dust) */
+    .caustic-node {
+      will-change: transform, opacity;
+    }
+    .caustic-core {
+      fill: var(--amber);
+      filter: drop-shadow(0 0 3px var(--amber));
+    }
+    .caustic-glow {
+      fill: var(--amber);
+      opacity: 0.25;
+    }
+
+    /* ─────────────────────────────────────────────────────────────
+       知觉抽帧核心动效：steps(4) 阶跃量化微漂移（零平滑补间）
+       对齐 AveritA 风格，只有当 --still > 0 时才会微幅跳跃浮动
+       ───────────────────────────────────────────────────────────── */
+    .has-stepped-jitter-1 {
+      animation: reticle-step-jitter-1 3.2s steps(4, jump-none) infinite alternate;
+      animation-play-state: running;
+    }
+    .has-stepped-jitter-2 {
+      animation: reticle-step-jitter-2 4.1s steps(4, jump-none) infinite alternate;
+      animation-play-state: running;
+    }
+    .has-stepped-jitter-3 {
+      animation: reticle-step-jitter-3 3.6s steps(4, jump-none) infinite alternate;
+      animation-play-state: running;
+    }
+
+    @keyframes reticle-step-jitter-1 {
+      0%   { transform: translate(0px, 0px); }
+      33%  { transform: translate(calc(var(--still) * 1.5px), calc(var(--still) * -1.2px)); }
+      66%  { transform: translate(calc(var(--still) * -1.8px), calc(var(--still) * 1.5px)); }
+      100% { transform: translate(calc(var(--still) * 2.2px), calc(var(--still) * -1.8px)); }
+    }
+    @keyframes reticle-step-jitter-2 {
+      0%   { transform: translate(0px, 0px); }
+      33%  { transform: translate(calc(var(--still) * -2.0px), calc(var(--still) * 1.6px)); }
+      66%  { transform: translate(calc(var(--still) * 1.4px), calc(var(--still) * -2.0px)); }
+      100% { transform: translate(calc(var(--still) * -1.5px), calc(var(--still) * 2.2px)); }
+    }
+    @keyframes reticle-step-jitter-3 {
+      0%   { transform: translate(0px, 0px); }
+      33%  { transform: translate(calc(var(--still) * 1.2px), calc(var(--still) * 2.0px)); }
+      66%  { transform: translate(calc(var(--still) * -2.2px), calc(var(--still) * -1.4px)); }
+      100% { transform: translate(calc(var(--still) * 1.8px), calc(var(--still) * 1.8px)); }
+    }
+
+    /* 7步循环与 3秒呼吸节律 (Cadence & Breath for Caustic Dust) */
+    .has-caustic-breath-1 {
+      animation: caustic-breath-cadence 10s steps(7, jump-none) infinite;
+      animation-delay: 0s;
+    }
+    .has-caustic-breath-2 {
+      animation: caustic-breath-cadence 10s steps(7, jump-none) infinite;
+      animation-delay: -3.3s;
+    }
+    .has-caustic-breath-3 {
+      animation: caustic-breath-cadence 10s steps(7, jump-none) infinite;
+      animation-delay: -6.7s;
+    }
+
+    @keyframes caustic-breath-cadence {
+      /* 0s ~ 7s: 7步阶梯式离散跃动 */
+      0%   { opacity: calc(var(--still) * 0.20); transform: scale(0.9); }
+      14%  { opacity: calc(var(--still) * 0.45); transform: scale(1.05); }
+      28%  { opacity: calc(var(--still) * 0.85); transform: scale(1.22); }
+      42%  { opacity: calc(var(--still) * 0.50); transform: scale(0.98); }
+      57%  { opacity: calc(var(--still) * 1.00); transform: scale(1.35); }
+      70%  { opacity: calc(var(--still) * 0.65); transform: scale(1.10); }
+      /* 7s ~ 10s (后 30%): 3秒静止呼吸停歇，微光内敛入定 */
+      72%  { opacity: calc(var(--still) * 0.28); transform: scale(0.92); }
+      100% { opacity: calc(var(--still) * 0.28); transform: scale(0.92); }
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       顶部交互调控中控台 (Control Deck)
+       ═══════════════════════════════════════════════════════════════════ */
+    .control-deck-dock {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(23, 27, 36, 0.78);
+      backdrop-filter: blur(16px) saturate(120%);
+      -webkit-backdrop-filter: blur(16px) saturate(120%);
+      border-bottom: 1px solid var(--line);
+      padding: 0.65rem 1.25rem;
+      transition: background 0.3s ease, border-color 0.3s ease;
+    }
+    body.theme-light .control-deck-dock {
+      background: rgba(233, 236, 239, 0.82);
+    }
+    body.theme-paper .control-deck-dock {
+      background: rgba(239, 233, 221, 0.85);
+    }
+
+    .deck-container {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.85rem 1.25rem;
+    }
+
+    .deck-section {
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+    }
+
+    .deck-label {
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--fg-faint);
+      white-space: nowrap;
+    }
+
+    /* 醒/梦切态开关 */
+    .toggle-capsule {
+      display: inline-flex;
+      background: rgba(0, 0, 0, 0.24);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 2px;
+      position: relative;
+    }
+    body.theme-light .toggle-capsule,
+    body.theme-paper .toggle-capsule {
+      background: rgba(0, 0, 0, 0.06);
+    }
+
+    .capsule-btn {
+      background: transparent;
+      border: none;
+      color: var(--fg-soft);
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      font-weight: 500;
+      padding: 0.28rem 0.85rem;
+      border-radius: 999px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      transition: color 0.15s ease, background 0.15s ease;
+      white-space: nowrap;
+    }
+    .capsule-btn:hover {
+      color: var(--fg);
+    }
+    .capsule-btn.is-active {
+      background: rgba(217, 160, 91, 0.2);
+      color: var(--amber);
+      font-weight: 600;
+    }
+    .capsule-pip {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    /* 连续滑动条 */
+    .slider-wrap {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+    }
+    .deck-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 140px;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.12);
+      border-radius: 2px;
+      outline: none;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+    body.theme-light .deck-slider,
+    body.theme-paper .deck-slider {
+      background: rgba(0, 0, 0, 0.12);
+    }
+    .deck-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--amber);
+      box-shadow: 0 0 8px var(--amber-glow);
+      cursor: pointer;
+      transition: transform 0.1s ease;
+    }
+    .deck-slider::-webkit-slider-thumb:hover {
+      transform: scale(1.2);
+    }
+    .slider-val-tag {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--amber);
+      min-width: 3.2em;
+    }
+
+    /* 按钮组 */
+    .mini-btn {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--line);
+      color: var(--fg-soft);
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      padding: 0.26rem 0.65rem;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .mini-btn:hover {
+      color: var(--fg);
+      border-color: var(--fg-soft);
+    }
+    .mini-btn.is-active {
+      border-color: var(--amber);
+      color: var(--amber);
+      background: rgba(217, 160, 91, 0.12);
+    }
+
+    /* 实时遥测小标 */
+    .telemetry-strip {
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      color: var(--fg-faint);
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+      letter-spacing: 0.06em;
+    }
+    .telemetry-strip span strong {
+      color: var(--amber);
+      font-weight: 500;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       站点主体骨架 (Site Content Layer)
+       ═══════════════════════════════════════════════════════════════════ */
+    .site-viewport {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 1.5rem 1.5rem 5rem;
+      position: relative;
+      z-index: 2;
+    }
+
+    /* 页头 (SiteHeader) */
+    .site-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1.5rem;
+      padding: 1.25rem 0 2rem;
+      border-bottom: 1px solid var(--line-subtle);
+      position: relative;
+    }
+
+    /* AveritA 醒梦转换引擎 Brand 容器 */
+    .brand-engine-frame {
+      display: inline-flex;
+      align-items: baseline;
+      text-decoration: none;
+      user-select: none;
+      cursor: pointer;
+      position: relative;
+      min-width: 150px;
+    }
+    .brand-word {
+      font-family: var(--font-display);
+      font-size: 1.42rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      color: var(--fg);
+      display: inline-flex;
+      align-items: baseline;
+      transition: color 0.3s ease;
+    }
+    .brand-word:hover {
+      color: var(--amber);
+    }
+
+    /* 字符插槽（抽帧量化核心） */
+    .brand-char {
+      display: inline-block;
+      position: relative;
+      transform-origin: center bottom;
+      will-change: transform;
+    }
+    /* 梦态激活时字符离散跳跃 */
+    .brand-word.is-dream .brand-char {
+      animation: char-quant-float 2.5s steps(4, jump-none) infinite alternate;
+      animation-delay: calc(var(--char-i) * -0.32s);
+    }
+    @keyframes char-quant-float {
+      0%   { transform: translateY(0px); }
+      33%  { transform: translateY(-1.5px); }
+      66%  { transform: translateY(-3.0px); }
+      100% { transform: translateY(-4.5px); }
+    }
+
+    .brand-reticle-pip {
+      position: absolute;
+      right: -12px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 4px;
+      height: 4px;
+      background: var(--amber);
+      border-radius: 50%;
+      opacity: calc(var(--still));
+      transition: opacity 0.3s ease;
+    }
+
+    /* 导航栏（双声轨文案 + 标尺刻度微标识） */
+    .site-nav {
+      display: flex;
+      align-items: center;
+      gap: 1.4rem;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      letter-spacing: 0.06em;
+    }
+    .nav-anchor {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      color: var(--fg-soft);
+      text-decoration: none;
+      padding: 0.3rem 0.2rem;
+      position: relative;
+      transition: color 0.2s ease;
+    }
+    .nav-anchor:hover {
+      color: var(--fg);
+    }
+    .nav-anchor.is-active {
+      color: var(--fg);
+      font-weight: 500;
+    }
+
+    /* 严禁裁缝缝线，改用精密标尺微刻度 (Reticle Tick Mark) */
+    .nav-reticle-tick {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      position: relative;
+    }
+    .nav-reticle-tick::before {
+      content: "";
+      position: absolute;
+      left: 3.5px;
+      top: 0;
+      width: 1px;
+      height: 8px;
+      background: var(--fg-faint);
+      opacity: 0.45;
+      transition: background 0.2s ease, opacity 0.2s ease;
+    }
+    .nav-reticle-tick::after {
+      content: "";
+      position: absolute;
+      top: 3.5px;
+      left: 0;
+      width: 8px;
+      height: 1px;
+      background: var(--fg-faint);
+      opacity: 0.45;
+      transition: background 0.2s ease, opacity 0.2s ease;
+    }
+    .nav-anchor.is-active .nav-reticle-tick::before,
+    .nav-anchor.is-active .nav-reticle-tick::after {
+      background: var(--amber);
+      opacity: 1;
+    }
+
+    /* 双态文案插槽：醒/梦 */
+    .dual-label {
+      position: relative;
+      display: inline-block;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       核心宣言与星野对齐区 (Hero Declaration)
+       ═══════════════════════════════════════════════════════════════════ */
+    .hero-section {
+      padding: 4.5rem 0 3.5rem;
+      position: relative;
+    }
+
+    .hero-eyebrow {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+      margin-bottom: 1.25rem;
+    }
+    .philosophy-badge {
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      padding: 0.2rem 0.65rem;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--amber);
+      background: rgba(217, 160, 91, 0.08);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .philosophy-badge::before {
+      content: "§";
+      color: var(--fg-faint);
+      font-weight: 600;
+    }
+    .eyebrow-coord {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: var(--fg-faint);
+      letter-spacing: 0.08em;
+    }
+
+    .hero-manifesto {
+      font-family: var(--font-display);
+      font-size: clamp(1.6rem, 3.8vw, 2.45rem);
+      font-weight: 400;
+      line-height: 1.48;
+      letter-spacing: 0.02em;
+      color: var(--fg);
+      max-width: 32em;
+      margin-bottom: 1.6rem;
+    }
+    .manifesto-line {
+      display: block;
+    }
+    .manifesto-line.sub {
+      color: var(--fg-soft);
+      font-size: 0.72em;
+      margin-top: 0.6rem;
+      line-height: 1.6;
+      font-weight: 300;
+    }
+
+    /* 标尺与星野对准观察框 (Reticle Target HUD) */
+    .reticle-target-hud {
+      background: rgba(255, 255, 255, 0.015);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 0.9rem 1.25rem;
+      margin-top: 2rem;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+    .hud-meta-block {
+      display: flex;
+      align-items: center;
+      gap: 1.25rem;
+      font-family: var(--font-mono);
+      font-size: 0.74rem;
+      color: var(--fg-soft);
+    }
+    .hud-metric-item strong {
+      color: var(--fg);
+      font-weight: 500;
+    }
+    .hud-cadence-pill {
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      padding: 0.2rem 0.6rem;
+      border-radius: 4px;
+      background: rgba(217, 160, 91, 0.12);
+      border: 1px solid rgba(217, 160, 91, 0.3);
+      color: var(--amber);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .hud-cadence-pip {
+      width: 6px;
+      height: 6px;
+      background: var(--amber);
+      border-radius: 50%;
+      animation: pulse-amber 1.8s ease-in-out infinite;
+    }
+    @keyframes pulse-amber {
+      0%, 100% { opacity: 0.4; transform: scale(0.9); }
+      50% { opacity: 1; transform: scale(1.2); }
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       核心四界骨架卡片 (The 4 Boundary Facets)
+       维特根斯坦命题边界：可言说的 / 可构造的 / 未命名的 / 存在于此
+       半透明树脂、磨砂玻璃与低饱和微温质感
+       ═══════════════════════════════════════════════════════════════════ */
+    .facets-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 1.5rem;
+      margin-top: 2rem;
+    }
+
+    .facet-card {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 1.5rem 1.6rem;
+      position: relative;
+      overflow: hidden;
+      backdrop-filter: blur(12px) saturate(110%);
+      -webkit-backdrop-filter: blur(12px) saturate(110%);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+      transition: border-color 0.3s ease, transform 0.25s ease, background 0.3s ease;
+    }
+    body.theme-light .facet-card {
+      background: rgba(255, 255, 255, 0.55);
+      box-shadow: 0 4px 24px rgba(38, 44, 51, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    }
+    body.theme-paper .facet-card {
+      background: rgba(255, 255, 255, 0.45);
+      box-shadow: 0 4px 24px rgba(85, 80, 63, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    }
+
+    .facet-card:hover {
+      border-color: rgba(217, 160, 91, 0.4);
+      transform: translateY(-2px);
+    }
+
+    /* 卡片四角微十字标尺装饰 */
+    .facet-card::before {
+      content: "+";
+      position: absolute;
+      top: 6px;
+      left: 8px;
+      font-family: var(--font-mono);
+      font-size: 8px;
+      color: var(--fg-faint);
+      opacity: 0.35;
+      pointer-events: none;
+    }
+    .facet-card::after {
+      content: "+";
+      position: absolute;
+      bottom: 6px;
+      right: 8px;
+      font-family: var(--font-mono);
+      font-size: 8px;
+      color: var(--fg-faint);
+      opacity: 0.35;
+      pointer-events: none;
+    }
+
+    .card-meta-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.8rem;
+      margin-bottom: 0.85rem;
+    }
+    .card-badge {
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 0.15rem 0.55rem;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      color: var(--fg-soft);
+      background: rgba(0, 0, 0, 0.08);
+    }
+    .card-badge.is-amber {
+      border-color: rgba(217, 160, 91, 0.3);
+      color: var(--amber);
+      background: rgba(217, 160, 91, 0.08);
+    }
+    .card-depth-label {
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      color: var(--fg-faint);
+      letter-spacing: 0.05em;
+    }
+
+    .card-title {
+      font-family: var(--font-display);
+      font-size: 1.15rem;
+      font-weight: 500;
+      letter-spacing: 0.02em;
+      color: var(--fg);
+      margin-bottom: 0.55rem;
+      line-height: 1.45;
+    }
+    .card-desc {
+      font-size: 0.86rem;
+      color: var(--fg-soft);
+      line-height: 1.6;
+      margin-bottom: 1.25rem;
+    }
+
+    .card-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-top: 0.85rem;
+      border-top: 1px solid var(--line-subtle);
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+    }
+    .card-repo-tag {
+      color: var(--fg-faint);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      text-decoration: none;
+      transition: color 0.2s ease;
+    }
+    .card-repo-tag:hover {
+      color: var(--amber);
+    }
+    .card-action-link {
+      color: var(--fg);
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      transition: color 0.2s ease;
+    }
+    .card-action-link:hover {
+      color: var(--amber);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       研发审计与设计论证面板 (Design Rationale & Verification)
+       ═══════════════════════════════════════════════════════════════════ */
+    .rationale-section {
+      margin-top: 4.5rem;
+      border-top: 1px solid var(--line);
+      padding-top: 2.5rem;
+    }
+    .rationale-title {
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--amber);
+      margin-bottom: 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+    .rationale-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.5rem;
+    }
+    .rationale-box {
+      background: rgba(0, 0, 0, 0.12);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 1.2rem;
+      font-size: 0.82rem;
+      color: var(--fg-soft);
+      line-height: 1.62;
+    }
+    body.theme-light .rationale-box,
+    body.theme-paper .rationale-box {
+      background: rgba(255, 255, 255, 0.4);
+    }
+    .rationale-box h4 {
+      font-family: var(--font-mono);
+      font-size: 0.84rem;
+      color: var(--fg);
+      margin-bottom: 0.45rem;
+      font-weight: 600;
+    }
+
+    /* 减弱动画适配 */
+    @media (prefers-reduced-motion: reduce) {
+      .has-stepped-jitter-1,
+      .has-stepped-jitter-2,
+      .has-stepped-jitter-3,
+      .has-caustic-breath-1,
+      .has-caustic-breath-2,
+      .has-caustic-breath-3,
+      .brand-word.is-dream .brand-char,
+      .hud-cadence-pip {
+        animation: none !important;
+      }
+      .page-root {
+        transition: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<div class="page-root" id="page-root">
+  <!-- ═════════════════════════════════════════════════════════════════
+       背景深处：超柔磨砂微温光晕 (Blur 85px)
+       ═════════════════════════════════════════════════════════════════ -->
+  <div class="ambient-halos-layer" aria-hidden="true">
+    <div class="resin-halo halo-top-right"></div>
+    <div class="resin-halo halo-bottom-left"></div>
+  </div>
+
+  <!-- ═════════════════════════════════════════════════════════════════
+       知觉星野与抽帧坐标标尺 SVG 渲染层 (Quantized Reticle Starfield)
+       ═════════════════════════════════════════════════════════════════ -->
+  <svg class="reticle-starfield-svg" id="reticle-svg" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none" aria-hidden="true">
+    <defs>
+      <!-- 琥珀焦散光晕滤镜 -->
+      <filter id="caustic-blur" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur stdDeviation="3" result="blur" />
+        <feComposite in="SourceGraphic" in2="blur" operator="over" />
+      </filter>
+    </defs>
+
+    <!-- 主坐标参考发丝线 (0.5px ~ 0.75px) -->
+    <g class="reticle-axes-group">
+      <!-- 垂直参考线（黄金比例分割位） -->
+      <line x1="16%" y1="0" x2="16%" y2="100%" class="reticle-grid-line is-dashed" />
+      <line x1="38%" y1="0" x2="38%" y2="100%" class="reticle-grid-line" />
+      <line x1="64%" y1="0" x2="64%" y2="100%" class="reticle-grid-line is-dashed" />
+      <line x1="84%" y1="0" x2="84%" y2="100%" class="reticle-grid-line is-major" />
+
+      <!-- 水平参考线 -->
+      <line x1="0" y1="96" x2="100%" y2="96" class="reticle-grid-line is-dashed" />
+      <line x1="0" y1="280" x2="100%" y2="280" class="reticle-grid-line" />
+      <line x1="0" y1="520" x2="100%" y2="520" class="reticle-grid-line is-dashed" />
+      <line x1="0" y1="760" x2="100%" y2="760" class="reticle-grid-line is-major" />
+
+      <!-- 14° 醒梦倾角微细导轨 (0.5px) -->
+      <line x1="-10%" y1="120" x2="110%" y2="620" class="reticle-grid-line is-dashed" style="opacity: 0.45;" />
+    </g>
+
+    <!-- ─────────────────────────────────────────────────────────────
+         节点标尺十字微单元 (Reticle Crosshairs) 与 维特根斯坦命题标记
+         通过 CSS steps(4) 阶跃抽帧产生微漂移
+         ───────────────────────────────────────────────────────────── -->
+    
+    <!-- 标尺节点 1 (左上) -->
+    <g class="reticle-crosshair has-stepped-jitter-1" transform="translate(180, 96)">
+      <!-- 十字标尺线 -->
+      <path d="M -8 0 L -2 0 M 2 0 L 8 0 M 0 -8 L 0 -2 M 0 2 L 0 8" />
+      <!-- 角落光学取景支架 ⌜ ⌟ -->
+      <path d="M -14 -6 L -14 -14 L -6 -14 M 6 14 L 14 14 L 14 6" style="opacity: 0.5;" />
+      <text x="12" y="-8" class="reticle-text-label">AXIS 14.0° · 01</text>
+      <text x="12" y="16" class="reticle-prop-badge">§ 1.000</text>
+    </g>
+
+    <!-- 标尺节点 2 (右上主焦点 · 琥珀焦散核心 A) -->
+    <g class="reticle-crosshair has-stepped-jitter-2" transform="translate(860, 96)">
+      <path d="M -10 0 L -2 0 M 2 0 L 10 0 M 0 -10 L 0 -2 M 0 2 L 0 10" />
+      <circle cx="0" cy="0" r="1.5" class="caustic-core" />
+      <!-- 7步呼吸焦散光晕 -->
+      <circle cx="0" cy="0" r="16" class="caustic-glow has-caustic-breath-1" filter="url(#caustic-blur)" />
+      <text x="14" y="-8" class="reticle-text-label">COORD [+088.4, -012.0]</text>
+      <text x="14" y="16" class="reticle-prop-badge">§ 2.0121</text>
+    </g>
+
+    <!-- 标尺节点 3 (中部左侧) -->
+    <g class="reticle-crosshair has-stepped-jitter-3" transform="translate(180, 280)">
+      <path d="M -6 0 L -2 0 M 2 0 L 6 0 M 0 -6 L 0 -2 M 0 2 L 0 6" />
+      <text x="10" y="12" class="reticle-text-label">SEC·02 [T F T F]</text>
+    </g>
+
+    <!-- 标尺节点 4 (居中命题黄金交叉点 · 琥珀焦散核心 B) -->
+    <g class="reticle-crosshair has-stepped-jitter-1" transform="translate(420, 280)">
+      <path d="M -12 0 L -3 0 M 3 0 L 12 0 M 0 -12 L 0 -3 M 0 3 L 0 12" />
+      <circle cx="0" cy="0" r="2" class="caustic-core" />
+      <circle cx="0" cy="0" r="22" class="caustic-glow has-caustic-breath-2" filter="url(#caustic-blur)" />
+      <text x="16" y="-10" class="reticle-text-label">DATUM 00 · ⊨ λ</text>
+      <text x="16" y="18" class="reticle-prop-badge">§ 4.0031</text>
+    </g>
+
+    <!-- 标尺节点 5 (中部右侧) -->
+    <g class="reticle-crosshair has-stepped-jitter-2" transform="translate(710, 280)">
+      <path d="M -6 0 L -2 0 M 2 0 L 6 0 M 0 -6 L 0 -2 M 0 2 L 0 6" />
+      <path d="M -10 -4 L -10 -10 L -4 -10 M 4 10 L 10 10 L 10 4" style="opacity: 0.4;" />
+      <text x="12" y="-6" class="reticle-text-label">REF·640 [◇p]</text>
+    </g>
+
+    <!-- 标尺节点 6 (腰部大标尺 · 维特根斯坦命题 5.6 核心) -->
+    <g class="reticle-crosshair has-stepped-jitter-3" transform="translate(860, 520)">
+      <path d="M -12 0 L -3 0 M 3 0 L 12 0 M 0 -12 L 0 -3 M 0 3 L 0 12" />
+      <circle cx="0" cy="0" r="1.8" class="caustic-core" />
+      <circle cx="0" cy="0" r="18" class="caustic-glow has-caustic-breath-3" filter="url(#caustic-blur)" />
+      <text x="16" y="-10" class="reticle-text-label">LIMITS OF LANGUAGE</text>
+      <text x="16" y="18" class="reticle-prop-badge">§ 5.6</text>
+    </g>
+
+    <!-- 标尺节点 7 (左下深处 · 琥珀焦散核心 C) -->
+    <g class="reticle-crosshair has-stepped-jitter-1" transform="translate(180, 520)">
+      <path d="M -8 0 L -2 0 M 2 0 L 8 0 M 0 -8 L 0 -2 M 0 2 L 0 8" />
+      <circle cx="0" cy="0" r="1.6" class="caustic-core" />
+      <circle cx="0" cy="0" r="14" class="caustic-glow has-caustic-breath-1" filter="url(#caustic-blur)" />
+      <text x="12" y="14" class="reticle-text-label">SUB·TIDE 23:07</text>
+    </g>
+
+    <!-- 标尺节点 8 (下缘沉默终章) -->
+    <g class="reticle-crosshair has-stepped-jitter-2" transform="translate(420, 760)">
+      <path d="M -8 0 L -2 0 M 2 0 L 8 0 M 0 -8 L 0 -2 M 0 2 L 0 8" />
+      <circle cx="0" cy="0" r="1.4" class="caustic-core" />
+      <text x="12" y="-8" class="reticle-text-label">SILENCE / 06:31</text>
+      <text x="12" y="16" class="reticle-prop-badge">§ 7.0</text>
+    </g>
+
+    <!-- 沿主轴线的游标微度量刻度 (Vernier Scale Ticks) -->
+    <g class="reticle-ticks-group" opacity="0.45">
+      <!-- 纵轴微刻度 (Y 轴刻度，步进 16px) -->
+      <path d="
+        M 177 120 L 183 120 M 178 136 L 182 136 M 178 152 L 182 152 M 178 168 L 182 168 M 176 184 L 184 184
+        M 178 200 L 182 200 M 178 216 L 182 216 M 178 232 L 182 232 M 176 248 L 184 248
+        M 857 320 L 863 320 M 858 336 L 862 336 M 858 352 L 862 352 M 858 368 L 862 368 M 856 384 L 864 384
+        M 858 400 L 862 400 M 858 416 L 862 416 M 858 432 L 862 432 M 856 448 L 864 448
+      " stroke="var(--reticle-wake)" stroke-width="0.6" fill="none" />
+      <!-- 横轴微刻度 (X 轴刻度，步进 24px) -->
+      <path d="
+        M 220 93 L 220 99 M 244 94 L 244 98 M 268 94 L 268 98 M 292 94 L 292 98 M 316 93 L 316 99
+        M 340 94 L 340 98 M 364 94 L 364 98 M 388 94 L 388 98 M 412 93 L 412 99
+      " stroke="var(--reticle-wake)" stroke-width="0.6" fill="none" />
+    </g>
+  </svg>
+
+  <!-- ═════════════════════════════════════════════════════════════════
+       顶部交互调控中控台 (Control Deck)
+       ═════════════════════════════════════════════════════════════════ -->
+  <header class="control-deck-dock">
+    <div class="deck-container">
+      <!-- 醒/梦两态切换（含 180ms 水汽溶变） -->
+      <div class="deck-section">
+        <span class="deck-label">现实面 / REALITY</span>
+        <div class="toggle-capsule">
+          <button type="button" class="capsule-btn is-active" id="btn-wake" onclick="setRealityDirect('wake')">
+            <span class="capsule-pip"></span>醒 · 静态
+          </button>
+          <button type="button" class="capsule-btn" id="btn-dream" onclick="setRealityDirect('dream')">
+            <span class="capsule-pip"></span>梦 · AveritA
+          </button>
+        </div>
+      </div>
+
+      <!-- 连续滑动条 (--reality-mix) -->
+      <div class="deck-section">
+        <span class="deck-label">--reality-mix</span>
+        <div class="slider-wrap">
+          <input type="range" class="deck-slider" id="slider-mix" min="0" max="1" step="0.01" value="1.00" oninput="onMixSliderInput(this.value)" />
+          <span class="slider-val-tag" id="label-mix">1.00</span>
+        </div>
+      </div>
+
+      <!-- 昼夜基底色切换 -->
+      <div class="deck-section">
+        <span class="deck-label">底色 / THEME</span>
+        <div style="display: flex; gap: 4px;">
+          <button type="button" class="mini-btn is-active" id="theme-night" onclick="setTheme('night')">夜色</button>
+          <button type="button" class="mini-btn" id="theme-light" onclick="setTheme('light')">日色</button>
+          <button type="button" class="mini-btn" id="theme-paper" onclick="setTheme('paper')">纸面</button>
+        </div>
+      </div>
+
+      <!-- 动效与检视辅助 -->
+      <div class="deck-section">
+        <button type="button" class="mini-btn" id="btn-inspect" onclick="toggleInspectMode()" title="提升标尺与光晕对比度，便于工程审查">标尺增强</button>
+        <button type="button" class="mini-btn" id="btn-motion" onclick="toggleReducedMotion()">减动模拟</button>
+      </div>
+
+      <!-- 实时遥测读数 -->
+      <div class="deck-section telemetry-strip">
+        <span>--still: <strong id="telemetry-still">0.00</strong></span>
+        <span>节奏: <strong id="telemetry-cadence">7-STEP / 3s</strong></span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ═════════════════════════════════════════════════════════════════
+       站点骨架视图 (Site Content Viewport)
+       ═════════════════════════════════════════════════════════════════ -->
+  <main class="site-viewport">
+    <!-- 站点页头 (SiteHeader) -->
+    <header class="site-header">
+      <!-- AveritA 醒梦转换引擎 Brand 框架 -->
+      <a class="brand-engine-frame" href="javascript:void(0)" id="brand-engine" title="点击可在醒态 Traveritas 与梦态 AveritA 间溶变切换" onclick="toggleRealityWithDissolve()">
+        <span class="brand-word" id="brand-word">
+          <!-- 由 JS 动态按字符填充插槽，醒态静态 Traveritas，梦态 AveritA 轮转 -->
+        </span>
+        <span class="brand-reticle-pip" id="brand-pip"></span>
+      </a>
+
+      <!-- 导航栏（双声轨文案，纯粹标尺刻度微标识，严禁裁缝缝线） -->
+      <nav class="site-nav">
+        <a class="nav-anchor is-active" href="#essays">
+          <i class="nav-reticle-tick"></i>
+          <span class="dual-label" data-wake="随笔" data-dream="断章">随笔</span>
+        </a>
+        <a class="nav-anchor" href="#projects">
+          <i class="nav-reticle-tick"></i>
+          <span class="dual-label" data-wake="项目" data-dream="造物">项目</span>
+        </a>
+        <a class="nav-anchor" href="#about">
+          <i class="nav-reticle-tick"></i>
+          <span class="dual-label" data-wake="关于" data-dream="此身">关于</span>
+        </a>
+      </nav>
+    </header>
+
+    <!-- 核心宣言区 (Hero Declaration) -->
+    <section class="hero-section">
+      <div class="hero-eyebrow">
+        <span class="philosophy-badge">可言说的 · SAYABLE</span>
+        <span class="eyebrow-coord">[RETICLE: 14.0° · 06:31 WASO]</span>
+      </div>
+
+      <h1 class="hero-manifesto">
+        <span class="manifesto-line">在即将醒来的那一瞬，</span>
+        <span class="manifesto-line">世界究竟是在成形，还是正在融化？</span>
+        <span class="manifesto-line sub">世界应当始终保留一种感觉：它随时可能消失，又随时可能重新被记起。</span>
+      </h1>
+
+      <!-- 标尺与星野对准观察框 (HUD) -->
+      <div class="reticle-target-hud">
+        <div class="hud-meta-block">
+          <div class="hud-metric-item">标尺基准面: <strong>DATUM-00 (14° 轴线)</strong></div>
+          <div class="hud-metric-item">知觉量化: <strong>steps(4) 离散抽帧</strong></div>
+          <div class="hud-metric-item">节点焦散: <strong>Amber #d9a05b</strong></div>
+        </div>
+        <div class="hud-cadence-pill" id="hud-status">
+          <span class="hud-cadence-pip"></span>
+          <span id="hud-status-text">醒态 · 绝对静止</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═════════════════════════════════════════════════════════════════
+         核心四界骨架卡片 (The 4 Facets)
+         ═════════════════════════════════════════════════════════════════ -->
+    <section class="facets-grid">
+      <!-- 卡片 1：项目 (可构造的 · BUILDABLE) -->
+      <article class="facet-card" id="projects">
+        <div class="card-meta-bar">
+          <span class="card-badge is-amber">可构造的 · BUILDABLE</span>
+          <span class="card-depth-label">浮现度 VII · 凝晶</span>
+        </div>
+        <h2 class="card-title">自旋刻度与非定域界面</h2>
+        <p class="card-desc">
+          基于离散坐标标尺与 steps(4) 抽帧算法构建的前端知觉引擎。消解传统平滑补间的油腻感，还原老式冷光阴极射线管与清晨薄雾中的微弱结晶感。
+        </p>
+        <div class="card-footer">
+          <span class="card-repo-tag">✓ 公开仓库</span>
+          <a class="card-action-link" href="javascript:void(0)">检视结构 →</a>
+        </div>
+      </article>
+
+      <!-- 卡片 2：随笔 (可言说的 · SAYABLE) -->
+      <article class="facet-card" id="essays">
+        <div class="card-meta-bar">
+          <span class="card-badge">可言说的 · SAYABLE</span>
+          <span class="card-depth-label">8 分钟 · 逻辑与晨光</span>
+        </div>
+        <h2 class="card-title">《维特根斯坦的坐标纸》</h2>
+        <p class="card-desc">
+          “语言的界限在此处化为 0.5px 的精密网格。凡是能够说出的，都能够清晰地说出；凡是不可言说的，在晨光与夜色交汇的标尺节点处保持微温的静默。”
+        </p>
+        <div class="card-footer">
+          <span class="card-repo-tag">命题 5.6 延伸</span>
+          <a class="card-action-link" href="javascript:void(0)">阅读断章 →</a>
+        </div>
+      </article>
+
+      <!-- 卡片 3：试验场 (未命名的 · UNNAMED) -->
+      <article class="facet-card">
+        <div class="card-meta-bar">
+          <span class="card-badge is-amber">未命名的 · UNNAMED</span>
+          <span class="card-depth-label">浮现度 IV · 浮影</span>
+        </div>
+        <h2 class="card-title">琥珀焦散粒子场 (Caustic Dust)</h2>
+        <p class="card-desc">
+          探索半透明树脂材料在 7 步循环与 3 秒呼吸节律下的低频漫射。交汇节点处微光的聚散模拟睡眠深度（从 WASO 微觉醒到 N3 深眠）的知觉起伏。
+        </p>
+        <div class="card-footer">
+          <span class="card-repo-tag">○ 试验场源码</span>
+          <a class="card-action-link" href="javascript:void(0)">进入观测 →</a>
+        </div>
+      </article>
+
+      <!-- 卡片 4：出口与关于 (存在于此 · PRESENCE) -->
+      <article class="facet-card" id="about">
+        <div class="card-meta-bar">
+          <span class="card-badge">存在于此 · PRESENCE</span>
+          <span class="card-depth-label">23:07 → 06:31</span>
+        </div>
+        <h2 class="card-title">一夜 · 444 分钟过夜轨图</h2>
+        <p class="card-desc">
+          三段平台色板校准：昼面、暗夜与纸面。Traveritas 在醒态下的自持，与 AveritA 在梦态下的异变，共同维系着整座站点的知觉张力。
+        </p>
+        <div class="card-footer">
+          <span class="card-repo-tag">晨昏对齐</span>
+          <a class="card-action-link" href="javascript:void(0)">关于此身 →</a>
+        </div>
+      </article>
+    </section>
+
+    <!-- ═════════════════════════════════════════════════════════════════
+         设计研发说明与指标核验 (Design Rationale & Verification)
+         ═════════════════════════════════════════════════════════════════ -->
+    <section class="rationale-section">
+      <div class="rationale-title">
+        <span>/// 视觉研发架构核验 (Visual Engineering Rationale)</span>
+      </div>
+      <div class="rationale-grid">
+        <div class="rationale-box">
+          <h4>1. 零缝纫隐喻与命题边界</h4>
+          <p>
+            全面摒除“针、线、针脚、缝合”等手工工匠黑话。导航指示点采用 8px 光学微十字微刻度（.nav-reticle-tick），分类徽标全面回归维特根斯坦命题边界（可言说的、可构造的、未命名的、存在于此）。
+          </p>
+        </div>
+        <div class="rationale-box">
+          <h4>2. 知觉抽帧与离散步进 (steps(4))</h4>
+          <p>
+            梦态下坐标星野与 AveritA 品牌字符完全摈弃普通 CSS 的贝塞尔平滑插值（tween），采用严格的 <code>steps(4, jump-none)</code> 离散阶跃。±1.5px~2.5px 的微跳跃带来精密机械失序与意识抽帧感。
+          </p>
+        </div>
+        <div class="rationale-box">
+          <h4>3. 7 步循环与 3 秒呼吸节律</h4>
+          <p>
+            琥珀微光核心节点与 AveritA 字符轮转完全对齐 7 步循环。在第 7 步落定后进入长达 3 秒的静止低频呼吸停歇，让周边视界始终沉浸在安静而深邃的定力之中。
+          </p>
+        </div>
+        <div class="rationale-box">
+          <h4>4. 磨砂水汽溶变 (180ms Dissolve)</h4>
+          <p>
+            醒/梦切换触发瞬时 180ms 水汽溶变滤镜（<code>blur(4px)</code> 与透明度微变），模拟水汽在冷热交替那一刻的凝华与蒸发，彻底摆脱普通网页平庸的淡入淡出。
+          </p>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- ═════════════════════════════════════════════════════════════════
+     核心交互控制驱动引擎 (Interactive Controller Script)
+     ═════════════════════════════════════════════════════════════════ -->
+<script>
+  (function () {
+    // ═════════════════════════════════════════════════════════════════
+    // 1. 基础状态与变量定义
+    // ═════════════════════════════════════════════════════════════════
+    const WAKE_WORD = "Traveritas";
+    const DREAM_BASE = "AveritA";
+
+    // AveritA 7 步循环环形序列：
+    // AveritA -> VeritaA -> EritaAV -> RitaAVe -> ItaAVer -> TaAVeri -> AAVerit
+    function generateCycle(base) {
+      const list = [];
+      const len = base.length;
+      const raw = base.toLowerCase();
+      for (let i = 0; i < len; i++) {
+        const chs = raw.split('');
+        const shifted = chs.slice(i).concat(chs.slice(0, i)).join('');
+        const formatted =
+          shifted.charAt(0).toUpperCase() +
+          shifted.slice(1, -1).toLowerCase() +
+          shifted.charAt(shifted.length - 1).toUpperCase();
+        list.push(formatted);
+      }
+      return list;
+    }
+    const DREAM_CYCLE = generateCycle(DREAM_BASE);
+
+    let realityState = 'wake'; // 'wake' | 'dream'
+    let realityMix = 1.0;      // 1.0 (纯醒) → 0.0 (纯梦)
+    let cycleStep = 0;
+    let cycleTimer = null;
+    let isBreathing = false;
+    let isReducedMotion = false;
+    let isInspectMode = false;
+
+    // DOM 元素引用
+    const pageRoot = document.getElementById('page-root');
+    const brandWordEl = document.getElementById('brand-word');
+    const btnWake = document.getElementById('btn-wake');
+    const btnDream = document.getElementById('btn-dream');
+    const sliderMix = document.getElementById('slider-mix');
+    const labelMix = document.getElementById('label-mix');
+    const telemetryStill = document.getElementById('telemetry-still');
+    const telemetryCadence = document.getElementById('telemetry-cadence');
+    const hudStatusText = document.getElementById('hud-status-text');
+    const dualLabels = document.querySelectorAll('.dual-label');
+
+    // ═════════════════════════════════════════════════════════════════
+    // 2. AveritA 字符插槽渲染
+    // ═════════════════════════════════════════════════════════════════
+    function renderBrandWord(word, isDream) {
+      brandWordEl.innerHTML = '';
+      if (isDream) {
+        brandWordEl.classList.add('is-dream');
+      } else {
+        brandWordEl.classList.remove('is-dream');
+      }
+
+      for (let i = 0; i < word.length; i++) {
+        const span = document.createElement('span');
+        span.className = 'brand-char';
+        span.style.setProperty('--char-i', i);
+        span.textContent = word[i];
+        brandWordEl.appendChild(span);
+      }
+    }
+
+    // 驱动一拍 AveritA 轮转
+    function stepBrandCadence() {
+      if (realityMix > 0.45) return; // 醒面占优时不转
+
+      cycleStep = (cycleStep + 1) % DREAM_CYCLE.length;
+      const currentWord = DREAM_CYCLE[cycleStep];
+      renderBrandWord(currentWord, true);
+
+      // 更新 HUD 状态
+      telemetryCadence.textContent = `STEP 0${cycleStep + 1}/07`;
+      hudStatusText.textContent = `梦态 · 轮转 0${cycleStep + 1}/07`;
+
+      // 7 步完成后触发 3 秒深长呼吸停歇
+      if (cycleStep === 0) {
+        isBreathing = true;
+        telemetryCadence.textContent = `BREATH (3.0s)`;
+        hudStatusText.textContent = `梦态 · 3s 呼吸停歇`;
+        clearTimeout(cycleTimer);
+        cycleTimer = setTimeout(() => {
+          isBreathing = false;
+          cycleTimer = setTimeout(stepBrandCadence, 1000);
+        }, 3000);
+      } else {
+        cycleTimer = setTimeout(stepBrandCadence, 1000);
+      }
+    }
+
+    // 启动/停止 Brand 轮转引擎
+    function updateBrandCadenceState() {
+      clearTimeout(cycleTimer);
+      if (realityMix <= 0.45 && !isReducedMotion) {
+        renderBrandWord(DREAM_CYCLE[cycleStep], true);
+        cycleTimer = setTimeout(stepBrandCadence, 1000);
+      } else {
+        renderBrandWord(WAKE_WORD, false);
+        telemetryCadence.textContent = `7-STEP / 3s`;
+        hudStatusText.textContent = realityMix > 0.8 ? `醒态 · 绝对静止` : `过渡态 (MIX ${realityMix.toFixed(2)})`;
+      }
+    }
+
+    // ═════════════════════════════════════════════════════════════════
+    // 3. 醒梦混合变量应用 (--reality-mix & --still)
+    // ═════════════════════════════════════════════════════════════════
+    function applyRealityMix(val) {
+      realityMix = parseFloat(val);
+      const stillVal = 1 - realityMix;
+
+      // 写入 CSS 自定义属性
+      document.documentElement.style.setProperty('--reality-mix', realityMix);
+      document.documentElement.style.setProperty('--still', stillVal);
+
+      // 同步 UI 控件
+      sliderMix.value = realityMix.toFixed(2);
+      labelMix.textContent = realityMix.toFixed(2);
+      telemetryStill.textContent = stillVal.toFixed(2);
+
+      // 激活按钮样式
+      if (realityMix >= 0.5) {
+        btnWake.classList.add('is-active');
+        btnDream.classList.remove('is-active');
+        realityState = 'wake';
+      } else {
+        btnDream.classList.add('is-active');
+        btnWake.classList.remove('is-active');
+        realityState = 'dream';
+      }
+
+      // 更新双声轨文案（随笔/断章、项目/造物、关于/此身）
+      dualLabels.forEach(el => {
+        const wakeText = el.getAttribute('data-wake');
+        const dreamText = el.getAttribute('data-dream');
+        el.textContent = realityMix > 0.4 ? wakeText : dreamText;
+      });
+
+      updateBrandCadenceState();
+    }
+
+    // ═════════════════════════════════════════════════════════════════
+    // 4. 水汽溶变 (Frosted Dissolve) 触发机制
+    // ═════════════════════════════════════════════════════════════════
+    function triggerFrostedDissolve(callback) {
+      if (isReducedMotion) {
+        callback();
+        return;
+      }
+      pageRoot.classList.add('is-dissolving');
+      setTimeout(() => {
+        callback();
+        setTimeout(() => {
+          pageRoot.classList.remove('is-dissolving');
+        }, 60);
+      }, 120);
+    }
+
+    // 外部调用的切换接口
+    window.setRealityDirect = function (target) {
+      const targetVal = target === 'wake' ? 1.0 : 0.0;
+      if (Math.abs(realityMix - targetVal) < 0.01) return;
+
+      triggerFrostedDissolve(() => {
+        applyRealityMix(targetVal);
+      });
+    };
+
+    window.toggleRealityWithDissolve = function () {
+      const nextTarget = realityMix >= 0.5 ? 'dream' : 'wake';
+      window.setRealityDirect(nextTarget);
+    };
+
+    window.onMixSliderInput = function (val) {
+      applyRealityMix(val);
+    };
+
+    // ═════════════════════════════════════════════════════════════════
+    // 5. 昼夜底色主题切换
+    // ═════════════════════════════════════════════════════════════════
+    window.setTheme = function (theme) {
+      document.body.classList.remove('theme-light', 'theme-paper');
+      document.getElementById('theme-night').classList.remove('is-active');
+      document.getElementById('theme-light').classList.remove('is-active');
+      document.getElementById('theme-paper').classList.remove('is-active');
+
+      if (theme === 'light') {
+        document.body.classList.add('theme-light');
+        document.getElementById('theme-light').classList.add('is-active');
+      } else if (theme === 'paper') {
+        document.body.classList.add('theme-paper');
+        document.getElementById('theme-paper').classList.add('is-active');
+      } else {
+        document.getElementById('theme-night').classList.add('is-active');
+      }
+    };
+
+    // ═════════════════════════════════════════════════════════════════
+    // 6. 减弱动画与标尺增强辅助
+    // ═════════════════════════════════════════════════════════════════
+    window.toggleReducedMotion = function () {
+      isReducedMotion = !isReducedMotion;
+      const btn = document.getElementById('btn-motion');
+      if (isReducedMotion) {
+        btn.classList.add('is-active');
+        document.documentElement.style.setProperty('--still', 0);
+        clearTimeout(cycleTimer);
+        renderBrandWord(WAKE_WORD, false);
+      } else {
+        btn.classList.remove('is-active');
+        applyRealityMix(realityMix);
+      }
+    };
+
+    window.toggleInspectMode = function () {
+      isInspectMode = !isInspectMode;
+      const btn = document.getElementById('btn-inspect');
+      if (isInspectMode) {
+        btn.classList.add('is-active');
+        document.documentElement.style.setProperty('--inspect-gain', '1.8');
+        document.documentElement.style.setProperty('--reticle-wake', 'rgba(167, 177, 186, 0.4)');
+      } else {
+        btn.classList.remove('is-active');
+        document.documentElement.style.setProperty('--inspect-gain', '0');
+        document.documentElement.style.setProperty('--reticle-wake', 'rgba(167, 177, 186, 0.14)');
+      }
+    };
+
+    // 键盘辅助：空格键触发醒梦溶变，左右方向键调节滑动条
+    window.addEventListener('keydown', (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') return;
+      if (e.code === 'Space') {
+        e.preventDefault();
+        window.toggleRealityWithDissolve();
+      } else if (e.code === 'ArrowLeft') {
+        const nextVal = Math.max(0, realityMix - 0.05);
+        applyRealityMix(nextVal);
+      } else if (e.code === 'ArrowRight') {
+        const nextVal = Math.min(1, realityMix + 0.05);
+        applyRealityMix(nextVal);
+      }
+    });
+
+    // 页面初始化
+    applyRealityMix(1.0);
+  })();
+</script>
+</body>
+</html>

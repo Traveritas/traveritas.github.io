@@ -1,0 +1,1189 @@
+<!doctype html>
+<html lang="zh-CN" data-zone="light">
+<!--
+  ═══════════════════════════════════════════════════════════════════════════
+  Phase 15 · 共用外壳（p15-shell.html）
+
+  这是本轮四稿的**共同起点**，不是一稿。四稿各自 `cp p15-shell.html p15-x-*.html`
+  后，只替换 `<div class="bg" id="p15-bg">` 那一段（BG SLOT）。
+  B 稿（谐波残影）额外可改 EEG SLOT。
+
+  外壳里已就位、四稿都不要动的东西：
+    · tokens（照抄 src/styles/tokens.css，含 --reality-mix / --still / --wash）
+    · 三段底色 ?zone=light|deep|paper（照抄 src/data/night.ts 的 ZONES）
+    · 层序：墙/纸 −3 → 背景 −2|−3 → 脑电 −2 → 缝线 −1 → 正文 0
+      首屏「千层纸」是不透明的，挂在 −3——这正是「背景层要不要穿透首屏」
+      这个老问题的由来。?plate=off 可撤掉纸看全幅。
+    · 双态引擎，行为对齐 src/scripts/reality.ts：
+        空白处长按 2200ms 入醒 / 1300ms 回梦；中途松手 ≤600ms 退回；
+        短按 ≤260ms ＝线头一弹（无状态变化）；键盘 Shift+空格等价；
+        sessionStorage 闩锁；prefers-reduced-motion 恒醒面。
+      长按全程逐帧写 --reality-mix（1=醒 → 0=梦），并同 reality.ts 一样插值
+      --amber / --umber / --ghost-ink / --dream / --wash（暖↔冷）。
+      **背景层的唯一合法输入就是这些 CSS 变量**——不许 JS 传参、不许另开 rAF。
+    · 左上角品牌字标 Traveritas ↔ AveritA（brand.ts 的 7 步轮转 + 3 秒呼吸
+      + 每字符 steps 抽帧 + 180ms 磨砂溶变）
+    · 14° 缝线与琥珀锚点、脑电发丝线、纸面颗粒（grain）
+    · 真实文案（取自 src/content 与 src/pages/index.astro）
+
+  查询参数（四稿共用）：
+    ?zone=light|deep|paper   三段夜色
+    ?mix=0..1                直接钉住醒度（1 醒 0 梦），用于逐帧审视过渡
+    ?face=wake|dream         开场在哪一面
+    ?bg=through|below|off    背景层挂 −2（穿透首屏）/ −3（被千层纸遮住）/ 关
+    ?plate=off               撤掉首屏千层纸（看全幅背景）
+    ?eeg=off                 藏脑电（背景层自身的对照）
+    ?freeze=1                全部 CSS 动画停在 0% 帧 + 脑电固定相位（严格对照）
+    ?reduced=1               模拟 prefers-reduced-motion
+    ?ui=0                    藏右下调试角标（截图一律用它）
+
+  调试：window.__p15 = { state(), setMix(m), face(f), hold(), release(), zone() }
+  ═══════════════════════════════════════════════════════════════════════════
+-->
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>醒梦 · Phase 15 背景双态 · 共用外壳</title>
+  <link rel="stylesheet" href="../../node_modules/@fontsource/noto-serif-sc/300.css" />
+  <link rel="stylesheet" href="../../node_modules/@fontsource/noto-serif-sc/600.css" />
+  <link rel="stylesheet" href="../../node_modules/@fontsource/ibm-plex-mono/400.css" />
+  <link rel="stylesheet" href="../../node_modules/@fontsource/ibm-plex-mono/500.css" />
+  <link rel="stylesheet" href="../../node_modules/@fontsource/silkscreen/400.css" />
+  <style>
+    /* ═══════════ 1 · tokens（照抄 src/styles/tokens.css） ═══════════ */
+    :root {
+      color-scheme: light;
+      --bg: #e9ecef;
+      --bg-sunken: #e1e5ea;
+      --fg: #262c33;
+      --fg-soft: #59626c;
+      --fg-faint: #8a929b;
+      --line: rgba(38, 44, 51, 0.14);
+
+      --wake: #a7b1ba;
+      --dream: #c2a382;
+      --umber: #765640;
+      --amber: #d9a05b;
+      --seal: #a3452f;
+      --seam-angle: 14deg;
+
+      --reality-mix: 1;
+      --still: calc(1 - var(--reality-mix));
+      --wash: #556270;
+
+      --font-display: 'Noto Serif SC', 'Palatino Linotype', Palatino, Georgia, 'Songti SC', SimSun, serif;
+      --font-body: system-ui, -apple-system, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei UI', sans-serif;
+      --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+      --font-pixel: 'Silkscreen', ui-monospace, Consolas, monospace;
+
+      --measure: 34em;
+      --gap-v: clamp(3.5rem, 9vh, 6.5rem);
+      --ghost-ink: #b98f74;
+    }
+
+    /* 三段夜色（照抄 src/data/night.ts 的 ZONES） */
+    html[data-zone='deep'] {
+      color-scheme: dark;
+      --bg: #171b24;
+      --fg: #e5e0d2;
+      --fg-soft: #b9b3a4;
+      --fg-faint: #8a8577;
+      --line: rgba(229, 224, 210, 0.16);
+    }
+    html[data-zone='paper'] {
+      color-scheme: light;
+      --bg: #efe9dd;
+      --fg: #55503f;
+      --fg-soft: #665f50;
+      --fg-faint: #8b8474;
+      --line: rgba(85, 80, 63, 0.16);
+    }
+
+    /* ═══════════ 2 · 基础（照抄 src/styles/global.css 的口径） ═══════════ */
+    *, *::before, *::after { box-sizing: border-box; }
+
+    html { -webkit-text-size-adjust: 100%; overflow-x: clip; scrollbar-width: none; }
+    ::-webkit-scrollbar { width: 0; height: 0; }
+
+    body {
+      margin: 0;
+      font-family: var(--font-body);
+      font-size: 1.0625rem;
+      line-height: 1.9;
+      color: var(--fg);
+      /* 大表面洗染：--wash 由状态机随醒度插值（梦暖褐 ↔ 醒冷灰），仅 7% */
+      background: color-mix(in srgb, var(--bg) 93%, var(--wash));
+      text-rendering: optimizeLegibility;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: clip;
+    }
+
+    h1, h2, h3 { font-family: var(--font-display); font-weight: 600; line-height: 1.55; margin: 0; letter-spacing: 0.01em; }
+    a { color: var(--fg); text-decoration-thickness: 1px; text-underline-offset: 0.3em; }
+    a:hover { color: var(--amber); }
+    .mono { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.14em; color: var(--fg-soft); }
+    .container { width: min(100% - 3rem, 42rem); margin-inline: auto; }
+    .src-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+
+    /* 双态文字：磨砂溶变换面（简版 morph，够用即可） */
+    [data-morph] {
+      transition: opacity 0.18s ease, filter 0.18s ease;
+      display: inline-block;
+    }
+    [data-morph].is-morphing { opacity: 0; filter: blur(3px); }
+
+    /* ═══════════ 3 · 全局 chrome（脑电 / 缝线 / 颗粒） ═══════════ */
+
+    /* 脑电：固定视口层，波轴心恒为视口 50vh，与缝线同轴；z −2 */
+    .eeg {
+      position: fixed; inset: 0; width: 100vw; height: 100vh;
+      z-index: -2; pointer-events: none; overflow: visible;
+    }
+    .eeg .eeg-main { stroke: var(--umber); stroke-width: 1.2; fill: none; opacity: 0.62; stroke-linecap: round; stroke-linejoin: round; }
+    .eeg .eeg-ghost { stroke: var(--dream); stroke-width: 1.1; fill: none; opacity: 0.32; stroke-linecap: butt; stroke-linejoin: miter; }
+    .eeg-hidden .eeg { display: none; }
+
+    /* 缝线：fixed 14°，170vmax，琥珀锚点呼吸 */
+    .seam {
+      position: fixed; left: 50%; top: 50%; width: 170vmax; height: 1px;
+      background: linear-gradient(90deg, var(--wake), var(--dream));
+      transform: translate(-50%, -50%) rotate(var(--seam-angle));
+      z-index: -1; pointer-events: none; opacity: 0.62;
+    }
+    .seam-anchor {
+      position: absolute; top: 50%; left: 50%; width: 8px; height: 8px; margin: -4px 0 0 -4px;
+      border-radius: 50%; background: var(--amber);
+      box-shadow: 0 0 10px 2px color-mix(in srgb, var(--amber) 55%, transparent),
+                  0 0 26px 6px color-mix(in srgb, var(--amber) 20%, transparent);
+      animation: anchor-breathe 5.5s ease-in-out infinite;
+    }
+    @keyframes anchor-breathe { 0%, 100% { opacity: 0.72; transform: scale(1); } 50% { opacity: 1; transform: scale(1.18); } }
+
+    /* 纸面颗粒（照抄 Grain.astro：梦更重，醒更净） */
+    .grain {
+      position: fixed; inset: 0; z-index: 60; pointer-events: none;
+      opacity: calc(0.05 + var(--still, 0) * 0.035);
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    }
+
+    /* ═══════════ 4 · 页面骨架 ═══════════ */
+    .page { display: flex; flex-direction: column; }
+
+    .site-header .header-row { padding-block: 1.4rem; display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; }
+    .brand {
+      color: var(--fg); text-decoration: none !important; font-family: var(--font-display);
+      font-weight: 600; font-size: 1.05rem; letter-spacing: 0.02em; white-space: nowrap;
+      display: inline-flex; align-items: baseline; min-width: 6.8em;
+      transition: opacity 0.18s cubic-bezier(0.2, 0.8, 0.3, 1), filter 0.18s cubic-bezier(0.2, 0.8, 0.3, 1), transform 0.18s cubic-bezier(0.2, 0.8, 0.3, 1), color 0.16s ease;
+    }
+    .brand:hover, .brand:focus { color: var(--fg); text-decoration: none !important; }
+    .brand.is-morphing { opacity: 0; filter: blur(2.5px); transform: translateY(-1px) scale(0.98); }
+    .brand-char { display: inline-block; will-change: transform, color; }
+    .brand-char:nth-child(odd) { --drift-x: 1; }
+    .brand-char:nth-child(even) { --drift-x: -1; }
+    .brand.is-dream .brand-char { animation: brand-pixel-float 2.4s step-end infinite alternate; animation-delay: calc(var(--i) * -0.32s); }
+    @keyframes brand-pixel-float {
+      0%   { transform: translate(0, 0); color: var(--fg); }
+      33%  { transform: translate(calc(0.25px * var(--drift-x, 1)), -1.4px); color: var(--fg); }
+      66%  { transform: translate(calc(-0.2px * var(--drift-x, 1)), -2.8px); color: color-mix(in srgb, var(--amber) 16%, var(--fg)); }
+      100% { transform: translate(calc(0.15px * var(--drift-x, 1)), -4.2px); color: color-mix(in srgb, var(--amber) 36%, var(--fg)); }
+    }
+
+    .site-nav { display: flex; align-items: center; gap: 1.15rem; }
+    .site-nav a {
+      display: inline-flex; align-items: center; gap: 0.5rem; font-family: var(--font-mono);
+      font-weight: 500; font-size: 0.75rem; letter-spacing: 0.05em; color: var(--fg-soft);
+      text-decoration: none; padding-block: 0.3rem; transition: color 0.16s ease;
+    }
+    .site-nav a:hover, .site-nav a:focus-visible { color: var(--fg); }
+    .stitch { display: inline-block; flex: none; width: 10px; height: 2px; border-radius: 2px; background: var(--fg-faint); transform: rotate(8deg); transition: width 0.16s ease, background-color 0.16s ease; }
+    .site-nav a:hover .stitch { width: 16px; }
+    .site-nav a.is-current { color: var(--fg); }
+    .site-nav a.is-current .stitch { background: var(--amber); }
+
+    /* ── 首屏：千层纸的简化版（不透明纸壳挂在 −3，与线上同） ── */
+    .hero { position: relative; min-height: 88vh; display: grid; place-items: center; padding: 2rem; }
+    .hero .plate {
+      position: absolute; inset: 3vh 2.5vw 5vh; z-index: -3;
+      background: color-mix(in srgb, var(--bg) 90%, var(--fg));
+      border: 1px solid var(--line);
+      box-shadow: 0 24px 60px -30px rgba(0, 0, 0, 0.28);
+    }
+    .plate-off .hero .plate { display: none; }
+    /* 偏移开视口中心：14° 缝线与琥珀锚点正过画面中心，字心不要落在锚点上 */
+    .hero-ink { position: relative; z-index: 0; display: grid; justify-items: center; gap: 1.1rem; transform: translate(8vw, -3vh); }
+    .hero-glyph {
+      font-family: var(--font-display); font-weight: 600; line-height: 1;
+      font-size: clamp(7rem, 19vw, 14rem); color: color-mix(in srgb, var(--fg) 78%, transparent);
+      letter-spacing: 0.04em;
+    }
+    .hero-note { display: flex; align-items: flex-start; gap: 1.4rem; }
+    .vsub { writing-mode: vertical-rl; font-family: var(--font-display); font-size: 0.86rem; letter-spacing: 0.34em; color: var(--fg-soft); max-height: 8.5em; }
+    .hero-meta { display: grid; gap: 0.3rem; text-align: left; }
+
+    /* ── 正文两段（随笔 / 项目），用来验「背景层会不会抢字」 ── */
+    .sec { padding-block: var(--gap-v); }
+    .sec-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; padding-bottom: 0.9rem; border-bottom: 1px solid var(--line); margin-bottom: 1.6rem; }
+    .sec-head h2 { font-size: 1.28rem; }
+    .rows { display: grid; gap: 1.7rem; }
+    .row { display: grid; gap: 0.35rem; }
+    .row h3 { font-size: 1.02rem; }
+    .row p { margin: 0; color: var(--fg-soft); font-size: 0.94rem; max-width: var(--measure); }
+    .row .tags { display: flex; gap: 0.6rem; }
+    .st { font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.1em; color: var(--amber); border: 1px solid color-mix(in srgb, var(--amber) 45%, transparent); padding: 0.05rem 0.45rem; }
+
+    .site-footer { border-top: 1px solid var(--line); padding-block: 2.4rem 4rem; }
+    .site-footer .ft { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+
+    /* ═══════════ 5 · 入梦检验的特效层（线 / 结 / 一弹） ═══════════ */
+    .fx { position: fixed; inset: 0; z-index: 210; pointer-events: none; overflow: hidden; }
+    .fx .thread { position: absolute; left: 0; top: 0; width: 0; height: 0; display: none; transform-origin: 0 0; }
+    .fx .t-core { position: absolute; top: -0.5px; left: 0; width: 0; height: 1px; }
+    .fx .thread.go .t-core { background: linear-gradient(90deg, rgba(167,177,186,0), rgba(167,177,186,.38) 8%, rgba(217,160,91,.8) 50%, rgba(167,177,186,.38) 92%, rgba(167,177,186,0)); }
+    .fx .thread.back .t-core { background: linear-gradient(90deg, rgba(194,163,130,0), rgba(194,163,130,.4) 8%, rgba(217,160,91,.8) 50%, rgba(194,163,130,.4) 92%, rgba(194,163,130,0)); }
+    .fx .flick {
+      position: absolute; left: 0; top: 0; width: 38px; height: 1px; margin: 0 0 0 -19px; display: none;
+      background: linear-gradient(90deg, rgba(167,177,186,0), rgba(167,177,186,.55) 50%, rgba(167,177,186,0));
+      transform: translate(var(--fx, 0px), var(--fy, 0px)) rotate(-4deg);
+    }
+    .fx .flick.go { display: block; animation: xmFlick 0.3s ease-out both; }
+    @keyframes xmFlick {
+      0% { transform: translate(var(--fx, 0px), var(--fy, 0px)) rotate(-4deg) scale(.15); opacity: 0; }
+      35% { transform: translate(var(--fx, 0px), var(--fy, 0px)) rotate(-4deg) scale(1); opacity: 1; }
+      100% { transform: translate(var(--fx, 0px), var(--fy, 0px)) rotate(-4deg) scale(.6); opacity: 0; }
+    }
+    body.reality-holding { user-select: none; -webkit-user-select: none; }
+
+    /* ═══════════ 6 · 右下调试角标（?ui=0 隐藏） ═══════════ */
+    .dbg {
+      position: fixed; right: 0.9rem; bottom: 0.9rem; z-index: 200;
+      display: flex; align-items: center; gap: 0.5rem;
+      font-family: var(--font-mono); font-size: 0.66rem; letter-spacing: 0.08em;
+      color: var(--fg-soft); background: color-mix(in srgb, var(--bg) 88%, transparent);
+      border: 1px solid var(--line); padding: 0.35rem 0.55rem; opacity: 0.62;
+    }
+    .dbg:hover { opacity: 1; }
+    .dbg button, .dbg a { font: inherit; color: inherit; background: none; border: 1px solid var(--line); padding: 0.1rem 0.4rem; cursor: pointer; text-decoration: none; }
+    .dbg button[aria-pressed='true'] { color: var(--amber); border-color: color-mix(in srgb, var(--amber) 50%, transparent); }
+    .dbg input { width: 7rem; }
+    .dbg .now { color: var(--amber); font-variant-numeric: tabular-nums; }
+    .ui-off .dbg { display: none; }
+
+    /* ═══════════ 7 · 定格（截图严格对照用） ═══════════ */
+    .freeze *, .freeze *::before, .freeze *::after {
+      animation-play-state: paused !important;
+      animation-delay: 0s !important;
+      transition: none !important;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; }
+    }
+    @media (max-width: 720px) {
+      .hero .plate { inset: 2vh 0.9rem 4vh; }
+      .container { width: min(100% - 2rem, 42rem); }
+    }
+  </style>
+</head>
+
+<body>
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       P15 BG SLOT · 本稿唯一要改的地方
+
+       契约：
+         · 根节点固定为 <div class="bg" id="p15-bg" data-layer="...">
+           内联 CSS 已给：position:fixed / inset:0 / pointer-events:none /
+           overflow:hidden；z 由 data-layer 决定（见下方 CSS）。
+         · 只允许消费这几个 CSS 变量（长按期间逐帧更新）：
+              --reality-mix  1=醒 → 0=梦
+              --still        1=梦 → 0=醒（＝1−reality-mix，动效倍率）
+              --amber --dream --umber --ghost-ink --wake --wash（暖↔冷插值中）
+              --bg --fg --fg-soft --line（三段夜色）
+           不许 JS 传参、不许自己开 rAF、不许加滚动监听。
+         · 所有动效只用 transform / opacity / filter（不触发重排重绘）；
+           不要在会动的元素上用 backdrop-filter（上一轮实测掉 37% 帧）。
+         · 醒态要「看得见但绝对静止」——能读出几何与秩序，不是隐身，
+           也零动画零呼吸。梦态＝同一件东西换一种读法。
+         · 不得侵入版心文字（.container 42rem / .sec 正文）；
+           背景最亮处 ≤ 相邻墨色亮度差的 35%。
+       ═══════════════════════════════════════════════════════════════════════ -->
+  <div class="bg" id="p15-bg" data-layer="through" aria-hidden="true">
+    <!-- ▼▼▼ 边边相重合 ↔ 接缝错开（P16-B）：容器留空，构造体由下方脚本一次性生成 ▼▼▼ -->
+    <div class="tl-field" id="tl-field" aria-hidden="true"></div>
+    <!-- ▲▲▲ 你的背景层到此为止 ▲▲▲ -->
+  </div>
+  <style>
+    .bg { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+    .bg[data-layer='through'] { z-index: -2; }  /* 在千层纸(−3)之上、缝线(−1)之下；与脑电同为 −2，DOM 在前故脑电压在它上面 */
+    .bg[data-layer='below'] { z-index: -3; }    /* 被首屏千层纸完全遮住，只有滚过首屏才出现 */
+    .bg[data-layer='off'] { display: none; }
+  </style>
+
+  <style>
+    /* ═══════════════════════════════════════════════════════════════════════
+       P16-B · 边边相重合 ↔ 接缝错开  Edge-Coincident Tiling → Opened Seams
+       ───────────────────────────────────────────────────────────────────────
+       母题（用户原话：醒状态大块内的正方体重组成边边相重合的拼接形式）：
+       每块构造体都是一整片「被分成若干正方形的整理形」，两态都成立——
+       醒：块内的正方形**边边相重合**（零重叠、共边处两枚 1px 边框相邻落在同一条
+           格线上 ⇒ 共边读成一条更重的缝、外轮廓仍是 1px 单线）。轮廓是阶梯直角，
+           内部线全部落在同一格线上；整片没有一处交叠，于是醒态没有琥珀窗。
+       梦：同一批正方形各自沿「它脱离的那条共享边」的法向滑开 0.30–0.52 边长
+           （带 ±0.12 边长的切向错开），接缝裂开、板片错开搭接；
+           每一处交叠被掏空成一枚 1px 琥珀窗（沿用 D 稿的解析求交规则）。
+       ───────────────────────────────────────────────────────────────────────
+       两态之间只有一条连续插值：位置 = loose + (tiled − loose) × σ(reality-mix)，
+       σ = --tl-k = smoothstep（f(0)=0、f(1)=1、两端导数为 0、f(0.5)=0.5）。
+       按下：接缝逐帧裂开；松手：逐帧合缝；中途停下就是「半合缝」的中间态——
+       「无缝」在这一稿里的观感是**缝在呼吸**，不是两种图案的叠加。
+       ───────────────────────────────────────────────────────────────────────
+       醒态平移（本稿对「醒态零动画」的例外声明，只有平移这一类）：
+       三档视差沿 14°（--seam-angle）同向，周期 100/84/68s。
+       取舍：**放弃 D 稿「内容复制两份 + 整周期位移」**，改成「净位移为 0 的往返」
+       （0 → +A → 0，A = 240/300/360px，cubic-bezier 两端缓）。于是：
+         · 首尾同帧仍然成立，而且不需要任何内容副本（t=0 与 t=T 都停在原点）；
+         · 长按把 σ 压到 0 时，归位距离 ≤ 一个振幅（最远 360px）而不是 D 稿的 2329px，
+           方向与「合缝」同向 —— 读起来是整片向格线收回，不是被猛拉一把；
+         · 代价：流动感从「传送带」变成「潮水」，每半个周期有一次降速转向，
+           峰速约 8.4/12.5/18.5px/s（D 稿 22–36px/s）。
+       ───────────────────────────────────────────────────────────────────────
+       红线：动效只有「漂移」与「阶跃」两类，阶跃幅度全部乘 --still（醒态恒 0）；
+       两态插值只用 transform，琥珀窗只用 opacity（每档一个 opacity 组，不是逐窗写）；
+       无 rAF、无滚动/尺寸监听、无 resize 重算、不读 DOM 尺寸；
+       不用 backdrop-filter、不用 blur；逐帧只改 transform / opacity，不改颜色。
+       ═══════════════════════════════════════════════════════════════════════ */
+    .tl-field {
+      position: absolute; inset: 0;
+      /* 梦态整场沿 14° 再登记 10px（静止帧上的第一层「错开」），连续插值不是开关 */
+      transform: translate3d(calc(10px * var(--still, 0)), calc(3px * var(--still, 0)), 0);
+    }
+    /* σ(reality-mix)：smoothstep。醒=1（合缝）、梦=0（错开）。
+       包这层的理由与 D 稿同：直接线性压幅度会让按下瞬间的位置速度突变；
+       smoothstep 让「裂开 / 合上」从 0 速起、到 0 速止，中途最快。 */
+    :root {
+      --tl-k: calc(var(--reality-mix) * var(--reality-mix) * (3 - 2 * var(--reality-mix)));
+    }
+    /* 外层：醒态往返漂移。净位移为 0 ⇒ t=0 与 t=T 逐像素同帧，且无需内容副本 */
+    .tl-drift {
+      position: absolute; inset: 0; opacity: var(--tl-o, 1);
+      animation: tl-drift var(--tl-dur, 84s) infinite;
+      /* 整档只动这一个元素；提成独立合成层后，漂移只是层的位移，
+         逐帧不再把 130 块板片重新栅格化（8× 降速实测：p95 33ms → 17ms） */
+      will-change: transform;
+    }
+    @keyframes tl-drift {
+      0%, 100% {
+        transform: translate3d(0, 0, 0);
+        animation-timing-function: cubic-bezier(0.45, 0, 0.55, 1);
+      }
+      50% {
+        transform: translate3d(calc(var(--tl-ax, 0px) * var(--tl-k, 1)), calc(var(--tl-ay, 0px) * var(--tl-k, 1)), 0);
+        animation-timing-function: cubic-bezier(0.45, 0, 0.55, 1);
+      }
+    }
+    /* 内层：梦态原地阶跃浮动（0–3 整数像素、净位移 0、7 步 + 3 秒呼吸，与 brand.ts 同拍）。
+       幅度全部乘 --still ⇒ 醒态严格为 0（矩阵恒等，不参与醒态构图） */
+    .tl-step {
+      position: absolute; inset: 0;
+      animation: tl-step var(--tl-sdur, 10s) steps(1, end) infinite;
+      animation-delay: var(--tl-sdel, 0s);
+    }
+    @keyframes tl-step {
+      0%        { transform: translate3d(0, 0, 0); }
+      10%       { transform: translate3d(calc(-1px * var(--tl-samp, 2) * var(--still, 0)), calc(-2px * var(--tl-samp, 2) * var(--still, 0)), 0); }
+      20%       { transform: translate3d(calc(1px * var(--tl-samp, 2) * var(--still, 0)), calc(-3px * var(--tl-samp, 2) * var(--still, 0)), 0); }
+      30%       { transform: translate3d(0px, calc(-1px * var(--tl-samp, 2) * var(--still, 0)), 0); }
+      40%       { transform: translate3d(calc(2px * var(--tl-samp, 2) * var(--still, 0)), 0px, 0); }
+      50%       { transform: translate3d(calc(1px * var(--tl-samp, 2) * var(--still, 0)), calc(2px * var(--tl-samp, 2) * var(--still, 0)), 0); }
+      60%       { transform: translate3d(calc(-1px * var(--tl-samp, 2) * var(--still, 0)), calc(1px * var(--tl-samp, 2) * var(--still, 0)), 0); }
+      70%, 100% { transform: translate3d(0, 0, 0); }
+    }
+    .tl-cell { position: absolute; inset: 0; }
+    /* 一个构造体：原点在它自己的 (X,Y) 屏幕点，板片相对它定位 */
+    .tl-cl { position: absolute; width: 0; height: 0; }
+    /* 一枚正方形板片：left/top 停在**梦态（loose）**位置，再用 transform 向醒态
+       （tiled）滑过去 —— 醒态 k=1 时正好落在整数格点上（1px 线不会糊）。 */
+    .tl-sq {
+      position: absolute;
+      /* 7% 面 / 13% 边线：共边处是两枚这样的 1px 边框相邻（合计 2px 的一条重缝），
+         实测最深处在亮面底色下决定「占墨色差」的最大值（见 notes 实测表） */
+      background: color-mix(in srgb, var(--ghost-ink) 7%, transparent);
+      border: 1px solid color-mix(in srgb, var(--ghost-ink) 13%, transparent);
+      transform: translate3d(calc(var(--tl-dx, 0px) * var(--tl-k, 1)), calc(var(--tl-dy, 0px) * var(--tl-k, 1)), 0);
+    }
+    /* 交叠窗：整档一个 opacity 组（逐帧只改这一个元素，不是逐窗改），
+       窗内是「底色被挖掉」+ 一圈 1px 琥珀框；醒态 alpha=0 ⇒ 醒态没有窗（零重叠）。 */
+    .tl-cutl { position: absolute; inset: 0; opacity: calc(var(--still, 0) * 0.9); }
+    .tl-cut {
+      position: absolute;
+      background: color-mix(in srgb, var(--bg) 93%, var(--wash));
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--amber) 40%, transparent);
+    }
+    /* ?reduced=1 只改外壳状态机（恒醒面），本层自己再补一条：两层都停在醒面构图上 */
+    .tl-rm .tl-drift, .tl-rm .tl-step { animation: none !important; }
+  </style>
+
+  <script>
+    /* ═══════════════════════════════════════════════════════════════════════
+       P16-B · 生成器（只跑一次；生成之后只剩 CSS 动画，零运行时成本）
+       · 固定种子 LCG（不用 Math.random）⇒ 每次加载 / 每次截图完全一致
+       · 生成期跑断言，读数写进 window.__p16：
+           醒 ① 任意两块正方形零重叠（精确求交，面积交必须为 0）
+              ② 每块正方形至少与一个邻居共享 ≥60% 边长的边（不许只靠角相接）
+           梦 ① 交叠处的板片数 ≤3（3px 采样）
+              ② 每个构造体错开后的整体尺寸仍在 160–420px
+       · 无 rAF、无滚动/尺寸监听、无 resize 重算、不读 DOM 尺寸
+       · ?seed=N 换一批（默认 20260924）
+       ═══════════════════════════════════════════════════════════════════════ */
+    (function () {
+      const T0 = performance.now();
+      const Q = new URLSearchParams(location.search);
+      const SEED = (parseInt(Q.get('seed') || '', 10) >>> 0) || 20260924;
+      if (Q.get('reduced') === '1') document.documentElement.classList.add('tl-rm');
+      let S = SEED;
+      const rnd = () => ((S = (Math.imul(S, 1664525) + 1013904223) >>> 0) / 4294967296);
+
+      const COS = 0.9702957, SIN = 0.2419219;      // 14°：与 --seam-angle 同向
+      const HW = 720, HH = 450, PAD = 220;         // 1440×900 基准视口的半宽/半高 + 构造体半径与边距
+
+      /* 三档视差：远/小/慢/淡 → 近/大/快/实。
+         span = 一个构造体醒态外接框的边长（px，决定正方形边长 = span / 形状格数）；
+         amp = 往返振幅（px，沿 14°）。峰速 ≈ 3.5·amp/dur ⇒ 约 8.4 / 12.5 / 18.5 px/s */
+      const BANDS = [
+        { n: 8, span: [170, 212], o: 0.66, amp: 240, dur: 100, sdur: 12.5, samp: 2, sdel: -1.5 },
+        { n: 8, span: [190, 246], o: 0.84, amp: 300, dur: 84,  sdur: 11.0, samp: 2, sdel: -4.0 },
+        { n: 8, span: [226, 292], o: 1.00, amp: 360, dur: 68,  sdur: 9.5,  samp: 3, sdel: -6.5 },
+      ];
+      /* 生成区域 = 视口 ⊕ 漂移 ⊕ 构造体半径：往返方案不需要 u 方向的周期外扩 */
+      for (const b of BANDS) {
+        b.OX = Math.round(HW + b.amp * COS + PAD);
+        b.OY = Math.round(HH + b.amp * SIN + PAD);
+      }
+
+      const idx = (i, j) => i + ',' + j;
+      const NB = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+      const has = (cs, i, j) => cs.some((c) => c[0] === i && c[1] === j);
+      function nbCount(c, cs) {
+        let n = 0;
+        for (const [di, dj] of NB) if (has(cs, c[0] + di, c[1] + dj)) n++;
+        return n;
+      }
+      function connected(cs) {
+        if (!cs.length) return false;
+        const seen = new Set([idx(cs[0][0], cs[0][1])]);
+        const q = [cs[0]];
+        while (q.length) {
+          const [i, j] = q.pop();
+          for (const [di, dj] of NB) {
+            const k = idx(i + di, j + dj);
+            if (seen.has(k) || !has(cs, i + di, j + dj)) continue;
+            seen.add(k); q.push([i + di, j + dj]);
+          }
+        }
+        return seen.size === cs.length;
+      }
+
+      /* ── 形状：从 2×2 / 2×3 / 3×3 的矩形里挖角，剩下的格必须连通、每格至少一个共边邻居 ──
+         于是醒态轮廓必然是**阶梯矩形**（挖掉的是角/边，3×3 的中心保留 = 回形）。
+         全部格共用一个模块 m ⇒ 每对相邻格共享 100% 边长。 */
+      const SHAPES = [
+        { w: 2, h: 2, n: 4 },
+        { w: 3, h: 2, n: 4 }, { w: 3, h: 2, n: 5 },
+        { w: 2, h: 3, n: 4 }, { w: 2, h: 3, n: 5 },
+        { w: 3, h: 3, n: 5 }, { w: 3, h: 3, n: 6 }, { w: 3, h: 3, n: 7 },
+      ];
+      function mkShape(spec) {
+        const { w, h, n } = spec;
+        let out = [];
+        for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) out.push([i, j]);
+        const corner = new Set([idx(0, 0), idx(w - 1, 0), idx(0, h - 1), idx(w - 1, h - 1)]);
+        let guard = 0;
+        while (out.length > n && guard++ < 60) {
+          const cs = out.filter((c) => corner.has(idx(c[0], c[1])));
+          const es = out.filter((c) => (c[0] === 0 || c[1] === 0 || c[0] === w - 1 || c[1] === h - 1) && !corner.has(idx(c[0], c[1])));
+          const pool = cs.length && (rnd() < 0.6 || !es.length) ? cs : es.length ? es : out;
+          const pick = pool[Math.floor(rnd() * pool.length)];
+          const rest = out.filter((c) => c !== pick);
+          if (connected(rest) && rest.every((c) => nbCount(c, rest) >= 1)) out = rest;
+        }
+        const mi = Math.min(...out.map((c) => c[0])), mj = Math.min(...out.map((c) => c[1]));
+        return out.map((c) => [c[0] - mi, c[1] - mj]);
+      }
+
+      /* ── 解析求交：轴对齐矩形的两两交（面积交为 0 的共边不算） ── */
+      function pairOverlaps(rs) {
+        const res = [];
+        for (let i = 0; i < rs.length; i++) {
+          for (let j = i + 1; j < rs.length; j++) {
+            const a = rs[i], b = rs[j];
+            const x1 = Math.max(a.x, b.x), x2 = Math.min(a.x + a.w, b.x + b.w);
+            const y1 = Math.max(a.y, b.y), y2 = Math.min(a.y + a.h, b.y + b.h);
+            if (x2 > x1 && y2 > y1) res.push({ x: x1, y: y1, w: x2 - x1, h: y2 - y1 });
+          }
+        }
+        return res;
+      }
+      /* 叠深：只在两两交里 3px 采样（叠深 >1 的点必然落在某个交里，所以这是精确覆盖） */
+      function maxDepth(rs) {
+        let mx = 1;
+        for (const o of pairOverlaps(rs)) {
+          for (let y = o.y + 0.5; y < o.y + o.h; y += 3) {
+            for (let x = o.x + 0.5; x < o.x + o.w; x += 3) {
+              let d = 0;
+              for (const r of rs) if (x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) d++;
+              if (d > mx) mx = d;
+            }
+          }
+        }
+        return mx;
+      }
+      /* 新构造体与已放板片的叠深（跨构造体也要 ≤3） */
+      function depthWith(nr, others) {
+        let mx = 1;
+        for (const a of nr) {
+          for (const b of others) {
+            const x1 = Math.max(a.x, b.x), x2 = Math.min(a.x + a.w, b.x + b.w);
+            const y1 = Math.max(a.y, b.y), y2 = Math.min(a.y + a.h, b.y + b.h);
+            if (x2 <= x1 || y2 <= y1) continue;
+            for (let y = y1 + 0.5; y < y2; y += 3) {
+              for (let x = x1 + 0.5; x < x2; x += 3) {
+                let d = 0;
+                for (const r of nr) if (x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) d++;
+                for (const r of others) if (x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) d++;
+                if (d > mx) mx = d;
+              }
+            }
+          }
+        }
+        return mx;
+      }
+      const bbox = (rs) => {
+        let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+        for (const r of rs) {
+          x0 = Math.min(x0, r.x); y0 = Math.min(y0, r.y);
+          x1 = Math.max(x1, r.x + r.w); y1 = Math.max(y1, r.y + r.h);
+        }
+        return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+      };
+
+      /* ── 一个构造体：tiled（边边相重合）+ loose（接缝错开）+ 交叠窗 ── */
+      let tries = 0, firstTry = 0;
+      function mkCluster(band) {
+        let best = null;
+        for (let k = 0; k < 40; k++) {
+          tries++;
+          const spec = SHAPES[Math.floor(rnd() * SHAPES.length)];
+          const cells = mkShape(spec);
+          const ext = Math.max(spec.w, spec.h);
+          const m = Math.min(118, Math.max(34, Math.round((band.span[0] + rnd() * (band.span[1] - band.span[0])) / ext)));
+          const tiled = cells.map(([i, j]) => ({ x: i * m, y: j * m, w: m, h: m }));
+          /* loose：每格挑一条它自己的共边（那个邻居），沿该边的法向滑开 0.30–0.52 边长，
+             68% 真的「脱离」（离开那条边 ⇒ 接缝张开），32% 朝那条边滑（叠出一枚窗）；
+             再带 ±0.12 边长的切向错开（否则只是百叶窗式的张开，不像「错开」） */
+          const loose = tiled.map((t, n) => {
+            const c = cells[n];
+            const nbs = NB.filter(([di, dj]) => has(cells, c[0] + di, c[1] + dj));
+            const nb = nbs[Math.floor(rnd() * nbs.length)];
+            const away = rnd() < 0.68 ? 1 : -1;
+            const mag = m * (0.30 + rnd() * 0.22);
+            const tan = Math.round((rnd() - 0.5) * 0.24 * m);
+            const ox = nb[0] !== 0 ? -nb[0] * away * mag : tan;
+            const oy = nb[1] !== 0 ? -nb[1] * away * mag : tan;
+            return { x: Math.round(t.x + ox), y: Math.round(t.y + oy), w: m, h: m };
+          });
+          const cuts = pairOverlaps(loose).filter((o) => o.w >= 12 && o.h >= 12)
+            .sort((p, q) => q.w * q.h - p.w * p.h).slice(0, 5);
+          const depth = maxDepth(loose);
+          const bb = bbox(loose);
+          const span = Math.max(bb.w, bb.h);
+          const bad = (depth > 3 ? 1 : 0) + (cuts.length ? 0 : 8) + (span > 420 ? 1 : 0) + (span < 160 ? 1 : 0);
+          if (!best || bad < best.bad) best = { m, tiled, loose, cuts, bb, span, depth, bad };
+          if (!bad) break;
+        }
+        if (best.bad === 0) firstTry++;
+        return best;
+      }
+
+      const placed = [];      // 已放构造体（跨档全局）：醒态外接框必须互不相交
+      const tiledAll = [];    // 全部板片的醒态矩形（屏幕坐标）
+      const looseAll = [];    // 全部板片的梦态矩形（屏幕坐标）
+      let failPlace = 0, retryPlace = 0, depthClip = 0;
+
+      function tryPlace(band) {
+        for (let a = 0; a < 80; a++) {
+          const g = mkCluster(band);
+          const x = Math.round((rnd() * 2 - 1) * band.OX);
+          const y = Math.round((rnd() * 2 - 1) * band.OY);
+          const box = { x: x + g.bb.x, y: y + g.bb.y, w: g.bb.w, h: g.bb.h };
+          let ok = true;
+          for (const p of placed) {
+            if (box.x < p.box.x + p.box.w + 26 && box.x + box.w + 26 > p.box.x &&
+                box.y < p.box.y + p.box.h + 26 && box.y + box.h + 26 > p.box.y) { ok = false; break; }
+          }
+          if (!ok) { retryPlace++; continue; }
+          const nr = g.loose.map((r) => ({ x: x + r.x, y: y + r.y, w: r.w, h: r.h }));
+          if (depthWith(nr, looseAll) > 3) { depthClip++; continue; }
+          return { x: x, y: y, m: g.m, tiled: g.tiled, loose: g.loose, cuts: g.cuts, bb: g.bb, span: g.span, depth: g.depth, box: box, nr: nr };
+        }
+        failPlace++;
+        return null;
+      }
+
+      /* ── 生成 + 落 DOM ── */
+      const field = document.getElementById('tl-field');
+      if (!field) return;
+      const frag = document.createDocumentFragment();
+      let nSq = 0, nCut = 0, nCl = 0;
+
+      for (const band of BANDS) {
+        /* 三档容器：.tl-drift（醒态往返漂移）> .tl-step（梦态阶跃）> .tl-cell（内容） */
+        const drift = document.createElement('div');
+        drift.className = 'tl-drift';
+        drift.style.setProperty('--tl-o', String(band.o));
+        drift.style.setProperty('--tl-dur', band.dur + 's');
+        drift.style.setProperty('--tl-ax', Math.round(band.amp * COS) + 'px');
+        drift.style.setProperty('--tl-ay', Math.round(band.amp * SIN) + 'px');
+        const step = document.createElement('div');
+        step.className = 'tl-step';
+        step.style.setProperty('--tl-sdur', band.sdur + 's');
+        step.style.setProperty('--tl-samp', String(band.samp));
+        step.style.setProperty('--tl-sdel', band.sdel + 's');
+        const cell = document.createElement('div');
+        cell.className = 'tl-cell';
+        const cutl = document.createElement('div');
+        cutl.className = 'tl-cutl';
+
+        for (let i = 0; i < band.n; i++) {
+          const g = tryPlace(band);
+          if (!g) continue;
+          for (const r of g.tiled) tiledAll.push({ x: g.x + r.x, y: g.y + r.y, w: r.w, h: r.h });
+          for (const r of g.nr) looseAll.push(r);
+          placed.push(g);
+          /* 一个构造体 = 一个 .tl-cl（0×0 原点）+ 它的正方形 */
+          const cl = document.createElement('div');
+          cl.className = 'tl-cl';
+          cl.style.cssText = 'left:calc(50% + ' + g.x + 'px);top:calc(50% + ' + g.y + 'px)';
+          cl.dataset.c = g.x + ',' + g.y;               // 供自验脚本从 DOM 复核几何
+          for (let n = 0; n < g.loose.length; n++) {
+            const lo = g.loose[n], ti = g.tiled[n];
+            const d = document.createElement('div');
+            d.className = 'tl-sq';
+            d.style.cssText = 'left:' + lo.x + 'px;top:' + lo.y + 'px;width:' + g.m + 'px;height:' + g.m + 'px;'
+              + '--tl-dx:' + (ti.x - lo.x) + 'px;--tl-dy:' + (ti.y - lo.y) + 'px';
+            d.dataset.b = ti.x + ',' + ti.y + ',' + g.m;   // 醒态（tiled）局部位置 + 边长
+            d.dataset.l = lo.x + ',' + lo.y;               // 梦态（loose）局部位置
+            cl.appendChild(d);
+            nSq++;
+          }
+          cell.appendChild(cl);
+          nCl++;
+          /* 交叠窗：整档挂在一个 .tl-cutl 下（逐帧只改这一个透明度） */
+          for (const ct of g.cuts) {
+            const d = document.createElement('div');
+            d.className = 'tl-cut';
+            d.style.cssText = 'left:calc(50% + ' + (g.x + ct.x) + 'px);top:calc(50% + ' + (g.y + ct.y) + 'px);'
+              + 'width:' + ct.w + 'px;height:' + ct.h + 'px';
+            cutl.appendChild(d);
+            nCut++;
+          }
+        }
+        cell.appendChild(cutl);
+        step.appendChild(cell);
+        drift.appendChild(step);
+        frag.appendChild(drift);
+      }
+      field.appendChild(frag);
+
+      /* ── 生成期断言（读数一起写进 window.__p16，notes 照抄实测值） ────────────── */
+      /* 醒 ① 零重叠：任意两块正方形面积交为 0（共边不算交） */
+      let badPairs = 0, worstOverlap = 0;
+      for (let i = 0; i < tiledAll.length; i++) {
+        for (let j = i + 1; j < tiledAll.length; j++) {
+          const a = tiledAll[i], b = tiledAll[j];
+          const w = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
+          const h = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+          if (w > 0 && h > 0) { badPairs++; worstOverlap = Math.max(worstOverlap, w * h); }
+        }
+      }
+      /* 醒 ② 每块正方形至少与一个邻居共享 ≥60% 边长（本稿的构造规则 ⇒ 恰为 100%） */
+      let sharedMin = 1, isolated = 0, sharedSum = 0;
+      for (const a of tiledAll) {
+        let best = 0;
+        for (const b of tiledAll) {
+          if (a === b) continue;
+          let seg = 0;
+          if (a.x + a.w === b.x || b.x + b.w === a.x) seg = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+          else if (a.y + a.h === b.y || b.y + b.h === a.y) seg = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
+          if (seg > best) best = seg;
+        }
+        const pct = best / a.w;
+        sharedSum += pct;
+        if (pct < 0.6) isolated++;
+        if (pct < sharedMin) sharedMin = pct;
+      }
+      /* 梦 ① 叠深 ≤3（跨构造体，3px 采样） */
+      const depthAll = maxDepth(looseAll);
+      /* 梦 ② 每个构造体错开后的整体尺寸 160–420px */
+      const spans = placed.map((p) => p.span);
+      const spanMin = Math.round(Math.min.apply(null, spans)), spanMax = Math.round(Math.max.apply(null, spans));
+      const cutMin = Math.min.apply(null, placed.map((p) => p.cuts.reduce((s, c) => Math.min(s, Math.min(c.w, c.h)), 1e9)).concat([1e9]));
+
+      window.__p16 = {
+        seed: SEED,
+        clusters: nCl, squares: nSq, cuts: nCut,
+        nodes: field.querySelectorAll('*').length,
+        ms: Math.round((performance.now() - T0) * 10) / 10,
+        a_tiledOverlapPairs: badPairs, a_tiledWorstOverlapPx: worstOverlap,
+        b_tiledSharedMinPct: +(sharedMin * 100).toFixed(1),
+        b_tiledSharedAvgPct: +(sharedSum / tiledAll.length * 100).toFixed(1),
+        b_tiledUnder60: isolated,
+        c_looseDepthMax: depthAll,
+        d_looseSpanMin: spanMin, d_looseSpanMax: spanMax,
+        e_looseCutMinSide: cutMin === 1e9 ? 0 : cutMin,
+        f_clusterTries: tries, f_firstTry: firstTry,
+        g_placeRetry: retryPlace, g_depthClip: depthClip, g_failPlace: failPlace,
+        bands: BANDS.map((b) => ({ n: b.n, amp: b.amp, dur: b.dur, span: b.span })),
+      };
+    })();
+  </script>
+  <!-- ═══════════════════════════ P15 BG SLOT END ═══════════════════════════ -->
+
+  <!-- 脑电：固定视口层，波轴心视口 50vh，与缝线同轴锁定 -->
+  <svg class="eeg" id="p15-eeg" aria-hidden="true">
+    <g>
+      <path class="eeg-main" />
+    </g>
+  </svg>
+
+  <div class="seam" aria-hidden="true"><span class="seam-anchor"></span></div>
+  <div class="grain" aria-hidden="true"></div>
+
+  <div class="page">
+    <header class="site-header">
+      <div class="container header-row">
+        <a class="brand is-wake" href="/" aria-label="Traveritas">Traveritas</a>
+        <nav class="site-nav" aria-label="主导航">
+          <a href="/articles/"><i class="stitch" aria-hidden="true"></i><span data-morph data-true="随笔" data-dream="断章">随笔</span></a>
+          <a href="/projects/"><i class="stitch" aria-hidden="true"></i><span data-morph data-true="项目" data-dream="造物">项目</span></a>
+          <a href="/about/"><i class="stitch" aria-hidden="true"></i><span data-morph data-true="关于" data-dream="此身">关于</span></a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero" id="ns-hero">
+        <div class="plate" aria-hidden="true"></div>
+        <div class="hero-ink">
+          <h1 class="src-only">Traveritas —— 在即将醒来的那一瞬，世界究竟是在成形，还是正在融化？</h1>
+          <span class="hero-glyph" data-morph data-true="醒" data-dream="梦" aria-hidden="true">醒</span>
+          <div class="hero-note">
+            <span class="vsub" aria-hidden="true">在醒与梦之间</span>
+            <div class="hero-meta">
+              <span class="mono">HYPNOGRAM · NIGHT 2026-09</span>
+              <span class="mono">入夜 · 初刻 / NIGHTFALL</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="sec" id="ns-essays">
+        <div class="container">
+          <div class="sec-head">
+            <h2 data-morph data-true="随笔" data-dream="断章">随笔</h2>
+            <span class="mono">SAYABLE · 可言说的</span>
+          </div>
+          <div class="rows">
+            <article class="row">
+              <h3>两态试笔</h3>
+              <p>同一段话的两面——醒梦两态正文语法示例稿。两态语法只负责分岔的地方：词的换面，或者整段的分岔。</p>
+              <span class="mono">2026.09.21</span>
+            </article>
+            <article class="row">
+              <h3>与智能体一起造一个网站</h3>
+              <p>这个网站不是我一个人写出来的——准确地说，一行代码都不是我写的。我的角色是：描述我想要什么、判断什么是对的。</p>
+              <span class="mono">2026.09.19</span>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="sec" id="ns-projects">
+        <div class="container">
+          <div class="sec-head">
+            <h2 data-morph data-true="项目" data-dream="造物">项目</h2>
+            <span class="mono">BUILDABLE · 可构造的</span>
+          </div>
+          <div class="rows">
+            <article class="row">
+              <h3>醒梦 · 视觉母题探索</h3>
+              <p>为「醒梦」寻找 2—4 个可以反复出现的核心视觉意象。构想仍在深水之下，尚未聚拢出实体。</p>
+              <div class="tags"><span class="st">构想中</span><span class="mono">FIVE DEPTHS</span></div>
+            </article>
+            <article class="row">
+              <h3>这个网站本身</h3>
+              <p>由 Astro 与智能体共建的个人网站，遵循「醒梦」审美。沉在深处的事物并不浮躁，它只是很慢地聚集成形。</p>
+              <div class="tags"><span class="st">进行中</span><span class="mono">✓ 公开仓库</span></div>
+            </article>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="container ft">
+        <span class="mono">© 2026 Traveritas</span>
+        <span class="mono"><span data-morph data-true="存在于此" data-dream="此身在此">存在于此</span> · PRESENCE</span>
+      </div>
+    </footer>
+  </div>
+
+  <div class="dbg" id="dbg">
+    <span>醒度</span>
+    <input id="mixrange" type="range" min="0" max="1000" value="1000" aria-label="醒度" />
+    <span class="now" id="mixon">1.00</span>
+    <button data-face="wake" aria-pressed="true">醒</button>
+    <button data-face="dream" aria-pressed="false">梦</button>
+  </div>
+
+  <script>
+    /* ═══════════════════════════════════════════════════════════════════════
+       状态机 · 对齐 src/scripts/reality.ts（简版：语义一致，特效只留线/一弹）
+       ═══════════════════════════════════════════════════════════════════════ */
+    (function () {
+      const docEl = document.documentElement;
+      const body = document.body;
+      const Q = new URLSearchParams(location.search);
+
+      /* ── 查询参数 ── */
+      const zone = Q.get('zone');
+      if (zone) docEl.dataset.zone = zone;
+      const layer = Q.get('layer') || Q.get('bg');
+      if (layer) document.getElementById('p15-bg').dataset.layer = layer === 'off' ? 'off' : layer;
+      if (Q.get('plate') === 'off') docEl.classList.add('plate-off');
+      if (Q.get('eeg') === 'off') docEl.classList.add('eeg-hidden');
+      if (Q.get('ui') === '0') docEl.classList.add('ui-off');
+      if (Q.get('freeze') === '1') docEl.classList.add('freeze');
+      const RM = (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) || Q.get('reduced') === '1';
+      const FREEZE = Q.get('freeze') === '1';
+
+      /* ── 强调色双色插值（照抄 reality.ts 的 ACCENT） ── */
+      const hex = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+      const ACCENT = {
+        '--amber': [hex('#d9a05b'), hex('#a7b1ba')],
+        '--umber': [hex('#765640'), hex('#556270')],
+        '--ghost-ink': [hex('#b98f74'), hex('#8e9aa6')],
+        '--dream': [hex('#c2a382'), hex('#a39c92')],
+        '--wash': [hex('#8a5a30'), hex('#556270')],
+      };
+      const mixRgb = (a, b, t) => `rgb(${Math.round(a[0] + (b[0] - a[0]) * t)},${Math.round(a[1] + (b[1] - a[1]) * t)},${Math.round(a[2] + (b[2] - a[2]) * t)})`;
+      let C = 1; // 醒度
+      function setTint(cc) {
+        C = cc;
+        for (const k in ACCENT) docEl.style.setProperty(k, mixRgb(ACCENT[k][0], ACCENT[k][1], cc));
+        docEl.style.setProperty('--reality-mix', cc.toFixed(4));
+        if (mixOn) mixOn.textContent = cc.toFixed(2);
+      }
+
+      /* ── 文字换面（简版 morph：180ms 磨砂溶变） ── */
+      const duals = Array.from(document.querySelectorAll('[data-morph]')).map((el) => ({ el, t: 0 }));
+      function applyFace(face, instant) {
+        for (const d of duals) {
+          const want = face === 'wake' ? d.el.dataset.true : d.el.dataset.dream;
+          if (d.el.textContent === want) continue;
+          if (instant || RM) { d.el.textContent = want; continue; }
+          d.el.classList.add('is-morphing');
+          clearTimeout(d.t);
+          d.t = setTimeout(() => { d.el.textContent = want; d.el.classList.remove('is-morphing'); }, 180);
+        }
+      }
+
+      /* ── 品牌字标：7 步轮转 + 3 秒呼吸（照抄 brand.ts） ── */
+      const WAKE_WORD = 'Traveritas';
+      const CYCLE = ['AveritA', 'VeritaA', 'EritaaV', 'RitaavE', 'ItaaveR', 'TaaverI', 'AaveriT'];
+      const brand = document.querySelector('.brand');
+      let bstep = 0, btimer = 0, brandInit = false, curFace = 'wake';
+      function ensureSpans(n) {
+        let s = brand.querySelectorAll('.brand-char');
+        if (s.length === n) return s;
+        brand.innerHTML = '';
+        for (let i = 0; i < n; i++) {
+          const sp = document.createElement('span');
+          sp.className = 'brand-char';
+          sp.style.setProperty('--i', String(i));
+          brand.appendChild(sp);
+        }
+        return brand.querySelectorAll('.brand-char');
+      }
+      function brandWord(w) {
+        const s = ensureSpans(w.length);
+        for (let i = 0; i < w.length; i++) if (s[i].textContent !== w[i]) s[i].textContent = w[i];
+      }
+      function brandTick() {
+        if (curFace !== 'dream' || RM) return;
+        bstep = (bstep + 1) % CYCLE.length;
+        brandWord(CYCLE[bstep]);
+        btimer = setTimeout(brandTick, bstep === 0 ? 3000 : 1000);
+      }
+      function applyBrand(face) {
+        clearTimeout(btimer);
+        bstep = 0;
+        brand.classList.toggle('is-dream', face === 'dream');
+        brand.classList.toggle('is-wake', face === 'wake');
+        if (face === 'dream') { if (RM) brand.textContent = CYCLE[0]; else { brandWord(CYCLE[0]); btimer = setTimeout(brandTick, 1000); } }
+        else brand.textContent = WAKE_WORD;
+      }
+      function brandTo(face) {
+        if (!brandInit || RM) { brandInit = true; applyBrand(face); return; }
+        brand.classList.add('is-morphing');
+        setTimeout(() => { applyBrand(face); brand.classList.remove('is-morphing'); }, 180);
+      }
+
+      /* ── 脑电（P15 EEG SLOT：默认＝线上现状，B 稿可改） ── */
+      const eegSvg = document.getElementById('p15-eeg');
+      const eegG = eegSvg.querySelector('g');
+      const eegPath = eegSvg.querySelector('.eeg-main');
+      const AMP = 3.6, FREQ = 0.5, SPD = 2.6, STEP = 26;
+      /* d = 梦度（0=醒 1=梦）。默认实现完全忽略 d：两态同一条平滑曲线，
+         与线上一致——「背景元素」才是本轮的变量，脑电不算。 */
+      function eegPathD(ph, d) {
+        const W = innerWidth, H = innerHeight, cy = H * 0.5;
+        const half = Math.sqrt(W * W + H * H) / 2 + 60;
+        let s = '', first = true;
+        for (let x = -half; x <= half; x += STEP) {
+          const u = x / 600;
+          const y = Math.sin(u * FREQ * Math.PI * 2 + ph * SPD) * AMP + Math.sin(u * FREQ * 2.7 + ph * 1.3) * AMP * 0.4;
+          s += (first ? 'M' : 'L') + (W / 2 + x).toFixed(1) + ' ' + (cy + y).toFixed(1);
+          first = false;
+        }
+        return s;
+      }
+      function eegDraw(ph) {
+        const d = 1 - C;
+        eegPath.setAttribute('d', eegPathD(ph, d));
+        eegG.setAttribute('transform', `rotate(14 ${innerWidth / 2} ${innerHeight * 0.5})`);
+      }
+      /* ══════════════════ P15 EEG SLOT END ══════════════════ */
+
+      let lastEeg = 0;
+      function eegTick(ph) { lastEeg = performance.now(); eegDraw(ph); }
+      eegTick(0);
+      if (!RM && !FREEZE) {
+        let last = 0;
+        (function loop(ts) {
+          requestAnimationFrame(loop);
+          if (ts - last < 33) return;
+          last = ts;
+          if (!document.hidden) { eegTick(ts / 1000); if (!pinned) setTint(C); }
+        })(0);
+        setInterval(() => { if (!document.hidden && performance.now() - lastEeg > 500) eegTick(performance.now() / 1000); }, 400);
+      }
+
+      /* ── 状态机 ── */
+      const T_GO = 2200, T_BACK = 1300, RETRACT_MS = 560, SETTLE_MS = 280, CLICK_MS = 260;
+      const EXCLUDE = 'a,button,input,textarea,select,label,summary,[contenteditable],h1,h2,h3,h4,h5,h6,p,li,blockquote,figcaption,time,code,pre,[data-morph],[data-nofx],.dbg';
+      const STORE = 'p15-reality';
+
+      let face = 'wake', mode = 'idle', dir = 'back', p = 0, px = 0, py = 0, pid = -1;
+      let holdT0 = 0, retractT0 = 0, retractFrom = 0, retractDur = 0, settleFrom = 1, settleTo = 1;
+      let rafId = 0, watchdog = 0, pinned = false, startX = 0, startY = 0, src = null;
+
+      const fx = document.createElement('div');
+      fx.className = 'fx';
+      const thread = document.createElement('div');
+      thread.className = 'thread';
+      const tCore = document.createElement('i');
+      tCore.className = 't-core';
+      thread.appendChild(tCore);
+      const flick = document.createElement('div');
+      flick.className = 'flick';
+      fx.append(thread, flick);
+      body.appendChild(fx);
+
+      const fullW = () => 2 * Math.max(px, innerWidth - px) + 80;
+      function drawThread(W, ang, op) {
+        thread.style.transform = `translate(${px}px,${py}px) rotate(${ang}deg)`;
+        tCore.style.width = `${W}px`;
+        tCore.style.left = `${-W / 2}px`;
+        tCore.style.opacity = String(op);
+      }
+      function latch() {
+        mode = 'freeze';
+        src = null;
+        pid = -1;
+        clearTimeout(watchdog);
+        body.classList.remove('reality-holding');
+        face = dir === 'go' ? 'wake' : 'dream';
+        body.dataset.reality = face;
+        try { sessionStorage.setItem(STORE, face); } catch (e) {}
+        applyFace(face, false);
+        brandTo(face);
+        settleFrom = C; settleTo = dir === 'go' ? 1 : 0;
+        const ft0 = performance.now();
+        if (RM) {
+          setTint(settleTo); thread.style.display = 'none'; mode = 'idle'; p = 0; stopLoop(); return;
+        }
+        watchdog = setTimeout(() => {
+          if (mode !== 'freeze') return;
+          mode = 'idle'; p = 0; thread.style.display = 'none'; stopLoop();
+        }, 520);
+        (function settle() {
+          const k = Math.min(1, (performance.now() - ft0) / SETTLE_MS);
+          setTint(settleFrom + (settleTo - settleFrom) * k);
+          drawThread(fullW() * (1 - k * 0.94), dir === 'go' ? -4 * k : -4, 1 - k);
+          if (k < 1 && mode === 'freeze') requestAnimationFrame(settle);
+          else if (mode === 'freeze') thread.style.display = 'none';
+        })();
+      }
+      function releaseHold() {
+        if (mode !== 'hold') return;
+        const held = performance.now() - holdT0;
+        mode = 'retract'; src = null; pid = -1;
+        body.classList.remove('reality-holding');
+        if (held <= CLICK_MS && !RM) {
+          flick.style.setProperty('--fx', `${px}px`);
+          flick.style.setProperty('--fy', `${py}px`);
+          flick.className = 'flick'; void flick.offsetWidth; flick.className = 'flick go';
+        }
+        retractT0 = performance.now(); retractFrom = p; retractDur = Math.min(RETRACT_MS, 200 + p * 380);
+        clearTimeout(watchdog);
+        watchdog = setTimeout(() => { if (mode === 'retract') finishRetract(); }, retractDur + 200);
+      }
+      function finishRetract() {
+        mode = 'idle'; p = 0; thread.style.display = 'none';
+        applyFace(face, false); stopLoop();
+      }
+      function toggleInstant() {
+        dir = face === 'dream' ? 'go' : 'back';
+        face = dir === 'go' ? 'wake' : 'dream';
+        body.dataset.reality = face;
+        try { sessionStorage.setItem(STORE, face); } catch (e) {}
+        applyFace(face, true); brandTo(face);
+        setTint(face === 'wake' ? 1 : 0);
+      }
+      function beginHold(x, y, from) {
+        const now = performance.now();
+        if (mode !== 'idle') { if (mode === 'freeze' && now - retractT0 > 400) { mode = 'idle'; p = 0; } else return; }
+        mode = 'hold'; src = from; dir = face === 'dream' ? 'go' : 'back';
+        px = x; py = y; p = 0; holdT0 = now;
+        body.classList.add('reality-holding');
+        if (!RM) { thread.className = `thread ${dir}`; thread.style.display = 'block'; drawThread(0, -4, 1); }
+        startLoop();
+        clearTimeout(watchdog);
+        watchdog = setTimeout(() => { if (mode === 'hold') latch(); }, (dir === 'go' ? T_GO : T_BACK) + 120);
+      }
+      function startLoop() { if (!rafId) rafId = requestAnimationFrame(loop); }
+      function stopLoop() { if (rafId) { cancelAnimationFrame(rafId); rafId = 0; } }
+      function loop(now) {
+        rafId = 0;
+        if (mode === 'hold') {
+          const T = dir === 'go' ? T_GO : T_BACK;
+          p = Math.min(1, (now - holdT0) / T);
+          if (!RM) {
+            setTint(dir === 'go' ? p : 1 - p);
+            drawThread(p * fullW(), -4, 1);
+            applyFace(p >= 0.5 ? (dir === 'go' ? 'wake' : 'dream') : (dir === 'go' ? 'dream' : 'wake'), false);
+          }
+          if (p >= 1) { latch(); return; }
+        } else if (mode === 'retract') {
+          const k = Math.min(1, (now - retractT0) / retractDur);
+          const eo = 1 - Math.pow(1 - k, 3);
+          p = retractFrom * (1 - eo);
+          if (!RM) { setTint(dir === 'go' ? p : 1 - p); drawThread(p * fullW(), -4, 1); }
+          if (k >= 1) { finishRetract(); return; }
+        }
+        if (mode !== 'idle') rafId = requestAnimationFrame(loop);
+      }
+
+      function wire() {
+        document.addEventListener('pointerdown', (e) => {
+          if (e.button !== undefined && e.button !== 0) return;
+          const t = e.target;
+          if (t instanceof Element && t.closest(EXCLUDE)) return;
+          if (src !== null) return;
+          pinned = false; mixrange.value = '1000';
+          if (RM) { px = e.clientX; py = e.clientY; toggleInstant(); syncDbg(); return; }
+          pid = e.pointerId; startX = e.clientX; startY = e.clientY;
+          beginHold(e.clientX, e.clientY, 'ptr');
+        });
+        document.addEventListener('pointermove', (e) => {
+          if (mode !== 'hold' || src !== 'ptr' || e.pointerId !== pid) return;
+          if (Math.hypot(e.clientX - startX, e.clientY - startY) > 20) { releaseHold(); syncDbg(); }
+        });
+        const up = (e) => { if (mode === 'hold' && src === 'ptr' && e.pointerId === pid) { releaseHold(); syncDbg(); } };
+        document.addEventListener('pointerup', up);
+        document.addEventListener('pointercancel', up);
+        document.addEventListener('keydown', (e) => {
+          if (e.code !== 'Space' || e.repeat || !e.shiftKey) return;
+          const ae = document.activeElement;
+          if (ae instanceof Element && ae.closest('a,button,input,[contenteditable]')) return;
+          e.preventDefault();
+          if (src !== null) return;
+          pinned = false;
+          if (RM) { toggleInstant(); syncDbg(); return; }
+          beginHold(Math.round(innerWidth / 2), Math.round(innerHeight * 0.45), 'kb');
+        });
+        document.addEventListener('keyup', (e) => { if (e.code === 'Space' && mode === 'hold' && src === 'kb') { releaseHold(); syncDbg(); } });
+      }
+
+      /* ── 调试角标 ── */
+      const dbg = document.getElementById('dbg');
+      const mixrange = document.getElementById('mixrange');
+      const mixOn = document.getElementById('mixon');
+      function syncDbg() {
+        dbg.querySelectorAll('[data-face]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.face === face)));
+        if (pinned) { mixrange.value = String(Math.round(C * 1000)); }
+      }
+      mixrange.addEventListener('input', () => {
+        mode = 'idle'; thread.style.display = 'none'; stopLoop();
+        pinned = true;
+        const m = Number(mixrange.value) / 1000;
+        setTint(m);
+        const f = m >= 0.5 ? 'wake' : 'dream';
+        if (f !== face) { face = f; body.dataset.reality = face; applyFace(face, true); brandTo(face); }
+        syncDbg();
+      });
+      dbg.querySelectorAll('[data-face]').forEach((b) =>
+        b.addEventListener('click', () => {
+          pinned = true; mode = 'idle'; thread.style.display = 'none'; stopLoop();
+          face = b.dataset.face; body.dataset.reality = face;
+          applyFace(face, true); brandTo(face);
+          setTint(face === 'wake' ? 1 : 0);
+          mixrange.value = face === 'wake' ? '1000' : '0';
+          syncDbg();
+        }),
+      );
+
+      /* ── 启动 ── */
+      let stored = null;
+      try { stored = sessionStorage.getItem(STORE); } catch (e) {}
+      const wantFace = Q.get('face') || stored || 'wake';
+      face = wantFace === 'dream' ? 'dream' : 'wake';
+      body.dataset.reality = face;
+      applyFace(face, true);
+      applyBrand(face);
+      brandInit = true;
+      if (Q.get('mix') !== null && Q.get('mix') !== undefined) {
+        pinned = true;
+        mixrange.value = String(Math.round(Number(Q.get('mix')) * 1000));
+        setTint(Number(Q.get('mix')));
+        const f = Number(Q.get('mix')) >= 0.5 ? 'wake' : 'dream';
+        if (f !== face) { face = f; body.dataset.reality = face; applyFace(face, true); applyBrand(face); }
+      } else {
+        setTint(face === 'wake' ? 1 : 0);
+      }
+      wire();
+      syncDbg();
+
+      window.__p15 = {
+        state: () => ({ face, mode, progress: +p.toFixed(3), mix: +C.toFixed(3), layer: document.getElementById('p15-bg').dataset.layer, zone: docEl.dataset.zone }),
+        setMix: (m) => { pinned = true; mixrange.value = String(Math.round(m * 1000)); setTint(m); },
+        face: (f) => { face = f; body.dataset.reality = f; applyFace(f, true); applyBrand(f); setTint(f === 'wake' ? 1 : 0); syncDbg(); },
+        hold: (x, y) => beginHold(x == null ? innerWidth / 2 : x, y == null ? innerHeight / 2 : y, 'kb'),
+        release: releaseHold,
+        layer: (l) => { document.getElementById('p15-bg').dataset.layer = l; },
+        zone: (z) => { docEl.dataset.zone = z; },
+      };
+    })();
+  </script>
+</body>
+</html>
