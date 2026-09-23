@@ -164,7 +164,7 @@ function buildFx() {
   0%{transform:translate(var(--fx,0px),var(--fy,0px)) rotate(-4deg) scale(.15);opacity:0}
   35%{transform:translate(var(--fx,0px),var(--fy,0px)) rotate(-4deg) scale(1);opacity:1}
   100%{transform:translate(var(--fx,0px),var(--fy,0px)) rotate(-4deg) scale(.6);opacity:0}}
-body.reality-holding{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+body.reality-holding{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;overflow-anchor:none}
 @media (prefers-reduced-motion:reduce){
   .fx-reality .knot i,.fx-reality .knot::after,.fx-reality .flick{animation:none!important}
 }`;
@@ -356,10 +356,13 @@ function beginHold(x: number, y: number, fromSrc: 'ptr' | 'kb') {
   holdT0 = now;
   holdActive = false;
   scrollMark = scrollY;
-  // 线到达阈值：按压时一次性测量（元素中心与按压点的横向距离）
+  // 线到达阈值：按压时一次性测量（元素中心与按压点的横向距离）；
+  // 屏外元素不参与随线渐进换面（阈值设为无穷大），留待闩锁时由 flipAllDuals 统一换面，
+  // 避免屏外元素乱码重排引发 scrollHeight 抖动劫持视口滚动位置导致长按中断
   for (const d of getDuals()) {
     const r = d.el.getBoundingClientRect();
-    d.dx = Math.max(14, Math.abs(r.left + r.width / 2 - px));
+    const onscreen = r.bottom > 0 && r.top < innerHeight && r.width > 0;
+    d.dx = onscreen ? Math.max(14, Math.abs(r.left + r.width / 2 - px)) : Infinity;
     d.flipped = false;
   }
   startLoop();
@@ -590,7 +593,14 @@ function wireGestures() {
   addEventListener(
     'scroll',
     () => {
-      if (mode === 'hold' && Math.abs(scrollY - scrollMark) > 4) releaseHold();
+      if (mode !== 'hold') return;
+      const maxScroll = Math.max(0, document.documentElement.scrollHeight - innerHeight);
+      // 若按压前就在页底，且当前仍停在（自适应重排后的）页底，说明是内容换面重排引起的视口贴底跟随，非用户意图滚屏
+      if (scrollMark >= maxScroll - 6 && Math.abs(scrollY - maxScroll) <= 6) {
+        scrollMark = scrollY;
+        return;
+      }
+      if (Math.abs(scrollY - scrollMark) > 4) releaseHold();
     },
     { passive: true },
   );
