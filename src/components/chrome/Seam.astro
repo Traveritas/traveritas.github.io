@@ -7,13 +7,45 @@ interface Props {
 const { variant = 'default' } = Astro.props;
 ---
 
-<div class:list={['seam', { 'seam--faint': variant === 'faint', 'seam--broken': variant === 'broken' }]} aria-hidden="true">
-  <span class="seam-anchor"></span>
+<div class="seam-wrap" aria-hidden="true">
+  <div class:list={['seam', { 'seam--faint': variant === 'faint', 'seam--broken': variant === 'broken' }]}>
+    <span class="seam-anchor"></span>
+  </div>
 </div>
 
 <style>
-  .seam {
+  .seam-wrap {
     position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    overflow: hidden;
+  }
+
+  /* 文章页中央消隐：文字阅读核心列完全隐退，两侧留白自然延伸 */
+  :global(body[data-page-type='article']) .seam-wrap {
+    -webkit-mask-image: linear-gradient(
+      to right,
+      black 0,
+      black calc(50% - 28rem),
+      transparent calc(50% - 21rem),
+      transparent calc(50% + 21rem),
+      black calc(50% + 28rem),
+      black 100%
+    );
+    mask-image: linear-gradient(
+      to right,
+      black 0,
+      black calc(50% - 28rem),
+      transparent calc(50% - 21rem),
+      transparent calc(50% + 21rem),
+      black calc(50% + 28rem),
+      black 100%
+    );
+  }
+
+  .seam {
+    position: absolute;
     left: 50%;
     top: 50%;
     width: 170vmax;
@@ -22,8 +54,6 @@ const { variant = 'default' } = Astro.props;
     transform: translate(-50%, -50%) rotate(var(--seam-angle)) scaleX(var(--draw, 0.02));
     transform-origin: center;
     transition: transform 2.6s cubic-bezier(0.22, 0.61, 0.36, 1);
-    /* 负 z：沉到内容之下（仍在背景色与顶部淡染之上），不再压字 */
-    z-index: -1;
     pointer-events: none;
     opacity: 0.62;
   }
@@ -41,6 +71,11 @@ const { variant = 'default' } = Astro.props;
 
   :global(html.booted) .seam {
     --draw: 1;
+  }
+
+  /* 文章页隐藏正中央呼吸发光锚点，消除焦点争抢 */
+  :global(body[data-page-type='article']) .seam-anchor {
+    display: none;
   }
 
   .seam-anchor {

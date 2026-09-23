@@ -46,6 +46,8 @@ const { layer = 'through' } = Astro.props;
                      ⚠ 边缝在**生成期**就烘焙进 left/top/width/height 里，一条
                      CSS 变量改不动已经生成好的几何 —— 真源是生成器顶部的 GAP
                      表（一行），另可用 ?gap=N 覆盖。这里只是把它记在明面上。
+       --sq-scale    梦态方块放大：方块在梦态随 --rw-k 原地膨胀，带平滑幂次随机
+                     分布（1.2x ~ 3.0x，最大约 3x），醒态恒为 1.0x。可用 ?smax=N 覆盖。
      ═══════════════════════════════════════════════════════════════════════ */
   .fld-bg {
     position: fixed;
@@ -154,9 +156,11 @@ const { layer = 'through' } = Astro.props;
     background: color-mix(in srgb, var(--ghost-ink) 7%, transparent);
     border: 1px solid color-mix(in srgb, var(--ghost-ink) 13%, transparent);
     transform: translate3d(calc(var(--fld-tx, 0px) * var(--fld-tk, 1)), calc(var(--fld-ty, 0px) * var(--fld-tk, 1)), 0);
+    transform-origin: center center;
+    scale: calc(1 + var(--sq-scale-delta, 0) * var(--rw-k, 0));
     animation: fld-sq-float var(--sq-dur, 3.6s) step-end infinite;
     animation-delay: var(--sq-del, 0s);
-    will-change: transform, translate;
+    will-change: transform, translate, scale;
   }
 
   @keyframes fld-sq-float {
@@ -202,6 +206,7 @@ const { layer = 'through' } = Astro.props;
     .fld-sq {
       animation: none !important;
       translate: 0 0 !important;
+      scale: 1 !important;
     }
   }
 </style>
@@ -251,6 +256,11 @@ const { layer = 'through' } = Astro.props;
     fldRoot.style.setProperty('--fld-rewind', rwPx + 'px');
     fldRoot.style.setProperty('--rw-x', RWX + 'px');
     fldRoot.style.setProperty('--rw-y', RWY + 'px');
+
+    /* ★ 一行调：MAX_SCALE（梦态方块最大放大倍率，默认 3.0x）；可用 ?smax=N 覆盖。
+       每个方块在 1.2x ~ MAX_SCALE 之间平滑幂次分布，保证留白与层次感。 */
+    const smaxQ = parseFloat(fldQ.get('smax') || '');
+    const MAX_SCALE = smaxQ >= 1.2 && isFinite(smaxQ) ? Math.min(10, smaxQ) : 3.0;
 
     /* ★ 一行调：GAP / sdur / sdel 表（远 4px / 中 6px / 近 8px，大幅留白）；?gap=N 覆盖全部三档。
        span ＝ 边长带：整体比上一稿加大 ~30%，每档数量 8 → 6（整片不再变吵），
@@ -666,6 +676,10 @@ const { layer = 'through' } = Astro.props;
             const dur = (3.0 + ((h >> 4) % 5) * 0.3).toFixed(1) + 's';
             const del = (-1 * (n * 0.45 + (((h >> 8) & 7) * 0.25))).toFixed(2) + 's';
 
+            // 梦态个体随机缩放：平滑幂次分布，最低 1.2x，最高约 3.0x（MAX_SCALE）
+            const rndScale = ((h >> 12) & 0xffff) / 65535;
+            const scaleDelta = (0.2 + Math.pow(rndScale, 1.4) * (MAX_SCALE - 1 - 0.2)).toFixed(2);
+
             d.style.cssText =
               'left:' +
               lo.x +
@@ -700,7 +714,9 @@ const { layer = 'through' } = Astro.props;
               ';--sq-y-mid:' +
               yMid +
               ';--sq-y-step:' +
-              yStep;
+              yStep +
+              ';--sq-scale-delta:' +
+              scaleDelta;
             d.dataset.b = ti.x + ',' + ti.y + ',' + g.sz; // 醒态（tiled）局部位置 + 边长
             d.dataset.l = lo.x + ',' + lo.y; // 梦态（loose）局部位置
             cl.appendChild(d);
