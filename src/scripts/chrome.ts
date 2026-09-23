@@ -163,6 +163,13 @@ export function initChrome() {
   const dawnGlow = document.querySelector<HTMLElement>('.dawn-glow');
 
   onScrollRaf(() => {
+    // 读操作前置（避免写后读引发 Layout Thrashing）
+    let prog = 0;
+    if (depthTarget) {
+      const r = depthTarget.getBoundingClientRect();
+      prog = clamp((innerHeight * 0.6 - r.top) / Math.max(r.height, 1), 0, 1);
+    }
+
     const doc = document.documentElement;
     const max = doc.scrollHeight - innerHeight;
     const p = max > 0 ? clamp(scrollY / max, 0, 1) : 0;
@@ -173,13 +180,7 @@ export function initChrome() {
 
     if (hairline) hairline.style.width = `${p * 100}%`;
 
-    // 叠影错位：页首半分离 → 中段最大 → 页尾合拢
-    const echo = p < 0.5 ? 0.5 + p : 1 - (p - 0.5) * 2;
-    doc.style.setProperty('--echo', echo.toFixed(3));
-
     if (depthTarget) {
-      const r = depthTarget.getBoundingClientRect();
-      const prog = clamp((innerHeight * 0.6 - r.top) / Math.max(r.height, 1), 0, 1);
       if (depthDot) depthDot.style.top = `${(6 + prog * 84).toFixed(1)}%`;
       if (dawnGlow) dawnGlow.style.opacity = (0.12 + prog * 0.85).toFixed(3);
     }

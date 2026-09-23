@@ -5,8 +5,8 @@
      随即散尽，闩锁醒面（松手不回）。
    · 同手势 1300ms 回梦：线反向生长，指下收拢成结、倒旋收起（环闪
      内收——落款的倒放），线抽走褪出，闩锁梦面。
-   · 中途松手 ≤600ms 退回原面；短按（≤260ms）＝线头一弹的点击反馈，
-     无状态变化。键盘：焦点不在交互件时按住 Shift＋空格 等价（裸空格保留给滚屏）。
+   · 中途松手 ≤600ms 退回原面；短按（≤260ms）＝判定窗口，完全静默（无状态变化、不展线、不动方块，为独立点击动画预留）。
+   · 键盘：焦点不在交互件时按住 Shift＋空格 等价（裸空格保留给滚屏）。
    · 双文案走 morph 引擎（[data-morph][data-dream]，元素内文本＝醒面
      真值）；按住时文字随线到达换面，闩锁时全部对齐当前面。
    · 配色不与夜色系统（night.ts 拥有 --bg/--fg/--fg-soft/--line）抢
@@ -101,6 +101,7 @@ let clicks = 0;
 let rafId = 0;
 let watchdog: ReturnType<typeof setTimeout> | 0 = 0;
 let knotShown = false;
+let holdActive = false;
 
 const RM = reducedMotion();
 let docEl: HTMLElement;
@@ -280,16 +281,16 @@ function pageSinkEnd() {
   }
 }
 
-/* ---------- 线头一弹（短按点击反馈，无状态变化） ---------- */
+/* ---------- 线头一弹（已按需禁用，预留未来独立点击动画） ----------
 function clickFlick() {
   if (!flick || RM) return;
   flick.style.setProperty('--fx', `${px}px`);
   flick.style.setProperty('--fy', `${py}px`);
   flick.className = 'flick';
-  void flick.offsetWidth; // 重启动画
+  void flick.offsetWidth;
   flick.className = 'flick go';
   clicks++;
-}
+} */
 
 /* ---------- 文字换面 ---------- */
 function targetFace() {
@@ -339,6 +340,7 @@ function beginHold(x: number, y: number, fromSrc: 'ptr' | 'kb') {
     if (mode === 'freeze' && now - freezeT0 > (dir === 'go' ? 340 : 480)) {
       mode = 'idle';
       p = 0;
+      holdActive = false;
       pageSinkEnd();
       knotDissolve();
     } else {
@@ -352,22 +354,13 @@ function beginHold(x: number, y: number, fromSrc: 'ptr' | 'kb') {
   py = y;
   p = 0;
   holdT0 = now;
+  holdActive = false;
   scrollMark = scrollY;
   // 线到达阈值：按压时一次性测量（元素中心与按压点的横向距离）
   for (const d of getDuals()) {
     const r = d.el.getBoundingClientRect();
     d.dx = Math.max(14, Math.abs(r.left + r.width / 2 - px));
     d.flipped = false;
-  }
-  body.classList.add('reality-holding');
-  setMorphPause(true); // 按住/定格期间暂停走神，避免与线换面打架
-  if (!RM) {
-    if (thread) {
-      thread.className = `thread ${dir}`;
-      thread.style.display = 'block';
-    }
-    drawThread(0, -4, 1, 0);
-    if (dir === 'back') knotDissolve();
   }
   startLoop();
   clearTimeout(watchdog);
@@ -378,15 +371,25 @@ function beginHold(x: number, y: number, fromSrc: 'ptr' | 'kb') {
 function releaseHold() {
   if (mode !== 'hold') return;
   const held = performance.now() - holdT0;
-  mode = 'retract';
   src = null;
   pid = -1;
   body.classList.remove('reality-holding');
-  if (held <= CLICK_MS && !RM) clickFlick();
+  clearTimeout(watchdog);
+
+  if (held <= CLICK_MS) {
+    mode = 'idle';
+    p = 0;
+    holdActive = false;
+    if (thread) thread.style.display = 'none';
+    stopLoop();
+    setMorphPause(false);
+    return;
+  }
+
+  mode = 'retract';
   retractT0 = performance.now();
   retractFrom = p;
   retractDur = Math.min(RETRACT_MS, 200 + p * 380);
-  clearTimeout(watchdog);
   watchdog = setTimeout(() => {
     if (mode === 'retract') finishRetract();
   }, retractDur + 200);
@@ -395,6 +398,7 @@ function latch() {
   mode = 'freeze';
   src = null;
   pid = -1;
+  holdActive = false;
   clearTimeout(watchdog);
   body.classList.remove('reality-holding');
   reality = dir === 'go' ? 'wake' : 'dream';
@@ -428,6 +432,7 @@ function finishFreeze() {
   if (mode !== 'freeze') return;
   mode = 'idle';
   p = 0;
+  holdActive = false;
   if (thread) thread.style.display = 'none';
   pageSinkEnd();
   if (dir === 'go') knotDissolve();
@@ -438,6 +443,7 @@ function finishFreeze() {
 function finishRetract() {
   mode = 'idle';
   p = 0;
+  holdActive = false;
   if (thread) thread.style.display = 'none';
   restoreDuals();
   stopLoop();
@@ -473,19 +479,37 @@ function stopLoop() {
 function loop(now: number) {
   rafId = 0;
   if (mode === 'hold') {
-    const T = dir === 'go' ? T_GO : T_BACK;
-    p = Math.min(1, (now - holdT0) / T);
-    if (!RM) {
-      c = dir === 'go' ? p : 1 - p;
-      setTint(c);
-      const W = p * fullW();
-      drawThread(W, -4, 1, 0.16 + 0.5 * p);
-      flipDualsByThread(W / 2);
-    }
-    if (p >= 1) {
-      latch();
-      startLoop(); // 闩锁后定格分支仍需渲染（绷直/成结/微沉）
-      return;
+    const elapsed = now - holdT0;
+    if (elapsed < CLICK_MS) {
+      p = 0;
+    } else {
+      if (!holdActive) {
+        holdActive = true;
+        body.classList.add('reality-holding');
+        setMorphPause(true); // 按住/定格期间暂停走神，避免与线换面打架
+        if (!RM) {
+          if (thread) {
+            thread.className = `thread ${dir}`;
+            thread.style.display = 'block';
+          }
+          drawThread(0, -4, 1, 0);
+          if (dir === 'back') knotDissolve();
+        }
+      }
+      const T = dir === 'go' ? T_GO : T_BACK;
+      p = Math.min(1, (elapsed - CLICK_MS) / (T - CLICK_MS));
+      if (!RM) {
+        c = dir === 'go' ? p : 1 - p;
+        setTint(c);
+        const W = p * fullW();
+        drawThread(W, -4, 1, 0.16 + 0.5 * p);
+        flipDualsByThread(W / 2);
+      }
+      if (p >= 1) {
+        latch();
+        startLoop(); // 闩锁后定格分支仍需渲染（绷直/成结/微沉）
+        return;
+      }
     }
   } else if (mode === 'retract') {
     const kk = Math.min(1, (now - retractT0) / retractDur);
@@ -685,7 +709,7 @@ declare global {
 }
 if (typeof window !== 'undefined' && import.meta.env.DEV) {
   window.__fx = {
-    state: () => ({ reality, holding: mode === 'hold', progress: +p.toFixed(3) }),
+    state: () => ({ reality, holding: mode === 'hold' && holdActive, progress: +p.toFixed(3) }),
     get clicks() {
       return clicks;
     },

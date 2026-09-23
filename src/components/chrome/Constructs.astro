@@ -5,7 +5,7 @@
      · 醒 ＝ 整片场沿 14° 朝右下连续匀速流动（三档视差 104/84/66s ＝ 23–36px/s），
             块与块之间恒留 1–2px 缝，读得出「拼接」；
      · 梦 ＝ 同一片场**停在当前进度**（animation-play-state: paused，不归位到生成原点），
-            只剩原地整数像素阶跃浮动、接缝裂开、交叠处留 1px 琥珀细边；
+            只剩原地整数像素阶跃浮动、接缝裂开；
             整片场朝 14° 反方向恒退 260px —— 定距回溯，与已经漂了多久无关。
    钩子只有两个，全部由 reality.ts 维护，本组件不新增任何 JS 状态：
      body.reality-holding（长按中）/ body[data-reality='dream'] ⇒ 漂移暂停；
@@ -42,7 +42,7 @@ const { layer = 'through' } = Astro.props;
                      −1.5 / −4.0 / −6.5s ＝ 8 站里每站 10%（7 档 + 30% 停歇，
                      与 brand.ts 同拍）。想让方块也「每拍一跳、三档齐拍」：
                      把三档 sdur 全改 10、sdel 全改 0。
-       --fld-gap     边缝（px）：醒态相邻两块之间的缝隙（远档 1 / 中近档 2）。
+       --fld-gap     边缝（px）：醒态相邻两块之间的缝隙（远档 4 / 中档 6 / 近档 8，大幅留白）。
                      ⚠ 边缝在**生成期**就烘焙进 left/top/width/height 里，一条
                      CSS 变量改不动已经生成好的几何 —— 真源是生成器顶部的 GAP
                      表（一行），另可用 ?gap=N 覆盖。这里只是把它记在明面上。
@@ -59,11 +59,6 @@ const { layer = 'through' } = Astro.props;
     /* 一个漂移周期的向量：2400px 沿 14° ⇒ (2329, 581)。两份副本按它错开 */
     --fld-pan-x: 2329px;
     --fld-pan-y: 581px;
-    /* 交叠窗的填充：**空**。原稿在这里填了「--bg 93% + --wash」的不透明底色，
-       梦态读成一枚挖出来的亮色块（用户原话「重叠处的白色色块」）。去掉填充后
-       交叠处只剩「浓度叠加 + 一圈琥珀细边」，不再是一枚亮洞。
-       要连那圈描边也去掉，删掉 .fld-cut 的 box-shadow 即可。 */
-    --fld-cut-fill: transparent;
     /* 两个 smoothstep：tk 管「拼合 ↔ 错开」（醒 1 → 梦 0），
        rk 管「回溯」（醒 0 → 梦 1）。两端导数都为 0 ⇒ 按下/闩锁那两下不顿。 */
     --fld-tk: calc(var(--reality-mix) * var(--reality-mix) * (3 - 2 * var(--reality-mix)));
@@ -194,20 +189,6 @@ const { layer = 'through' } = Astro.props;
     }
   }
 
-  /* 交叠窗：整档一个 opacity 组（逐帧只改这一个元素），窗内是「浓度叠加 + 一圈
-     1px 琥珀框」；醒态 alpha=0（醒态零重叠 ⇒ 一枚窗都没有） */
-  .fld-cutl {
-    position: absolute;
-    inset: 0;
-    opacity: calc(var(--still, 0) * 0.9);
-  }
-
-  .fld-cut {
-    position: absolute;
-    background: var(--fld-cut-fill, transparent);
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--amber) 40%, transparent);
-  }
-
   /* 减动效：整层停在醒面构图上（静止的拼接）。
      站点的 global.css 没有「全部动画停摆」的兜底规则（mock 外壳有），
      所以这一条必须由本组件自己给；reality.ts 在 RM 下恒醒面 ⇒ 场就是 tiled 那一态。 */
@@ -267,7 +248,7 @@ const { layer = 'through' } = Astro.props;
     fldRoot.style.setProperty('--rw-x', RWX + 'px');
     fldRoot.style.setProperty('--rw-y', RWY + 'px');
 
-    /* ★ 一行调：GAP / sdur / sdel 表（远 1px / 中近 2px，按档递增）；?gap=N 覆盖全部三档。
+    /* ★ 一行调：GAP / sdur / sdel 表（远 4px / 中 6px / 近 8px，大幅留白）；?gap=N 覆盖全部三档。
        span ＝ 边长带：整体比上一稿加大 ~30%，每档数量 8 → 6（整片不再变吵），
        m（格距）的上限随之 118 → 146、下界 34 → 44。
        sdur / sdel ＝ 方块的抽帧节拍（8 站里每站 10%：7 档 + 30% 停歇，三档错相）。
@@ -275,11 +256,11 @@ const { layer = 'through' } = Astro.props;
        齐拍）」⇒ 三档 sdur 全写 10、sdel 全写 0（10 站 × 10%，一站=一拍）。 */
     const GAPQ = parseInt(fldQ.get('gap') || '', 10);
     const BANDS = [
-      { n: 6, span: [225, 280], o: 0.66, dur: 104, amp: 2, gap: 1, gapU: 300, sdur: 12.5, sdel: -1.5 },
-      { n: 6, span: [250, 320], o: 0.84, dur: 84, amp: 2, gap: 2, gapU: 330, sdur: 11.0, sdel: -4.0 },
-      { n: 6, span: [295, 380], o: 1.0, dur: 66, amp: 3, gap: 2, gapU: 360, sdur: 9.5, sdel: -6.5 },
+      { n: 6, span: [225, 280], o: 0.66, dur: 104, amp: 2, gap: 4, gapU: 300, sdur: 12.5, sdel: -1.5 },
+      { n: 6, span: [250, 320], o: 0.84, dur: 84, amp: 2, gap: 6, gapU: 330, sdur: 11.0, sdel: -4.0 },
+      { n: 6, span: [295, 380], o: 1.0, dur: 66, amp: 3, gap: 8, gapU: 360, sdur: 9.5, sdel: -6.5 },
     ];
-    if (GAPQ >= 0 && GAPQ <= 4) for (const b of BANDS) b.gap = GAPQ;
+    if (GAPQ >= 0 && GAPQ <= 16) for (const b of BANDS) b.gap = GAPQ;
 
     /* 生成区（u,v 是 14° 的正交系 ⇒ 这里的距离就是屏幕距离）与「副本不相交」的 u 边界 */
     const UMAX = 830,
@@ -299,7 +280,6 @@ const { layer = 'through' } = Astro.props;
       gap: number;
       tiled: Rect[];
       loose: Rect[];
-      cuts: Rect[];
       bb: Rect;
       span: number;
       depth: number;
@@ -315,7 +295,6 @@ const { layer = 'through' } = Astro.props;
       sz: number;
       tiled: Rect[];
       loose: Rect[];
-      cuts: Rect[];
       bb: Rect;
       span: number;
       box: Rect;
@@ -497,10 +476,6 @@ const { layer = 'through' } = Astro.props;
           const oy = nb[1] !== 0 ? -nb[1] * away * mag : tan;
           return { x: Math.round(t.x + ox), y: Math.round(t.y + oy), w: s, h: s };
         });
-        const cuts = pairOverlaps(loose)
-          .filter((o) => o.w >= 12 && o.h >= 12)
-          .sort((p, q) => q.w * q.h - p.w * p.h)
-          .slice(0, 5);
         const depth = maxDepth(loose);
         /* 占位框 = 醒态 bbox ∪ 梦态 bbox：过渡是两态之间的插值，
            所以「这个构造体的足迹」必须两个态都包住（不然跨构造体会撞上） */
@@ -512,8 +487,8 @@ const { layer = 'through' } = Astro.props;
           y1 = Math.max(bbT.y + bbT.h, bbL.y + bbL.h);
         const bb = { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
         const span = Math.max(bbL.w, bbL.h);
-        const bad = (depth > 3 ? 1 : 0) + (cuts.length ? 0 : 8) + (span > 420 ? 1 : 0) + (span < 160 ? 1 : 0);
-        if (!best || bad < best.bad) best = { m, sz: s, gap: g, tiled, loose, cuts, bb, span, depth, bad };
+        const bad = (depth > 3 ? 1 : 0) + (span > 420 ? 1 : 0) + (span < 160 ? 1 : 0);
+        if (!best || bad < best.bad) best = { m, sz: s, gap: g, tiled, loose, bb, span, depth, bad };
         if (!bad) break;
       }
       // 循环至少跑一轮 ⇒ best 必有值
@@ -587,7 +562,6 @@ const { layer = 'through' } = Astro.props;
           sz: g.sz,
           tiled: g.tiled,
           loose: g.loose,
-          cuts: g.cuts,
           bb: g.bb,
           span: g.span,
           box,
@@ -604,7 +578,6 @@ const { layer = 'through' } = Astro.props;
     const rewind = document.createElement('div');
     rewind.className = 'fld-rewind';
     let nSq = 0,
-      nCut = 0,
       nCl = 0;
 
     for (const band of BANDS) {
@@ -632,8 +605,6 @@ const { layer = 'through' } = Astro.props;
         cell.className = 'fld-cell';
         /* 第二份＝第一份整体位移 −(DX,DY)：与 .fld-pan 的平移量严格相等 ⇒ 无缝环回 */
         if (c) cell.style.transform = 'translate3d(' + -DX + 'px,' + -DY + 'px,0)';
-        const cutl = document.createElement('div');
-        cutl.className = 'fld-cutl';
         for (const g of items) {
           const cl = document.createElement('div');
           cl.className = 'fld-cl';
@@ -731,27 +702,9 @@ const { layer = 'through' } = Astro.props;
             cl.appendChild(d);
             nSq++;
           }
-          for (const ct of g.cuts) {
-            const d = document.createElement('div');
-            d.className = 'fld-cut';
-            d.style.cssText =
-              'left:calc(50% + ' +
-              (g.X + ct.x) +
-              'px);top:calc(50% + ' +
-              (g.Y + ct.y) +
-              'px);' +
-              'width:' +
-              ct.w +
-              'px;height:' +
-              ct.h +
-              'px';
-            cutl.appendChild(d);
-            nCut++;
-          }
           cell.appendChild(cl);
           nCl++;
         }
-        cell.appendChild(cutl);
         beat.appendChild(cell);
       }
       pan.appendChild(beat);
@@ -761,7 +714,7 @@ const { layer = 'through' } = Astro.props;
     fldField.appendChild(rewind);
 
     /* ── 生成期断言：只在 dev 下跑（生产构建整块 DCE）。读数写进 window.__fld。
-       ①醒态任意两块零重叠 ②相邻平行边间隙 ∈ [1,2]px ③跨副本零重叠
+       ①醒态任意两块零重叠 ②相邻平行边间隙符合 gap 设定 ③跨副本零重叠
        ④梦态叠深 ≤3 ⑤构体错开后整体尺寸 160–420px ───────────────────────── */
     if (import.meta.env.DEV) {
       let badPairs = 0,
@@ -797,6 +750,7 @@ const { layer = 'through' } = Astro.props;
         gapMin = 0,
         gapMax = 0;
       const touched = new Set<number>();
+      const maxBandGap = Math.max(...BANDS.map((b) => b.gap));
       for (let i = 0; i < tiledAll.length; i++) {
         for (let j = 0; j < tiledAll.length; j++) {
           if (i === j) continue;
@@ -808,19 +762,19 @@ const { layer = 'through' } = Astro.props;
             t = 0;
           if (yOv > 0) {
             t = b.x - (a.x + a.w);
-            if (t >= 0 && t <= 3) d = t;
+            if (t >= 0 && t <= maxBandGap + 1) d = t;
           }
           if (d < 0 && xOv > 0) {
             t = b.y - (a.y + a.h);
-            if (t >= 0 && t <= 3) d = t;
+            if (t >= 0 && t <= maxBandGap + 1) d = t;
           }
           if (d < 0 && yOv > 0) {
             t = a.x - (b.x + b.w);
-            if (t >= 0 && t <= 3) d = t;
+            if (t >= 0 && t <= maxBandGap + 1) d = t;
           }
           if (d < 0 && xOv > 0) {
             t = a.y - (b.y + b.h);
-            if (t >= 0 && t <= 3) d = t;
+            if (t >= 0 && t <= maxBandGap + 1) d = t;
           }
           if (d < 0) continue;
           touched.add(i);
@@ -851,7 +805,6 @@ const { layer = 'through' } = Astro.props;
           clusters: nCl,
           clustersPerCopy: nCl / 2,
           squares: nSq,
-          cuts: nCut,
           nodes: fldField.querySelectorAll('*').length,
           ms: Math.round((performance.now() - T0) * 10) / 10,
           rewindPx: rwPx,

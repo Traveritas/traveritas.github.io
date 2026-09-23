@@ -1,0 +1,198 @@
+---
+/* ─────────────────────────────────────────────────────────────
+   主页 · 五阶段全屏沉浸背景画布（StageBackdrop）
+   1. 纯净平色底衬：移除所有泛白光斑，采用质朴克制的低饱和纯色：
+      - Hero: 昼面冷灰(#e9ecef)
+      - Essays: 纯正沉静夜黑(#171b24)
+      - Projects: 沉潜克制夜蓝(#131824)
+      - REM: 幽微克制烟紫灰(#191522)
+      - Dawn: 破晓手记暖纸面(#efe9dd)
+   2. 自然层叠级联（Natural Stacking Cascade）：
+      - 5 图层按 DOM 树天然纵深堆叠；
+      - 向下滚时新图层 0.85s 优美淡入（ease-in-out S曲线），老图层在底下
+        100% 不透明垫底，绝不漏光；
+      - 向上滚时上层自然淡出退隐，底层稳稳显露；
+      - 彻底消除 z-index 跳变与状态冲突，边界来回摩擦也能实现 100% 丝滑连续过渡。
+   3. 视口黄金线连续几何判定（Centerline Hit Test）：
+      - 消除 Observer 死区与事件合并，确保每次跨线都精准触发。
+   ───────────────────────────────────────────────────────────── */
+---
+
+<div class="stage-backdrop" id="stage-backdrop" aria-hidden="true">
+  <div class="stage-layer is-hero on" data-stage="hero"></div>
+  <div class="stage-layer is-essays" data-stage="essays"></div>
+  <div class="stage-layer is-projects" data-stage="projects"></div>
+  <div class="stage-layer is-rem" data-stage="rem"></div>
+  <div class="stage-layer is-dawn" data-stage="dawn"></div>
+</div>
+
+<style>
+  .stage-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: -4;
+    pointer-events: none;
+    overflow: hidden;
+    background-color: #e9ecef;
+  }
+
+  .stage-layer {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    /* 0.85s 悠长从容的标准平滑曲线，过渡温润可感，绝不生硬跳变 */
+    transition: opacity 0.85s cubic-bezier(0.4, 0, 0.2, 1);
+    will-change: opacity;
+  }
+
+  /* 激活状态：处于当前阶段及其底层的图层全开，新图层盖在旧图层上方淡入 */
+  .stage-layer.on {
+    opacity: 1;
+  }
+
+  /* ① Hero: 昼面冷灰纯平色 */
+  .stage-layer.is-hero {
+    background-color: #e9ecef;
+  }
+
+  /* ② 随笔: 沉静深黑纯平色 */
+  .stage-layer.is-essays {
+    background-color: #171b24;
+  }
+
+  /* ③ 项目: 沉潜深邃低饱和纯夜蓝 */
+  .stage-layer.is-projects {
+    background-color: #131824;
+  }
+
+  /* ④ 试验场: 幽微克制低饱和纯烟紫灰 */
+  .stage-layer.is-rem {
+    background-color: #191522;
+  }
+
+  /* ⑤ 晨醒: 破晓手记暖纸面纯色 */
+  .stage-layer.is-dawn {
+    background-color: #efe9dd;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .stage-layer {
+      transition: none !important;
+    }
+  }
+</style>
+
+<script>
+  function setupBackdrop() {
+    const backdrop = document.getElementById('stage-backdrop');
+    if (!backdrop) return;
+
+    const STAGE_ORDER = ['hero', 'essays', 'projects', 'rem', 'dawn'];
+
+    const layers: Record<string, HTMLElement | null> = {
+      hero: backdrop.querySelector('.is-hero'),
+      essays: backdrop.querySelector('.is-essays'),
+      projects: backdrop.querySelector('.is-projects'),
+      rem: backdrop.querySelector('.is-rem'),
+      dawn: backdrop.querySelector('.is-dawn'),
+    };
+
+    const sectionIds = [
+      { id: 'ns-hero', name: 'hero' },
+      { id: 'ns-essays', name: 'essays' },
+      { id: 'ns-projects', name: 'projects' },
+      { id: 'ns-rem', name: 'rem' },
+      { id: 'ns-dawn', name: 'dawn' },
+    ];
+
+    let currentStage = 'hero';
+
+    function setActiveStage(name: string) {
+      if (name === currentStage) return;
+      currentStage = name;
+      const targetIdx = STAGE_ORDER.indexOf(name);
+      if (targetIdx < 0) return;
+
+      // 自然层叠级联：当前阶段及所有底层全部维持开（on），上层随退场自然淡出
+      for (let i = 0; i < STAGE_ORDER.length; i++) {
+        const el = layers[STAGE_ORDER[i]];
+        if (el) {
+          el.classList.toggle('on', i <= targetIdx);
+        }
+      }
+    }
+
+    // 几何连续命中判定（Centerline Hit Test）：
+    // 视线黄金点（视口 45% 高度处）落在哪两个段落之间，必定映射到该段，0死区、0遗漏
+    const offsets: Record<string, number> = {
+      hero: 0,
+      essays: Infinity,
+      projects: Infinity,
+      rem: Infinity,
+      dawn: Infinity,
+    };
+
+    function measure() {
+      const vh = innerHeight;
+      for (const s of sectionIds) {
+        const el = document.getElementById(s.id);
+        if (el) {
+          offsets[s.name] = el.getBoundingClientRect().top + scrollY - vh * 0.45;
+        }
+      }
+    }
+
+    function update() {
+      const y = scrollY;
+      let next = 'hero';
+      if (y >= offsets.dawn) {
+        next = 'dawn';
+      } else if (y >= offsets.rem) {
+        next = 'rem';
+      } else if (y >= offsets.projects) {
+        next = 'projects';
+      } else if (y >= offsets.essays) {
+        next = 'essays';
+      } else {
+        next = 'hero';
+      }
+      setActiveStage(next);
+    }
+
+    measure();
+    update();
+
+    let ticking = false;
+    window.addEventListener(
+      'scroll',
+      () => {
+        if (!ticking) {
+          requestAnimationFrame(() => {
+            update();
+            ticking = false;
+          });
+          ticking = true;
+        }
+      },
+      { passive: true },
+    );
+
+    window.addEventListener('resize', () => {
+      measure();
+      update();
+    });
+
+    if (typeof document !== 'undefined' && document.fonts) {
+      document.fonts.ready.then(() => {
+        measure();
+        update();
+      });
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupBackdrop, { once: true });
+  } else {
+    setupBackdrop();
+  }
+</script>
