@@ -162,6 +162,31 @@ export function initChrome() {
   const depthDot = rail?.querySelector<HTMLElement>('.rail-dot');
   const dawnGlow = document.querySelector<HTMLElement>('.dawn-glow');
 
+  const heroEl = document.getElementById('ns-hero');
+  const dawnEl = document.getElementById('ns-dawn');
+  let heroBottom = innerHeight;
+  let dawnTriggerY = Infinity;
+
+  function measureBounds() {
+    const vh = innerHeight;
+    if (heroEl) {
+      heroBottom = heroEl.offsetTop + heroEl.offsetHeight;
+    }
+    if (dawnEl) {
+      dawnTriggerY = dawnEl.getBoundingClientRect().top + scrollY - vh * 0.45;
+    }
+  }
+
+  if (heroEl) {
+    measureBounds();
+    window.addEventListener('resize', measureBounds, { passive: true });
+    window.addEventListener('load', measureBounds, { passive: true });
+    if (typeof document !== 'undefined' && document.fonts) {
+      document.fonts.ready.then(measureBounds);
+    }
+    setTimeout(measureBounds, 1200);
+  }
+
   onScrollRaf(() => {
     // 读操作前置（避免写后读引发 Layout Thrashing）
     let prog = 0;
@@ -174,9 +199,16 @@ export function initChrome() {
     const max = doc.scrollHeight - innerHeight;
     const p = max > 0 ? clamp(scrollY / max, 0, 1) : 0;
 
-    // 首页左轨：滚过首屏才浮现（内页无首屏，恒为浮现态）
-    const hasHero = !!document.getElementById('ns-hero');
-    document.body.classList.toggle('past-hero', !hasHero || scrollY > innerHeight * 0.5);
+    // 首页左轨：首屏完全消失后才进入，触及破晓明亮处收起（内页无首屏，恒为浮现态）
+    if (heroEl) {
+      const pastHero = scrollY >= heroBottom;
+      const inDawn = scrollY >= dawnTriggerY;
+      document.body.classList.toggle('past-hero', pastHero);
+      document.body.classList.toggle('in-dawn', inDawn);
+    } else {
+      document.body.classList.add('past-hero');
+      document.body.classList.remove('in-dawn');
+    }
 
     if (hairline) hairline.style.width = `${p * 100}%`;
 
