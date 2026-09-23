@@ -48,6 +48,9 @@ const { layer = 'through' } = Astro.props;
                      表（一行），另可用 ?gap=N 覆盖。这里只是把它记在明面上。
        --sq-scale    梦态方块放大：方块在梦态随 --rw-k 原地膨胀，带平滑幂次随机
                      分布（1.2x ~ 3.0x，最大约 3x），醒态恒为 1.0x。可用 ?smax=N 覆盖。
+       --sq-amp      梦态方块位置量化浮动：严格参考标题（AveritA）实现，采用 Celeste 风格
+                     简谐位置量化（3px 最大幅值，1px 整像素阶跃，step-end 零 tween 瞬切，
+                     波峰波谷 26% 滞空缓动）。
      ═══════════════════════════════════════════════════════════════════════ */
   .fld-bg {
     position: fixed;
@@ -149,7 +152,8 @@ const { layer = 'through' } = Astro.props;
      醒态是「相邻边之间空出 1–2px」的拼接：渲染尺寸 = 格距 m − 缝宽 g，
      两档同一套尺寸 ⇒ 过渡只动 transform（不会逐帧改 width/height）。
      7% 面 / 13% 边线：缝两侧各一条 1px 边线，中间留 1–2px 底色 ⇒ 读得出「拼接」。
-     梦态独立小块浮动：采用与品牌名同源的 Celeste 风格简谐位置量化（横纵双向整像素跳阶），
+     梦态独立小块浮动：参考标题（AveritA）实现，采用 Celeste 风格简谐位置量化
+     （3px 最大幅值，1px 整像素阶跃，step-end 零 tween 瞬切，波峰波谷 26% 滞空缓动）；
      位移全部乘 --still ⇒ 醒态与回醒过渡中恒等收缩回预定的初始相对位置（零位移）。 */
   .fld-sq {
     position: absolute;
@@ -158,7 +162,7 @@ const { layer = 'through' } = Astro.props;
     transform: translate3d(calc(var(--fld-tx, 0px) * var(--fld-tk, 1)), calc(var(--fld-ty, 0px) * var(--fld-tk, 1)), 0);
     transform-origin: center center;
     scale: calc(1 + var(--sq-scale-delta, 0) * var(--rw-k, 0));
-    animation: fld-sq-float var(--sq-dur, 3.6s) step-end infinite;
+    animation: fld-sq-float var(--sq-dur, 2.8s) step-end infinite;
     animation-delay: var(--sq-del, 0s);
     will-change: transform, translate, scale;
   }
@@ -167,31 +171,27 @@ const { layer = 'through' } = Astro.props;
     0% {
       translate: 0px 0px;
     }
-    10% {
-      translate: calc(var(--sq-x-step, 1px) * var(--sq-dir, 1) * var(--still, 0))
+    13% {
+      translate: calc(var(--sq-x-step, 0px) * var(--sq-dir, 1) * var(--still, 0))
                  calc(var(--sq-y-step, 1px) * -1 * var(--sq-ydir, 1) * var(--still, 0));
     }
-    20% {
+    25% {
       translate: calc(var(--sq-x-mid, 1px) * var(--sq-dir, 1) * var(--still, 0))
                  calc(var(--sq-y-mid, 2px) * -1 * var(--sq-ydir, 1) * var(--still, 0));
     }
-    32% {
-      translate: calc(var(--sq-x-max, 2px) * var(--sq-dir, 1) * var(--still, 0))
+    37% {
+      translate: calc(var(--sq-x-max, 1px) * var(--sq-dir, 1) * var(--still, 0))
                  calc(var(--sq-y-max, 3px) * -1 * var(--sq-ydir, 1) * var(--still, 0));
     }
-    58% {
+    63% {
       translate: calc(var(--sq-x-mid, 1px) * var(--sq-dir, 1) * var(--still, 0))
                  calc(var(--sq-y-mid, 2px) * -1 * var(--sq-ydir, 1) * var(--still, 0));
     }
-    70% {
-      translate: calc(var(--sq-x-step, 1px) * var(--sq-dir, 1) * -1 * var(--still, 0))
+    75% {
+      translate: calc(var(--sq-x-step, 0px) * var(--sq-dir, 1) * var(--still, 0))
                  calc(var(--sq-y-step, 1px) * -1 * var(--sq-ydir, 1) * var(--still, 0));
     }
-    82% {
-      translate: calc(var(--sq-x-step, 1px) * var(--sq-dir, 1) * -1 * var(--still, 0))
-                 0px;
-    }
-    92%,
+    87%,
     100% {
       translate: 0px 0px;
     }
@@ -630,55 +630,56 @@ const { layer = 'through' } = Astro.props;
             const d = document.createElement('div');
             d.className = 'fld-sq';
             const h = ((g.X * 73856093) ^ (g.Y * 19349663) ^ (n * 83492791)) >>> 0;
-            // 4 档离散随机浮动配置（严格整数像素，保持 Celeste 风格网格对齐）
-            const tier = h % 4;
-            let xMax = '2px',
-              xMid = '1px',
-              xStep = '1px';
-            let yMax = '3px',
-              yMid = '2px',
-              yStep = '1px';
-            if (tier === 0) {
-              // 微幅档 (1px / 2px)
-              xMax = '1px';
-              xMid = '1px';
-              xStep = '0px';
-              yMax = '2px';
-              yMid = '1px';
-              yStep = '1px';
-            } else if (tier === 1) {
-              // 标称档 (2px / 3px)
-              xMax = '2px';
-              xMid = '1px';
-              xStep = '1px';
-              yMax = '3px';
-              yMid = '2px';
-              yStep = '1px';
-            } else if (tier === 2) {
-              // 纵深档 (3px / 4px)
-              xMax = '3px';
-              xMid = '2px';
-              xStep = '1px';
-              yMax = '4px';
-              yMid = '2px';
-              yStep = '1px';
-            } else {
-              // 纯纵向档 (0px / 3px)
-              xMax = '0px';
-              xMid = '0px';
-              xStep = '0px';
-              yMax = '3px';
-              yMid = '2px';
-              yStep = '1px';
-            }
             const dirX = h & 1 ? 1 : -1;
             const dirY = h & 2 ? 1 : -1;
-            const dur = (3.0 + ((h >> 4) % 5) * 0.3).toFixed(1) + 's';
-            const del = (-1 * (n * 0.45 + (((h >> 8) & 7) * 0.25))).toFixed(2) + 's';
+            const dur = (2.8 + ((h >> 4) % 5) * 0.2).toFixed(1) + 's';
+            const del = (-1 * (n * 0.4 + (((h >> 8) & 7) * 0.2))).toFixed(2) + 's';
 
             // 梦态个体随机缩放：平滑幂次分布，最低 1.2x，最高约 3.0x（MAX_SCALE）
             const rndScale = ((h >> 12) & 0xffff) / 65535;
             const scaleDelta = (0.2 + Math.pow(rndScale, 1.4) * (MAX_SCALE - 1 - 0.2)).toFixed(2);
+
+            // 4 档离散随机浮动配置（严格对齐 AveritA 3px 峰值与 1px 阶跃量化，零 tween 瞬切）
+            const tier = h % 4;
+            let xStep = '0px',
+              xMid = '0px',
+              xMax = '0px';
+            let yStep = '1px',
+              yMid = '2px',
+              yMax = '3px';
+            if (tier === 0) {
+              // 档 0：纯纵向 3px 量化浮动（与 AveritA 字符完全同构）
+              xStep = '0px';
+              xMid = '0px';
+              xMax = '0px';
+              yStep = '1px';
+              yMid = '2px';
+              yMax = '3px';
+            } else if (tier === 1) {
+              // 档 1：微倾斜 3px 量化浮动（X 最大 1px，Y 3px）
+              xStep = '0px';
+              xMid = '1px';
+              xMax = '1px';
+              yStep = '1px';
+              yMid = '2px';
+              yMax = '3px';
+            } else if (tier === 2) {
+              // 档 2：折线倾角 3px 量化浮动（X 最大 2px，Y 3px）
+              xStep = '1px';
+              xMid = '1px';
+              xMax = '2px';
+              yStep = '1px';
+              yMid = '2px';
+              yMax = '3px';
+            } else {
+              // 档 3：微幅纵向 2px 量化浮动（X 1px，Y 2px）
+              xStep = '0px';
+              xMid = '1px';
+              xMax = '1px';
+              yStep = '1px';
+              yMid = '1px';
+              yMax = '2px';
+            }
 
             d.style.cssText =
               'left:' +
@@ -703,18 +704,18 @@ const { layer = 'through' } = Astro.props;
               dirX +
               ';--sq-ydir:' +
               dirY +
-              ';--sq-x-max:' +
-              xMax +
-              ';--sq-x-mid:' +
-              xMid +
               ';--sq-x-step:' +
               xStep +
-              ';--sq-y-max:' +
-              yMax +
-              ';--sq-y-mid:' +
-              yMid +
+              ';--sq-x-mid:' +
+              xMid +
+              ';--sq-x-max:' +
+              xMax +
               ';--sq-y-step:' +
               yStep +
+              ';--sq-y-mid:' +
+              yMid +
+              ';--sq-y-max:' +
+              yMax +
               ';--sq-scale-delta:' +
               scaleDelta;
             d.dataset.b = ti.x + ',' + ti.y + ',' + g.sz; // 醒态（tiled）局部位置 + 边长
