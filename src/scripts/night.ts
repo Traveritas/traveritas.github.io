@@ -141,6 +141,16 @@ export function initNight() {
   probeWaveBg = document.getElementById('probe-wave-bg') as SVGPathElement | null;
   probeWaveBox = document.getElementById('probe-wave-box');
 
+  if (railProbe) {
+    railProbe.style.position = 'absolute';
+    const dot = railProbe.querySelector<HTMLElement>('.rail-dot');
+    if (dot) {
+      dot.style.position = 'relative';
+      dot.style.left = 'auto';
+      dot.style.top = 'auto';
+    }
+  }
+
   let measuredOnce = false;
 
   paint();
