@@ -1,0 +1,378 @@
+---
+/* ─────────────────────────────────────────────────────────────
+   入梦检验 · 首次访问引导标尺（方案一：时空仪轨 · 呼吸光核）
+   · 悬浮于首屏右下方（移动端居中下部），磨砂树脂微章质感
+   · 光学微刻角标 ⌜ ⌟ + 6px 琥珀微核 + 演示抽丝
+   · 首次访问并在揭幕后 2 秒自动做一次 -4° 发丝微抽演示
+   · 接入 [data-morph] 双态转换引擎（随长按自动切面）
+   · 只有在用户真正发生双态切换（非初始化载入）时才消隐并记录
+   · 独立组件封装，便于后续无缝替换或移除
+   ───────────────────────────────────────────────────────────── */
+---
+
+<div class="reality-guide" id="reality-guide" aria-label="双态长按指引">
+  <!-- 光学微刻角标 -->
+  <span class="rg-reticle rg-rt-tl mono" aria-hidden="true">⌜</span>
+  <span class="rg-reticle rg-rt-br mono" aria-hidden="true">⌟</span>
+
+  <!-- 琥珀微核与发丝微抽演示器 -->
+  <div class="rg-emitter" aria-hidden="true">
+    <i class="rg-dot"></i>
+    <i class="rg-demo-thread"></i>
+  </div>
+
+  <!-- 引导文案（随双态转换自适应：在梦中引导唤醒，在醒时引导归位） -->
+  <span class="rg-text" data-morph data-true="触按长驻 · 重归夜色" data-dream="触按长驻 · 唤醒世界">触按长驻 · 唤醒世界</span>
+
+  <!-- 时间与按键刻度 -->
+  <span class="rg-meta mono" aria-hidden="true">
+    <span class="rg-dur" data-morph data-true="1.3s" data-dream="2.2s">2.2s</span>
+    <span class="rg-action">HOLD</span>
+    <span class="rg-kbd">[Shift+Space]</span>
+  </span>
+</div>
+
+<script is:inline>
+  // 零闪烁状态检查：若曾经已完成引导，立即隐藏
+  try {
+    localStorage.removeItem('xm-reality-guided'); // 清除旧版误杀的脏数据
+    if (localStorage.getItem('xm-reality-guided-v2') === '1') {
+      document.getElementById('reality-guide')?.classList.add('is-hidden');
+    }
+  } catch (e) {}
+</script>
+
+<script>
+  import { reducedMotion } from '../../scripts/lib';
+
+  const STORAGE_KEY = 'xm-reality-guided-v2';
+  const guide = document.getElementById('reality-guide');
+
+  if (guide) {
+    let guided = false;
+    try {
+      guided = localStorage.getItem(STORAGE_KEY) === '1';
+    } catch {
+      /* 隐私模式静默 */
+    }
+
+    if (guided) {
+      guide.classList.add('is-hidden');
+    } else {
+      // 演示发丝微抽（开屏揭幕后延迟 2 秒轻微示范）
+      const runPulseDemo = () => {
+        if (reducedMotion() || guide.classList.contains('is-dismissed')) return;
+        setTimeout(() => {
+          if (!guide.classList.contains('is-dismissed')) {
+            guide.classList.add('is-pulsing');
+            setTimeout(() => guide.classList.remove('is-pulsing'), 1800);
+          }
+        }, 1800);
+      };
+
+      if (document.documentElement.classList.contains('booted')) {
+        runPulseDemo();
+      } else {
+        const observer = new MutationObserver(() => {
+          if (document.documentElement.classList.contains('booted')) {
+            observer.disconnect();
+            runPulseDemo();
+          }
+        });
+        observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+      }
+
+      // 准确监听双态切换：必须忽略初次加载时的 initialReality 广播
+      let currentReality: string | null = null;
+      window.addEventListener('xm:reality', (e: Event) => {
+        const customEvent = e as CustomEvent<{ reality: string }>;
+        const next = customEvent.detail?.reality;
+        if (!currentReality) {
+          currentReality = next; // 首次仅记录初始状态（如 'dream'）
+          return;
+        }
+
+        // 仅在真实发生换面时执行消隐
+        if (next !== currentReality) {
+          currentReality = next;
+          if (guide.classList.contains('is-dismissed')) return;
+          guide.classList.add('is-dismissed');
+          try {
+            localStorage.setItem(STORAGE_KEY, '1');
+          } catch {
+            /* 隐私模式静默 */
+          }
+          setTimeout(() => {
+            guide.classList.add('is-hidden');
+          }, 800);
+        }
+      });
+    }
+  }
+</script>
+
+<style>
+  .reality-guide {
+    position: absolute;
+    right: 6vw;
+    top: calc(92svh - 52px);
+    z-index: 10;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.44rem 0.95rem 0.42rem 0.85rem;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    background: color-mix(in srgb, var(--bg) 75%, rgba(255, 255, 255, 0.08));
+    backdrop-filter: blur(16px) saturate(125%);
+    -webkit-backdrop-filter: blur(16px) saturate(125%);
+    box-shadow:
+      0 10px 30px -8px rgba(10, 14, 20, 0.35),
+      0 0 1px 1px rgba(255, 255, 255, 0.1),
+      inset 0 1px 0 rgba(255, 255, 255, 0.28);
+    color: var(--fg);
+    cursor: pointer;
+    pointer-events: auto;
+    user-select: none;
+    -webkit-user-select: none;
+    opacity: 0.92;
+    transform: translateY(0);
+    transition:
+      opacity 0.6s cubic-bezier(0.2, 0.8, 0.3, 1),
+      transform 0.6s cubic-bezier(0.2, 0.8, 0.3, 1),
+      border-color 0.25s ease,
+      box-shadow 0.25s ease,
+      filter 0.5s ease;
+  }
+
+  /* 记忆隐藏状态 */
+  .reality-guide.is-hidden {
+    display: none !important;
+  }
+
+  /* 悬浮轻微增亮并泛起微光 */
+  .reality-guide:hover {
+    opacity: 1 !important;
+    border-color: color-mix(in srgb, var(--amber) 50%, rgba(255, 255, 255, 0.35));
+    box-shadow:
+      0 12px 32px -6px rgba(10, 14, 20, 0.42),
+      0 0 16px 1px color-mix(in srgb, var(--amber) 22%, transparent),
+      inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  }
+
+  /* 长按中状态联动：光核收紧，边框化为琥珀色 */
+  :global(body.reality-holding) .reality-guide {
+    border-color: var(--amber);
+    box-shadow:
+      0 0 20px 2px color-mix(in srgb, var(--amber) 40%, transparent),
+      inset 0 1px 0 rgba(255, 255, 255, 0.5);
+    transform: scale(0.98);
+  }
+
+  /* 消隐水汽溶变动画 */
+  .reality-guide.is-dismissed {
+    opacity: 0 !important;
+    filter: blur(4px);
+    transform: translateY(-4px) scale(0.96) !important;
+    pointer-events: none;
+    transition:
+      opacity 0.7s cubic-bezier(0.2, 0.8, 0.3, 1),
+      filter 0.7s cubic-bezier(0.2, 0.8, 0.3, 1),
+      transform 0.7s cubic-bezier(0.2, 0.8, 0.3, 1);
+  }
+
+  /* 光学微刻角标 ⌜ ⌟ */
+  .rg-reticle {
+    position: absolute;
+    font-size: 8px;
+    line-height: 1;
+    color: var(--fg-soft);
+    opacity: 0.6;
+    pointer-events: none;
+  }
+
+  .rg-rt-tl {
+    top: -4px;
+    left: -3px;
+  }
+
+  .rg-rt-br {
+    bottom: -4px;
+    right: -3px;
+  }
+
+  /* 琥珀微核与发射器 */
+  .rg-emitter {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 12px;
+    height: 12px;
+  }
+
+  .rg-dot {
+    display: block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--amber);
+    box-shadow: 0 0 8px 1px color-mix(in srgb, var(--amber) 65%, transparent);
+    animation: rg-dot-breathe 3.6s ease-in-out infinite;
+    transition:
+      transform 0.25s ease,
+      box-shadow 0.25s ease;
+  }
+
+  @keyframes rg-dot-breathe {
+    0%, 100% {
+      opacity: 0.75;
+      transform: scale(0.95);
+      box-shadow: 0 0 6px 1px color-mix(in srgb, var(--amber) 45%, transparent);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.15);
+      box-shadow: 0 0 10px 2px color-mix(in srgb, var(--amber) 80%, transparent);
+    }
+  }
+
+  :global(body.reality-holding) .rg-dot {
+    animation: none;
+    transform: scale(1.4);
+    box-shadow: 0 0 12px 2px var(--amber);
+  }
+
+  /* 演示微抽发丝线（-4°倾角） */
+  .rg-demo-thread {
+    position: absolute;
+    right: 6px;
+    top: 5.5px;
+    width: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--amber) 40%, transparent) 20%, var(--amber));
+    transform-origin: 100% 50%;
+    transform: rotate(-4deg);
+    pointer-events: none;
+    opacity: 0;
+  }
+
+  /* 呼吸预演脉冲动效 */
+  .reality-guide.is-pulsing .rg-dot {
+    animation: rg-pulse-dot 1.6s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+  }
+
+  .reality-guide.is-pulsing .rg-demo-thread {
+    animation: rg-pulse-thread 1.6s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+  }
+
+  @keyframes rg-pulse-dot {
+    0% {
+      transform: scale(1);
+    }
+    30% {
+      transform: scale(1.5);
+      box-shadow: 0 0 14px 2px var(--amber);
+    }
+    70% {
+      transform: scale(1.2);
+      box-shadow: 0 0 9px 1px var(--amber);
+    }
+    100% {
+      transform: scale(1);
+    }
+  }
+
+  @keyframes rg-pulse-thread {
+    0% {
+      width: 0;
+      opacity: 0;
+    }
+    35% {
+      width: 42px;
+      opacity: 0.95;
+    }
+    75% {
+      width: 42px;
+      opacity: 0.75;
+    }
+    100% {
+      width: 0;
+      opacity: 0;
+    }
+  }
+
+  /* 文案样式 */
+  .rg-text {
+    font-family: var(--font-display);
+    font-size: 0.76rem;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    color: var(--fg);
+    white-space: nowrap;
+  }
+
+  /* 元信息刻度 */
+  .rg-meta {
+    font-size: 0.64rem;
+    letter-spacing: 0.14em;
+    color: var(--fg-soft);
+    opacity: 0.85;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.38rem;
+    white-space: nowrap;
+    border-left: 1px solid color-mix(in srgb, var(--fg-soft) 25%, transparent);
+    padding-left: 0.55rem;
+  }
+
+  .rg-dur {
+    color: var(--amber);
+    font-weight: 500;
+  }
+
+  .rg-kbd {
+    font-size: 0.58rem;
+    letter-spacing: 0.08em;
+    opacity: 0.75;
+  }
+
+  /* 窄屏适配（移动端） */
+  @media (max-width: 760px) {
+    .reality-guide {
+      right: auto;
+      left: 50%;
+      transform: translateX(-50%);
+      top: calc(100svh - 96px);
+      padding: 0.4rem 0.85rem 0.38rem 0.78rem;
+      gap: 0.5rem;
+    }
+
+    .rg-text {
+      font-size: 0.7rem;
+      letter-spacing: 0.08em;
+    }
+
+    .rg-kbd {
+      display: none;
+    }
+  }
+
+  @media (hover: none) and (pointer: coarse) {
+    .rg-kbd {
+      display: none;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .reality-guide {
+      transition: none !important;
+      transform: none !important;
+    }
+
+    .reality-guide.is-pulsing .rg-dot,
+    .reality-guide.is-pulsing .rg-demo-thread {
+      animation: none !important;
+    }
+  }
+</style>
