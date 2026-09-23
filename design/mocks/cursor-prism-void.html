@@ -1,0 +1,1574 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>醒梦 · 解构浮空晶刃与虚空准星原型（Deconstructed Prism & Void Reticle）</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Noto+Serif+SC:wght@300;400;600&display=swap" rel="stylesheet">
+  <style>
+    /* ─────────────────────────────────────────────────────────────
+       醒梦之界 · 方案 B：解构浮空晶刃与虚空准星原型
+       （Deconstructed Prism & Void Reticle）
+       设计母题：4 枚细长筝形浮空晶瓣 + 3.5px 虚空取景框 + 1px 超微晶核
+       ───────────────────────────────────────────────────────────── */
+
+    :root {
+      /* 基础昼态色板 */
+      --bg: #e9ecef;
+      --bg-card: #f3f5f7;
+      --bg-card-subtle: rgba(243, 245, 247, 0.72);
+      --fg: #262c33;
+      --fg-soft: #59626c;
+      --fg-faint: #8a929b;
+      --line: rgba(38, 44, 51, 0.14);
+      --line-subtle: rgba(38, 44, 51, 0.08);
+
+      /* 醒梦双态令牌 (严格遵循 tokens.css) */
+      --wake: #a7b1ba;       /* 醒 · 冷灰 */
+      --dream: #c2a382;      /* 梦 · 暖沙 */
+      --amber: #d9a05b;      /* 全站唯一异质色：锚点 / 焦点 / 琥珀 */
+      --ghost-ink: #b98f74;  /* 叠影残墨 */
+      --wash: #556270;
+
+      /* 晶刃切面色调（醒态昼面：冷灰 + 极淡冰蓝雾色散） */
+      --blade-facet-l1: rgba(238, 243, 248, 0.88);
+      --blade-facet-l2: rgba(188, 208, 226, 0.95);
+      --blade-facet-r1: rgba(155, 168, 179, 0.65);
+      --blade-facet-r2: rgba(132, 146, 158, 0.82);
+      --blade-ridge: rgba(255, 255, 255, 0.85);
+      --blade-dispersion: rgba(152, 198, 235, 0.75); /* 冰蓝雾色散 */
+      --blade-glow: rgba(167, 177, 186, 0.42);
+      --core-color: #2a313a;
+      --core-glow: rgba(167, 177, 186, 0.65);
+
+      /* 字体 */
+      --font-display: 'Noto Serif SC', 'Palatino Linotype', Georgia, serif;
+      --font-body: system-ui, -apple-system, sans-serif;
+      --font-mono: 'IBM Plex Mono', monospace;
+    }
+
+    /* 梦态覆写（暖沙 + 极淡暖玫瑰色散） */
+    body.is-dream {
+      --bg: #ece6df;
+      --bg-card: #f6f2ec;
+      --bg-card-subtle: rgba(246, 242, 236, 0.72);
+      --fg: #2c2724;
+      --fg-soft: #635b54;
+      --fg-faint: #9c9085;
+      --line: rgba(70, 50, 35, 0.12);
+      --line-subtle: rgba(70, 50, 35, 0.07);
+
+      --blade-facet-l1: rgba(248, 241, 236, 0.88);
+      --blade-facet-l2: rgba(235, 196, 188, 0.95);
+      --blade-facet-r1: rgba(186, 158, 134, 0.65);
+      --blade-facet-r2: rgba(165, 136, 112, 0.82);
+      --blade-ridge: rgba(255, 250, 244, 0.88);
+      --blade-dispersion: rgba(238, 178, 186, 0.75); /* 暖玫瑰色散 */
+      --blade-glow: rgba(194, 163, 130, 0.45);
+      --core-color: #3b322a;
+      --core-glow: rgba(194, 163, 130, 0.65);
+    }
+
+    /* 夜态 · 醒面（深空灰蓝 + 星辉色散） */
+    body.is-night {
+      --bg: #14171a;
+      --bg-card: #1c2024;
+      --bg-card-subtle: rgba(28, 32, 36, 0.75);
+      --fg: #d6dade;
+      --fg-soft: #9aa1a8;
+      --fg-faint: #5a626a;
+      --line: rgba(255, 255, 255, 0.11);
+      --line-subtle: rgba(255, 255, 255, 0.06);
+
+      --blade-facet-l1: rgba(215, 232, 246, 0.92);
+      --blade-facet-l2: rgba(145, 190, 232, 0.98);
+      --blade-facet-r1: rgba(110, 132, 152, 0.72);
+      --blade-facet-r2: rgba(85, 108, 128, 0.86);
+      --blade-ridge: rgba(240, 248, 255, 0.95);
+      --blade-dispersion: rgba(160, 215, 255, 0.85);
+      --blade-glow: rgba(178, 192, 204, 0.45);
+      --core-color: #e4eef6;
+      --core-glow: rgba(200, 222, 242, 0.85);
+    }
+
+    /* 夜态 · 梦面（深褐暖夜 + 晶莹香槟微光） */
+    body.is-night.is-dream {
+      --bg: #1a1715;
+      --bg-card: #24201d;
+      --bg-card-subtle: rgba(36, 32, 29, 0.75);
+      --fg: #ded6cf;
+      --fg-soft: #a89e95;
+      --fg-faint: #6a6159;
+      --line: rgba(255, 240, 220, 0.1);
+      --line-subtle: rgba(255, 240, 220, 0.05);
+
+      --blade-facet-l1: rgba(248, 228, 210, 0.92);
+      --blade-facet-l2: rgba(238, 185, 155, 0.98);
+      --blade-facet-r1: rgba(155, 126, 102, 0.72);
+      --blade-facet-r2: rgba(125, 96, 75, 0.86);
+      --blade-ridge: rgba(255, 245, 230, 0.95);
+      --blade-dispersion: rgba(245, 195, 175, 0.85);
+      --blade-glow: rgba(223, 191, 160, 0.48);
+      --core-color: #faeee2;
+      --core-glow: rgba(240, 215, 190, 0.85);
+    }
+
+    /* ── 基础布局 ── */
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: var(--font-body);
+      transition: background 0.4s ease, color 0.4s ease;
+      overflow-x: hidden;
+    }
+
+    /* 隐藏默认系统光标（若未开启原生光标对照） */
+    body:not(.show-native-cursor) * {
+      cursor: none !important;
+    }
+
+    /* 贯穿全页的 14° 发丝微缝线 (全站核心母题) */
+    .seam-bg {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      width: 190vmax;
+      height: 1px;
+      background: linear-gradient(90deg, transparent 4%, var(--wake) 38%, var(--dream) 62%, transparent 96%);
+      opacity: 0.32;
+      transform: translate(-50%, -50%) rotate(14deg);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .layout {
+      position: relative;
+      z-index: 1;
+      max-width: 1040px;
+      margin: 0 auto;
+      padding: 3.5rem 2rem 7rem;
+    }
+
+    header {
+      margin-bottom: 3.5rem;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 2rem;
+    }
+
+    .badge-bar {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .badge {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--fg-soft);
+      padding: 0.22rem 0.65rem;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--bg-card) 60%, transparent);
+    }
+
+    .badge.accent {
+      border-color: var(--amber);
+      color: var(--amber);
+    }
+
+    h1 {
+      font-family: var(--font-display);
+      font-size: clamp(2rem, 4.4vw, 2.9rem);
+      font-weight: 300;
+      letter-spacing: 0.02em;
+      line-height: 1.32;
+      margin: 0 0 1.25rem;
+    }
+
+    p.lead {
+      color: var(--fg-soft);
+      font-size: 1.05rem;
+      line-height: 1.85;
+      max-width: 48em;
+      margin: 0;
+    }
+
+    p.lead strong {
+      font-weight: 600;
+      color: var(--fg);
+    }
+
+    /* ── 展示网格 ── */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
+      gap: 1.85rem;
+      margin-top: 2.75rem;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 1.85rem;
+      position: relative;
+      transition: border-color 0.25s ease, box-shadow 0.25s ease;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .card:hover {
+      border-color: color-mix(in srgb, var(--amber) 40%, var(--line));
+    }
+
+    .card-title {
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--fg-soft);
+      margin-bottom: 0.85rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .card-title .tag {
+      font-size: 0.7rem;
+      padding: 2px 7px;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      background: color-mix(in srgb, var(--bg) 50%, transparent);
+    }
+
+    .card p.desc {
+      font-size: 0.88rem;
+      color: var(--fg-soft);
+      line-height: 1.65;
+      margin: 0 0 1.25rem;
+    }
+
+    /* 交互元素样式 */
+    .interactive-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.8rem;
+      margin-top: auto;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-size: 0.84rem;
+      padding: 0.58rem 1.15rem;
+      border-radius: 4px;
+      border: 1px solid var(--line);
+      background: color-mix(in srgb, var(--bg-card) 60%, transparent);
+      color: var(--fg);
+      text-decoration: none;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .btn:hover {
+      border-color: var(--amber);
+      color: var(--amber);
+      background: color-mix(in srgb, var(--amber) 9%, transparent);
+      transform: translateY(-1px);
+    }
+
+    .btn-pill {
+      border-radius: 999px;
+      padding: 0.45rem 1.1rem;
+    }
+
+    .text-sample {
+      font-family: var(--font-display);
+      font-size: 1.12rem;
+      line-height: 1.95;
+      color: var(--fg);
+      margin: 0;
+      user-select: text;
+      padding: 1rem 1.25rem;
+      background: color-mix(in srgb, var(--bg) 50%, transparent);
+      border-left: 2px solid var(--line);
+      border-radius: 0 6px 6px 0;
+      transition: border-color 0.2s ease;
+    }
+
+    .text-sample:hover {
+      border-left-color: var(--amber);
+    }
+
+    /* 蓄力试验区 */
+    .hold-area {
+      height: 150px;
+      border: 1px dashed var(--line);
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      color: var(--fg-soft);
+      user-select: none;
+      position: relative;
+      overflow: hidden;
+      background: color-mix(in srgb, var(--bg) 40%, transparent);
+      transition: border-color 0.2s ease;
+    }
+
+    .hold-area:active {
+      border-color: var(--amber);
+    }
+
+    .hold-area .progress-ring {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 72px;
+      height: 72px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+
+    .hold-area.is-active .progress-ring {
+      opacity: 1;
+    }
+
+    .progress-bar-line {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      height: 2px;
+      background: var(--amber);
+      width: 0%;
+      transition: width 0.05s linear;
+    }
+
+    /* 迎风微摆动风洞测速区 */
+    .wind-sandbox {
+      height: 160px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      position: relative;
+      background: repeating-linear-gradient(45deg, transparent, transparent 15px, var(--line-subtle) 15px, var(--line-subtle) 16px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .wind-readout {
+      position: absolute;
+      bottom: 0.75rem;
+      left: 0.85rem;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--fg-faint);
+      display: flex;
+      gap: 1.25rem;
+      pointer-events: none;
+    }
+
+    .wind-hint {
+      font-family: var(--font-display);
+      font-size: 0.92rem;
+      color: var(--fg-soft);
+      pointer-events: none;
+      text-align: center;
+      padding: 0 1rem;
+    }
+
+    /* 显微镜实时 HUD 卡片 */
+    .micro-scope-card {
+      grid-column: 1 / -1;
+      background: var(--bg-card-subtle);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      display: grid;
+      grid-template-columns: 240px 1fr;
+      gap: 2rem;
+      align-items: center;
+    }
+
+    @media (max-width: 768px) {
+      .micro-scope-card {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .loupe-viewport {
+      width: 220px;
+      height: 220px;
+      border-radius: 50%;
+      border: 1px solid var(--line);
+      background: color-mix(in srgb, var(--bg) 80%, transparent);
+      box-shadow: inset 0 0 24px rgba(0, 0, 0, 0.08), 0 8px 24px rgba(0, 0, 0, 0.04);
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      margin: 0 auto;
+    }
+
+    .loupe-reticle {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at center, transparent 35px, var(--line-subtle) 36px, transparent 37px),
+        radial-gradient(circle at center, transparent 75px, var(--line-subtle) 76px, transparent 77px),
+        linear-gradient(to right, transparent 49.5%, var(--line-subtle) 49.5%, var(--line-subtle) 50.5%, transparent 50.5%),
+        linear-gradient(to bottom, transparent 49.5%, var(--line-subtle) 49.5%, var(--line-subtle) 50.5%, transparent 50.5%);
+    }
+
+    .loupe-svg {
+      width: 200px;
+      height: 200px;
+      transform-origin: center center;
+    }
+
+    .loupe-details {
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
+    }
+
+    .loupe-header {
+      font-family: var(--font-display);
+      font-size: 1.25rem;
+      margin: 0;
+    }
+
+    .loupe-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+    }
+
+    .loupe-table td {
+      padding: 0.35rem 0.5rem;
+      border-bottom: 1px solid var(--line-subtle);
+    }
+
+    .loupe-table td:first-child {
+      color: var(--fg-soft);
+      width: 45%;
+    }
+
+    .loupe-table td:last-child {
+      color: var(--fg);
+      font-weight: 500;
+    }
+
+    /* 滑块调参栏 */
+    .slider-box {
+      display: flex;
+      flex-direction: column;
+      gap: 0.9rem;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+    }
+
+    .slider-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+
+    .slider-row label {
+      color: var(--fg-soft);
+      min-width: 140px;
+    }
+
+    .slider-row input[type="range"] {
+      flex: 1;
+      accent-color: var(--amber);
+      height: 4px;
+      background: var(--line);
+      border-radius: 2px;
+    }
+
+    .slider-val {
+      min-width: 52px;
+      text-align: right;
+      color: var(--fg);
+      font-weight: 500;
+    }
+
+    /* ── 底部悬浮控制台 (Dock Panel) ── */
+    .dock-panel {
+      position: fixed;
+      bottom: 1.6rem;
+      left: 50%;
+      transform: translateX(-50%);
+      background: color-mix(in srgb, var(--bg-card) 85%, transparent);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 0.7rem 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 1.15rem;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.12);
+      z-index: 1000;
+      font-size: 0.8rem;
+      font-family: var(--font-mono);
+      white-space: nowrap;
+    }
+
+    .dock-group {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+    }
+
+    .dock-btn {
+      background: transparent;
+      border: 1px solid var(--line);
+      color: var(--fg-soft);
+      padding: 0.38rem 0.72rem;
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 0.78rem;
+      transition: all 0.15s ease;
+    }
+
+    .dock-btn:hover, .dock-btn.active {
+      color: var(--fg);
+      border-color: var(--amber);
+      background: color-mix(in srgb, var(--amber) 12%, transparent);
+    }
+
+    .dock-divider {
+      width: 1px;
+      height: 18px;
+      background: var(--line);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       核心主角：解构浮空晶刃与虚空准星光标系统（#xm-cursor）
+       ═══════════════════════════════════════════════════════════════ */
+
+    #xm-cursor {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 0;
+      height: 0;
+      pointer-events: none;
+      z-index: 99999;
+      will-change: transform;
+    }
+
+    /* 1. 绝对物理中心核：1px 超微晶核（零延迟精准点击热点） */
+    .cursor-core-anchor {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 0;
+      height: 0;
+      pointer-events: none;
+      will-change: transform;
+    }
+
+    .cursor-core-dot {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 1.5px;
+      height: 1.5px;
+      border-radius: 50%;
+      background: var(--core-color);
+      transform: translate(-50%, -50%);
+      box-shadow: 0 0 3px var(--core-glow), 0 0 6px var(--core-glow);
+      transition: background 0.3s ease, transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease;
+    }
+
+    /* 2. 主解构晶刃浮动舞台（带 rAF 平滑阻尼跟随） */
+    .cursor-stage {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 64px;
+      height: 64px;
+      margin-top: -32px;
+      margin-left: -32px;
+      transform-origin: center center;
+      will-change: transform;
+      pointer-events: none;
+    }
+
+    /* 中心虚空取景框光晕（聚焦时绽放琥珀光芒） */
+    .void-aperture-halo {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 18px;
+      height: 18px;
+      margin-top: -9px;
+      margin-left: -9px;
+      border-radius: 50%;
+      background: radial-gradient(circle, var(--amber) 0%, transparent 70%);
+      opacity: 0;
+      transform: scale(0.4);
+      transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+      pointer-events: none;
+      mix-blend-mode: screen;
+    }
+
+    /* 3. 梦态微叠影（Ghost Echo） */
+    .cursor-echo {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 64px;
+      height: 64px;
+      margin-top: -32px;
+      margin-left: -32px;
+      transform-origin: center center;
+      opacity: 0;
+      pointer-events: none;
+      mix-blend-mode: multiply;
+      transition: opacity 0.35s ease;
+      will-change: transform;
+    }
+
+    body.is-dream .cursor-echo {
+      opacity: 0.38;
+    }
+
+    body.is-night.is-dream .cursor-echo {
+      mix-blend-mode: screen;
+      opacity: 0.32;
+    }
+
+    /* 4. 单击瞬间的晶体折射震波微环 */
+    .cursor-ripple {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 6px;
+      height: 6px;
+      margin-top: -3px;
+      margin-left: -3px;
+      border-radius: 50%;
+      border: 1px solid var(--amber);
+      opacity: 0;
+      transform: scale(0.5);
+      pointer-events: none;
+    }
+
+    @keyframes crystal-pulse {
+      0% {
+        opacity: 0.9;
+        transform: scale(0.6);
+        border-width: 1.2px;
+      }
+      50% {
+        opacity: 0.5;
+        border-color: var(--blade-ridge);
+      }
+      100% {
+        opacity: 0;
+        transform: scale(4.2);
+        border-width: 0.5px;
+      }
+    }
+
+    .cursor-ripple.animate {
+      animation: crystal-pulse 0.46s cubic-bezier(0.12, 0.8, 0.32, 1) forwards;
+    }
+
+    /* ── 晶刃各状态与样式 ── */
+    .blade-unit {
+      transform-origin: 0 0;
+      transition: opacity 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+      will-change: transform;
+    }
+
+    /* 切面几何与光影过渡 */
+    .facet {
+      transition: fill 0.3s ease;
+    }
+
+    .facet-left {
+      fill: url(#grad-facet-left);
+    }
+
+    .facet-right {
+      fill: url(#grad-facet-right);
+    }
+
+    .facet-ridge {
+      stroke: var(--blade-ridge);
+      stroke-width: 0.65;
+      stroke-linecap: round;
+      opacity: 0.9;
+    }
+
+    .facet-dispersion {
+      stroke: var(--blade-dispersion);
+      stroke-width: 0.75;
+      opacity: 0.7;
+    }
+
+    .facet-glint {
+      fill: var(--blade-ridge);
+      opacity: 0.95;
+    }
+
+    /* ── 状态机形变 (Data States) ── */
+
+    /* 状态 A: 悬停 Focus (链接、按钮) -> 虚空取景框舒张外扩，中心琥珀光晕点亮 */
+    #xm-cursor[data-state="focus"] .void-aperture-halo {
+      opacity: 0.85;
+      transform: scale(1.4);
+    }
+    #xm-cursor[data-state="focus"] .cursor-core-dot {
+      background: var(--amber);
+      box-shadow: 0 0 6px var(--amber), 0 0 12px rgba(217, 160, 91, 0.8);
+      transform: translate(-50%, -50%) scale(1.6);
+    }
+
+    /* 状态 B: 悬停 Text (文本划词) -> 左右晶刃淡化隐退，上下晶刃闭合成极微晶体竖线 */
+    #xm-cursor[data-state="text"] .cursor-core-dot {
+      opacity: 0.35;
+      transform: translate(-50%, -50%) scale(0.8);
+    }
+    #xm-cursor[data-state="text"] .void-aperture-halo {
+      opacity: 0;
+      transform: scale(0.2);
+    }
+
+    /* 状态 C: 长按蓄力 Hold -> 四刃微旋倒收，聚焦能量入微核 */
+    #xm-cursor[data-state="hold"] .void-aperture-halo {
+      opacity: 1;
+      transform: scale(1.8);
+    }
+    #xm-cursor[data-state="hold"] .cursor-core-dot {
+      background: var(--amber);
+      transform: translate(-50%, -50%) scale(2.2);
+      box-shadow: 0 0 10px var(--amber), 0 0 20px rgba(217, 160, 91, 0.9);
+    }
+
+    /* 视口边界隐藏 */
+    #xm-cursor.is-out {
+      opacity: 0;
+      transition: opacity 0.25s ease;
+    }
+
+    /* 触屏完全隐藏 */
+    @media (hover: none) or (pointer: coarse) {
+      #xm-cursor {
+        display: none !important;
+      }
+      body * {
+        cursor: auto !important;
+      }
+      .dock-panel {
+        display: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 贯穿全站 14° 发丝微缝线 -->
+  <div class="seam-bg"></div>
+
+  <!-- ── 底部悬浮控制台 ── -->
+  <aside class="dock-panel">
+    <div class="dock-group">
+      <span style="color: var(--fg-faint)">面：</span>
+      <button class="dock-btn active" id="btn-wake">醒 (冷灰·蓝雾)</button>
+      <button class="dock-btn" id="btn-dream">梦 (暖沙·玫瑰)</button>
+    </div>
+    <div class="dock-divider"></div>
+    <div class="dock-group">
+      <span style="color: var(--fg-faint)">光：</span>
+      <button class="dock-btn active" id="btn-day">昼</button>
+      <button class="dock-btn" id="btn-night">夜</button>
+    </div>
+    <div class="dock-divider"></div>
+    <div class="dock-group">
+      <span style="color: var(--fg-faint)">定格调试：</span>
+      <button class="dock-btn active" data-lock="auto">嗅探</button>
+      <button class="dock-btn" data-lock="default">默认</button>
+      <button class="dock-btn" data-lock="focus">焦点</button>
+      <button class="dock-btn" data-lock="text">文本</button>
+      <button class="dock-btn" data-lock="hold">蓄力</button>
+    </div>
+    <div class="dock-divider"></div>
+    <div class="dock-group">
+      <button class="dock-btn" id="btn-toggle-native">对照：显示系统光标</button>
+    </div>
+  </aside>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       自定义光标实体（绝对物理热点 + 解构晶刃跟随舞台）
+       ═══════════════════════════════════════════════════════════════ -->
+  <div id="xm-cursor">
+    <!-- 梦态叠影跟随 (Ghost Echo) -->
+    <div class="cursor-echo" id="cursor-echo">
+      <svg viewBox="-32 -32 64 64" width="64" height="64" fill="none">
+        <g id="echo-blades-group">
+          <!-- 动态同步的 4 枚残影晶刃 -->
+          <g class="echo-blade-n" transform="rotate(0) translate(0, -3.5)"><polygon points="0,0 -2.4,-4.8 0,-17.5 2.4,-4.8" fill="var(--ghost-ink)" opacity="0.4" /></g>
+          <g class="echo-blade-e" transform="rotate(90) translate(0, -3.5)"><polygon points="0,0 -2.4,-4.8 0,-17.5 2.4,-4.8" fill="var(--ghost-ink)" opacity="0.4" /></g>
+          <g class="echo-blade-s" transform="rotate(180) translate(0, -3.5)"><polygon points="0,0 -2.4,-4.8 0,-17.5 2.4,-4.8" fill="var(--ghost-ink)" opacity="0.4" /></g>
+          <g class="echo-blade-w" transform="rotate(270) translate(0, -3.5)"><polygon points="0,0 -2.4,-4.8 0,-17.5 2.4,-4.8" fill="var(--ghost-ink)" opacity="0.4" /></g>
+        </g>
+      </svg>
+    </div>
+
+    <!-- 主解构浮空晶刃舞台（带平滑阻尼插值与惯性微摆） -->
+    <div class="cursor-stage" id="cursor-stage">
+      <!-- 虚空取景框琥珀晕染 -->
+      <div class="void-aperture-halo" id="void-halo"></div>
+
+      <!-- 矢量晶刃 SVG 容器 -->
+      <svg id="cursor-svg" viewBox="-32 -32 64 64" width="64" height="64" fill="none">
+        <defs>
+          <!-- 晶刃左切面渐变（高透冷光至磨砂内缘） -->
+          <linearGradient id="grad-facet-left" x1="0%" y1="100%" x2="0%" y2="0%">
+            <stop offset="0%" stop-color="var(--blade-facet-l1)" stop-opacity="0.6" />
+            <stop offset="35%" stop-color="var(--blade-facet-l1)" stop-opacity="0.82" />
+            <stop offset="100%" stop-color="var(--blade-facet-l2)" stop-opacity="0.95" />
+          </linearGradient>
+
+          <!-- 晶刃右切面渐变（柔和漫射背阴面） -->
+          <linearGradient id="grad-facet-right" x1="0%" y1="100%" x2="0%" y2="0%">
+            <stop offset="0%" stop-color="var(--blade-facet-r1)" stop-opacity="0.5" />
+            <stop offset="35%" stop-color="var(--blade-facet-r1)" stop-opacity="0.75" />
+            <stop offset="100%" stop-color="var(--blade-facet-r2)" stop-opacity="0.88" />
+          </linearGradient>
+
+          <!-- 磨砂微雾扩散滤镜 -->
+          <filter id="crystal-frost-filter" x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="0.8" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
+
+        <!-- 4 枚解构浮空晶刃单元（默认间距 3.5px，在中心形成菱形虚空取景框） -->
+        <!-- 北刃 (N) -->
+        <g id="blade-n" class="blade-unit blade-n" transform="rotate(0) translate(0, -3.5)">
+          <!-- 左切面 -->
+          <polygon class="facet facet-left" points="0,0 -2.4,-4.8 0,-17.5 0,0" />
+          <!-- 右切面 -->
+          <polygon class="facet facet-right" points="0,0 0,-17.5 2.4,-4.8 0,0" />
+          <!-- 纵向脊线 (Hairline Ridge) -->
+          <line class="facet-ridge" x1="0" y1="0" x2="0" y2="-17.5" />
+          <!-- 棱镜色散高光 (Dispersion Edge) -->
+          <line class="facet-dispersion" x1="-2.4" y1="-4.8" x2="0" y2="-17.5" />
+          <!-- 尖端微晶 (Glint) -->
+          <circle class="facet-glint" cx="0" cy="-17.5" r="0.65" />
+        </g>
+
+        <!-- 东刃 (E) -->
+        <g id="blade-e" class="blade-unit blade-e" transform="rotate(90) translate(0, -3.5)">
+          <polygon class="facet facet-left" points="0,0 -2.4,-4.8 0,-17.5 0,0" />
+          <polygon class="facet facet-right" points="0,0 0,-17.5 2.4,-4.8 0,0" />
+          <line class="facet-ridge" x1="0" y1="0" x2="0" y2="-17.5" />
+          <line class="facet-dispersion" x1="-2.4" y1="-4.8" x2="0" y2="-17.5" />
+          <circle class="facet-glint" cx="0" cy="-17.5" r="0.65" />
+        </g>
+
+        <!-- 南刃 (S) -->
+        <g id="blade-s" class="blade-unit blade-s" transform="rotate(180) translate(0, -3.5)">
+          <polygon class="facet facet-left" points="0,0 -2.4,-4.8 0,-17.5 0,0" />
+          <polygon class="facet facet-right" points="0,0 0,-17.5 2.4,-4.8 0,0" />
+          <line class="facet-ridge" x1="0" y1="0" x2="0" y2="-17.5" />
+          <line class="facet-dispersion" x1="-2.4" y1="-4.8" x2="0" y2="-17.5" />
+          <circle class="facet-glint" cx="0" cy="-17.5" r="0.65" />
+        </g>
+
+        <!-- 西刃 (W) -->
+        <g id="blade-w" class="blade-unit blade-w" transform="rotate(270) translate(0, -3.5)">
+          <polygon class="facet facet-left" points="0,0 -2.4,-4.8 0,-17.5 0,0" />
+          <polygon class="facet facet-right" points="0,0 0,-17.5 2.4,-4.8 0,0" />
+          <line class="facet-ridge" x1="0" y1="0" x2="0" y2="-17.5" />
+          <line class="facet-dispersion" x1="-2.4" y1="-4.8" x2="0" y2="-17.5" />
+          <circle class="facet-glint" cx="0" cy="-17.5" r="0.65" />
+        </g>
+      </svg>
+    </div>
+
+    <!-- 0 延迟绝对物理点击核：1px 超微晶核（瞬时更新，保证操作严丝合缝） -->
+    <div class="cursor-core-anchor" id="cursor-core-anchor">
+      <div class="cursor-core-dot" id="cursor-core-dot"></div>
+    </div>
+
+    <!-- 单击瞬释晶体折射震波 -->
+    <div class="cursor-ripple" id="cursor-ripple"></div>
+  </div>
+
+  <!-- ── 页面展示内容 ── -->
+  <main class="layout">
+    <header>
+      <div class="badge-bar">
+        <span class="badge">PROTOTYPE // 方案 B · 醒梦</span>
+        <span class="badge accent">解构浮空晶刃与虚空准星</span>
+        <span class="badge">DECONSTRUCTED PRISM &amp; VOID RETICLE</span>
+      </div>
+      <h1>解构浮空晶刃与虚空准星</h1>
+      <p class="lead">
+        四个细长筝形晶瓣从中心悬浮解构，在正中留出 <strong>3.5px 虚空取景框（Void Aperture）</strong>，并在虚空中心点亮一枚 <strong>1px 超微物理晶核</strong>。<br>
+        晶刃具备纵向双切面与折射色散；驻留时如几何星轨，掠过时随切线产生微风浮晶般的迎风摇曳。
+      </p>
+    </header>
+
+    <div class="grid">
+      <!-- 显微镜实时透镜卡片 -->
+      <section class="card micro-scope-card">
+        <div class="loupe-viewport">
+          <div class="loupe-reticle"></div>
+          <svg id="loupe-svg" class="loupe-svg" viewBox="-32 -32 64 64" fill="none">
+            <!-- 镜像同步的放大晶体 -->
+            <g id="loupe-stage"></g>
+          </svg>
+        </div>
+        <div class="loupe-details">
+          <div class="card-title" style="margin-bottom: 0;">
+            <span style="color: var(--amber);">实时显微透镜 · 4.8× Zoom</span>
+            <span class="tag" id="loupe-state-tag">STATE: DEFAULT</span>
+          </div>
+          <p style="font-size: 0.86rem; color: var(--fg-soft); line-height: 1.6; margin: 0.2rem 0 0.8rem;">
+            在微观尺度下观察：中心 1px 晶核与 4 枚筝形内缘保持的 3.5px 纯净空隙，以及脊线左右两侧的非对称折射。
+          </p>
+          <table class="loupe-table">
+            <tbody>
+              <tr>
+                <td>虚空取景框 (Void Gap)</td>
+                <td id="loupe-val-gap">3.50 px (菱形对角 7.0px)</td>
+              </tr>
+              <tr>
+                <td>晶刃几何 (Blade Spec)</td>
+                <td>长 17.5px · 肩宽 4.8px (筝形)</td>
+              </tr>
+              <tr>
+                <td>绝对物理热点 (Core)</td>
+                <td>1.5px 超微晶核 (0ms 硬件延迟)</td>
+              </tr>
+              <tr>
+                <td>迎风摆动姿态 (Wind Yaw)</td>
+                <td id="loupe-val-yaw">N: 0.0° · E: 0.0° · S: 0.0° · W: 0.0°</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 区域 1: 链接与按钮对焦测试 -->
+      <section class="card">
+        <div class="card-title">
+          <span>01 · 链接与按钮对焦</span>
+          <span class="tag">Hover Focus</span>
+        </div>
+        <p class="desc">
+          悬停至可交互元素时，4 枚晶刃从 3.5px 舒展外扩至 7.5px，中心虚空取景框变大，并点亮一抹琥珀微晕。
+        </p>
+        <div class="interactive-list">
+          <a href="#link1" class="btn" onclick="event.preventDefault()">可言说的 · 随笔</a>
+          <a href="#link2" class="btn" onclick="event.preventDefault()">可构造的 · 造物</a>
+          <button class="btn btn-pill">未命名的 · 试验场</button>
+        </div>
+      </section>
+
+      <!-- 区域 2: 文本选区标尺测试 -->
+      <section class="card">
+        <div class="card-title">
+          <span>02 · 文本微雕测度竖线</span>
+          <span class="tag">Text Reticle</span>
+        </div>
+        <p class="desc">
+          悬停进入文本划选区：左右晶刃淡化隐退，上下晶刃向中心闭合对接成一条 35px 极微晶体竖线（I-beam）。
+        </p>
+        <p class="text-sample">
+          “在即将醒来的那一瞬，世界究竟是在成形，还是正在融化？”
+        </p>
+      </section>
+
+      <!-- 区域 3: 空白处长按蓄力测试 (入梦检验) -->
+      <section class="card">
+        <div class="card-title">
+          <span>03 · 虚空取景与长按蓄力</span>
+          <span class="tag">Hold &amp; Click</span>
+        </div>
+        <p class="desc">
+          短按释放晶体折射震波微环；长按 260ms 后四刃倒旋 45° 向内凝聚，中心超微晶核膨胀点燃。
+        </p>
+        <div class="hold-area" id="hold-box">
+          <span id="hold-status">在此区域长按蓄力或轻击</span>
+          <div class="progress-bar-line" id="hold-progress"></div>
+        </div>
+      </section>
+
+      <!-- 区域 4: 迎风微摆动风洞测速区 -->
+      <section class="card">
+        <div class="card-title">
+          <span>04 · 迎风微摆动力学测试</span>
+          <span class="tag">Kinetic Wind</span>
+        </div>
+        <p class="desc">
+          快速在该区域划动或画圈：晶刃根据即时速度矢量产生顺应切线的迎风微摆（风中浮晶感）。
+        </p>
+        <div class="wind-sandbox" id="wind-sandbox">
+          <span class="wind-hint">快速划过或在此画圈 · 观察晶刃切线微摆</span>
+          <div class="wind-readout">
+            <span>瞬时速度: <b id="speed-meter">0.0</b> px/s</span>
+            <span>微摆姿态: <b id="sway-meter">静止</b></span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 区域 5: 物理动力学与几何参数调节 -->
+      <section class="card" style="grid-column: 1 / -1;">
+        <div class="card-title">
+          <span>05 · 物理动力学与几何参数微调</span>
+          <span class="tag">Live Tuning</span>
+        </div>
+        <div class="grid" style="margin-top: 0.5rem; gap: 1.5rem;">
+          <div class="slider-box">
+            <div class="slider-row">
+              <label for="slider-gap">虚空取景间隙 (Gap)</label>
+              <input type="range" id="slider-gap" min="1.5" max="8.0" step="0.25" value="3.5" />
+              <span class="slider-val" id="val-gap">3.50px</span>
+            </div>
+            <div class="slider-row">
+              <label for="slider-lerp">外层跟随阻尼 (Lerp)</label>
+              <input type="range" id="slider-lerp" min="0.15" max="0.95" step="0.05" value="0.42" />
+              <span class="slider-val" id="val-lerp">0.42</span>
+            </div>
+            <div class="slider-row">
+              <label for="slider-sway">迎风微摆幅度 (Sway)</label>
+              <input type="range" id="slider-sway" min="0.0" max="2.5" step="0.1" value="1.0" />
+              <span class="slider-val" id="val-sway">1.00x</span>
+            </div>
+          </div>
+          <div class="slider-box">
+            <div class="slider-row">
+              <label for="slider-length">晶刃延伸长度 (Length)</label>
+              <input type="range" id="slider-length" min="12" max="26" step="0.5" value="17.5" />
+              <span class="slider-val" id="val-length">17.5px</span>
+            </div>
+            <div class="slider-row">
+              <label for="slider-echo">梦态叠影滞后 (Echo)</label>
+              <input type="range" id="slider-echo" min="0.05" max="0.30" step="0.02" value="0.13" />
+              <span class="slider-val" id="val-echo">0.13</span>
+            </div>
+            <div class="slider-row">
+              <label for="slider-frost">磨砂雾化 (Frost Blur)</label>
+              <input type="range" id="slider-frost" min="0.0" max="3.0" step="0.2" value="0.8" />
+              <span class="slider-val" id="val-frost">0.8px</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    /* ─────────────────────────────────────────────────────────────
+       方案 B：解构浮空晶刃与虚空准星动力学引擎
+       · 架构分层：
+         1. 物理绝对核心核（0ms 瞬时物理响应，绝对硬件精准）
+         2. 外层浮空晶刃群（rAF 阻尼跟随 + 空气动力学切线微摆）
+         3. 状态自动感知与形变器（focus 舒展 / text 对接 / hold 凝聚）
+         4. 4.8× 显微镜实时几何镜像同步
+       ───────────────────────────────────────────────────────────── */
+
+    const cursorContainer = document.getElementById('xm-cursor');
+    const cursorCoreAnchor = document.getElementById('cursor-core-anchor');
+    const cursorCoreDot = document.getElementById('cursor-core-dot');
+    const cursorStage = document.getElementById('cursor-stage');
+    const cursorEcho = document.getElementById('cursor-echo');
+    const cursorRipple = document.getElementById('cursor-ripple');
+    const voidHalo = document.getElementById('void-halo');
+
+    // 四晶刃 DOM
+    const bladeN = document.getElementById('blade-n');
+    const bladeE = document.getElementById('blade-e');
+    const bladeS = document.getElementById('blade-s');
+    const bladeW = document.getElementById('blade-w');
+
+    // 显微镜 DOM
+    const loupeStage = document.getElementById('loupe-stage');
+    const loupeSvg = document.getElementById('loupe-svg');
+    const loupeStateTag = document.getElementById('loupe-state-tag');
+    const loupeValGap = document.getElementById('loupe-val-gap');
+    const loupeValYaw = document.getElementById('loupe-val-yaw');
+    const speedMeter = document.getElementById('speed-meter');
+    const swayMeter = document.getElementById('sway-meter');
+
+    // 坐标与阻尼参数
+    let targetX = window.innerWidth / 2;
+    let targetY = window.innerHeight / 2;
+    let stageX = targetX;
+    let stageY = targetY;
+    let echoX = targetX;
+    let echoY = targetY;
+
+    // 速度与迎风物理计算
+    let lastX = targetX;
+    let lastY = targetY;
+    let velX = 0;
+    let velY = 0;
+    let smoothVelX = 0;
+    let smoothVelY = 0;
+    let speed = 0;
+
+    // 状态机
+    let currentState = 'default'; // 'default' | 'focus' | 'text' | 'hold'
+    let stateLocked = 'auto';     // 'auto' | 'default' | 'focus' | 'text' | 'hold'
+    let isHolding = false;
+    let holdStart = 0;
+    const HOLD_THRESHOLD = 240;
+    const HOLD_FULL = 1350;
+
+    // 动态几何与物理可调参数
+    let baseGap = 3.5;       // 默认间隙 3.5px
+    let currentGap = 3.5;    // 插值后的当前间隙
+    let targetGap = 3.5;
+    let bladeLength = 17.5;  // 晶刃长度
+    let lerpStage = 0.42;    // 跟随响应
+    let lerpEcho = 0.13;     // 残影滞后
+    let swayFactor = 1.0;    // 微摆灵敏度
+    let frostBlur = 0.8;
+
+    // 迎风微摆当前角度
+    let swayN = 0, swayE = 0, swayS = 0, swayW = 0;
+    let targetSwayN = 0, targetSwayE = 0, targetSwayS = 0, targetSwayW = 0;
+
+    // 1. 物理位置直接采样 (零延迟更新中心核)
+    window.addEventListener('pointermove', (e) => {
+      targetX = e.clientX;
+      targetY = e.clientY;
+
+      // 零延迟绝对热点
+      cursorCoreAnchor.style.transform = `translate3d(${targetX}px, ${targetY}px, 0)`;
+
+      if (cursorContainer.classList.contains('is-out')) {
+        cursorContainer.classList.remove('is-out');
+      }
+    }, { passive: true });
+
+    document.addEventListener('mouseleave', () => {
+      cursorContainer.classList.add('is-out');
+    });
+
+    document.addEventListener('mouseenter', () => {
+      cursorContainer.classList.remove('is-out');
+    });
+
+    // 2. rAF 物理与动力学循环
+    function tick() {
+      // 计算瞬时速度与平滑速度 (用于风洞微摆)
+      velX = targetX - lastX;
+      velY = targetY - lastY;
+      lastX = targetX;
+      lastY = targetY;
+
+      // 低通滤波平滑速度
+      smoothVelX += (velX - smoothVelX) * 0.28;
+      smoothVelY += (velY - smoothVelY) * 0.28;
+      speed = Math.hypot(smoothVelX, smoothVelY);
+
+      // 舞台阻尼平滑跟随
+      stageX += (targetX - stageX) * lerpStage;
+      stageY += (targetY - stageY) * lerpStage;
+      cursorStage.style.transform = `translate3d(${stageX}px, ${stageY}px, 0)`;
+
+      // 梦态叠影更慢的流体阻尼
+      echoX += (targetX - echoX) * lerpEcho;
+      echoY += (targetY - echoY) * lerpEcho;
+      cursorEcho.style.transform = `translate3d(${echoX}px, ${echoY}px, 0)`;
+
+      // ── 空气动力学切线微摆计算 (风中浮晶感) ──
+      // 迎面相对风向 = -速度
+      const windX = -smoothVelX * 0.42 * swayFactor;
+      const windY = -smoothVelY * 0.42 * swayFactor;
+
+      if (currentState === 'text' || currentState === 'hold') {
+        // 特殊状态下锁定微摆，维持纯粹几何秩序
+        targetSwayN = 0;
+        targetSwayE = 0;
+        targetSwayS = 0;
+        targetSwayW = 0;
+      } else {
+        // 北刃（朝上）：受到水平风 windX 侧向吹拂，偏摆角约为 windX
+        targetSwayN = Math.max(-13, Math.min(13, windX * 1.8));
+        // 南刃（朝下）：受到水平风 windX 吹拂，偏摆角反向
+        targetSwayS = Math.max(-13, Math.min(13, -windX * 1.8));
+        // 东刃（朝右）：受到纵向风 windY 侧向吹拂，偏摆角约为 windY
+        targetSwayE = Math.max(-13, Math.min(13, windY * 1.8));
+        // 西刃（朝左）：受到纵向风 windY 吹拂，偏摆角反向
+        targetSwayW = Math.max(-13, Math.min(13, -windY * 1.8));
+      }
+
+      // 弹性回正阻尼
+      swayN += (targetSwayN - swayN) * 0.22;
+      swayE += (targetSwayE - swayE) * 0.22;
+      swayS += (targetSwayS - swayS) * 0.22;
+      swayW += (targetSwayW - swayW) * 0.22;
+
+      // ── 间隙平滑插值 ──
+      currentGap += (targetGap - currentGap) * 0.24;
+
+      // ── 应用晶刃形变 ──
+      updateBlades(currentGap, swayN, swayE, swayS, swayW);
+
+      // ── 同步显微透镜 ──
+      syncLoupe();
+
+      // 实时测速面板反馈
+      if (speedMeter) {
+        speedMeter.textContent = (speed * 60).toFixed(0);
+        if (Math.abs(swayN) > 1.2 || Math.abs(swayE) > 1.2) {
+          swayMeter.textContent = `迎风微摆中 (${Math.abs(swayN).toFixed(1)}°)`;
+          swayMeter.style.color = 'var(--amber)';
+        } else {
+          swayMeter.textContent = '稳态悬浮';
+          swayMeter.style.color = 'var(--fg-faint)';
+        }
+      }
+
+      requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+
+    // 更新四晶刃几何定位与摆角
+    function updateBlades(gap, sN, sE, sS, sW) {
+      if (currentState === 'text') {
+        // 文本状态：左右收拢淡化，上下紧密对接成一条精密竖线
+        bladeN.setAttribute('transform', `rotate(0) translate(0, -0.6)`);
+        bladeS.setAttribute('transform', `rotate(180) translate(0, -0.6)`);
+        bladeE.setAttribute('transform', `rotate(90) translate(0, -${gap * 2.2}) scale(0.2)`);
+        bladeW.setAttribute('transform', `rotate(270) translate(0, -${gap * 2.2}) scale(0.2)`);
+
+        bladeE.style.opacity = '0';
+        bladeW.style.opacity = '0';
+        bladeN.style.opacity = '1';
+        bladeS.style.opacity = '1';
+      } else if (currentState === 'hold') {
+        // 蓄力状态：四刃旋转 45° 倒收
+        bladeN.setAttribute('transform', `rotate(45) translate(0, -${gap * 0.55})`);
+        bladeE.setAttribute('transform', `rotate(135) translate(0, -${gap * 0.55})`);
+        bladeS.setAttribute('transform', `rotate(225) translate(0, -${gap * 0.55})`);
+        bladeW.setAttribute('transform', `rotate(315) translate(0, -${gap * 0.55})`);
+
+        bladeN.style.opacity = '1';
+        bladeE.style.opacity = '1';
+        bladeS.style.opacity = '1';
+        bladeW.style.opacity = '1';
+      } else {
+        // 默认 / Focus 状态
+        bladeN.setAttribute('transform', `rotate(0) translate(0, -${gap}) rotate(${sN})`);
+        bladeE.setAttribute('transform', `rotate(90) translate(0, -${gap}) rotate(${sE})`);
+        bladeS.setAttribute('transform', `rotate(180) translate(0, -${gap}) rotate(${sS})`);
+        bladeW.setAttribute('transform', `rotate(270) translate(0, -${gap}) rotate(${sW})`);
+
+        bladeN.style.opacity = '1';
+        bladeE.style.opacity = '1';
+        bladeS.style.opacity = '1';
+        bladeW.style.opacity = '1';
+      }
+    }
+
+    // ── 悬停目标自动嗅探 (Hover State Detection) ──
+    document.addEventListener('pointerover', (e) => {
+      if (stateLocked !== 'auto') return;
+      if (isHolding) return;
+
+      const target = e.target;
+      if (target.closest('a, button, [role="button"], input[type="range"]')) {
+        setState('focus');
+      } else if (target.closest('.text-sample, h1, p.lead')) {
+        setState('text');
+      } else {
+        setState('default');
+      }
+    });
+
+    function setState(state) {
+      if (currentState === state) return;
+      currentState = state;
+      cursorContainer.setAttribute('data-state', state);
+
+      if (state === 'focus') {
+        targetGap = baseGap * 2.15; // 舒展外扩至 7.5px 左右
+      } else if (state === 'text') {
+        targetGap = 0.6;           // 闭合对接
+      } else if (state === 'hold') {
+        targetGap = baseGap * 0.6;  // 向内聚集
+      } else {
+        targetGap = baseGap;        // 默认 3.5px
+      }
+
+      if (loupeStateTag) {
+        loupeStateTag.textContent = `STATE: ${state.toUpperCase()}`;
+        loupeStateTag.style.borderColor = state === 'focus' || state === 'hold' ? 'var(--amber)' : 'var(--line)';
+        loupeStateTag.style.color = state === 'focus' || state === 'hold' ? 'var(--amber)' : 'var(--fg-soft)';
+      }
+    }
+
+    // 3. 点击涟漪震波
+    window.addEventListener('pointerdown', (e) => {
+      triggerRipple(e.clientX, e.clientY);
+    });
+
+    function triggerRipple(x, y) {
+      cursorRipple.style.left = `${x}px`;
+      cursorRipple.style.top = `${y}px`;
+      cursorRipple.classList.remove('animate');
+      void cursorRipple.offsetWidth;
+      cursorRipple.classList.add('animate');
+    }
+
+    // 4. 长按空白区 (模拟入梦蓄力联动)
+    const holdBox = document.getElementById('hold-box');
+    const holdStatus = document.getElementById('hold-status');
+    const holdProgress = document.getElementById('hold-progress');
+
+    holdBox.addEventListener('pointerdown', () => {
+      if (stateLocked !== 'auto') return;
+      isHolding = true;
+      holdStart = performance.now();
+      holdStatus.textContent = '蓄力凝聚中... (虚空能量注入)';
+      holdBox.classList.add('is-active');
+
+      const checkLoop = () => {
+        if (!isHolding) return;
+        const elapsed = performance.now() - holdStart;
+        if (elapsed > HOLD_THRESHOLD) {
+          setState('hold');
+          const p = Math.min(1, (elapsed - HOLD_THRESHOLD) / (HOLD_FULL - HOLD_THRESHOLD));
+          holdProgress.style.width = `${p * 100}%`;
+          if (p >= 1) {
+            holdStatus.textContent = '成形！(引信就绪)';
+            triggerRipple(targetX, targetY);
+            return;
+          }
+        }
+        requestAnimationFrame(checkLoop);
+      };
+      requestAnimationFrame(checkLoop);
+    });
+
+    const endHold = () => {
+      if (!isHolding) return;
+      isHolding = false;
+      holdBox.classList.remove('is-active');
+      holdProgress.style.width = '0%';
+      holdStatus.textContent = '在此区域长按蓄力或轻击';
+      if (stateLocked === 'auto') {
+        setState('default');
+      }
+    };
+
+    holdBox.addEventListener('pointerup', endHold);
+    holdBox.addEventListener('pointerleave', endHold);
+
+    // ── 显微镜实时几何镜像 ──
+    function initLoupe() {
+      // 克隆光标内部的 SVG 节点到显微镜视口
+      const svgContent = document.getElementById('cursor-svg').cloneNode(true);
+      svgContent.id = 'loupe-mirrored-svg';
+      loupeStage.innerHTML = '';
+      loupeStage.appendChild(svgContent);
+
+      // 在中心添加放大的超微晶核与刻度标尺
+      const coreMarker = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      coreMarker.setAttribute('cx', '0');
+      coreMarker.setAttribute('cy', '0');
+      coreMarker.setAttribute('r', '1.2');
+      coreMarker.setAttribute('fill', 'var(--core-color)');
+      coreMarker.setAttribute('id', 'loupe-core');
+      loupeStage.appendChild(coreMarker);
+    }
+    initLoupe();
+
+    function syncLoupe() {
+      const loupeSvgContent = document.getElementById('loupe-mirrored-svg');
+      if (!loupeSvgContent) return;
+
+      // 实时复制晶刃变换
+      const ln = loupeSvgContent.querySelector('#blade-n');
+      const le = loupeSvgContent.querySelector('#blade-e');
+      const ls = loupeSvgContent.querySelector('#blade-s');
+      const lw = loupeSvgContent.querySelector('#blade-w');
+
+      if (ln && bladeN) ln.setAttribute('transform', bladeN.getAttribute('transform'));
+      if (le && bladeE) le.setAttribute('transform', bladeE.getAttribute('transform'));
+      if (ls && bladeS) ls.setAttribute('transform', bladeS.getAttribute('transform'));
+      if (lw && bladeW) lw.setAttribute('transform', bladeW.getAttribute('transform'));
+
+      if (ln && bladeN) ln.style.opacity = bladeN.style.opacity;
+      if (le && bladeE) le.style.opacity = bladeE.style.opacity;
+      if (ls && bladeS) ls.style.opacity = bladeS.style.opacity;
+      if (lw && bladeW) lw.style.opacity = bladeW.style.opacity;
+
+      const loupeCore = document.getElementById('loupe-core');
+      if (loupeCore) {
+        if (currentState === 'focus' || currentState === 'hold') {
+          loupeCore.setAttribute('fill', 'var(--amber)');
+          loupeCore.setAttribute('r', currentState === 'hold' ? '2.4' : '1.8');
+        } else if (currentState === 'text') {
+          loupeCore.setAttribute('fill', 'var(--core-color)');
+          loupeCore.setAttribute('r', '0.7');
+        } else {
+          loupeCore.setAttribute('fill', 'var(--core-color)');
+          loupeCore.setAttribute('r', '1.2');
+        }
+      }
+
+      // 数值看板刷新
+      if (loupeValGap) {
+        loupeValGap.textContent = `${currentGap.toFixed(2)} px (对角 ${(currentGap * Math.SQRT2).toFixed(2)}px)`;
+      }
+      if (loupeValYaw) {
+        loupeValYaw.textContent = `N:${swayN.toFixed(1)}° E:${swayE.toFixed(1)}° S:${swayS.toFixed(1)}° W:${swayW.toFixed(1)}°`;
+      }
+    }
+
+    // ── 控制台联动 ──
+    const btnWake = document.getElementById('btn-wake');
+    const btnDream = document.getElementById('btn-dream');
+    const btnDay = document.getElementById('btn-day');
+    const btnNight = document.getElementById('btn-night');
+    const btnToggleNative = document.getElementById('btn-toggle-native');
+
+    btnWake.addEventListener('click', () => {
+      document.body.classList.remove('is-dream');
+      btnWake.classList.add('active');
+      btnDream.classList.remove('active');
+    });
+
+    btnDream.addEventListener('click', () => {
+      document.body.classList.add('is-dream');
+      btnDream.classList.add('active');
+      btnWake.classList.remove('active');
+    });
+
+    btnDay.addEventListener('click', () => {
+      document.body.classList.remove('is-night');
+      btnDay.classList.add('active');
+      btnNight.classList.remove('active');
+    });
+
+    btnNight.addEventListener('click', () => {
+      document.body.classList.add('is-night');
+      btnNight.classList.add('active');
+      btnDay.classList.remove('active');
+    });
+
+    btnToggleNative.addEventListener('click', () => {
+      const show = document.body.classList.toggle('show-native-cursor');
+      btnToggleNative.textContent = show ? '对照：隐藏系统光标' : '对照：显示系统光标';
+      btnToggleNative.classList.toggle('active', show);
+    });
+
+    // 定格状态调试切换
+    const lockButtons = document.querySelectorAll('[data-lock]');
+    lockButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        lockButtons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        stateLocked = btn.getAttribute('data-lock');
+
+        if (stateLocked !== 'auto') {
+          setState(stateLocked);
+        } else {
+          setState('default');
+        }
+      });
+    });
+
+    // ── 参数滑块交互与动态绑定 ──
+    const sGap = document.getElementById('slider-gap');
+    const sLerp = document.getElementById('slider-lerp');
+    const sSway = document.getElementById('slider-sway');
+    const sLength = document.getElementById('slider-length');
+    const sEcho = document.getElementById('slider-echo');
+    const sFrost = document.getElementById('slider-frost');
+
+    const frostFilter = document.querySelector('#crystal-frost-filter feGaussianBlur');
+
+    sGap.addEventListener('input', (e) => {
+      baseGap = parseFloat(e.target.value);
+      if (currentState === 'default') targetGap = baseGap;
+      else if (currentState === 'focus') targetGap = baseGap * 2.15;
+      document.getElementById('val-gap').textContent = `${baseGap.toFixed(2)}px`;
+    });
+
+    sLerp.addEventListener('input', (e) => {
+      lerpStage = parseFloat(e.target.value);
+      document.getElementById('val-lerp').textContent = lerpStage.toFixed(2);
+    });
+
+    sSway.addEventListener('input', (e) => {
+      swayFactor = parseFloat(e.target.value);
+      document.getElementById('val-sway').textContent = `${swayFactor.toFixed(2)}x`;
+    });
+
+    sLength.addEventListener('input', (e) => {
+      bladeLength = parseFloat(e.target.value);
+      document.getElementById('val-length').textContent = `${bladeLength.toFixed(1)}px`;
+      updateKiteGeometry(bladeLength);
+    });
+
+    sEcho.addEventListener('input', (e) => {
+      lerpEcho = parseFloat(e.target.value);
+      document.getElementById('val-echo').textContent = lerpEcho.toFixed(2);
+    });
+
+    sFrost.addEventListener('input', (e) => {
+      frostBlur = parseFloat(e.target.value);
+      frostFilter.setAttribute('stdDeviation', frostBlur.toFixed(1));
+      document.getElementById('val-frost').textContent = `${frostBlur.toFixed(1)}px`;
+    });
+
+    // 动态调整晶刃几何多边形
+    function updateKiteGeometry(len) {
+      const sw = 2.4;
+      const sh = 4.8;
+      const ptsL = `0,0 -${sw},-${sh} 0,-${len} 0,0`;
+      const ptsR = `0,0 0,-${len} ${sw},-${sh} 0,0`;
+
+      document.querySelectorAll('.facet-left').forEach(el => el.setAttribute('points', ptsL));
+      document.querySelectorAll('.facet-right').forEach(el => el.setAttribute('points', ptsR));
+      document.querySelectorAll('.facet-ridge').forEach(el => el.setAttribute('y2', `-${len}`));
+      document.querySelectorAll('.facet-dispersion').forEach(el => el.setAttribute('y2', `-${len}`));
+      document.querySelectorAll('.facet-glint').forEach(el => el.setAttribute('cy', `-${len}`));
+
+      initLoupe(); // 重新同步镜像
+    }
+  </script>
+</body>
+</html>

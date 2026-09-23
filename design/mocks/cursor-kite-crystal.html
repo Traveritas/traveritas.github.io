@@ -1,0 +1,1707 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>醒梦 · 极简细长筝形八面水晶光标（Kite Faceted Crystal Cursor）</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;0,600;1,400&family=Noto+Serif+SC:wght@300;400;600&display=swap" rel="stylesheet">
+  <style>
+    /* ─────────────────────────────────────────────────────────────
+       醒梦之界 · 极简细长筝形八面水晶（Kite Faceted Crystal）
+       设计哲学：八面折射棱镜 + 0.6px 高光发丝脊线 + 动态定向采光
+       ───────────────────────────────────────────────────────────── */
+
+    :root {
+      /* 昼态基础色板 */
+      --bg: #eef1f4;
+      --bg-card: #f7f9fb;
+      --bg-card-sub: #ffffff;
+      --fg: #22272e;
+      --fg-soft: #57606a;
+      --fg-faint: #8c959f;
+      --line: rgba(34, 39, 46, 0.12);
+      --line-strong: rgba(34, 39, 46, 0.22);
+
+      /* 醒梦双态令牌 */
+      --wake: #9aa8b6;        /* 醒 · 冷灰 */
+      --wake-high: #f0f4f8;   /* 醒 · 冰晶高光 */
+      --wake-deep: #566472;   /* 醒 · 折射暗部 */
+
+      --dream: #c7a788;       /* 梦 · 暖沙 */
+      --dream-high: #fff7ed;  /* 梦 · 暖金高光 */
+      --dream-deep: #7d644d;  /* 梦 · 琥珀暗部 */
+
+      --amber: #d99a4e;       /* 异质核心激活色 */
+      --ghost-ink: #b89178;   /* 梦态叠影残墨 */
+
+      /* 当前激活的主色调（默认醒态） */
+      --crystal-base: var(--wake);
+      --crystal-high: var(--wake-high);
+      --crystal-deep: var(--wake-deep);
+      --crystal-glow: rgba(154, 168, 182, 0.35);
+      --crystal-ridge: rgba(255, 255, 255, 0.92);
+
+      /* 字体规范 */
+      --font-display: 'Noto Serif SC', serif;
+      --font-body: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --font-mono: 'IBM Plex Mono', monospace;
+    }
+
+    /* 梦态覆写 (Dream State) */
+    body.is-dream {
+      --bg: #ece5dc;
+      --bg-card: #f6f1eb;
+      --bg-card-sub: #ffffff;
+      --fg: #2d2621;
+      --fg-soft: #675c53;
+      --fg-faint: #9e9185;
+      --line: rgba(74, 53, 38, 0.11);
+      --line-strong: rgba(74, 53, 38, 0.22);
+
+      --crystal-base: var(--dream);
+      --crystal-high: var(--dream-high);
+      --crystal-deep: var(--dream-deep);
+      --crystal-glow: rgba(199, 167, 136, 0.45);
+      --crystal-ridge: rgba(255, 250, 240, 0.95);
+    }
+
+    /* 夜态覆写 (Night State) */
+    body.is-night {
+      --bg: #121518;
+      --bg-card: #1a1e23;
+      --bg-card-sub: #22272e;
+      --fg: #dce1e6;
+      --fg-soft: #9aa2ab;
+      --fg-faint: #59616a;
+      --line: rgba(255, 255, 255, 0.09);
+      --line-strong: rgba(255, 255, 255, 0.18);
+
+      --wake: #a9bbcc;
+      --wake-high: #ffffff;
+      --wake-deep: #435160;
+
+      --crystal-base: var(--wake);
+      --crystal-high: var(--wake-high);
+      --crystal-deep: var(--wake-deep);
+      --crystal-glow: rgba(169, 187, 204, 0.42);
+      --crystal-ridge: rgba(255, 255, 255, 0.98);
+    }
+
+    /* 夜态 + 梦态叠加 (Night + Dream) */
+    body.is-night.is-dream {
+      --bg: #191614;
+      --bg-card: #231f1c;
+      --bg-card-sub: #2d2824;
+      --fg: #ded5cc;
+      --fg-soft: #a89d92;
+      --fg-faint: #6c6258;
+      --line: rgba(255, 235, 215, 0.08);
+      --line-strong: rgba(255, 235, 215, 0.17);
+
+      --dream: #dcbfa2;
+      --dream-high: #fff9f0;
+      --dream-deep: #6e5642;
+
+      --crystal-base: var(--dream);
+      --crystal-high: var(--dream-high);
+      --crystal-deep: var(--dream-deep);
+      --crystal-glow: rgba(220, 191, 162, 0.45);
+      --crystal-ridge: rgba(255, 248, 238, 0.98);
+    }
+
+    /* ── 基础布局重置 ── */
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: var(--font-body);
+      transition: background 0.4s cubic-bezier(0.16, 1, 0.3, 1), color 0.4s ease;
+      overflow-x: hidden;
+    }
+
+    /* 默认隐藏原生鼠标（若未开启原生对照） */
+    body:not(.show-native-cursor) * {
+      cursor: none !important;
+    }
+
+    /* 贯穿全景的 14° 发丝微光接缝 */
+    .seam-bg {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      width: 200vmax;
+      height: 1px;
+      background: linear-gradient(90deg, transparent 4%, var(--wake) 32%, var(--dream) 68%, transparent 96%);
+      opacity: 0.28;
+      transform: translate(-50%, -50%) rotate(14deg);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── 自定义水晶光标容器系统 ── */
+    #xm-cursor-host {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 0;
+      height: 0;
+      pointer-events: none;
+      z-index: 999999;
+      will-change: transform;
+    }
+
+    /* 1. 物理绝对击中点（零延迟，绝对瞬时） */
+    .cursor-core {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 3px;
+      height: 3px;
+      border-radius: 50%;
+      background: var(--crystal-ridge);
+      transform: translate(-50%, -50%);
+      box-shadow: 0 0 5px var(--crystal-glow), 0 0 1px rgba(0,0,0,0.3);
+      transition: background 0.25s ease, transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease;
+      z-index: 3;
+    }
+
+    /* 2. 主体八面水晶（平滑阻尼跟随） */
+    .cursor-crystal {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 64px;
+      height: 64px;
+      margin-top: -32px;
+      margin-left: -32px;
+      transform-origin: 32px 32px;
+      transition: opacity 0.2s ease;
+      will-change: transform;
+      z-index: 2;
+    }
+
+    /* 3. 梦态轻雾叠影 (Echo Layer) */
+    .cursor-echo {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 64px;
+      height: 64px;
+      margin-top: -32px;
+      margin-left: -32px;
+      transform-origin: 32px 32px;
+      opacity: 0;
+      transition: opacity 0.35s ease;
+      pointer-events: none;
+      mix-blend-mode: multiply;
+      z-index: 1;
+    }
+
+    body.is-dream .cursor-echo {
+      opacity: 0.42;
+    }
+    body.is-night.is-dream .cursor-echo {
+      opacity: 0.35;
+      mix-blend-mode: screen;
+    }
+
+    /* 4. 单击瞬间的极细微环 (Ripple Ring) */
+    .cursor-ripple {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 8px;
+      height: 8px;
+      margin-top: -4px;
+      margin-left: -4px;
+      border-radius: 50%;
+      border: 0.8px solid var(--amber);
+      opacity: 0;
+      transform: scale(0.6);
+      pointer-events: none;
+      z-index: 4;
+    }
+
+    @keyframes ripple-shockwave {
+      0% {
+        opacity: 0.95;
+        transform: scale(0.5);
+      }
+      60% {
+        opacity: 0.6;
+      }
+      100% {
+        opacity: 0;
+        transform: scale(4.4);
+      }
+    }
+
+    .cursor-ripple.animate {
+      animation: ripple-shockwave 0.5s cubic-bezier(0.12, 0.82, 0.28, 1) forwards;
+    }
+
+    /* ── SVG 晶体切面与脊线材质 ── */
+    .facet {
+      transition: fill 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+      stroke: rgba(0, 0, 0, 0.08);
+      stroke-width: 0.3px;
+    }
+
+    body.is-night .facet {
+      stroke: rgba(255, 255, 255, 0.12);
+    }
+
+    .ridge {
+      stroke: var(--crystal-ridge);
+      stroke-width: 0.65px;
+      stroke-linecap: round;
+      opacity: 0.92;
+      transition: stroke 0.3s ease, opacity 0.25s ease;
+    }
+
+    /* 中心琥珀微光微粒 */
+    .core-sparkle {
+      fill: var(--amber);
+      opacity: 0;
+      transform: scale(0.2);
+      transform-origin: 0 0;
+      transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    /* ── 状态机形变 (State Machine Morphing) ── */
+
+    /* 状态 A: 悬停可点击对象 (Focus)
+       四枚筝形晶瓣轻柔向外扩展 2px 并微旋 45°，中心空隙显现琥珀微光微粒 */
+    #xm-cursor-host[data-state="focus"] .cursor-crystal {
+      transform: rotate(45deg);
+      transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    #xm-cursor-host[data-state="focus"] .kite-top {
+      transform: translateY(-2.2px);
+    }
+    #xm-cursor-host[data-state="focus"] .kite-bottom {
+      transform: translateY(2.2px);
+    }
+    #xm-cursor-host[data-state="focus"] .kite-left {
+      transform: translateX(-2.2px);
+    }
+    #xm-cursor-host[data-state="focus"] .kite-right {
+      transform: translateX(2.2px);
+    }
+    #xm-cursor-host[data-state="focus"] .core-sparkle {
+      opacity: 0.95;
+      transform: scale(1.6);
+      filter: drop-shadow(0 0 3px var(--amber));
+    }
+    #xm-cursor-host[data-state="focus"] .cursor-core {
+      background: var(--amber);
+      box-shadow: 0 0 9px var(--amber);
+      transform: translate(-50%, -50%) scale(1.25);
+    }
+
+    /* 状态 B: 悬停文本区 (Text Reticle)
+       横向两枚筝形晶瓣平滑向内合拢压缩，纵向两枚拉长，演化为极细的水晶标尺（Reticle I-beam） */
+    #xm-cursor-host[data-state="text"] .kite-left {
+      transform: scaleX(0.12) scaleY(0.5);
+      opacity: 0.15;
+    }
+    #xm-cursor-host[data-state="text"] .kite-right {
+      transform: scaleX(0.12) scaleY(0.5);
+      opacity: 0.15;
+    }
+    #xm-cursor-host[data-state="text"] .kite-top {
+      transform: scaleY(1.36) scaleX(0.72) translateY(-1px);
+    }
+    #xm-cursor-host[data-state="text"] .kite-bottom {
+      transform: scaleY(1.36) scaleX(0.72) translateY(1px);
+    }
+    #xm-cursor-host[data-state="text"] .cursor-core {
+      opacity: 0.28;
+    }
+
+    /* 状态 C: 单击蓄力/按压 (Hold / Click)
+       四个筝形向中心微收聚 */
+    #xm-cursor-host[data-state="click"] .kite-top,
+    #xm-cursor-host[data-state="hold"] .kite-top {
+      transform: translateY(1.4px) scale(0.9);
+    }
+    #xm-cursor-host[data-state="click"] .kite-bottom,
+    #xm-cursor-host[data-state="hold"] .kite-bottom {
+      transform: translateY(-1.4px) scale(0.9);
+    }
+    #xm-cursor-host[data-state="click"] .kite-left,
+    #xm-cursor-host[data-state="hold"] .kite-left {
+      transform: translateX(1.4px) scale(0.9);
+    }
+    #xm-cursor-host[data-state="click"] .kite-right,
+    #xm-cursor-host[data-state="hold"] .kite-right {
+      transform: translateX(-1.4px) scale(0.9);
+    }
+    #xm-cursor-host[data-state="hold"] .cursor-crystal {
+      transform: rotate(-45deg);
+      transition: transform 0.24s ease;
+    }
+    #xm-cursor-host[data-state="hold"] .cursor-core {
+      background: var(--amber);
+      transform: translate(-50%, -50%) scale(1.5);
+      box-shadow: 0 0 10px var(--amber);
+    }
+
+    /* 晶瓣平滑形变基础转场 */
+    .kite-petal {
+      transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.24s ease;
+      transform-origin: 0 0;
+    }
+
+    /* 离屏隐藏 */
+    #xm-cursor-host.is-out {
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+
+    /* 移动端/触屏隐藏光标容器与控制台悬浮条 */
+    @media (hover: none) or (pointer: coarse) {
+      #xm-cursor-host {
+        display: none !important;
+      }
+      body * {
+        cursor: auto !important;
+      }
+    }
+
+    /* ── 页面视觉排版 ── */
+    .layout {
+      position: relative;
+      z-index: 1;
+      max-width: 1040px;
+      margin: 0 auto;
+      padding: 3.5rem 2rem 7rem;
+    }
+
+    /* 顶部导航与命题边界 */
+    .site-nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 1.25rem;
+      margin-bottom: 3.5rem;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+    }
+
+    .site-nav .brand {
+      font-weight: 600;
+      letter-spacing: 0.14em;
+      color: var(--fg);
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+
+    .brand-gem {
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      background: var(--crystal-base);
+      transform: rotate(45deg);
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 1.75rem;
+    }
+
+    .nav-item {
+      color: var(--fg-soft);
+      text-decoration: none;
+      transition: color 0.2s ease;
+    }
+    .nav-item:hover {
+      color: var(--amber);
+    }
+
+    /* 标题区域 */
+    header {
+      margin-bottom: 3.5rem;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--fg-soft);
+      padding: 0.25rem 0.75rem;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      margin-bottom: 1.2rem;
+      background: color-mix(in srgb, var(--bg-card) 60%, transparent);
+    }
+
+    h1 {
+      font-family: var(--font-display);
+      font-size: clamp(2rem, 4.5vw, 3rem);
+      font-weight: 300;
+      letter-spacing: 0.03em;
+      line-height: 1.3;
+      margin: 0 0 1.25rem;
+    }
+
+    p.lead {
+      color: var(--fg-soft);
+      font-size: 1.05rem;
+      line-height: 1.85;
+      max-width: 44em;
+      margin: 0;
+    }
+
+    /* ── 交互测试网格 ── */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 1.75rem;
+      margin-top: 2.5rem;
+    }
+
+    .col-6 { grid-column: span 6; }
+    .col-7 { grid-column: span 7; }
+    .col-5 { grid-column: span 5; }
+    .col-12 { grid-column: span 12; }
+
+    @media (max-width: 860px) {
+      .col-6, .col-7, .col-5 { grid-column: span 12; }
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 1.85rem;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      position: relative;
+    }
+
+    .card:hover {
+      border-color: color-mix(in srgb, var(--crystal-base) 60%, var(--line));
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.03);
+    }
+
+    .card-title {
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--fg-soft);
+      margin-bottom: 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .card-title .tag {
+      font-size: 0.7rem;
+      padding: 2px 7px;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      background: color-mix(in srgb, var(--bg) 50%, transparent);
+    }
+
+    .interactive-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.8rem;
+      margin-top: 1.25rem;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      padding: 0.6rem 1.2rem;
+      border-radius: 6px;
+      border: 1px solid var(--line);
+      background: transparent;
+      color: var(--fg);
+      text-decoration: none;
+      transition: all 0.2s ease;
+    }
+
+    .btn:hover {
+      border-color: var(--amber);
+      color: var(--amber);
+      background: color-mix(in srgb, var(--amber) 8%, transparent);
+    }
+
+    .btn-pill {
+      border-radius: 999px;
+      padding: 0.5rem 1.1rem;
+    }
+
+    .btn-solid {
+      background: var(--fg);
+      color: var(--bg);
+      border-color: var(--fg);
+    }
+    .btn-solid:hover {
+      background: var(--amber);
+      border-color: var(--amber);
+      color: #ffffff;
+    }
+
+    .text-sample {
+      font-family: var(--font-display);
+      font-size: 1.1rem;
+      line-height: 1.9;
+      color: var(--fg);
+      margin: 0;
+      user-select: text;
+    }
+
+    .text-sample em {
+      font-style: normal;
+      color: var(--amber);
+    }
+
+    /* 长按蓄力区 */
+    .hold-area {
+      height: 140px;
+      border: 1px dashed var(--line-strong);
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      color: var(--fg-soft);
+      user-select: none;
+      position: relative;
+      overflow: hidden;
+      background: color-mix(in srgb, var(--bg-card-sub) 50%, transparent);
+      transition: border-color 0.2s ease, background 0.2s ease;
+    }
+
+    .hold-area:active {
+      background: color-mix(in srgb, var(--amber) 6%, transparent);
+      border-color: var(--amber);
+    }
+
+    .hold-area .progress-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--crystal-base), var(--amber));
+      width: 0%;
+      transition: width 0.05s linear;
+    }
+
+    /* ── 几何解构与实时切面采光 (Card 04) ── */
+    .inspector-container {
+      display: flex;
+      gap: 2rem;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .inspector-stage {
+      flex: 0 0 240px;
+      height: 240px;
+      background: color-mix(in srgb, var(--bg-card-sub) 70%, transparent);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .inspector-stage .grid-lines {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-image:
+        radial-gradient(circle at center, var(--line) 1px, transparent 1px),
+        linear-gradient(to right, var(--line) 1px, transparent 1px),
+        linear-gradient(to bottom, var(--line) 1px, transparent 1px);
+      background-size: 100% 100%, 20px 20px, 20px 20px;
+      background-position: center center;
+      opacity: 0.6;
+      pointer-events: none;
+    }
+
+    .inspector-details {
+      flex: 1;
+      min-width: 260px;
+    }
+
+    .facet-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: var(--font-mono);
+      font-size: 0.74rem;
+      margin-top: 0.5rem;
+    }
+
+    .facet-table th, .facet-table td {
+      padding: 0.35rem 0.5rem;
+      text-align: left;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .facet-table th {
+      color: var(--fg-faint);
+      font-weight: 500;
+    }
+
+    .lum-bar-wrap {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .lum-bar {
+      height: 4px;
+      border-radius: 2px;
+      background: var(--amber);
+      transition: width 0.15s ease;
+    }
+
+    /* ── 几何参数滑块面板 ── */
+    .slider-box {
+      margin-top: 1.25rem;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1.2rem;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+    }
+
+    .slider-row {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+
+    .slider-header {
+      display: flex;
+      justify-content: space-between;
+      color: var(--fg-soft);
+    }
+
+    .slider-header span.val {
+      color: var(--fg);
+      font-weight: 500;
+    }
+
+    .slider-row input[type="range"] {
+      width: 100%;
+      accent-color: var(--amber);
+      height: 4px;
+    }
+
+    /* 代码输出展示块 */
+    .code-block-wrap {
+      position: relative;
+      margin-top: 1rem;
+    }
+
+    .code-block {
+      background: color-mix(in srgb, var(--bg-card-sub) 80%, transparent);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 0.85rem 1rem;
+      font-family: var(--font-mono);
+      font-size: 0.74rem;
+      color: var(--fg-soft);
+      overflow-x: auto;
+      white-space: pre;
+      line-height: 1.5;
+    }
+
+    .copy-btn {
+      position: absolute;
+      top: 0.5rem;
+      right: 0.5rem;
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      padding: 0.25rem 0.6rem;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      background: var(--bg-card);
+      color: var(--fg-soft);
+      transition: all 0.15s ease;
+    }
+    .copy-btn:hover {
+      border-color: var(--amber);
+      color: var(--amber);
+    }
+
+    /* ── 底部悬浮控制台 (Dock Panel) ── */
+    .dock-panel {
+      position: fixed;
+      bottom: 1.5rem;
+      left: 50%;
+      transform: translateX(-50%);
+      background: color-mix(in srgb, var(--bg-card) 88%, transparent);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      border: 1px solid var(--line-strong);
+      border-radius: 999px;
+      padding: 0.55rem 1.4rem;
+      display: flex;
+      align-items: center;
+      gap: 1.1rem;
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.1);
+      z-index: 1000;
+      font-size: 0.8rem;
+      font-family: var(--font-mono);
+      white-space: nowrap;
+    }
+
+    .dock-group {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+    }
+
+    .dock-btn {
+      background: transparent;
+      border: 1px solid var(--line);
+      color: var(--fg-soft);
+      padding: 0.32rem 0.75rem;
+      border-radius: 999px;
+      font-family: inherit;
+      font-size: 0.76rem;
+      transition: all 0.18s ease;
+    }
+
+    .dock-btn:hover, .dock-btn.active {
+      color: var(--fg);
+      border-color: var(--amber);
+      background: color-mix(in srgb, var(--amber) 12%, transparent);
+    }
+
+    .dock-btn.active {
+      font-weight: 500;
+    }
+
+    .dock-divider {
+      width: 1px;
+      height: 18px;
+      background: var(--line-strong);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="seam-bg"></div>
+
+  <!-- ── 自定义水晶光标实体容器 ── -->
+  <div id="xm-cursor-host" data-state="normal">
+    <!-- 梦态叠影层 (Echo) -->
+    <div class="cursor-echo" id="cursor-echo">
+      <svg viewBox="-32 -32 64 64" width="64" height="64" fill="none">
+        <g id="echo-crystal-group" opacity="0.35">
+          <!-- 动态同步的切面形状将注入于此 -->
+        </g>
+      </svg>
+    </div>
+
+    <!-- 主水晶层 (Crystal Halo，平滑跟随) -->
+    <div class="cursor-crystal" id="cursor-crystal">
+      <svg id="svg-crystal" viewBox="-32 -32 64 64" width="64" height="64" fill="none">
+        <defs>
+          <!-- 极弱的水汽漫射滤镜 -->
+          <filter id="crystal-mist" x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="0.8" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" opacity="0.3" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+
+          <!-- 0.6px 中轴脊线的高光渐隐渐变 -->
+          <linearGradient id="ridge-grad-v" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#ffffff" stop-opacity="0.2" />
+            <stop offset="35%" stop-color="#ffffff" stop-opacity="0.95" />
+            <stop offset="100%" stop-color="#ffffff" stop-opacity="0.1" />
+          </linearGradient>
+
+          <radialGradient id="sparkle-glow" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="var(--amber)" stop-opacity="1" />
+            <stop offset="60%" stop-color="var(--amber)" stop-opacity="0.4" />
+            <stop offset="100%" stop-color="var(--amber)" stop-opacity="0" />
+          </radialGradient>
+        </defs>
+
+        <!-- 水晶背景微晕 -->
+        <circle cx="0" cy="0" r="10" fill="var(--crystal-glow)" opacity="0.25" filter="url(#crystal-mist)" />
+
+        <!-- 四枚筝形晶瓣容器 (8个精密三角形切面) -->
+        <g id="crystal-petals" filter="url(#crystal-mist)">
+          <!-- Top Kite (Pointing Up) -->
+          <g class="kite-petal kite-top" id="g-kite-top">
+            <polygon class="facet" id="facet-top-l" points="0,-1.8 -3.0,-5.8 0,-22.0" />
+            <polygon class="facet" id="facet-top-r" points="0,-1.8 3.0,-5.8 0,-22.0" />
+            <line class="ridge" id="ridge-top" x1="0" y1="-1.8" x2="0" y2="-22.0" />
+          </g>
+
+          <!-- Right Kite (Pointing Right) -->
+          <g class="kite-petal kite-right" id="g-kite-right">
+            <polygon class="facet" id="facet-right-t" points="1.8,0 5.8,-3.0 22.0,0" />
+            <polygon class="facet" id="facet-right-b" points="1.8,0 5.8,3.0 22.0,0" />
+            <line class="ridge" id="ridge-right" x1="1.8" y1="0" x2="22.0" y2="0" />
+          </g>
+
+          <!-- Bottom Kite (Pointing Down) -->
+          <g class="kite-petal kite-bottom" id="g-kite-bottom">
+            <polygon class="facet" id="facet-bottom-l" points="0,1.8 -3.0,5.8 0,22.0" />
+            <polygon class="facet" id="facet-bottom-r" points="0,1.8 3.0,5.8 0,22.0" />
+            <line class="ridge" id="ridge-bottom" x1="0" y1="1.8" x2="0" y2="22.0" />
+          </g>
+
+          <!-- Left Kite (Pointing Left) -->
+          <g class="kite-petal kite-left" id="g-kite-left">
+            <polygon class="facet" id="facet-left-t" points="-1.8,0 -5.8,-3.0 -22.0,0" />
+            <polygon class="facet" id="facet-left-b" points="-1.8,0 -5.8,3.0 -22.0,0" />
+            <line class="ridge" id="ridge-left" x1="-1.8" y1="0" x2="-22.0" y2="0" />
+          </g>
+        </g>
+
+        <!-- 中心空隙隐藏的琥珀微光微粒 (悬停 Focus 时绽放) -->
+        <circle class="core-sparkle" id="core-sparkle" cx="0" cy="0" r="1.4" />
+      </svg>
+    </div>
+
+    <!-- 零延迟物理核心击中点 -->
+    <div class="cursor-core" id="cursor-core"></div>
+
+    <!-- 单击波纹微环 -->
+    <div class="cursor-ripple" id="cursor-ripple"></div>
+  </div>
+
+  <!-- ── 页面主体内容 ── -->
+  <main class="layout">
+    <!-- 顶部极简导航 -->
+    <nav class="site-nav">
+      <div class="brand">
+        <span class="brand-gem"></span>
+        <span>TRAVERITAS // 醒梦</span>
+      </div>
+      <div class="nav-links">
+        <a href="#articles" class="nav-item">随笔 · SAYABLE</a>
+        <a href="#projects" class="nav-item">项目 · BUILDABLE</a>
+        <a href="#lab" class="nav-item">试验场 · UNNAMED</a>
+        <a href="#about" class="nav-item">关于 · PRESENCE</a>
+      </div>
+    </nav>
+
+    <!-- 头部文案 -->
+    <header>
+      <div class="badge">
+        <span>SCHEME A</span>
+        <span>//</span>
+        <span>KITE FACETED CRYSTAL</span>
+      </div>
+      <h1>极简细长筝形八面水晶光标</h1>
+      <p class="lead">
+        在即将醒来的那一瞬，世界究竟是在成形，还是正在融化？<br>
+        指针由 4 枚修长挺拔的筝形晶瓣环抱而成，沿中轴脊线精密切割为 8 个微米切面。
+        左上采光与三维法线折射赋予其天然双棱锥水晶的静穆通透，驻留时舒展对焦，选区时敛化为水晶标尺。
+      </p>
+    </header>
+
+    <!-- 交互测试网格 -->
+    <div class="grid">
+      <!-- 01: 链接与按钮对焦 -->
+      <section class="card col-6">
+        <div class="card-title">
+          <span>01 · 链接与按钮对焦</span>
+          <span class="tag">Hover Focus</span>
+        </div>
+        <p style="font-size: 0.9rem; color: var(--fg-soft); line-height: 1.7; margin: 0 0 1rem;">
+          当悬停至可交互链接或按钮时，4 枚筝形晶瓣平滑向外扩展 <strong>2.2px</strong> 并微旋 <strong>45°</strong>，
+          中心空隙绽放出一抹晶莹的琥珀微光微粒。
+        </p>
+        <div class="interactive-list">
+          <a href="#btn1" class="btn" onclick="event.preventDefault()">可言说的 · 随笔</a>
+          <a href="#btn2" class="btn btn-solid" onclick="event.preventDefault()">可构造的 · 项目</a>
+          <button class="btn btn-pill">未命名的 · 试验场</button>
+        </div>
+      </section>
+
+      <!-- 02: 文本选区水晶标尺 -->
+      <section class="card col-6">
+        <div class="card-title">
+          <span>02 · 文本选区标尺</span>
+          <span class="tag">Text Reticle</span>
+        </div>
+        <p class="text-sample">
+          “世界应当始终保留一种感觉：<em>它随时可能消失，又随时可能重新被记起</em>。”
+        </p>
+        <p style="font-size: 0.84rem; color: var(--fg-faint); margin-top: 0.85rem; line-height: 1.6;">
+          试着用光标划选上方文本：横向两枚筝形晶瓣向内平滑压缩隐退，纵向两枚优雅伸长，
+          自然演化为一枚极细通透的<strong>水晶测量标尺（Reticle I-beam）</strong>。
+        </p>
+      </section>
+
+      <!-- 03: 单击与长按入梦检验 -->
+      <section class="card col-5">
+        <div class="card-title">
+          <span>03 · 单击与长按入梦检验</span>
+          <span class="tag">Click & Hold</span>
+        </div>
+        <div class="hold-area" id="hold-box">
+          <span id="hold-status" style="letter-spacing: 0.05em;">在此按住长按 (蓄力入梦) 或单击</span>
+          <div class="progress-bar" id="hold-progress"></div>
+        </div>
+        <p style="font-size: 0.82rem; color: var(--fg-faint); margin: 0.85rem 0 0; line-height: 1.6;">
+          • 单击：4 枚筝形向中心瞬时收拢聚光，释出一圈极细的折射微环。<br>
+          • 长按 1.2 秒：晶体倒旋并聚拢，触发<strong>「醒/梦双态转换」</strong>。
+        </p>
+      </section>
+
+      <!-- 04: 6x 几何解构与切面采光矩阵 -->
+      <section class="card col-7">
+        <div class="card-title">
+          <span>04 · 几何解构与 8 切面采光 (6× 放大)</span>
+          <span class="tag">Faceted Geometry</span>
+        </div>
+
+        <div class="inspector-container">
+          <div class="inspector-stage">
+            <div class="grid-lines"></div>
+            <!-- 6x 放大镜像 SVG -->
+            <svg id="inspector-svg" viewBox="-32 -32 64 64" width="190" height="190" fill="none">
+              <!-- 动态同步的 8 个切面与高光脊线 -->
+            </svg>
+          </div>
+
+          <div class="inspector-details">
+            <div style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--fg-faint); margin-bottom: 0.4rem;">
+              实时三维采光法线强度矩阵（Lambertian Cosine + 镜面微光）
+            </div>
+            <table class="facet-table">
+              <thead>
+                <tr>
+                  <th>切面 (Facet)</th>
+                  <th>主朝向</th>
+                  <th>相对明度</th>
+                </tr>
+              </thead>
+              <tbody id="facet-tbody">
+                <!-- 动态更新 -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- 05: 参数控制台与代码生成器 -->
+      <section class="card col-12">
+        <div class="card-title">
+          <span>05 · 矢量几何参数实时调校 (Parameter Engine)</span>
+          <span class="tag">Realtime Math</span>
+        </div>
+
+        <div class="slider-box">
+          <div class="slider-row">
+            <div class="slider-header">
+              <span>长轴外尖距 (R_out)</span>
+              <span class="val" id="val-rout">22.0 px</span>
+            </div>
+            <input type="range" id="input-rout" min="16" max="28" step="0.5" value="22" />
+          </div>
+
+          <div class="slider-row">
+            <div class="slider-header">
+              <span>侧翼轴向距 (R_wing)</span>
+              <span class="val" id="val-rwing">5.8 px</span>
+            </div>
+            <input type="range" id="input-rwing" min="3.5" max="8.5" step="0.2" value="5.8" />
+          </div>
+
+          <div class="slider-row">
+            <div class="slider-header">
+              <span>侧翼半宽 (W_wing)</span>
+              <span class="val" id="val-wwing">3.0 px</span>
+            </div>
+            <input type="range" id="input-wwing" min="2.0" max="4.8" step="0.1" value="3.0" />
+          </div>
+
+          <div class="slider-row">
+            <div class="slider-header">
+              <span>内尖空隙距 (R_in)</span>
+              <span class="val" id="val-rin">1.8 px</span>
+            </div>
+            <input type="range" id="input-rin" min="1.0" max="3.5" step="0.1" value="1.8" />
+          </div>
+
+          <div class="slider-row">
+            <div class="slider-header">
+              <span>主光源方位角 (Light Azimuth)</span>
+              <span class="val" id="val-light">315° (左上)</span>
+            </div>
+            <input type="range" id="input-light" min="0" max="360" step="5" value="315" />
+          </div>
+
+          <div class="slider-row">
+            <div class="slider-header">
+              <span>平滑跟随速度 (Follow Lerp)</span>
+              <span class="val" id="val-lerp">0.20</span>
+            </div>
+            <input type="range" id="input-lerp" min="0.05" max="0.45" step="0.02" value="0.20" />
+          </div>
+        </div>
+
+        <div class="code-block-wrap">
+          <button class="copy-btn" id="btn-copy-svg">复制生产级 SVG</button>
+          <pre class="code-block" id="svg-code-output"></pre>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <!-- ── 底部悬浮控制台 (Dock Panel) ── -->
+  <aside class="dock-panel">
+    <div class="dock-group">
+      <span style="color: var(--fg-faint)">面：</span>
+      <button class="dock-btn active" id="dock-btn-wake">醒 (冷灰)</button>
+      <button class="dock-btn" id="dock-btn-dream">梦 (暖沙)</button>
+    </div>
+
+    <div class="dock-divider"></div>
+
+    <div class="dock-group">
+      <span style="color: var(--fg-faint)">光：</span>
+      <button class="dock-btn active" id="dock-btn-day">昼</button>
+      <button class="dock-btn" id="dock-btn-night">夜</button>
+    </div>
+
+    <div class="dock-divider"></div>
+
+    <div class="dock-group">
+      <span style="color: var(--fg-faint)">预设：</span>
+      <button class="dock-btn active" id="preset-standard">细长筝晶 (标准)</button>
+      <button class="dock-btn" id="preset-stiletto">极锐长剑</button>
+      <button class="dock-btn" id="preset-compact">紧凑微晶</button>
+    </div>
+
+    <div class="dock-divider"></div>
+
+    <div class="dock-group">
+      <button class="dock-btn" id="dock-btn-native">对照：原生光标</button>
+    </div>
+  </aside>
+
+  <!-- ── 几何计算引擎与交互核心逻辑 ── -->
+  <script>
+    (function() {
+      'use strict';
+
+      // 1. 核心几何状态参数
+      const params = {
+        rOut: 22.0,   // 外尖距中心
+        rWing: 5.8,   // 侧翼沿中轴距中心
+        wWing: 3.0,   // 侧翼半宽
+        rIn: 1.8,     // 内尖空隙距中心
+        lightAngle: 315, // 光源方位角 (315° 为西北/左上光)
+        lerp: 0.20    // 光标平滑跟随阻尼
+      };
+
+      // 2. DOM 元素缓存
+      const host = document.getElementById('xm-cursor-host');
+      const core = document.getElementById('cursor-core');
+      const crystal = document.getElementById('cursor-crystal');
+      const echo = document.getElementById('cursor-echo');
+      const ripple = document.getElementById('cursor-ripple');
+      const inspectorSvg = document.getElementById('inspector-svg');
+      const echoCrystalGroup = document.getElementById('echo-crystal-group');
+      const svgCodeOutput = document.getElementById('svg-code-output');
+      const facetTbody = document.getElementById('facet-tbody');
+
+      // 滑块 DOM
+      const inputRout = document.getElementById('input-rout');
+      const inputRwing = document.getElementById('input-rwing');
+      const inputWwing = document.getElementById('input-wwing');
+      const inputRin = document.getElementById('input-rin');
+      const inputLight = document.getElementById('input-light');
+      const inputLerp = document.getElementById('input-lerp');
+
+      const valRout = document.getElementById('val-rout');
+      const valRwing = document.getElementById('val-rwing');
+      const valWwing = document.getElementById('val-wwing');
+      const valRin = document.getElementById('val-rin');
+      const valLight = document.getElementById('val-light');
+      const valLerp = document.getElementById('val-lerp');
+
+      // 3. 几何模型推导与 3D 法线光照计算
+      // 8 个切面的定义：
+      // 每个筝形在中轴被剖开为两个切面：左切面与右切面（沿其朝向观察）
+      const facetDefs = [
+        { id: 'top-l', kite: 'top', side: 'L', name: '上筝瓣 · 左切面', dir: '西北偏西', angle: 0 },
+        { id: 'top-r', kite: 'top', side: 'R', name: '上筝瓣 · 右切面', dir: '东北偏东', angle: 0 },
+        { id: 'right-t', kite: 'right', side: 'L', name: '右筝瓣 · 上切面', dir: '东北偏北', angle: 90 },
+        { id: 'right-b', kite: 'right', side: 'R', name: '右筝瓣 · 下切面', dir: '东南偏南', angle: 90 },
+        { id: 'bottom-l', kite: 'bottom', side: 'R', name: '下筝瓣 · 左切面', dir: '西南偏西', angle: 180 },
+        { id: 'bottom-r', kite: 'bottom', side: 'L', name: '下筝瓣 · 右切面', dir: '东南偏东', angle: 180 },
+        { id: 'left-t', kite: 'left', side: 'R', name: '左筝瓣 · 上切面', dir: '西北偏北', angle: 270 },
+        { id: 'left-b', kite: 'left', side: 'L', name: '左筝瓣 · 下切面', dir: '西南偏南', angle: 270 }
+      ];
+
+      /**
+       * 计算切面的 3D 法线与采光系数
+       * @param {number} kiteAngle - 筝形的主朝向角度 (0=上, 90=右, 180=下, 270=左)
+       * @param {string} side - 'L' (左切面) 或 'R' (右切面)
+       * @param {number} lightDeg - 光源方位角 (度)
+       */
+      function calculateFacetIllumination(kiteAngle, side, lightDeg) {
+        // 假设三维中水晶脊线隆起高度为 hRidge = 1.6px，翼点高度为 0
+        const hRidge = 1.6;
+        const sideSign = side === 'L' ? -1 : 1;
+
+        // 本地坐标系下 (u: 沿主轴向前, v: 垂直主轴向右, z: 向上垂直于屏幕)
+        // 切面由 P_in(rIn, 0, hRidge), P_wing(rWing, sideSign*wWing, 0), P_out(rOut, 0, 0.4) 构成
+        // 法线向量推导:
+        const v1 = [params.rWing - params.rIn, sideSign * params.wWing, -hRidge];
+        const v2 = [params.rOut - params.rIn, 0, 0.4 - hRidge];
+
+        // 叉积 v1 x v2
+        let nu = v1[1] * v2[2] - v1[2] * v2[1];
+        let nv = v1[2] * v2[0] - v1[0] * v2[2];
+        let nz = v1[0] * v2[1] - v1[1] * v2[0];
+
+        // 确保法线朝向屏幕外 (nz > 0)
+        if (nz < 0) {
+          nu = -nu;
+          nv = -nv;
+          nz = -nz;
+        }
+
+        // 转换回全局 (x: 向右, y: 向下, z: 向上)
+        // kiteAngle = 0: u对应 -y, v对应 +x
+        // 旋转角度 rad
+        const rad = (kiteAngle * Math.PI) / 180;
+        // x_world = u * sin(rad) + v * cos(rad)
+        // y_world = -u * cos(rad) + v * sin(rad)
+        const nx = nu * Math.sin(rad) + nv * Math.cos(rad);
+        const ny = -nu * Math.cos(rad) + nv * Math.sin(rad);
+
+        const len = Math.hypot(nx, ny, nz);
+        const normX = nx / len;
+        const normY = ny / len;
+        const normZ = nz / len;
+
+        // 光源向量 (lightDeg 为光源来自的方向)
+        // 0° 为正东 (+x), 90° 为正南 (+y), 180° 为正西 (-x), 270° 为正北 (-y)
+        // 315° 为西北 (-x, -y)
+        const lRad = (lightDeg * Math.PI) / 180;
+        // 光线来自 (lx, ly, lz)
+        const lx = Math.cos(lRad);
+        const ly = Math.sin(lRad);
+        const lz = 1.0; // 光源高度仰角约 45°
+        const lLen = Math.hypot(lx, ly, lz);
+        const lNormX = lx / lLen;
+        const lNormY = ly / lLen;
+        const lNormZ = lz / lLen;
+
+        // 朗伯余弦点积 + 环境光底色
+        const dot = normX * lNormX + normY * lNormY + normZ * lNormZ;
+        const diffuse = Math.max(0, dot);
+
+        // 镜面高光反射
+        const halfX = lNormX;
+        const halfY = lNormY;
+        const halfZ = lNormZ + 1.0;
+        const hLen = Math.hypot(halfX, halfY, halfZ);
+        const specDot = Math.max(0, (normX * halfX + normY * halfY + normZ * halfZ) / hLen);
+        const specular = Math.pow(specDot, 12);
+
+        // 归一化综合明度 (0.35 ~ 0.98)
+        const lum = 0.38 + 0.42 * diffuse + 0.20 * specular;
+        return Math.min(1.0, Math.max(0.2, lum));
+      }
+
+      /**
+       * 重新生成几何多边形坐标点与样式
+       */
+      function updateGeometry() {
+        const { rOut, rWing, wWing, rIn, lightAngle } = params;
+
+        // 1. 各筝形顶点坐标推导 (以局部 (0,0) 为原点)
+        // Top Kite
+        const topPtsL = `0,-${rIn.toFixed(1)} -${wWing.toFixed(1)},-${rWing.toFixed(1)} 0,-${rOut.toFixed(1)}`;
+        const topPtsR = `0,-${rIn.toFixed(1)} ${wWing.toFixed(1)},-${rWing.toFixed(1)} 0,-${rOut.toFixed(1)}`;
+
+        // Right Kite
+        const rightPtsT = `${rIn.toFixed(1)},0 ${rWing.toFixed(1)},-${wWing.toFixed(1)} ${rOut.toFixed(1)},0`;
+        const rightPtsB = `${rIn.toFixed(1)},0 ${rWing.toFixed(1)},${wWing.toFixed(1)} ${rOut.toFixed(1)},0`;
+
+        // Bottom Kite
+        const bottomPtsL = `0,${rIn.toFixed(1)} -${wWing.toFixed(1)},${rWing.toFixed(1)} 0,${rOut.toFixed(1)}`;
+        const bottomPtsR = `0,${rIn.toFixed(1)} ${wWing.toFixed(1)},${rWing.toFixed(1)} 0,${rOut.toFixed(1)}`;
+
+        // Left Kite
+        const leftPtsT = `-${rIn.toFixed(1)},0 -${rWing.toFixed(1)},-${wWing.toFixed(1)} -${rOut.toFixed(1)},0`;
+        const leftPtsB = `-${rIn.toFixed(1)},0 -${rWing.toFixed(1)},${wWing.toFixed(1)} -${rOut.toFixed(1)},0`;
+
+        // 更新各切面的 points 属性
+        const facetMap = {
+          'facet-top-l': { pts: topPtsL, kiteAngle: 0, side: 'L' },
+          'facet-top-r': { pts: topPtsR, kiteAngle: 0, side: 'R' },
+          'facet-right-t': { pts: rightPtsT, kiteAngle: 90, side: 'L' },
+          'facet-right-b': { pts: rightPtsB, kiteAngle: 90, side: 'R' },
+          'facet-bottom-l': { pts: bottomPtsL, kiteAngle: 180, side: 'R' },
+          'facet-bottom-r': { pts: bottomPtsR, kiteAngle: 180, side: 'L' },
+          'facet-left-t': { pts: leftPtsT, kiteAngle: 270, side: 'R' },
+          'facet-left-b': { pts: leftPtsB, kiteAngle: 270, side: 'L' }
+        };
+
+        // 计算各切面明度并着色
+        let tableHtml = '';
+        let svgCodeFacets = '';
+
+        for (const [id, data] of Object.entries(facetMap)) {
+          const el = document.getElementById(id);
+          if (el) el.setAttribute('points', data.pts);
+
+          const lum = calculateFacetIllumination(data.kiteAngle, data.side, lightAngle);
+
+          // 动态颜色插值：在高光色与暗面色之间根据 lum 进行色彩混合
+          // 纯粹的玻璃水晶质感：透明度与明度联动
+          const opacity = (0.28 + lum * 0.62).toFixed(2);
+          const fillColor = `color-mix(in srgb, var(--crystal-high) ${(lum * 100).toFixed(0)}%, var(--crystal-deep))`;
+
+          if (el) {
+            el.style.fill = fillColor;
+            el.style.fillOpacity = opacity;
+          }
+
+          // 构造表格展示
+          const def = facetDefs.find(f => f.id === id.replace('facet-', ''));
+          if (def) {
+            tableHtml += `
+              <tr>
+                <td><span style="display:inline-block;width:8px;height:8px;background:${fillColor};opacity:${opacity};border-radius:2px;margin-right:6px;"></span>${def.name}</td>
+                <td style="color:var(--fg-soft);">${def.dir}</td>
+                <td>
+                  <div class="lum-bar-wrap">
+                    <span style="min-width:32px;">${(lum * 100).toFixed(0)}%</span>
+                    <div class="lum-bar" style="width:${Math.round(lum * 60)}px;"></div>
+                  </div>
+                </td>
+              </tr>
+            `;
+          }
+
+          svgCodeFacets += `  <polygon class="facet facet-${id.replace('facet-', '')}" points="${data.pts}" fill="${fillColor}" opacity="${opacity}" />\n`;
+        }
+
+        facetTbody.innerHTML = tableHtml;
+
+        // 更新中轴脊线坐标
+        const ridgeTop = document.getElementById('ridge-top');
+        const ridgeRight = document.getElementById('ridge-right');
+        const ridgeBottom = document.getElementById('ridge-bottom');
+        const ridgeLeft = document.getElementById('ridge-left');
+
+        if (ridgeTop) {
+          ridgeTop.setAttribute('y1', `-${rIn.toFixed(1)}`);
+          ridgeTop.setAttribute('y2', `-${rOut.toFixed(1)}`);
+        }
+        if (ridgeRight) {
+          ridgeRight.setAttribute('x1', `${rIn.toFixed(1)}`);
+          ridgeRight.setAttribute('x2', `${rOut.toFixed(1)}`);
+        }
+        if (ridgeBottom) {
+          ridgeBottom.setAttribute('y1', `${rIn.toFixed(1)}`);
+          ridgeBottom.setAttribute('y2', `${rOut.toFixed(1)}`);
+        }
+        if (ridgeLeft) {
+          ridgeLeft.setAttribute('x1', `-${rIn.toFixed(1)}`);
+          ridgeLeft.setAttribute('x2', `-${rOut.toFixed(1)}`);
+        }
+
+        // 同步 6x 放大镜像检查器
+        inspectorSvg.innerHTML = `
+          <g filter="drop-shadow(0 0 8px var(--crystal-glow))">
+            <!-- 4 个筝形晶瓣与 8 切面 -->
+            <polygon points="${topPtsL}" style="fill:${document.getElementById('facet-top-l').style.fill};fill-opacity:${document.getElementById('facet-top-l').style.fillOpacity};" />
+            <polygon points="${topPtsR}" style="fill:${document.getElementById('facet-top-r').style.fill};fill-opacity:${document.getElementById('facet-top-r').style.fillOpacity};" />
+            <line x1="0" y1="-${rIn.toFixed(1)}" x2="0" y2="-${rOut.toFixed(1)}" stroke="var(--crystal-ridge)" stroke-width="0.8" stroke-linecap="round" />
+
+            <polygon points="${rightPtsT}" style="fill:${document.getElementById('facet-right-t').style.fill};fill-opacity:${document.getElementById('facet-right-t').style.fillOpacity};" />
+            <polygon points="${rightPtsB}" style="fill:${document.getElementById('facet-right-b').style.fill};fill-opacity:${document.getElementById('facet-right-b').style.fillOpacity};" />
+            <line x1="${rIn.toFixed(1)}" y1="0" x2="${rOut.toFixed(1)}" y2="0" stroke="var(--crystal-ridge)" stroke-width="0.8" stroke-linecap="round" />
+
+            <polygon points="${bottomPtsL}" style="fill:${document.getElementById('facet-bottom-l').style.fill};fill-opacity:${document.getElementById('facet-bottom-l').style.fillOpacity};" />
+            <polygon points="${bottomPtsR}" style="fill:${document.getElementById('facet-bottom-r').style.fill};fill-opacity:${document.getElementById('facet-bottom-r').style.fillOpacity};" />
+            <line x1="0" y1="${rIn.toFixed(1)}" x2="0" y2="${rOut.toFixed(1)}" stroke="var(--crystal-ridge)" stroke-width="0.8" stroke-linecap="round" />
+
+            <polygon points="${leftPtsT}" style="fill:${document.getElementById('facet-left-t').style.fill};fill-opacity:${document.getElementById('facet-left-t').style.fillOpacity};" />
+            <polygon points="${leftPtsB}" style="fill:${document.getElementById('facet-left-b').style.fill};fill-opacity:${document.getElementById('facet-left-b').style.fillOpacity};" />
+            <line x1="-${rIn.toFixed(1)}" y1="0" x2="-${rOut.toFixed(1)}" y2="0" stroke="var(--crystal-ridge)" stroke-width="0.8" stroke-linecap="round" />
+
+            <!-- 放大镜微核心 -->
+            <circle cx="0" cy="0" r="1.5" fill="var(--crystal-ridge)" />
+          </g>
+        `;
+
+        // 同步梦态残影层
+        echoCrystalGroup.innerHTML = `
+          <polygon points="${topPtsL}" fill="var(--ghost-ink)" />
+          <polygon points="${topPtsR}" fill="var(--ghost-ink)" />
+          <polygon points="${rightPtsT}" fill="var(--ghost-ink)" />
+          <polygon points="${rightPtsB}" fill="var(--ghost-ink)" />
+          <polygon points="${bottomPtsL}" fill="var(--ghost-ink)" />
+          <polygon points="${bottomPtsR}" fill="var(--ghost-ink)" />
+          <polygon points="${leftPtsT}" fill="var(--ghost-ink)" />
+          <polygon points="${leftPtsB}" fill="var(--ghost-ink)" />
+        `;
+
+        // 输出可复制的生产级 SVG
+        svgCodeOutput.textContent = `<!-- 醒梦 · 极简八面细长筝形水晶 (Kite Faceted Crystal) -->
+<svg viewBox="-32 -32 64 64" width="64" height="64" fill="none">
+  <!-- 8 个折射切面 (Facets) -->
+${svgCodeFacets}
+  <!-- 4 条 0.6px 高光发丝中轴脊线 (Hairline Ridges) -->
+  <line x1="0" y1="-${rIn.toFixed(1)}" x2="0" y2="-${rOut.toFixed(1)}" stroke="var(--crystal-ridge)" stroke-width="0.65" stroke-linecap="round" />
+  <line x1="${rIn.toFixed(1)}" y1="0" x2="${rOut.toFixed(1)}" y2="0" stroke="var(--crystal-ridge)" stroke-width="0.65" stroke-linecap="round" />
+  <line x1="0" y1="${rIn.toFixed(1)}" x2="0" y2="${rOut.toFixed(1)}" stroke="var(--crystal-ridge)" stroke-width="0.65" stroke-linecap="round" />
+  <line x1="-${rIn.toFixed(1)}" y1="0" x2="-${rOut.toFixed(1)}" y2="0" stroke="var(--crystal-ridge)" stroke-width="0.65" stroke-linecap="round" />
+</svg>`;
+      }
+
+      // 4. 滑块监听与实时更新
+      inputRout.addEventListener('input', (e) => {
+        params.rOut = parseFloat(e.target.value);
+        valRout.textContent = `${params.rOut.toFixed(1)} px`;
+        updateGeometry();
+      });
+
+      inputRwing.addEventListener('input', (e) => {
+        params.rWing = parseFloat(e.target.value);
+        valRwing.textContent = `${params.rWing.toFixed(1)} px`;
+        updateGeometry();
+      });
+
+      inputWwing.addEventListener('input', (e) => {
+        params.wWing = parseFloat(e.target.value);
+        valWwing.textContent = `${params.wWing.toFixed(1)} px`;
+        updateGeometry();
+      });
+
+      inputRin.addEventListener('input', (e) => {
+        params.rIn = parseFloat(e.target.value);
+        valRin.textContent = `${params.rIn.toFixed(1)} px`;
+        updateGeometry();
+      });
+
+      inputLight.addEventListener('input', (e) => {
+        params.lightAngle = parseInt(e.target.value, 10);
+        let dirStr = '';
+        if (params.lightAngle >= 300 || params.lightAngle <= 30) dirStr = ' (左上/北)';
+        else if (params.lightAngle > 30 && params.lightAngle <= 120) dirStr = ' (右上/东)';
+        else if (params.lightAngle > 120 && params.lightAngle <= 210) dirStr = ' (右下/南)';
+        else dirStr = ' (左下/西)';
+        valLight.textContent = `${params.lightAngle}°${dirStr}`;
+        updateGeometry();
+      });
+
+      inputLerp.addEventListener('input', (e) => {
+        params.lerp = parseFloat(e.target.value);
+        valLerp.textContent = params.lerp.toFixed(2);
+      });
+
+      // 复制 SVG 按钮
+      document.getElementById('btn-copy-svg').addEventListener('click', () => {
+        navigator.clipboard.writeText(svgCodeOutput.textContent).then(() => {
+          const btn = document.getElementById('btn-copy-svg');
+          const original = btn.textContent;
+          btn.textContent = '已复制到剪贴板 ✓';
+          btn.style.color = 'var(--amber)';
+          setTimeout(() => {
+            btn.textContent = original;
+            btn.style.color = '';
+          }, 1800);
+        });
+      });
+
+      // 5. 物理绝对核心与水晶阻尼平滑跟随驱动 (Physics Engine)
+      let mouseX = window.innerWidth / 2;
+      let mouseY = window.innerHeight / 2;
+      let haloX = mouseX;
+      let haloY = mouseY;
+      let echoX = mouseX;
+      let echoY = mouseY;
+      let isMouseInside = false;
+
+      window.addEventListener('mousemove', (e) => {
+        mouseX = e.clientX;
+        mouseY = e.clientY;
+
+        if (!isMouseInside) {
+          isMouseInside = true;
+          host.classList.remove('is-out');
+          haloX = mouseX;
+          haloY = mouseY;
+          echoX = mouseX;
+          echoY = mouseY;
+        }
+
+        // 核心绝对零延迟瞬移
+        core.style.transform = `translate3d(${mouseX}px, ${mouseY}px, 0) translate(-50%, -50%)`;
+      });
+
+      window.addEventListener('mouseleave', () => {
+        isMouseInside = false;
+        host.classList.add('is-out');
+      });
+
+      // rAF 渲染主循环
+      function renderLoop() {
+        if (isMouseInside) {
+          // 主水晶平滑追赶
+          haloX += (mouseX - haloX) * params.lerp;
+          haloY += (mouseY - haloY) * params.lerp;
+          crystal.style.transform = `translate3d(${haloX}px, ${haloY}px, 0)`;
+
+          // 梦态叠影以更迟缓阻尼追赶
+          echoX += (mouseX - echoX) * (params.lerp * 0.45);
+          echoY += (mouseY - echoY) * (params.lerp * 0.45);
+          echo.style.transform = `translate3d(${echoX}px, ${echoY}px, 0)`;
+        }
+        requestAnimationFrame(renderLoop);
+      }
+      requestAnimationFrame(renderLoop);
+
+      // 6. 交互状态机侦测 (State Machine)
+      window.addEventListener('mouseover', (e) => {
+        const target = e.target;
+        if (!target) return;
+
+        // 优先级 1: 可点击对象 (Focus)
+        if (target.closest('a, button, input[type="range"], .btn, .dock-btn, .hold-area')) {
+          host.setAttribute('data-state', 'focus');
+        }
+        // 优先级 2: 文本选区 (Text Reticle)
+        else if (target.closest('.text-sample, p, h1, h2, h3, .badge, code, pre')) {
+          host.setAttribute('data-state', 'text');
+        }
+        // 常态
+        else {
+          host.setAttribute('data-state', 'normal');
+        }
+      });
+
+      // 7. 单击瞬释涟漪波纹
+      window.addEventListener('mousedown', (e) => {
+        // 单击形变微收
+        host.classList.add('is-clicking');
+        if (host.getAttribute('data-state') !== 'hold') {
+          host.setAttribute('data-state', 'click');
+        }
+
+        // 放置涟漪位置
+        ripple.style.transform = `translate3d(${e.clientX}px, ${e.clientY}px, 0) scale(0.6)`;
+        ripple.classList.remove('animate');
+        void ripple.offsetWidth; // 触发 reflow
+        ripple.classList.add('animate');
+      });
+
+      window.addEventListener('mouseup', () => {
+        host.classList.remove('is-clicking');
+        // 恢复原有探测状态
+        const hovered = document.elementFromPoint(mouseX, mouseY);
+        if (hovered && hovered.closest('a, button, input[type="range"], .btn, .dock-btn, .hold-area')) {
+          host.setAttribute('data-state', 'focus');
+        } else if (hovered && hovered.closest('.text-sample, p, h1, h2, h3, .badge, code, pre')) {
+          host.setAttribute('data-state', 'text');
+        } else {
+          host.setAttribute('data-state', 'normal');
+        }
+      });
+
+      // 8. 长按蓄力入梦检验系统 (Hold Box)
+      const holdBox = document.getElementById('hold-box');
+      const holdProgress = document.getElementById('hold-progress');
+      const holdStatus = document.getElementById('hold-status');
+      let holdTimer = null;
+      let holdStartTime = 0;
+      const HOLD_DURATION = 1200; // 1.2s 蓄力
+
+      function startHold(e) {
+        if (e.button !== 0) return;
+        host.setAttribute('data-state', 'hold');
+        holdStartTime = performance.now();
+        holdStatus.textContent = '感知意识汇聚中...';
+        holdStatus.style.color = 'var(--amber)';
+
+        function step() {
+          const elapsed = performance.now() - holdStartTime;
+          const progress = Math.min(1.0, elapsed / HOLD_DURATION);
+          holdProgress.style.width = `${progress * 100}%`;
+
+          if (progress < 1.0) {
+            holdTimer = requestAnimationFrame(step);
+          } else {
+            // 蓄力完成：触发醒梦双态切换
+            completeHold();
+          }
+        }
+        holdTimer = requestAnimationFrame(step);
+      }
+
+      function cancelHold() {
+        if (holdTimer) {
+          cancelAnimationFrame(holdTimer);
+          holdTimer = null;
+        }
+        holdProgress.style.width = '0%';
+        holdStatus.textContent = '在此按住长按 (蓄力入梦) 或单击';
+        holdStatus.style.color = '';
+        if (host.getAttribute('data-state') === 'hold') {
+          host.setAttribute('data-state', 'focus');
+        }
+      }
+
+      function completeHold() {
+        if (holdTimer) cancelAnimationFrame(holdTimer);
+        holdTimer = null;
+
+        // 切换醒/梦状态
+        document.body.classList.toggle('is-dream');
+        const isDream = document.body.classList.contains('is-dream');
+        syncDockButtons();
+        updateGeometry();
+
+        holdStatus.textContent = isDream ? '已进入「梦态 · 暖沙微温」' : '已重返「醒态 · 冷灰微透」';
+        holdStatus.style.color = 'var(--amber)';
+
+        // 触发强力光环闪烁
+        ripple.style.transform = `translate3d(${mouseX}px, ${mouseY}px, 0) scale(1.0)`;
+        ripple.classList.remove('animate');
+        void ripple.offsetWidth;
+        ripple.classList.add('animate');
+
+        setTimeout(() => {
+          cancelHold();
+        }, 1200);
+      }
+
+      holdBox.addEventListener('mousedown', startHold);
+      window.addEventListener('mouseup', cancelHold);
+
+      // 9. 底部悬浮控制台交互 (Dock Controls)
+      const btnWake = document.getElementById('dock-btn-wake');
+      const btnDream = document.getElementById('dock-btn-dream');
+      const btnDay = document.getElementById('dock-btn-day');
+      const btnNight = document.getElementById('dock-btn-night');
+      const btnNative = document.getElementById('dock-btn-native');
+
+      const presetStd = document.getElementById('preset-standard');
+      const presetStiletto = document.getElementById('preset-stiletto');
+      const presetCompact = document.getElementById('preset-compact');
+
+      function syncDockButtons() {
+        const isDream = document.body.classList.contains('is-dream');
+        btnWake.classList.toggle('active', !isDream);
+        btnDream.classList.toggle('active', isDream);
+
+        const isNight = document.body.classList.contains('is-night');
+        btnDay.classList.toggle('active', !isNight);
+        btnNight.classList.toggle('active', isNight);
+      }
+
+      btnWake.addEventListener('click', () => {
+        document.body.classList.remove('is-dream');
+        syncDockButtons();
+        updateGeometry();
+      });
+
+      btnDream.addEventListener('click', () => {
+        document.body.classList.add('is-dream');
+        syncDockButtons();
+        updateGeometry();
+      });
+
+      btnDay.addEventListener('click', () => {
+        document.body.classList.remove('is-night');
+        syncDockButtons();
+        updateGeometry();
+      });
+
+      btnNight.addEventListener('click', () => {
+        document.body.classList.add('is-night');
+        syncDockButtons();
+        updateGeometry();
+      });
+
+      btnNative.addEventListener('click', () => {
+        document.body.classList.toggle('show-native-cursor');
+        const isShown = document.body.classList.contains('show-native-cursor');
+        btnNative.classList.toggle('active', isShown);
+        btnNative.textContent = isShown ? '对照：已显原生光标' : '对照：原生光标';
+      });
+
+      // 预设切换
+      function applyPreset(rout, rwing, wwing, rin, btn) {
+        params.rOut = rout;
+        params.rWing = rwing;
+        params.wWing = wwing;
+        params.rIn = rin;
+
+        inputRout.value = rout;
+        inputRwing.value = rwing;
+        inputWwing.value = wwing;
+        inputRin.value = rin;
+
+        valRout.textContent = `${rout.toFixed(1)} px`;
+        valRwing.textContent = `${rwing.toFixed(1)} px`;
+        valWwing.textContent = `${wwing.toFixed(1)} px`;
+        valRin.textContent = `${rin.toFixed(1)} px`;
+
+        [presetStd, presetStiletto, presetCompact].forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+
+        updateGeometry();
+      }
+
+      presetStd.addEventListener('click', () => {
+        applyPreset(22.0, 5.8, 3.0, 1.8, presetStd);
+      });
+
+      presetStiletto.addEventListener('click', () => {
+        applyPreset(26.0, 5.0, 2.3, 2.0, presetStiletto);
+      });
+
+      presetCompact.addEventListener('click', () => {
+        applyPreset(18.0, 6.2, 3.8, 1.5, presetCompact);
+      });
+
+      // 初始化渲染
+      updateGeometry();
+      syncDockButtons();
+    })();
+  </script>
+</body>
+</html>
