@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>醒梦 · 四芒星水汽微芒光标原型（Cursor Diffraction Mock）</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Serif+SC:wght@300;400;600&display=swap" rel="stylesheet">
+  <style>
+    /* ─────────────────────────────────────────────────────────────
+       醒梦之界 · 四芒星水汽微芒光标（Mock 原型）
+       设计母题：光学十字衍射 (Diffraction Spikes) + 磨砂水汽微晕
+       ───────────────────────────────────────────────────────────── */
+
+    :root {
+      /* 昼态基础色板 */
+      --bg: #e9ecef;
+      --bg-card: #f3f5f7;
+      --fg: #262c33;
+      --fg-soft: #59626c;
+      --fg-faint: #8a929b;
+      --line: rgba(38, 44, 51, 0.14);
+
+      /* 醒梦双态令牌 */
+      --wake: #a7b1ba;       /* 醒 · 冷灰 */
+      --dream: #c2a382;      /* 梦 · 暖沙 */
+      --amber: #d9a05b;      /* 琥珀 · 异质激活色 */
+      --ghost-ink: #b98f74;  /* 叠影残墨 */
+      --wash: #556270;
+
+      /* 当前光标主色彩（随醒梦动态切换） */
+      --cursor-core: var(--wake);
+      --cursor-glow: rgba(167, 177, 186, 0.45);
+      --cursor-spike: rgba(167, 177, 186, 0.85);
+
+      /* 字体 */
+      --font-display: 'Noto Serif SC', serif;
+      --font-body: system-ui, -apple-system, sans-serif;
+      --font-mono: 'IBM Plex Mono', monospace;
+    }
+
+    /* 梦态覆写 */
+    body.is-dream {
+      --bg: #ece6df;
+      --bg-card: #f6f2ec;
+      --fg: #2c2724;
+      --fg-soft: #635b54;
+      --fg-faint: #9c9085;
+      --line: rgba(70, 50, 35, 0.12);
+
+      --cursor-core: var(--dream);
+      --cursor-glow: rgba(194, 163, 130, 0.55);
+      --cursor-spike: rgba(194, 163, 130, 0.9);
+    }
+
+    /* 夜态覆写 */
+    body.is-night {
+      --bg: #14171a;
+      --bg-card: #1c2024;
+      --fg: #d6dade;
+      --fg-soft: #9aa1a8;
+      --fg-faint: #5a626a;
+      --line: rgba(255, 255, 255, 0.1);
+
+      --cursor-core: #b2c0cc;
+      --cursor-glow: rgba(178, 192, 204, 0.4);
+      --cursor-spike: rgba(210, 222, 232, 0.95);
+    }
+
+    body.is-night.is-dream {
+      --bg: #1a1715;
+      --bg-card: #24201d;
+      --fg: #ded6cf;
+      --fg-soft: #a89e95;
+      --fg-faint: #6a6159;
+      --line: rgba(255, 240, 220, 0.09);
+
+      --cursor-core: #dfbfa0;
+      --cursor-glow: rgba(223, 191, 160, 0.45);
+      --cursor-spike: rgba(240, 215, 190, 0.95);
+    }
+
+    /* ── 页面基础 ── */
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: var(--font-body);
+      transition: background 0.4s ease, color 0.4s ease;
+      overflow-x: hidden;
+    }
+
+    /* 隐藏默认系统光标（若未开启原生光标对照） */
+    body:not(.show-native-cursor) * {
+      cursor: none !important;
+    }
+
+    /* 贯穿全页的 14° 发丝细线 */
+    .seam-bg {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      width: 180vmax;
+      height: 1px;
+      background: linear-gradient(90deg, transparent 5%, var(--wake) 35%, var(--dream) 65%, transparent 95%);
+      opacity: 0.35;
+      transform: translate(-50%, -50%) rotate(14deg);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* 页面骨架 */
+    .layout {
+      position: relative;
+      z-index: 1;
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 3rem 2rem 6rem;
+    }
+
+    header {
+      margin-bottom: 3.5rem;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 2rem;
+    }
+
+    .badge {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--fg-soft);
+      padding: 0.2rem 0.6rem;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      margin-bottom: 1rem;
+    }
+
+    h1 {
+      font-family: var(--font-display);
+      font-size: clamp(1.8rem, 4vw, 2.7rem);
+      font-weight: 300;
+      letter-spacing: 0.02em;
+      line-height: 1.35;
+      margin: 0 0 1rem;
+    }
+
+    p.lead {
+      color: var(--fg-soft);
+      font-size: 1.05rem;
+      line-height: 1.8;
+      max-width: 42em;
+      margin: 0;
+    }
+
+    /* ── 交互测试区 ── */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.75rem;
+      margin-top: 2.5rem;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 1.75rem;
+      transition: border-color 0.2s ease, transform 0.2s ease;
+      position: relative;
+    }
+
+    .card:hover {
+      border-color: color-mix(in srgb, var(--cursor-core) 60%, var(--line));
+    }
+
+    .card-title {
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--fg-soft);
+      margin-bottom: 0.75rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .card-title .tag {
+      font-size: 0.7rem;
+      padding: 2px 6px;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+    }
+
+    .interactive-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-top: 1rem;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      padding: 0.55rem 1.1rem;
+      border-radius: 4px;
+      border: 1px solid var(--line);
+      background: transparent;
+      color: var(--fg);
+      text-decoration: none;
+      transition: all 0.2s ease;
+    }
+
+    .btn:hover {
+      border-color: var(--amber);
+      color: var(--amber);
+      background: color-mix(in srgb, var(--amber) 8%, transparent);
+    }
+
+    .btn-pill {
+      border-radius: 999px;
+      padding: 0.4rem 1rem;
+    }
+
+    .text-sample {
+      font-family: var(--font-display);
+      font-size: 1.05rem;
+      line-height: 1.85;
+      color: var(--fg);
+      margin: 0;
+      user-select: text;
+    }
+
+    .hold-area {
+      height: 140px;
+      border: 1px dashed var(--line);
+      border-radius: 6px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--fg-soft);
+      user-select: none;
+      position: relative;
+      overflow: hidden;
+      background: color-mix(in srgb, var(--bg-card) 60%, transparent);
+    }
+
+    .hold-area .progress-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      height: 2px;
+      background: var(--amber);
+      width: 0%;
+      transition: width 0.05s linear;
+    }
+
+    /* ── 悬浮控制台 (Dock Panel) ── */
+    .dock-panel {
+      position: fixed;
+      bottom: 1.5rem;
+      left: 50%;
+      transform: translateX(-50%);
+      background: color-mix(in srgb, var(--bg-card) 85%, transparent);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 0.75rem 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 1.25rem;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.08);
+      z-index: 100;
+      font-size: 0.82rem;
+      font-family: var(--font-mono);
+    }
+
+    .dock-group {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .dock-btn {
+      background: transparent;
+      border: 1px solid var(--line);
+      color: var(--fg-soft);
+      padding: 0.35rem 0.7rem;
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 0.78rem;
+      transition: all 0.15s ease;
+    }
+
+    .dock-btn:hover, .dock-btn.active {
+      color: var(--fg);
+      border-color: var(--amber);
+      background: color-mix(in srgb, var(--amber) 10%, transparent);
+    }
+
+    .dock-divider {
+      width: 1px;
+      height: 18px;
+      background: var(--line);
+    }
+
+    /* ── 自定义光标容器（主角色） ── */
+    #xm-cursor {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 0;
+      height: 0;
+      pointer-events: none;
+      z-index: 99999;
+      will-change: transform;
+    }
+
+    /* 1. 物理绝对核心点（零延迟，精准击中） */
+    .cursor-core {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 3px;
+      height: 3px;
+      border-radius: 50%;
+      background: var(--cursor-core);
+      transform: translate(-50%, -50%);
+      transition: background 0.3s ease, transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: 0 0 4px var(--cursor-glow);
+    }
+
+    /* 2. 外层柔光四芒星（平滑跟随） */
+    .cursor-halo {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 48px;
+      height: 48px;
+      margin-top: -24px;
+      margin-left: -24px;
+      transform-origin: center center;
+      transition: opacity 0.25s ease, filter 0.3s ease;
+      will-change: transform;
+    }
+
+    /* 3. 梦态微叠影（Ghost Echo） */
+    .cursor-echo {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 48px;
+      height: 48px;
+      margin-top: -24px;
+      margin-left: -24px;
+      transform-origin: center center;
+      opacity: 0;
+      pointer-events: none;
+      mix-blend-mode: multiply;
+      transition: opacity 0.3s ease;
+    }
+
+    body.is-dream .cursor-echo {
+      opacity: 0.45;
+    }
+
+    body.is-night.is-dream .cursor-echo {
+      mix-blend-mode: screen;
+      opacity: 0.35;
+    }
+
+    /* 4. 单击瞬间的环闪光波 */
+    .cursor-ripple {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 8px;
+      height: 8px;
+      margin-top: -4px;
+      margin-left: -4px;
+      border-radius: 50%;
+      border: 1px solid var(--amber);
+      opacity: 0;
+      transform: scale(0.6);
+      pointer-events: none;
+    }
+
+    @keyframes ripple-pop {
+      0% {
+        opacity: 0.85;
+        transform: scale(0.6);
+      }
+      100% {
+        opacity: 0;
+        transform: scale(3.8);
+      }
+    }
+
+    .cursor-ripple.animate {
+      animation: ripple-pop 0.48s cubic-bezier(0.12, 0.8, 0.32, 1) forwards;
+    }
+
+    /* ── 光标状态机形变 (Data States) ── */
+
+    /* 状态 A: 悬停可点击对象 (Focus) -> 45° 舒展为对焦菱形框 + 琥珀微亮 */
+    #xm-cursor[data-state="focus"] .cursor-halo svg {
+      transform: rotate(45deg) scale(1.15);
+    }
+    #xm-cursor[data-state="focus"] .cursor-core {
+      background: var(--amber);
+      box-shadow: 0 0 8px var(--amber);
+      transform: translate(-50%, -50%) scale(1.3);
+    }
+
+    /* 状态 B: 悬停文本区 (Text) -> 横芒收回，纵芒拉长成测度标尺 I-beam */
+    #xm-cursor[data-state="text"] .cursor-halo svg .spike-h {
+      opacity: 0;
+      transform: scaleX(0.1);
+    }
+    #xm-cursor[data-state="text"] .cursor-halo svg .spike-v {
+      transform: scaleY(1.35);
+      stroke-width: 1.2px;
+    }
+    #xm-cursor[data-state="text"] .cursor-core {
+      opacity: 0.3;
+    }
+
+    /* 状态 C: 按压蓄力 (Hold) -> 四芒倒旋并向中心收聚 */
+    #xm-cursor[data-state="hold"] .cursor-halo svg {
+      transform: rotate(-135deg) scale(0.75);
+      filter: blur(0.5px);
+    }
+    #xm-cursor[data-state="hold"] .cursor-core {
+      background: var(--amber);
+      transform: translate(-50%, -50%) scale(1.6);
+      box-shadow: 0 0 12px var(--amber);
+    }
+
+    /* 离屏隐藏 */
+    #xm-cursor.is-out {
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+
+    /* 触屏完全隐藏 */
+    @media (hover: none) or (pointer: coarse) {
+      #xm-cursor {
+        display: none !important;
+      }
+      body * {
+        cursor: auto !important;
+      }
+      .dock-panel {
+        display: none !important;
+      }
+    }
+
+    /* 侧边滑块调试栏 */
+    .slider-box {
+      margin-top: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.8rem;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+    }
+
+    .slider-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+
+    .slider-row label {
+      color: var(--fg-soft);
+      min-width: 140px;
+    }
+
+    .slider-row input[type="range"] {
+      flex: 1;
+      accent-color: var(--amber);
+    }
+
+    .slider-val {
+      min-width: 45px;
+      text-align: right;
+      color: var(--fg);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="seam-bg"></div>
+
+  <!-- ── 悬浮控制台 ── -->
+  <aside class="dock-panel">
+    <div class="dock-group">
+      <span style="color: var(--fg-faint)">面：</span>
+      <button class="dock-btn active" id="btn-wake">醒 (冷灰)</button>
+      <button class="dock-btn" id="btn-dream">梦 (暖沙)</button>
+    </div>
+    <div class="dock-divider"></div>
+    <div class="dock-group">
+      <span style="color: var(--fg-faint)">光：</span>
+      <button class="dock-btn active" id="btn-day">昼</button>
+      <button class="dock-btn" id="btn-night">夜</button>
+    </div>
+    <div class="dock-divider"></div>
+    <div class="dock-group">
+      <span style="color: var(--fg-faint)">造型：</span>
+      <button class="dock-btn active" data-style="diffraction">A 光学十字</button>
+      <button class="dock-btn" data-style="crystal">B 树脂微晶</button>
+      <button class="dock-btn" data-style="mist">C 水汽晕染</button>
+    </div>
+    <div class="dock-divider"></div>
+    <div class="dock-group">
+      <button class="dock-btn" id="btn-toggle-native">对照：显示原生光标</button>
+    </div>
+  </aside>
+
+  <!-- ── 自定义光标实体 ── -->
+  <div id="xm-cursor">
+    <!-- 梦态跟随残影 -->
+    <div class="cursor-echo" id="cursor-echo">
+      <svg viewBox="0 0 48 48" width="48" height="48" fill="none">
+        <path class="echo-shape" d="M24 6 C24 16 26 22 36 24 C26 26 24 32 24 42 C24 32 22 26 12 24 C22 22 24 16 24 6 Z" fill="var(--ghost-ink)" opacity="0.3" />
+      </svg>
+    </div>
+
+    <!-- 主柔光微芒（带平滑跟随与水汽滤波） -->
+    <div class="cursor-halo" id="cursor-halo">
+      <!-- SVG 过滤器：水汽与近雾漫射 -->
+      <svg id="cursor-svg" viewBox="0 0 48 48" width="48" height="48" fill="none" style="transition: transform 0.24s cubic-bezier(0.16, 1, 0.3, 1);">
+        <defs>
+          <!-- 水汽漫射滤镜 -->
+          <filter id="mist-filter" x="-40%" y="-40%" width="180%" height="180%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="1.6" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
+
+        <!-- 柔光背晕 -->
+        <circle cx="24" cy="24" r="8" fill="var(--cursor-glow)" opacity="0.45" filter="url(#mist-filter)" />
+
+        <!-- 方案 A：光学十字衍射 (默认) -->
+        <g id="shape-diffraction" filter="url(#mist-filter)">
+          <!-- 水平芒线 -->
+          <line class="spike-h" x1="8" y1="24" x2="40" y2="24" stroke="var(--cursor-spike)" stroke-width="1.1" stroke-linecap="round" style="transition: transform 0.2s ease, opacity 0.2s ease; transform-origin: 24px 24px;" />
+          <!-- 垂直芒线 -->
+          <line class="spike-v" x1="24" y1="8" x2="24" y2="40" stroke="var(--cursor-spike)" stroke-width="1.1" stroke-linecap="round" style="transition: transform 0.2s ease; transform-origin: 24px 24px;" />
+          <!-- 对角极短次微芒 (经纬仪微标) -->
+          <circle cx="24" cy="24" r="2.2" stroke="var(--cursor-spike)" stroke-width="0.75" opacity="0.6" />
+        </g>
+
+        <!-- 方案 B：树脂微晶 (备选) -->
+        <g id="shape-crystal" style="display:none;" filter="url(#mist-filter)">
+          <!-- 纤细四角菱形叶瓣 -->
+          <path d="M24 10 C24 18 25 23 33 24 C25 25 24 30 24 38 C24 30 23 25 15 24 C23 23 24 18 24 10 Z" fill="color-mix(in srgb, var(--cursor-spike) 25%, transparent)" stroke="var(--cursor-spike)" stroke-width="0.9" />
+          <line x1="24" y1="13" x2="24" y2="35" stroke="var(--cursor-spike)" stroke-width="0.8" opacity="0.7" />
+          <line x1="13" y1="24" x2="35" y2="24" stroke="var(--cursor-spike)" stroke-width="0.8" opacity="0.7" />
+        </g>
+
+        <!-- 方案 C：水汽晕染 (备选) -->
+        <g id="shape-mist" style="display:none;">
+          <circle cx="24" cy="24" r="14" fill="var(--cursor-glow)" opacity="0.3" filter="url(#mist-filter)" />
+          <path d="M24 7 Q24 24 41 24 Q24 24 24 41 Q24 24 7 24 Q24 24 24 7 Z" fill="var(--cursor-spike)" opacity="0.75" filter="url(#mist-filter)" />
+        </g>
+      </svg>
+    </div>
+
+    <!-- 物理瞬时点击核 -->
+    <div class="cursor-core" id="cursor-core"></div>
+
+    <!-- 点击瞬释涟漪 -->
+    <div class="cursor-ripple" id="cursor-ripple"></div>
+  </div>
+
+  <!-- ── 页面展示内容 ── -->
+  <main class="layout">
+    <header>
+      <div class="badge">PROTOTYPE // CURSOR DIFFRACTION · 醒梦</div>
+      <h1>四芒星水汽微芒光标系统</h1>
+      <p class="lead">
+        在即将醒来的那一瞬，指针不再是一枚冰冷的机械箭头，而是一抹折射在水汽与玻璃深处的十字微芒。<br>
+        移动时带有轻灵的空气阻尼与水汽叠影，驻留时化作测度星图。
+      </p>
+    </header>
+
+    <div class="grid">
+      <!-- 区域 1: 链接与按钮对焦测试 -->
+      <section class="card">
+        <div class="card-title">
+          <span>01 · 链接与按钮对焦</span>
+          <span class="tag">Hover Focus</span>
+        </div>
+        <p style="font-size: 0.9rem; color: var(--fg-soft); line-height: 1.6; margin-bottom: 1rem;">
+          悬停至可交互元素时，四芒星平滑微旋 45° 舒展为对焦菱形框（◆），芒心透出一缕琥珀微光。
+        </p>
+        <div class="interactive-list">
+          <a href="#link1" class="btn" onclick="event.preventDefault()">可言说的 · 随笔</a>
+          <a href="#link2" class="btn" onclick="event.preventDefault()">可构造的 · 项目</a>
+          <button class="btn btn-pill">未命名的 · 试验</button>
+        </div>
+      </section>
+
+      <!-- 区域 2: 文本选区标尺测试 -->
+      <section class="card">
+        <div class="card-title">
+          <span>02 · 文本选区标尺</span>
+          <span class="tag">Text Reticle</span>
+        </div>
+        <p class="text-sample">
+          “世界应当始终保留一种感觉：它随时可能消失，又随时可能重新被记起。”
+        </p>
+        <p style="font-size: 0.85rem; color: var(--fg-faint); margin-top: 0.75rem; line-height: 1.6;">
+          试着用光标在此段划词选中。横芒收拢隐去，竖芒化作纤细透明的测量标尺（Reticle I-beam），消除遮挡。
+        </p>
+      </section>
+
+      <!-- 区域 3: 空白处长按蓄力测试 (入梦检验) -->
+      <section class="card">
+        <div class="card-title">
+          <span>03 · 长按与点击反馈</span>
+          <span class="tag">Hold & Click</span>
+        </div>
+        <div class="hold-area" id="hold-box">
+          <span id="hold-status">在此区域长按 (蓄力入梦) 或单击</span>
+          <div class="progress-bar" id="hold-progress"></div>
+        </div>
+        <p style="font-size: 0.8rem; color: var(--fg-faint); margin-top: 0.75rem;">
+          短按松开释放瞬逝微环；长按 260ms 后四芒星倒旋收束，充当入梦细线的引信。
+        </p>
+      </section>
+
+      <!-- 区域 4: 物理手感与光学参数调节 -->
+      <section class="card">
+        <div class="card-title">
+          <span>04 · 物理动力学调节</span>
+          <span class="tag">Tuning</span>
+        </div>
+        <div class="slider-box">
+          <div class="slider-row">
+            <label for="slider-lerp">外层跟随阻尼 (Lerp)</label>
+            <input type="range" id="slider-lerp" min="0.1" max="1.0" step="0.05" value="0.4" />
+            <span class="slider-val" id="val-lerp">0.40</span>
+          </div>
+          <div class="slider-row">
+            <label for="slider-blur">水汽模糊 (Mist Blur)</label>
+            <input type="range" id="slider-blur" min="0" max="6" step="0.2" value="1.6" />
+            <span class="slider-val" id="val-blur">1.6px</span>
+          </div>
+          <div class="slider-row">
+            <label for="slider-scale">四芒尺度 (Spike Scale)</label>
+            <input type="range" id="slider-scale" min="0.6" max="1.5" step="0.05" value="1.0" />
+            <span class="slider-val" id="val-scale">1.0x</span>
+          </div>
+          <div class="slider-row">
+            <label for="slider-echo">梦态叠影滞后 (Echo)</label>
+            <input type="range" id="slider-echo" min="0.05" max="0.3" step="0.02" value="0.14" />
+            <span class="slider-val" id="val-echo">0.14</span>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    /* ─────────────────────────────────────────────────────────────
+       四芒星光标动力学引擎
+       · 解耦架构：核心核 (0ms 瞬时物理响应) + 柔光外环 (rAF 阻尼插值)
+       · 状态机：默认 / focus / text / hold
+       ───────────────────────────────────────────────────────────── */
+
+    const cursorContainer = document.getElementById('xm-cursor');
+    const cursorCore = document.getElementById('cursor-core');
+    const cursorHalo = document.getElementById('cursor-halo');
+    const cursorEcho = document.getElementById('cursor-echo');
+    const cursorRipple = document.getElementById('cursor-ripple');
+    const cursorSvg = document.getElementById('cursor-svg');
+    const mistFilter = document.querySelector('#mist-filter feGaussianBlur');
+
+    // 目标物理坐标与当前插值坐标
+    let targetX = window.innerWidth / 2;
+    let targetY = window.innerHeight / 2;
+    let haloX = targetX;
+    let haloY = targetY;
+    let echoX = targetX;
+    let echoY = targetY;
+
+    // 速度与切角（用于微弱的运动姿态）
+    let lastX = targetX;
+    let lastY = targetY;
+    let speed = 0;
+
+    // 动力学参数 (可通过面板滑块调节)
+    let lerpHalo = 0.40;
+    let lerpEcho = 0.14;
+    let currentScale = 1.0;
+
+    // 状态管理
+    let isOut = false;
+    let currentState = 'default'; // 'default' | 'focus' | 'text' | 'hold'
+    let isHolding = false;
+    let holdTimer = null;
+    let holdStart = 0;
+    const HOLD_THRESHOLD = 260; // 判定窗口
+    const HOLD_FULL = 1400;     // 蓄满时间
+
+    // 1. 物理位置直接采样 (零延迟更新中心核)
+    window.addEventListener('pointermove', (e) => {
+      targetX = e.clientX;
+      targetY = e.clientY;
+
+      // 物理核零延迟：直接写入硬件位置
+      cursorCore.style.transform = `translate3d(${targetX}px, ${targetY}px, 0) translate(-50%, -50%)`;
+
+      if (isOut) {
+        isOut = false;
+        cursorContainer.classList.remove('is-out');
+      }
+
+      // 计算瞬时速度
+      const dx = targetX - lastX;
+      const dy = targetY - lastY;
+      speed = Math.sqrt(dx * dx + dy * dy);
+      lastX = targetX;
+      lastY = targetY;
+    }, { passive: true });
+
+    // 视口出入监听
+    document.addEventListener('mouseleave', () => {
+      isOut = true;
+      cursorContainer.classList.add('is-out');
+    });
+
+    document.addEventListener('mouseenter', () => {
+      isOut = false;
+      cursorContainer.classList.remove('is-out');
+    });
+
+    // 2. rAF 动力学循环 (柔光微芒与叠影平滑平移)
+    function tick() {
+      // 外层柔光平滑跟随
+      haloX += (targetX - haloX) * lerpHalo;
+      haloY += (targetY - haloY) * lerpHalo;
+      cursorHalo.style.transform = `translate3d(${haloX}px, ${haloY}px, 0)`;
+
+      // 梦态叠影跟随（更慢的迟滞，产生水汽拖影）
+      echoX += (targetX - echoX) * lerpEcho;
+      echoY += (targetY - echoY) * lerpEcho;
+      cursorEcho.style.transform = `translate3d(${echoX}px, ${echoY}px, 0)`;
+
+      requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+
+    // 3. 悬停目标自动嗅探 (Hover State Detection)
+    document.addEventListener('pointerover', (e) => {
+      if (isHolding) return;
+
+      const target = e.target;
+      // 判定可交互链接/按钮
+      if (target.closest('a, button, [role="button"], input[type="range"]')) {
+        setState('focus');
+      } 
+      // 判定文字可划选区域
+      else if (target.closest('.text-sample, h1, p.lead')) {
+        setState('text');
+      } 
+      else {
+        setState('default');
+      }
+    });
+
+    function setState(state) {
+      if (currentState === state) return;
+      currentState = state;
+      cursorContainer.setAttribute('data-state', state);
+    }
+
+    // 4. 点击涟漪瞬释
+    window.addEventListener('pointerdown', (e) => {
+      triggerRipple(e.clientX, e.clientY);
+    });
+
+    function triggerRipple(x, y) {
+      cursorRipple.style.left = `${x}px`;
+      cursorRipple.style.top = `${y}px`;
+      cursorRipple.classList.remove('animate');
+      void cursorRipple.offsetWidth; // 触发 reflow
+      cursorRipple.classList.add('animate');
+    }
+
+    // 5. 长按空白区 (模拟入梦检验蓄力联动)
+    const holdBox = document.getElementById('hold-box');
+    const holdStatus = document.getElementById('hold-status');
+    const holdProgress = document.getElementById('hold-progress');
+
+    holdBox.addEventListener('pointerdown', (e) => {
+      isHolding = true;
+      holdStart = performance.now();
+      holdStatus.textContent = '蓄力中... (微芒凝聚)';
+      
+      const checkLoop = () => {
+        if (!isHolding) return;
+        const elapsed = performance.now() - holdStart;
+        if (elapsed > HOLD_THRESHOLD) {
+          setState('hold');
+          const p = Math.min(1, (elapsed - HOLD_THRESHOLD) / (HOLD_FULL - HOLD_THRESHOLD));
+          holdProgress.style.width = `${p * 100}%`;
+          if (p >= 1) {
+            holdStatus.textContent = '成形！(引信就绪)';
+            return;
+          }
+        }
+        requestAnimationFrame(checkLoop);
+      };
+      requestAnimationFrame(checkLoop);
+    });
+
+    const endHold = () => {
+      if (!isHolding) return;
+      isHolding = false;
+      setState('default');
+      holdProgress.style.width = '0%';
+      holdStatus.textContent = '在此区域长按 (蓄力入梦) 或单击';
+    };
+
+    holdBox.addEventListener('pointerup', endHold);
+    holdBox.addEventListener('pointerleave', endHold);
+
+    // ── 控制台联动 ──
+    const btnWake = document.getElementById('btn-wake');
+    const btnDream = document.getElementById('btn-dream');
+    const btnDay = document.getElementById('btn-day');
+    const btnNight = document.getElementById('btn-night');
+    const btnToggleNative = document.getElementById('btn-toggle-native');
+
+    btnWake.addEventListener('click', () => {
+      document.body.classList.remove('is-dream');
+      btnWake.classList.add('active');
+      btnDream.classList.remove('active');
+    });
+
+    btnDream.addEventListener('click', () => {
+      document.body.classList.add('is-dream');
+      btnDream.classList.add('active');
+      btnWake.classList.remove('active');
+    });
+
+    btnDay.addEventListener('click', () => {
+      document.body.classList.remove('is-night');
+      btnDay.classList.add('active');
+      btnNight.classList.remove('active');
+    });
+
+    btnNight.addEventListener('click', () => {
+      document.body.classList.add('is-night');
+      btnNight.classList.add('active');
+      btnDay.classList.remove('active');
+    });
+
+    btnToggleNative.addEventListener('click', () => {
+      const show = document.body.classList.toggle('show-native-cursor');
+      btnToggleNative.textContent = show ? '对照：隐藏原生光标' : '对照：显示原生光标';
+      btnToggleNative.classList.toggle('active', show);
+    });
+
+    // 造型方案切换
+    const styleButtons = document.querySelectorAll('[data-style]');
+    const shapeDiffraction = document.getElementById('shape-diffraction');
+    const shapeCrystal = document.getElementById('shape-crystal');
+    const shapeMist = document.getElementById('shape-mist');
+
+    styleButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        styleButtons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const st = btn.getAttribute('data-style');
+
+        shapeDiffraction.style.display = st === 'diffraction' ? 'inline' : 'none';
+        shapeCrystal.style.display = st === 'crystal' ? 'inline' : 'none';
+        shapeMist.style.display = st === 'mist' ? 'inline' : 'none';
+      });
+    });
+
+    // 参数滑块响应
+    const sLerp = document.getElementById('slider-lerp');
+    const sBlur = document.getElementById('slider-blur');
+    const sScale = document.getElementById('slider-scale');
+    const sEcho = document.getElementById('slider-echo');
+
+    sLerp.addEventListener('input', (e) => {
+      lerpHalo = parseFloat(e.target.value);
+      document.getElementById('val-lerp').textContent = lerpHalo.toFixed(2);
+    });
+
+    sBlur.addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value);
+      mistFilter.setAttribute('stdDeviation', val.toFixed(1));
+      document.getElementById('val-blur').textContent = `${val.toFixed(1)}px`;
+    });
+
+    sScale.addEventListener('input', (e) => {
+      currentScale = parseFloat(e.target.value);
+      cursorSvg.style.transform = `scale(${currentScale})`;
+      document.getElementById('val-scale').textContent = `${currentScale.toFixed(2)}x`;
+    });
+
+    sEcho.addEventListener('input', (e) => {
+      lerpEcho = parseFloat(e.target.value);
+      document.getElementById('val-echo').textContent = lerpEcho.toFixed(2);
+    });
+  </script>
+</body>
+</html>
