@@ -18,6 +18,9 @@ import BootVeil from '../components/chrome/BootVeil.astro';
 
 interface Props {
   title: string;
+  dreamTitle?: string;
+  awayWakeTitle?: string;
+  awayDreamTitle?: string;
   description?: string;
   type?: 'website' | 'article';
   seam?: 'default' | 'faint' | 'broken';
@@ -40,6 +43,9 @@ interface Props {
 
 const {
   title,
+  dreamTitle,
+  awayWakeTitle,
+  awayDreamTitle,
   description = 'Traveritas 的个人网站——随笔、项目，与一些尚在成形的东西。',
   type = 'website',
   seam = 'faint',
@@ -49,6 +55,22 @@ const {
   rail,
 } = Astro.props;
 
+// 醒/梦双态标题推导规则（符合 AGENTS.md 核心词汇映射）
+const deriveDreamTitle = (wake: string): string => {
+  let dt = wake;
+  dt = dt.replace(/Traveritas的个人网页/g, 'AveritA的昼梦叙集');
+  dt = dt.replace(/随笔/g, '断章');
+  dt = dt.replace(/项目/g, '造物');
+  dt = dt.replace(/关于/g, '此身');
+  dt = dt.replace(/试验场/g, '未命名');
+  dt = dt.replace(/标签「/g, '印记「');
+  dt = dt.replace(/找不到这一页/g, '世界在边缘处留白');
+  dt = dt.replace(/Traveritas/g, 'AveritA');
+  return dt;
+};
+
+const resolvedDreamTitle = dreamTitle ?? deriveDreamTitle(title);
+
 const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site).href : undefined;
 ---
 
@@ -57,7 +79,12 @@ const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site).href : un
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{title}</title>
+    <title
+      data-wake={title}
+      data-dream={resolvedDreamTitle}
+      data-away-wake={awayWakeTitle}
+      data-away-dream={awayDreamTitle}
+    >{title}</title>
     <meta name="description" content={description} />
     <link rel="canonical" href={canonical} />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -68,7 +95,7 @@ const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site).href : un
       href={Astro.site ? new URL('rss.xml', Astro.site).href : '/rss.xml'}
     />
     <meta property="og:type" content={type} />
-    <meta property="og:site_name" content="Traveritas" />
+    <meta property="og:site_name" content="Traveritas的个人网页" />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonical} />
@@ -110,12 +137,14 @@ const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site).href : un
       import { initNight } from '../scripts/night';
       import { initBrand } from '../scripts/brand';
       import { initReality } from '../scripts/reality';
+      import { initTitle } from '../scripts/title';
       initBoot();
       initChrome();
       initNight();
       initMorph();
       initBrand();
       initReality();
+      initTitle();
 
       // 进页停在页头之下（p11-h 终选）：页头恰好被遮住，上滚才露出；
       // 浏览器还原了滚动位置或带锚点进入时不干预。
