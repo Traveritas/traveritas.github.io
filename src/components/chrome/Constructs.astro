@@ -10,9 +10,13 @@
    钩子只有两个，全部由 reality.ts 维护，本组件不新增任何 JS 状态：
      body.reality-holding（长按中）/ body[data-reality='dream'] ⇒ 漂移暂停；
      --reality-mix 与 --still（逐帧写入的醒度与动效倍率）⇒ 拼合↔错开、回溯幅度。
+     ★ 但**方块自己的浮动动画**必须与这条逐帧变量链脱钩：它只在
+     body[data-reality='dream']:not(.reality-holding) 成立（见 .fld-sq 上方注释）。
+     160 条主线程动画只要在跑就逐帧被 tick，长按期间会把掉帧数从个位数推到 40 帧。
    性能纪律：几何在装载期一次性烘焙（固定种子 LCG ⇒ 每次加载完全一致），
    之后只剩 transform/opacity 的 CSS 动画——无 rAF、无滚动/尺寸监听、不 resize 重算；
-   两态共用同一套尺寸，过渡只动 transform，不会逐帧改 width/height 触发重排。
+   两态共用同一套尺寸，过渡只动 transform，不会逐帧改 width/height 触发重排；
+   动画的成立条件按状态收窄，绝不留下「振幅为 0 却照跑」的空转动画。
    样式非 scoped：整片场是生成器运行时建的节点，拿不到 Astro 的组件 scope 属性，
    故一律用 .fld- 前缀做命名空间。 */
 interface Props {
@@ -51,6 +55,8 @@ const { layer = 'through' } = Astro.props;
        --sq-amp      梦态方块位置量化浮动：严格参考标题（AveritA）实现，采用 Celeste 风格
                      简谐位置量化（3px 最大幅值，1px 整像素阶跃，step-end 零 tween 瞬切，
                      波峰波谷 26% 滞空缓动）。
+                     ⚠ 只在梦面静置时成立（醒面与长按期间不声明这条动画）——
+                     这是一条硬性能约束，不是可调项，详见 .fld-sq 上方注释。
      ═══════════════════════════════════════════════════════════════════════ */
   .fld-bg {
     position: fixed;
@@ -153,8 +159,8 @@ const { layer = 'through' } = Astro.props;
      两档同一套尺寸 ⇒ 过渡只动 transform（不会逐帧改 width/height）。
      7% 面 / 13% 边线：缝两侧各一条 1px 边线，中间留 1–2px 底色 ⇒ 读得出「拼接」。
      梦态独立小块浮动：参考标题（AveritA）实现，采用 Celeste 风格简谐位置量化
-     （3px 最大幅值，1px 整像素阶跃，step-end 零 tween 瞬切，波峰波谷 26% 滞空缓动）；
-     位移全部乘 --still ⇒ 醒态与回醒过渡中恒等收缩回预定的初始相对位置（零位移）。 */
+     （3px 最大幅值，1px 整像素阶跃，step-end 零 tween 瞬切，波峰波谷 26% 滞空缓动）。
+     ★ 浮动动画的声明在下面那条梦面规则里，**不写在这里** —— 原因见该处注释。 */
   .fld-sq {
     position: absolute;
     background: color-mix(in srgb, var(--ghost-ink) 7%, transparent);
@@ -162,34 +168,49 @@ const { layer = 'through' } = Astro.props;
     transform: translate3d(calc(var(--fld-tx, 0px) * var(--fld-tk, 1)), calc(var(--fld-ty, 0px) * var(--fld-tk, 1)), 0);
     transform-origin: center center;
     scale: calc(1 + var(--sq-scale-delta, 0) * var(--rw-k, 0));
-    animation: fld-sq-float var(--sq-dur, 2.8s) step-end infinite;
-    animation-delay: var(--sq-del, 0s);
     will-change: transform, translate, scale;
   }
 
+  /* ★ 浮动只在「梦面静置」时存在：醒面与长按（含回梦途中）都不声明 animation-name。
+     这 160 条浮动动画各自引用 var(--sq-*)，属于主线程动画 ⇒ 只要它在跑，Blink 每帧
+     都要 tick 一遍并为每个方块重新解算动画值。实测主页长按 2.4s（trace 累计）：
+     全站样式重算 1026→766ms、动画 Tick 423→62ms（＝「整片场不存在」?fld=off 的水平）；
+     墙钟同口径多轮中位：p50 39.4→15.3ms、掉帧（>33ms）42→3 帧、长任务 6→0。
+     只摘掉这一条动画即可，别的都不用动。
+     而这两种状态下浮动本就是空转：醒面振幅为 0（原来是 --still 乘 0，白跑）；
+     长按中 160 块正在做拼合/回溯过渡，1–3px 的原地阶跃看不见。
+     ⚠ 别用 animation-play-state: paused 代替：暂停的动画仍逐帧解算 var()，
+     实测反而更卡（掉帧 42 → 48 帧），必须让它根本不成立。 */
+  body[data-reality='dream']:not(.reality-holding) .fld-sq {
+    animation: fld-sq-float var(--sq-dur, 2.8s) step-end infinite;
+    animation-delay: var(--sq-del, 0s);
+  }
+
+  /* 浮动轨迹：振幅不再乘 --still（那一乘让 160 条 keyframes 逐帧依赖根变量，
+     也随动画在梦面常驻而失去意义）。醒面/长按不成立动画 ⇒ translate 回到 0。 */
   @keyframes fld-sq-float {
     0% {
       translate: 0px 0px;
     }
     13% {
-      translate: calc(var(--sq-x-step, 0px) * var(--sq-dir, 1) * var(--still, 0))
-                 calc(var(--sq-y-step, 1px) * -1 * var(--sq-ydir, 1) * var(--still, 0));
+      translate: calc(var(--sq-x-step, 0px) * var(--sq-dir, 1))
+                 calc(var(--sq-y-step, 1px) * -1 * var(--sq-ydir, 1));
     }
     25% {
-      translate: calc(var(--sq-x-mid, 1px) * var(--sq-dir, 1) * var(--still, 0))
-                 calc(var(--sq-y-mid, 2px) * -1 * var(--sq-ydir, 1) * var(--still, 0));
+      translate: calc(var(--sq-x-mid, 1px) * var(--sq-dir, 1))
+                 calc(var(--sq-y-mid, 2px) * -1 * var(--sq-ydir, 1));
     }
     37% {
-      translate: calc(var(--sq-x-max, 1px) * var(--sq-dir, 1) * var(--still, 0))
-                 calc(var(--sq-y-max, 3px) * -1 * var(--sq-ydir, 1) * var(--still, 0));
+      translate: calc(var(--sq-x-max, 1px) * var(--sq-dir, 1))
+                 calc(var(--sq-y-max, 3px) * -1 * var(--sq-ydir, 1));
     }
     63% {
-      translate: calc(var(--sq-x-mid, 1px) * var(--sq-dir, 1) * var(--still, 0))
-                 calc(var(--sq-y-mid, 2px) * -1 * var(--sq-ydir, 1) * var(--still, 0));
+      translate: calc(var(--sq-x-mid, 1px) * var(--sq-dir, 1))
+                 calc(var(--sq-y-mid, 2px) * -1 * var(--sq-ydir, 1));
     }
     75% {
-      translate: calc(var(--sq-x-step, 0px) * var(--sq-dir, 1) * var(--still, 0))
-                 calc(var(--sq-y-step, 1px) * -1 * var(--sq-ydir, 1) * var(--still, 0));
+      translate: calc(var(--sq-x-step, 0px) * var(--sq-dir, 1))
+                 calc(var(--sq-y-step, 1px) * -1 * var(--sq-ydir, 1));
     }
     87%,
     100% {
