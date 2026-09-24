@@ -5,7 +5,7 @@ date: 2026-09-19
 status: 构想中
 cover: https://picsum.photos/seed/xingmeng-motif/800/500
 note:
-  awake: 构想仍在深水之下，尚未聚拢出实体。暂不占用白昼的公网地址，待其廓清。
+  awake: 构想仍在深水之下，尚未聚拢出实体。暂不赋予明确形态，待其廓清。
   dream: “它尚未在现实里拥有重量。若闭上眼细细辨认，那些花与光芒，早已绽开过三次。”
 related:
   - label: 《母题探索记录：从碎块到花》——三轮探索与两次否决的完整记录

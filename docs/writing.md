@@ -60,8 +60,16 @@ npm run new:article -- "标题" my-slug
 
 创建 `src/content/articles/yyyy-mm-dd-slug.md`，默认 `draft: true`。
 
+项目没有对应的脚手架，新项目请从模板复制命名：
+
+- 随笔模板：`docs/templates/article-template.md`
+- 项目模板：`docs/templates/project-template.md`
+
+两份模板都是逐字段注释的完整示例，可直接复制进内容目录后改名。模板本身放在 `docs/` 下，
+不会被内容 loader 收走（loader 只扫 `src/content/` 下不以 `_` 开头的 `.md`）。
+
 ## 实现位置
 
-- 语法解析：`src/remark/twilight.mjs`（经 `remark-directive` 挂入 `astro.config.mjs`）
+- 语法解析：`src/markdown/twilight.mjs`（经 `@astrojs/markdown-satteri` 的 `features.directive` 挂入 `astro.config.mjs`）
 - 块级显隐：`src/styles/global.css` 的 `[data-side]` 规则（挂 `body[data-reality]`）
 - 行内换面：`src/scripts/morph.ts` 双面元素 + `src/scripts/reality.ts` 入梦检验
