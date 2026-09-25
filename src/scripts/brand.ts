@@ -3,12 +3,16 @@
    · 醒态：静态展示标准 Traveritas（展示衬线体，无动效）
    · 梦态：AveritA（展示衬线体），独立字符 Celeste 风格简谐位置量化浮动
      + 琥珀微扰，按「7步轮转 + 3秒呼吸停歇」循环步进
+     · 浮动振幅与琥珀灼点随 --still 收放（SiteHeader.astro 的 keyframes）：
+       长按回醒的那 2.2s 里，字渐渐落定；同时这里停住「字母轮转」——
+       振幅归零之后，每秒一次的换字就不再是浮动的一部分，只会变成一下突兀的
+       跳动。世界在醒，词就先定住，闩锁后再由磨砂溶变换回 Traveritas。
    · 双态切换：磨砂微晕溶变过渡（Frosted Dissolve），如水汽融聚
    · prefers-reduced-motion：停止过渡与轮转，仅做即时文字切换
    ───────────────────────────────────────────────────────────── */
 
 import { reducedMotion } from './lib';
-import { onRealityChange, type Reality } from './reality';
+import { onRealityChange, wakeMix, type Reality } from './reality';
 
 const WAKE_WORD = 'Traveritas';
 // 梦态 7 字符环形序列：两端始终大写，中间全部小写
@@ -25,6 +29,10 @@ const CYCLE_WORDS = [
 const CADENCE_MS = 1000;
 const BREATH_PAUSE_MS = 3000;
 const FADE_DUR_MS = 180;
+/* 醒度低于此值才算「还在梦里」：长按一过判定窗（260ms）醒度就开始爬升，
+   约 40ms 后越过这条线，字母随即停转；中途松手退回梦面时又自动接上。 */
+const SETTLED = 0.02;
+const SETTLE_POLL_MS = 240;
 
 export function initBrand() {
   const brand = document.querySelector<HTMLElement>('.brand');
@@ -64,6 +72,12 @@ export function initBrand() {
 
   function tick() {
     if (currentReality !== 'dream' || RM) return;
+    // 世界正在醒（长按已过判定窗）：字母原地停转，位移由 --still 收干净。
+    // 不换字、也不改 step —— 中途松手退回梦面时从同一个词接着轮转。
+    if (wakeMix() > SETTLED) {
+      cycleTimer = window.setTimeout(tick, SETTLE_POLL_MS);
+      return;
+    }
     step = (step + 1) % CYCLE_WORDS.length;
     updateChars(CYCLE_WORDS[step]);
 

@@ -216,11 +216,16 @@ hr {
 /* ─────────────────────────────────────────────────────────────
    行内光景：逐字浮起 .float-run / 流光 .sheen-run
    正文语法 ((…)) 与 {{…}}（手册 docs/writing.md，参数与边界见
-   docs/design/content-typography.md）。两条都**只在梦面成立**：
-     · 醒面、无 JS、读屏、RM、长按中一律不声明 animation —— 位移为零、
-       字色就是正文原色（与「醒面是唯一真值」「醒静梦动」同一条规矩）；
-     · keyframes 里不乘 --still：逐帧解算这个根变量会让 Blink 每帧 tick，
-       构块场为此把浮动动画收窄到「梦面静置」（Constructs.astro 的实测注）。
+   docs/design/content-typography.md）。两条都**只在梦面看得见**：
+     · 动画常驻声明，位移与顶点色都乘 --still（梦 1 → 醒 0）：醒面、
+       无 JS、读屏、RM 下位移为零、字色就是正文原色 —— 与「醒面是唯一
+       真值」「醒静梦动」同一条规矩，但换面时不再有开关动作；
+     · 为什么是「乘 --still」而不是「按面开关动画」：开关会让长按一激活
+       就把 .float-ch 从半浮位一步拽回基线（实测 3px 骤停），回梦时又从
+       暂停位突然起跳。常驻的动画相位从不断，振幅由 --still 连续带过，
+       于是一路是「渐渐落定 / 渐渐浮起」。见 docs/design/content-typography.md
+       「定格漂浮族」一节，以及 design/.probe-float-ramp.cjs 的实测（含
+       四条「试过但不管用」的省法，别重复试）。
    ───────────────────────────────────────────────────────────── */
 
 /* —— 逐字浮起：包装层只承参数，一个字一个 inline-block 盒 ——
@@ -228,13 +233,23 @@ hr {
    ⚠ 拆字后字串内部不再换行（2–8 字为宜），两端对齐在这里留缺口；
      流光不拆字，没有这条限制。 */
 .float-run {
-  /* 顶点色：琥珀按 --float-tint 混进正文色，默认 0%（纯位移、不动色） */
-  --float-peak: color-mix(in srgb, var(--amber) var(--float-tint, 0%), currentColor);
+  /* 顶点色：琥珀按 --float-tint 混进正文色，默认 0%（纯位移、不动色）。
+     占比乘 --still ⇒ 醒面就是 0% ＝ 纯 currentColor，不闪一下暖色。 */
+  --float-tint-now: calc(var(--float-tint, 0%) * var(--still, 0));
+  --float-peak: color-mix(in srgb, var(--amber) var(--float-tint-now), currentColor);
 }
 
 .float-ch {
   display: inline-block;
   white-space: pre;
+  animation: float-char var(--float-dur, 2.8s) step-end infinite;
+  animation-delay: calc(var(--i, 0) * var(--float-stagger, -0.4s));
+}
+
+/* 提层只随梦面：醒面的振幅恒 0，让这些字留在普通（非合成）层上 ——
+   醒面因此逐像素与「没有这条动画」时相同（design/.probe-float-wake-pixels.cjs 的像素对照） */
+body[data-reality='dream'] .float-ch {
+  will-change: translate;
 }
 
 .float-ch:nth-child(odd) {
@@ -245,15 +260,9 @@ hr {
   --float-dir: -1;
 }
 
-/* will-change 只随动画一起声明：醒面没有动画，也就没有理由把每个字提成合成层 */
-body[data-reality='dream']:not(.reality-holding) .float-ch {
-  will-change: translate;
-  animation: float-char var(--float-dur, 2.8s) step-end infinite;
-  animation-delay: calc(var(--i, 0) * var(--float-stagger, -0.4s));
-}
-
 /* 轨迹：0 → 峰 −1 倍振幅 → 0，step-end 瞬切定格（与品牌字标同一条曲线）。
-   横向只在 --float-sway > 0 时出现，默认 0 = 纯垂直。 */
+   横向只在 --float-sway > 0 时出现，默认 0 = 纯垂直。
+   振幅乘 --still：梦面满幅、醒面恒 0（两端的值仍是整数像素，见序号的同一注）。 */
 @keyframes float-char {
   0%,
   87%,
@@ -262,27 +271,27 @@ body[data-reality='dream']:not(.reality-holding) .float-ch {
     color: currentColor;
   }
   13% {
-    translate: calc(var(--float-amp, 3px) * var(--float-sway, 0) * var(--float-dir, 1) * 0.33)
-      calc(var(--float-amp, 3px) * -0.33);
+    translate: calc(var(--float-amp, 3px) * var(--float-sway, 0) * var(--float-dir, 1) * 0.33 * var(--still, 0))
+      calc(var(--float-amp, 3px) * -0.33 * var(--still, 0));
   }
   25% {
-    translate: calc(var(--float-amp, 3px) * var(--float-sway, 0) * var(--float-dir, 1) * 0.66)
-      calc(var(--float-amp, 3px) * -0.66);
+    translate: calc(var(--float-amp, 3px) * var(--float-sway, 0) * var(--float-dir, 1) * 0.66 * var(--still, 0))
+      calc(var(--float-amp, 3px) * -0.66 * var(--still, 0));
     color: var(--float-peak);
   }
   37% {
-    translate: calc(var(--float-amp, 3px) * var(--float-sway, 0) * var(--float-dir, 1))
-      calc(var(--float-amp, 3px) * -1);
+    translate: calc(var(--float-amp, 3px) * var(--float-sway, 0) * var(--float-dir, 1) * var(--still, 0))
+      calc(var(--float-amp, 3px) * -1 * var(--still, 0));
     color: var(--float-peak);
   }
   63% {
-    translate: calc(var(--float-amp, 3px) * var(--float-sway, 0) * var(--float-dir, 1) * 0.66)
-      calc(var(--float-amp, 3px) * -0.66);
+    translate: calc(var(--float-amp, 3px) * var(--float-sway, 0) * var(--float-dir, 1) * 0.66 * var(--still, 0))
+      calc(var(--float-amp, 3px) * -0.66 * var(--still, 0));
     color: var(--float-peak);
   }
   75% {
-    translate: calc(var(--float-amp, 3px) * var(--float-sway, 0) * var(--float-dir, 1) * 0.33)
-      calc(var(--float-amp, 3px) * -0.33);
+    translate: calc(var(--float-amp, 3px) * var(--float-sway, 0) * var(--float-dir, 1) * 0.33 * var(--still, 0))
+      calc(var(--float-amp, 3px) * -0.33 * var(--still, 0));
   }
 }
 
@@ -588,10 +597,101 @@ main {
   margin-block: 1.8em;
 }
 
-/* —— markdown 公共层（.md）：小节编号 · 列表 · 行内强调 · 互链 · 梦侧引文 ——
+/* —— markdown 公共层（.md）：小节序号 · 列表 · 行内强调 · 互链 · 梦侧引文 ——
    随笔与项目取值一致的部分写在这里；两页相异处一律下移到变体层。 */
-.md {
-  counter-reset: sec;
+
+/* ══ 小节序号 · 定格漂浮（Ordinal · Stepped Float）════════════════════
+   记号由 mdast 插件在构建期注入（src/markdown/ordinal.mjs）——内容页仍然零客户端 JS。
+   醒与梦**共用同一套字**：序号吃标题自己的字（标题统一走 --font-display），是标题那一行
+   的延续，不是插进来的第二套字。两面的差别只有动与不动：
+     · 醒 ＝ 振幅 0（位移为零）
+     · 梦 ＝ 每枚数字按 1px 整像素阶跃、step-end 零补间地定格漂浮 —— 与品牌字标
+             （brand.ts）、正文 ((浮起)) 同一条曲线
+   色彩不归它管：`color: var(--amber)` 与全站同源，被 reality.ts 逐帧插值
+   （梦端暖琥珀、醒端冷灰 #a7b1ba），旧写法取的也是同一个 token。
+
+   ⚠ 一条硬纪律，别当可调项：
+   浮动只走 translate ⇒ **不改变任何占位**：标题永远不会因为入梦而位移，序号
+   也就不需要固定盒。数字落在标题的基线上（不是靠 vertical-align 硬凑）。
+
+   ★ 动画常驻、振幅乘 --still（2026-09-25 改）——原先写成
+     `body[data-reality='dream']:not(.reality-holding) .ord-digit { animation: … }`，
+     即「按面开关动画」。开关有两个躲不掉的动作：长按一激活（reality-holding 落下）
+     整枚数字从当前档位**一步拽回基线**，实测 −3px→0px 只隔一帧；回梦闩锁时又从
+     基线突然起跳。改成常驻之后，动画相位从不断，--still 随醒度连续把振幅带过
+     1→0 → 数字是「渐渐落定」，0→1 → 「渐渐浮起」，两端都不再有一帧跳变。
+     实测：design/.probe-float-ramp.cjs（`npm run build && node design/.probe-float-ramp.cjs`）。
+   ⚠ 常驻的代价是这条 keyframes 逐帧依赖 --still（动画因此走主线程）。序号是
+     「一节两枚」的量级，实测（design/.probe-float-ramp.cjs，5 次中位、Chrome 计数器口径）：
+     随笔页 6 枚 —— 静置 −3%、长按 +3%，都在噪声内；样式预览页 46 枚 + 29 段逐字浮起 ——
+     静置 +1…3%、**长按 +17% 主线程任务**（≈ +0.17ms/帧）。那一笔买的是「长按期间这些
+     浮动不熄」；量化振幅 / 去 will-change / @property 注册 / 收成单个长度变量四条都试过，
+     全在噪声内或更差（重解由「被读的变量在动」触发，不看值变没变）。
+     构块场那 160 枚 .fld-sq 是另一回事，仍按面开关（见 Constructs.astro 的实测注）。
+   ⚠ 醒面恒等是靠「振幅恰为 0 且不提层」拿到的，不是靠「不声明动画」：改这族请连着
+     design/.probe-float-wake-pixels.cjs 一起跑（醒面逐像素必须与「没有这条动画」相同）。
+   无 JS / 读屏 / 减动效：--reality-mix 恒 1 ⇒ --still 恒 0 ⇒ 位移为零（唯一真值），
+   RM 直接停摆（见文件末的减动效块）。 */
+.ord {
+  display: inline-block;
+  color: var(--amber);
+  white-space: nowrap;
+}
+
+/* 一枚数字一个盒：translate 只对 inline-block 以上的盒子生效。
+   盒里是常规文本，所以它的基线就是数字自己的基线 —— 无需任何对齐补偿。
+   min-inline-size 是**手工版的 tabular figures**：标题字（--font-display）的数字
+   是比例宽，实测「1」0.589em、其余 0.698em，而 `font-variant-numeric: tabular-nums`
+   对 Noto Serif SC 是空操作（写上也没用，别再加）。不补这一刀，「01」就比「02」窄
+   1.4px，每章标题的文字起点会各不相同 —— 原先用汉字（等宽）时不存在这个问题。
+   0.7em 是量出来的（最宽数字 0.698em）；换标题字时要重新量一次。
+   will-change 只在梦面提（动画本身常驻）：醒面的振幅恒 0，让数字留在普通
+   （非合成）层上，字体的次像素抗锯齿与「没有这条动画」时一致。 */
+.ord-digit {
+  display: inline-block;
+  min-inline-size: 0.7em;
+  text-align: center;
+  animation: ord-digit-float 2.8s step-end infinite;
+  animation-delay: calc(var(--i, 0) * -0.4s);
+}
+
+body[data-reality='dream'] .ord-digit {
+  will-change: translate;
+}
+
+/* 轨迹：0 → 峰 −3px → 0，7 档停歇（与 brand-pixel-float 同一条曲线：
+   13 / 25 / 37 / 63 / 75 / 87% 六次瞬切，波峰波谷滞空）。
+   振幅乘 --still：梦面 1 ⇒ 仍是 −1/−2/−3px 整像素阶跃（字形不发虚），
+   醒面 0 ⇒ 恒在基线；中间过程是连续的，只有换面那一段会落在小数像素上。 */
+@keyframes ord-digit-float {
+  0%,
+  87%,
+  100% {
+    translate: 0 0;
+  }
+  13% {
+    translate: 0 calc(-1px * var(--still, 0));
+  }
+  25% {
+    translate: 0 calc(-2px * var(--still, 0));
+  }
+  37% {
+    translate: 0 calc(-3px * var(--still, 0));
+  }
+  63% {
+    translate: 0 calc(-2px * var(--still, 0));
+  }
+  75% {
+    translate: 0 calc(-1px * var(--still, 0));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ord-digit {
+    will-change: auto;
+    animation: none !important;
+    translate: none !important;
+  }
 }
 
 .md p {
@@ -600,17 +700,6 @@ main {
 
 .md div[data-side] {
   margin: 0 0 1.5em;
-}
-
-.md h2 {
-  counter-increment: sec;
-}
-
-/* 小节号：汉字序号 · 琥珀；字号与落位由各变体定 */
-.md h2::before {
-  content: counter(sec, cjk-ideographic);
-  font-weight: 600;
-  color: var(--amber);
 }
 
 .md ul {
@@ -831,10 +920,11 @@ main {
   margin: 2.65em 0 0.95em;
 }
 
-.prose--essay .md h2::before {
-  display: inline-block;
-  margin-right: 0.7em;
-  transform: translateY(-0.12em);
+/* 随笔的小节序号：行内嵌字、无框（记号本身见公共层「小节序号 · 定格漂浮」）。
+   只定字号与右边距 —— 数字落在标题的基线上，不需要任何对齐补偿；幅度只走
+   translate，所以入梦时它不会把标题推一下。 */
+.prose--essay .md h2 .ord {
+  margin-inline-end: 0.62em;
   font-size: 0.6em;
   letter-spacing: 0.12em;
 }
@@ -894,12 +984,20 @@ main {
   margin: 2.5em 0 0.8em;
 }
 
-.prose--project .md h2::before {
+/* 项目的小节序号：一枚印章板（记号本身见公共层「小节序号 · 定格漂浮」）。
+   字号与内距都写在板子上，所以内距按**序号自己的字号**折算（0.66em 的 0.3em），
+   与旧写法（`::before` 同时吃字号与内距）逐像素同值；两位数字等宽，板子因此
+   不随章节数变化，「09」与「10」是同一枚章。
+   ⚠ `line-height: 1` 必须留着：序号盒里的数字只占一行，不写就吃标题那条约 1.55
+   的行高（12.7px 的字撑出 19.6px 的行盒），板子从 21.6px 涨到 28.6px，数字骑在
+   上沿、下面留一块空当。旧写法的 `::before` 上有这一条，搬过来时漏过一次。
+   随笔那边没有板子、也不显形，反而要留着继承的行高（它撑着序号盒的基线位置）。 */
+.prose--project .md h2 .ord {
   flex: none;
+  padding: 0.3em 0.45em 0.25em;
+  border: 1px solid color-mix(in srgb, var(--amber) 45%, transparent);
   font-size: 0.66em;
   letter-spacing: 0.1em;
-  border: 1px solid color-mix(in srgb, var(--amber) 45%, transparent);
-  padding: 0.3em 0.45em 0.25em;
   line-height: 1;
 }
 
@@ -1132,8 +1230,10 @@ body[data-reality='dream'] [data-side='wake'] {
     display: none;
   }
 
-  /* 行内光景：RM 下 reality.ts 本就不落梦面，这两条是给「HTML 被单独打开」兜底 */
+  /* 行内光景：RM 下 reality.ts 本就不落梦面（--still 恒 0，位移本就是零），
+     这两条是给「HTML 被单独打开」「--still 被别处改写」兜底，顺带摘掉合成层 */
   .float-ch {
+    will-change: auto;
     animation: none !important;
     translate: none !important;
   }

@@ -24,6 +24,11 @@ import Prose from '../styleguide/specimens/prose.md';
 import Tasklist from '../styleguide/specimens/tasklist.md';
 import TwoSided from '../styleguide/specimens/two-sided.md';
 import InlineFx from '../styleguide/specimens/inline-fx.md';
+import { ordinalMarkup } from '../markdown/ordinal.mjs';
+
+/* 小节序号样张：01–12 全部由插件那一个函数画出来（set:html），
+   所以这排序号与正文里的记号永远同源，不会各自漂移。 */
+const ORD_SAMPLES = Array.from({ length: 12 }, (_, i) => i + 1);
 
 /* 目录：加章节时这里加一行，正文里加一个同 id 的 <GuideSection> */
 const SECTIONS = [
@@ -295,7 +300,7 @@ const LOCAL_BLOCKS = [
       n="二"
       title="内容页正文"
       en="PROSE · 3 LAYERS"
-      note="内页 markdown 容器都是 .md，排版分三层：默认层给非 markdown 长文兜底、公共层写随笔与项目取值一致的部分、变体层只声明两页相异处。<b>同一份样张</b>放在三条管道里，差异一眼可对。全貌与待设计清单见 docs/design/content-typography.md。<br />本轮已补齐（2026-09-25）：<code>ol</code> 保留原生序号、只换成 mono 与 <code>--fg-soft</code>；<code>table</code> 公共层只走横向发丝线、项目侧加成方框板块；<code>figure</code> / <code>figcaption</code> 图注内容由正文自己写、不自动编号；<code>code</code> / <code>pre</code> 随笔是梦色左缘、项目成方框，配色改由 src/markdown/shiki-theme.mjs 指到站内令牌（原先 github-dark 会盖成一块深色板）。<code>h3</code> 的记号与其上的小节序号留给自制的「小节」组件，本页仍只有默认层。"
+      note="内页 markdown 容器都是 .md，排版分三层：默认层给非 markdown 长文兜底、公共层写随笔与项目取值一致的部分、变体层只声明两页相异处。<b>同一份样张</b>放在三条管道里，差异一眼可对。全貌与待设计清单见 docs/design/content-typography.md。<br />本轮已补齐（2026-09-25）：<code>ol</code> 保留原生序号、只换成 mono 与 <code>--fg-soft</code>；<code>table</code> 公共层只走横向发丝线、项目侧加成方框板块；<code>figure</code> / <code>figcaption</code> 图注内容由正文自己写、不自动编号；<code>code</code> / <code>pre</code> 随笔是梦色左缘、项目成方框，配色改由 src/markdown/shiki-theme.mjs 指到站内令牌（原先 github-dark 会盖成一块深色板）。<b>小节序号</b>已由构建期注入的「定格漂浮」接管（见下方样张），<code>h3</code> 的记号仍留给自制的「小节」组件的下一层。"
     >
       <div class="sg-cols sg-cols--3">
         <Spec
@@ -313,7 +318,7 @@ const LOCAL_BLOCKS = [
           name="随笔 · 宋体夜话"
           cls=".prose--essay"
           src="styles/global.css · 变体层"
-          note="clamp(17→18.5px)、行高 2.08、字距 .015em、两端对齐（≤640px 转左对齐）；小节号行内嵌字。"
+          note="clamp(17→18.5px)、行高 2.08、字距 .015em、两端对齐（≤640px 转左对齐）；小节号行内嵌字，与标题同一套字。"
         >
           <div class="prose prose--essay">
             <div class="md"><Prose /></div>
@@ -324,13 +329,24 @@ const LOCAL_BLOCKS = [
           name="项目 · 黑体方正文"
           cls=".prose--project"
           src="styles/global.css · 变体层"
-          note="16px、行高 2.05、字距 .02em；小节号是方框 + 右侧细线，列表符号是 mono 空心圈。"
+          note="16px、行高 2.05、字距 .02em；小节号是一枚印章板 + 右侧细线（板宽不随章节数变化），列表符号是 mono 空心圈。"
         >
           <div class="prose prose--project">
             <div class="md"><Prose /></div>
           </div>
         </Spec>
       </div>
+
+      <Spec
+        name="小节序号 · 定格漂浮"
+        cls=".ord / .ord-digit"
+        src="styles/global.css + markdown/ordinal.mjs"
+        note="h2 的序号在<b>构建期</b>由 mdast 插件注入（把数字拆成一枚一个 span），所以内容页仍然零客户端 JS——这排样张也是那同一个函数画的。<b>醒与梦共用同一套字</b>：序号吃标题自己的字，是标题那一行的延续；两面的差别只有动与不动——动画常驻，振幅乘 <code>--still</code>：梦面满幅（每枚数字按 1px 整像素阶跃定格漂浮，与品牌字标同一条曲线、0.4s 错相），醒面收到 0。切「醒 / 梦」对看：振幅是连续带过的，所以两面之间不会有一下骤停。因为浮动只走 translate，标题永远不会被推一下，序号也就不需要固定盒。"
+      >
+        <div class="sg-ord-row">
+          {ORD_SAMPLES.map((n) => <span set:html={ordinalMarkup(n)} />)}
+        </div>
+      </Spec>
 
       <Spec
         name="页头与元信息"
@@ -590,7 +606,7 @@ const LOCAL_BLOCKS = [
         name="行内光景"
         cls=".float-run / .sheen-run"
         src="markdown/twilight.mjs · styles/global.css"
-        note="正文写作 <code>((浮起))</code> 与 <code>{{流过}}</code>，参数跟在 <code>|</code> 后（<code>((字|amp=6px))</code>）。两条都只在梦面成立：醒面没有动画、没有背景，字就是正文原色。下面五支滑杆写在这一格上 —— 样张里<b>没写参数</b>的那两处会继承它们，写了参数的按自己那份走。"
+        note="正文写作 <code>((浮起))</code> 与 <code>{{流过}}</code>，参数跟在 <code>|</code> 后（<code>((字|amp=6px))</code>）。两条都只在梦面看得见：浮起的动画常驻、振幅乘 <code>--still</code>，醒面收到 0（位移为零，字色就是正文原色）；流光在醒面不设背景，字就是墨色。下面五支滑杆写在这一格上 —— 样张里<b>没写参数</b>的那两处会继承它们，写了参数的按自己那份走。"
       >
         <div id="sg-inline-fx">
           <div class="prose prose--essay">

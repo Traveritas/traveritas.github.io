@@ -109,7 +109,14 @@ npm run new:article -- "标题" my-slug
 ## 实现位置
 
 - 语法解析：`src/markdown/twilight.mjs`（经 `@astrojs/markdown-satteri` 的 `features.directive` 挂入 `astro.config.mjs`）
-- 行内光景的样式：`src/styles/global.css`「行内光景」一节（`.float-run` / `.sheen-run`），只在 `body[data-reality='dream']` 下成立
+- 小节序号：`src/markdown/ordinal.mjs`（同一份 `mdastPlugins`，构建期把 `h2` 的序号拆成一枚数字一个 span 注入；**写作侧不用管它，`##` 就是全部语法**。样式与形制见 `docs/design/content-typography.md` 第二节末）
+- 行内光景的样式：`src/styles/global.css`「行内光景」一节（`.float-run` / `.sheen-run`）。
+  逐字浮起的动画**常驻**、位移与顶点色都乘 `--still`（梦 1 → 醒 0）：醒面（含无 JS、读屏、RM）位移为零、
+  字色回到正文原色，而换面时不再有一下骤停；流光换的是整幅 `background-image`、没有「振幅」可收，
+  仍按 `body[data-reality='dream']` 开关。
 - ⚠ **改完解析器要重启 dev server**：`astro.config.mjs` 与它引入的 mdast 插件只在 dev 启动时读一次，热更新不会带上（症状是新的行内语法原样输出成 `((…))`，而 CSS、老语法一切正常）。
+- ⚠ **改完插件还要清构建缓存**：插件的改动不算内容改动，`npm run build` 会直接复用 `.astro/` 与
+  `node_modules/.astro/` 里缓存的渲染结果（症状是「插件改了、构建成功、`dist/` 里的标记没变」）。
+  先 `rm -rf .astro node_modules/.astro` 再构建。
 - 块级显隐：`src/styles/global.css` 的 `[data-side]` 规则（挂 `body[data-reality]`）
 - 行内换面：`src/scripts/morph.ts` 双面元素 + `src/scripts/reality.ts` 入梦检验

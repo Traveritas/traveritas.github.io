@@ -2,6 +2,7 @@ import { defineConfig } from 'astro/config';
 import { satteri } from '@astrojs/markdown-satteri';
 import sitemap from '@astrojs/sitemap';
 import { twilight } from './src/markdown/twilight.mjs';
+import { ordinal } from './src/markdown/ordinal.mjs';
 import { xingmeng } from './src/markdown/shiki-theme.mjs';
 
 // https://astro.build/config
@@ -13,9 +14,11 @@ export default defineConfig({
   ],
   markdown: {
     // 醒梦两态正文语法（:::dream/:::wake 块、[[醒|梦]] 行内），见 docs/writing.md
+    // + 小节序号：h2 的「点阵显影」记号在构建期注入（醒＝等宽数字 / 梦＝点阵），
+    //   见 src/markdown/ordinal.mjs —— 内容页因此仍然零客户端 JS
     processor: satteri({
       features: { directive: true },
-      mdastPlugins: [twilight],
+      mdastPlugins: [twilight, ordinal],
     }),
     // 代码配色自己写：默认的 github-dark 会用行内样式把代码块压成深色板，
     // 且盖掉 .md pre 的底色。详见 src/markdown/shiki-theme.mjs
