@@ -1,0 +1,904 @@
+---
+/* ─────────────────────────────────────────────────────────────
+   样式预览（/styleguide/）
+   把全站「共用的」样式与变体摊在一页上：令牌 · 正文三层 · 通用构件 ·
+   醒梦双态 · 全站仪器层。样张里的样式一律现取真实来源
+   （tokens.css / global.css / 组件），本页只负责摆框与标注。
+   新增样张的约定见 docs/design/styleguide.md —— 一句话：
+   在对应的 <GuideSection> 里塞一个 <Spec>，把实物放进它的 slot。
+
+   本页刻意不进 sitemap、robots 禁止收录、也不挂任何站内导航：
+   它是工作台，不是内容页。
+   ───────────────────────────────────────────────────────────── */
+import BaseLayout from '../layouts/BaseLayout.astro';
+import GuideSection from '../components/styleguide/GuideSection.astro';
+import Spec from '../components/styleguide/Spec.astro';
+import Swatch from '../components/styleguide/Swatch.astro';
+import StitchHeader from '../components/home/StitchHeader.astro';
+import GlassChip from '../components/home/GlassChip.astro';
+import ShardMark from '../components/ShardMark.astro';
+import Rail from '../components/chrome/Rail.astro';
+import Seam from '../components/chrome/Seam.astro';
+import '../styles/styleguide.css';
+import Prose from '../styleguide/specimens/prose.md';
+import Tasklist from '../styleguide/specimens/tasklist.md';
+import TwoSided from '../styleguide/specimens/two-sided.md';
+import InlineFx from '../styleguide/specimens/inline-fx.md';
+
+/* 目录：加章节时这里加一行，正文里加一个同 id 的 <GuideSection> */
+const SECTIONS = [
+  { id: 'tokens', n: '一', title: '设计令牌', en: 'TOKENS' },
+  { id: 'prose', n: '二', title: '内容页正文', en: 'PROSE · 3 LAYERS' },
+  { id: 'parts', n: '三', title: '通用构件', en: 'PARTS' },
+  { id: 'dual', n: '四', title: '醒梦双态', en: 'TWO FACES' },
+  { id: 'chrome', n: '五', title: '全站仪器层', en: 'CHROME LAYERS' },
+  { id: 'local', n: '六', title: '页面专属块', en: 'PAGE-LOCAL' },
+];
+
+/* 页面专属块索引：样式写在各自页面的 <style> 里（Astro 作用域隔离），
+   本页复用不到，只给实物入口。 */
+const LOCAL_BLOCKS = [
+  {
+    name: '随笔名录（回眠行）',
+    cls: '.essay-ledger .el-*',
+    file: 'pages/articles/index.astro',
+    to: '/articles/',
+    at: '随笔列表',
+  },
+  {
+    name: '项目名录（夜档）',
+    cls: '.prj-ledger .r-* .status-chip .tick',
+    file: 'pages/projects/index.astro',
+    to: '/projects/',
+    at: '项目列表',
+  },
+  {
+    name: '项目封面（δ 波纹 + 幽灵编号）',
+    cls: '.coverband .ghostno',
+    file: 'pages/projects/[slug].astro',
+    to: '/projects/personal-website/',
+    at: '项目页 · 封面',
+  },
+  {
+    name: '成形度行与深眠注记',
+    cls: '.pin-line .file-note',
+    file: 'pages/projects/[slug].astro',
+    to: '/projects/personal-website/',
+    at: '项目页 · 正文上缘',
+  },
+  {
+    name: '出口区（相关链接 / 项目导航）',
+    cls: '.link-list .ll-* .pj-next',
+    file: 'pages/projects/[slug].astro',
+    to: '/projects/personal-website/',
+    at: '项目页 · 文末',
+  },
+  {
+    name: '标签行与醒来卡',
+    cls: '.tag-row .wake-card .wc-* .wn-*',
+    file: 'pages/articles/[slug].astro',
+    to: '/articles/hello-xingmeng/',
+    at: '随笔页 · 文末',
+  },
+  {
+    name: '晓线',
+    cls: '.dawn-glow',
+    file: 'pages/articles/[slug].astro',
+    to: '/articles/hello-xingmeng/',
+    at: '随笔页 · 全页',
+  },
+  {
+    name: '标签页的结',
+    cls: '.knot-head .big-knot',
+    file: 'pages/tags/[tag].astro',
+    to: '/tags/建站/',
+    at: '标签页',
+  },
+  {
+    name: '关于页区块与出口名录',
+    cls: '.about-section .about-quote .lead-line .signal-list',
+    file: 'pages/about.astro',
+    to: '/about/',
+    at: '关于页',
+  },
+  {
+    name: '主页各夜段（深色主题作用域）',
+    cls: '.band-essays / .band-projects / .band-rem',
+    file: 'pages/index.astro',
+    to: '/',
+    at: '首屏之下的各段',
+  },
+  {
+    name: '玻璃片梯与药丸星座',
+    cls: '.ladder .rung .pill .pill-skin',
+    file: 'pages/index.astro',
+    to: '/',
+    at: '浅梦段 / 异相段',
+  },
+  {
+    name: '晨醒出口与手记',
+    cls: '.wake-anchor .dawn-card .dawn-line',
+    file: 'pages/index.astro',
+    to: '/',
+    at: '晨醒段',
+  },
+  {
+    name: '首屏千层纸',
+    cls: '.ps-* .sheet .ch-wake .ch-dream .note-*',
+    file: 'pages/index.astro',
+    to: '/',
+    at: '首页首屏',
+  },
+  {
+    name: '失线页',
+    cls: '.lost .lost-beacon .rethread',
+    file: 'pages/404.astro',
+    to: '/404.html',
+    at: '404',
+  },
+];
+---
+
+<BaseLayout
+  title="样式预览 — Traveritas"
+  description="站内共用样式与变体的自查页。"
+  seam="faint"
+  boot={false}
+>
+  <div class="sg-grid-overlay" aria-hidden="true"></div>
+
+  <div class="sg-body">
+    <header class="page-head">
+      <h1>样式预览</h1>
+      <p class="sg-lede">
+        这一页只放<b>共用</b>的东西：全站令牌、内容页正文的公共层与两个变体、通用构件、醒梦双态机制、全站仪器层。
+        每一格都标了类名与出处文件，格子里是实物——样式现取真实来源，不在这里另写一份。
+      </p>
+      <ul class="sg-hints">
+        <li>长按空白处 2.2 秒：入梦；同手势 1.3 秒：回醒。下方面板可即时切换同一状态。</li>
+        <li>Shift + 空格 = 键盘等价手势；短按 260ms 内完全静默。</li>
+        <li>下方面板还能逐层关掉仪器、叠上 8 / 64px 参考线与轮廓。</li>
+        <li>新样式怎么加进来：见仓库里 docs/design/styleguide.md；改正文排版前先读的那份地图是 docs/design/content-typography.md。</li>
+      </ul>
+      <ul class="sg-toc">
+        {
+          SECTIONS.map((s) => (
+            <li>
+              <a href={`#sg-${s.id}`}>
+                {s.n} · {s.title}
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+    </header>
+
+    <!-- ═══ 一 · 设计令牌 ═══ -->
+    <GuideSection
+      id="tokens"
+      n="一"
+      title="设计令牌"
+      en="TOKENS"
+      note="一条 14° 的发丝线贯穿整站；醒侧冷灰、梦侧暖沙，琥珀是全站唯一的异质色。下面每一格的色票与数值都取自变量本身，切面时数值会跟着变。"
+    >
+      <Spec
+        name="醒梦缝与强调色"
+        cls=":root"
+        src="styles/tokens.css"
+        note="强调色由 reality.ts 按醒度插值逐帧改写：醒面是冷灰的休眠态（--amber 退成 #a7b1ba），梦面才是暖琥珀。--seal 只用于关于页的「醒」章；--wash 是大表面 7% 洗染的指向色。"
+      >
+        <div class="sg-swatches">
+          <Swatch token="--wake" role="醒 · 冷灰" />
+          <Swatch token="--dream" role="梦 · 暖沙" />
+          <Swatch token="--umber" role="正文里的链接色" />
+          <Swatch token="--amber" role="全站唯一异质色：锚点 / 进度 / 焦点" />
+          <Swatch token="--seal" role="朱砂 · 仅关于页的「醒」章" />
+          <Swatch token="--ghost-ink" role="叠影残影的暖墨" />
+          <Swatch token="--wash" role="大表面洗染的醒端指向色" />
+        </div>
+      </Spec>
+
+      <Spec
+        name="面与底线"
+        cls=":root"
+        src="styles/tokens.css"
+        note="--line 是 rgba 的发丝线，色票要在浅底上才看得见。--fg-faint 已从全站文字用途退场（只留给主页夜色系统），正文小字一律 --fg-soft。"
+      >
+        <div class="sg-swatches">
+          <Swatch token="--bg" role="根底色（静态，不随醒度变）" />
+          <Swatch token="--bg-sunken" role="行内代码与等宽块的凹底" />
+          <Swatch token="--fg" role="正文" />
+          <Swatch token="--fg-soft" role="次级文字 / 元信息" />
+          <Swatch token="--fg-faint" role="已退场，仅夜色系统留用" />
+          <Swatch token="--line" role="发丝线 · 1px 分隔" />
+        </div>
+      </Spec>
+
+      <Spec
+        name="字体"
+        cls="--font-display / --font-body / --font-mono / --font-pixel"
+        src="styles/tokens.css"
+        note="Noto Serif SC 载入 300 / 500 / 600 / 900 四档（正文只要 400，浏览器的隐性字重匹配见 backlog 三.5）；IBM Plex Mono 只载 400，界面上的 mono「粗体」是伪粗体。"
+      >
+        <div class="sg-fonts">
+          <div class="sg-font sg-font--display">
+            <div class="sg-font-h">--font-display · 标题与长文正典（宋体）</div>
+            <p class="sg-font-sample">在即将醒来的那一瞬，世界究竟是在成形，还是正在融化？</p>
+            <span class="sg-font-en">Aa Gg Rr 0123 · Palatino / Songti / Noto Serif SC</span>
+          </div>
+          <div class="sg-font sg-font--body">
+            <div class="sg-font-h">--font-body · 界面与元信息（黑体）</div>
+            <p class="sg-font-sample">正在做、做过、以及还只存在于念头里的东西。</p>
+            <span class="sg-font-en">system-ui · PingFang SC · Microsoft YaHei</span>
+          </div>
+          <div class="sg-font sg-font--mono">
+            <div class="sg-font-h">--font-mono · 刻度、编号与时刻</div>
+            <p class="sg-font-sample">23:07 → 06:31 · N3 δ · 06.8:1</p>
+            <span class="sg-font-en">IBM Plex Mono · 只载 400</span>
+          </div>
+          <div class="sg-font sg-font--pixel">
+            <div class="sg-font-h">--font-pixel · 极窄用途</div>
+            <p class="sg-font-sample">ERR 404 OUT OF BOUNDS</p>
+            <span class="sg-font-en">Silkscreen · 只有拉丁字形</span>
+          </div>
+        </div>
+      </Spec>
+
+      <Spec
+        name="度量与骨架"
+        cls="--measure / --gap-v / --seam-angle / .container"
+        src="styles/tokens.css · global.css"
+        note="--measure 是 34em：随笔变体的字号把它折算成 629px、项目 544px（1280 视口实测），两个值是否该一致尚未拍板。下面两条虚线框是 .container 与 .container-wide 的真实宽度。"
+      >
+        <div class="sg-metrics">
+          <div>
+            <p class="sg-metric-h">
+              <code class="sg-spec-cls">--measure</code><span>列宽 · 34em</span>
+              <span class="sg-val" data-sg-w="sg-m-measure">—</span>
+            </p>
+            <div class="sg-metric-bar" id="sg-m-measure" style="width: var(--measure)"></div>
+          </div>
+          <div>
+            <p class="sg-metric-h">
+              <code class="sg-spec-cls">--gap-v</code><span>段落级留白 · clamp(3.5rem, 9vh, 6.5rem)</span>
+              <span class="sg-val" data-sg-h="sg-m-gap">—</span>
+            </p>
+            <div class="sg-metric-gap" id="sg-m-gap" style="height: var(--gap-v)"></div>
+          </div>
+          <div>
+            <p class="sg-metric-h">
+              <code class="sg-spec-cls">--seam-angle</code><span>缝线与刻度倾斜 · 14deg</span>
+            </p>
+            <div class="sg-metric-rule"></div>
+          </div>
+          <div>
+            <p class="sg-metric-h">
+              <code class="sg-spec-cls">.container</code><span>长文容器 · min(100% - 3rem, 42rem)</span>
+              <span class="sg-val" data-sg-w="sg-m-container">—</span>
+            </p>
+            <div class="container sg-metric-box" id="sg-m-container">正文列</div>
+          </div>
+          <div>
+            <p class="sg-metric-h">
+              <code class="sg-spec-cls">.container-wide</code><span>列表容器 · min(100% - 3rem, 56rem)</span>
+              <span class="sg-val" data-sg-w="sg-m-wide">—</span>
+            </p>
+            <div class="container-wide sg-metric-box" id="sg-m-wide">名录与列表</div>
+          </div>
+        </div>
+      </Spec>
+    </GuideSection>
+
+    <!-- ═══ 二 · 内容页正文 ═══ -->
+    <GuideSection
+      id="prose"
+      n="二"
+      title="内容页正文"
+      en="PROSE · 3 LAYERS"
+      note="内页 markdown 容器都是 .md，排版分三层：默认层给非 markdown 长文兜底、公共层写随笔与项目取值一致的部分、变体层只声明两页相异处。<b>同一份样张</b>放在三条管道里，差异一眼可对。全貌与待设计清单见 docs/design/content-typography.md。<br />本轮已补齐（2026-09-25）：<code>ol</code> 保留原生序号、只换成 mono 与 <code>--fg-soft</code>；<code>table</code> 公共层只走横向发丝线、项目侧加成方框板块；<code>figure</code> / <code>figcaption</code> 图注内容由正文自己写、不自动编号；<code>code</code> / <code>pre</code> 随笔是梦色左缘、项目成方框，配色改由 src/markdown/shiki-theme.mjs 指到站内令牌（原先 github-dark 会盖成一块深色板）。<code>h3</code> 的记号与其上的小节序号留给自制的「小节」组件，本页仍只有默认层。"
+    >
+      <div class="sg-cols sg-cols--3">
+        <Spec
+          name="默认层"
+          cls=".prose .md"
+          src="styles/global.css · 默认层"
+          note="关于页这类非 markdown 长文，以及两页尚未分化的 h3 / ol / code / pre / img / table / figure。"
+        >
+          <div class="prose">
+            <div class="md"><Prose /></div>
+          </div>
+        </Spec>
+
+        <Spec
+          name="随笔 · 宋体夜话"
+          cls=".prose--essay"
+          src="styles/global.css · 变体层"
+          note="clamp(17→18.5px)、行高 2.08、字距 .015em、两端对齐（≤640px 转左对齐）；小节号行内嵌字。"
+        >
+          <div class="prose prose--essay">
+            <div class="md"><Prose /></div>
+          </div>
+        </Spec>
+
+        <Spec
+          name="项目 · 黑体方正文"
+          cls=".prose--project"
+          src="styles/global.css · 变体层"
+          note="16px、行高 2.05、字距 .02em；小节号是方框 + 右侧细线，列表符号是 mono 空心圈。"
+        >
+          <div class="prose prose--project">
+            <div class="md"><Prose /></div>
+          </div>
+        </Spec>
+      </div>
+
+      <Spec
+        name="页头与元信息"
+        cls=".prose-head / .prose-meta / .prose-rule"
+        src="styles/global.css"
+        note="同一份页头挂在两个变体下。两页的 hr 都只有 --line 那条发丝线（随笔页原有的 3.4rem 琥珀起笔标尺已于 2026-09-25 移除）。"
+      >
+        <div class="sg-cols sg-cols--2">
+          <div class="prose prose--essay">
+            <header class="prose-head">
+              <h1>在即将醒来的那一瞬</h1>
+              <p class="prose-meta">
+                <time datetime="2026-09-21">2026.09.21</time>
+              </p>
+            </header>
+            <hr class="prose-rule" />
+          </div>
+          <div class="prose prose--project">
+            <header class="prose-head">
+              <h1>个人网站</h1>
+              <p class="prose-meta">
+                <span class="status">进行中</span> · <time datetime="2026-09-18">2026.09.18</time>
+              </p>
+            </header>
+            <hr class="prose-rule" />
+          </div>
+        </div>
+      </Spec>
+
+      <div class="sg-cols sg-cols--2">
+        <Spec
+          name="任务清单 · 项目变体"
+          cls=".prose--project .md li:has(input)"
+          src="styles/global.css"
+          note="li 里的原生 checkbox 被藏起，改由 ::before 画符号：○ 未完成 → 琥珀 ✓ 完成。"
+        >
+          <div class="prose prose--project">
+            <div class="md"><Tasklist /></div>
+          </div>
+        </Spec>
+
+        <Spec
+          name="同一份清单 · 随笔变体"
+          cls=".prose--essay"
+          src="styles/global.css · 变体层（缺）"
+          note="随笔侧没有这套规则，勾选态仍是浏览器默认的原生复选框 —— 这是 docs 里记着「还没有设计」的一项，此处照实呈现，不是渲染出错。"
+        >
+          <div class="prose prose--essay">
+            <div class="md"><Tasklist /></div>
+          </div>
+        </Spec>
+      </div>
+
+      <Spec
+        name="跨页互链块"
+        cls=".xfile / .xfile-t"
+        src="styles/global.css"
+        note="随笔页取值 margin-top 2.6rem，项目页 3rem；标签文案与条目由页面各自给（「关联篇章」/「关联记述」）。"
+      >
+        <div class="sg-cols sg-cols--2">
+          <div class="prose prose--essay">
+            <div class="xfile">
+              <span class="xfile-t">关联篇章 · RELATED</span>
+              <a href="/articles/">在即将醒来的那一瞬</a>
+              <a href="/projects/">个人网站</a>
+            </div>
+          </div>
+          <div class="prose prose--project">
+            <div class="xfile">
+              <span class="xfile-t">关联记述 · RELATED</span>
+              <a href="/projects/">醒梦 · 视觉母题探索</a>
+            </div>
+          </div>
+        </div>
+      </Spec>
+    </GuideSection>
+
+    <!-- ═══ 三 · 通用构件 ═══ -->
+    <GuideSection
+      id="parts"
+      n="三"
+      title="通用构件"
+      en="PARTS"
+      note="跨页复用、已经有自己组件的那些。页头与页脚就在这一页上（随面切换会换文案），不再另做样张。"
+    >
+      <Spec
+        name="站头轴线"
+        cls=".stitch-head"
+        src="components/home/StitchHeader.astro"
+        note="各夜段的段首：一条 -4° 分段轴线从左划出（进视口时 scaleX 0→1），两端 mono 标签，菱形「结」兼作缝线锚点的停靠位。三段的名目与时刻只是取实样，样式与内容无关。"
+      >
+        <div class="sg-cols sg-cols--3">
+          <Spec name="浅梦段" cls=".stitch-head">
+            <StitchHeader title="随笔" stage="浅梦 · LIGHT · N1–N2" time="23:19 → 01:11" />
+          </Spec>
+          <Spec name="深眠段" cls=".stitch-head">
+            <StitchHeader title="项目" stage="深眠 · DEEP · N3 δ" time="01:11 → 02:08" />
+          </Spec>
+          <Spec name="异相段" cls=".stitch-head">
+            <StitchHeader title="试验场" stage="异相 · REM · 眼动" time="02:08 → 04:59" />
+          </Spec>
+        </div>
+      </Spec>
+
+      <Spec
+        name="玻璃片入口"
+        cls=".chip-slot / .chip / .chip-glass"
+        src="components/home/GlassChip.astro"
+        note="梦侧元素：浮动振幅 9px（乘 --still，醒面归零），悬停抬升归稳。深色底是它的设计前提 —— 上缘为此铺了一块夜色舞台（底色取自 StageBackdrop 的随笔段）。"
+      >
+        <div class="sg-night-stage">
+          <GlassChip
+            href="/articles/"
+            title="在即将醒来的那一瞬"
+            desc="世界究竟是在成形，还是正在融化？"
+            meta="随笔 · 01"
+            style="--tilt: -1.1deg"
+          />
+          <GlassChip
+            href="/projects/"
+            title="个人网站"
+            desc="醒梦双态的纯静态站。"
+            meta="造物 · 02"
+            compact
+            style="--tilt: 1deg"
+          />
+        </div>
+      </Spec>
+
+      <Spec
+        name="名录（醒侧：绝对静止）"
+        cls=".ledger / .ledger-date / .ledger-title / .ledger-desc"
+        src="styles/global.css"
+        note="标签页用的原样：日期列 7.5em ‖ 标题与描述（框内按标签页的 .container 宽度 42rem 摆）。主页把它放宽成三列并追加核验列（page-local），项目列表另有一套 .prj-ledger。"
+      >
+        <div class="sg-narrow">
+          <ul class="ledger">
+            <li>
+              <a href="/projects/">
+                <span class="ledger-date">2026.09.18</span>
+                <span>
+                  <span class="ledger-title">
+                    个人网站<span class="ledger-status">进行中</span>
+                    <span class="stitch-meter" aria-hidden="true">
+                      {Array.from({ length: 8 }).map((_, i) => <i class:list={{ on: i < 5 }} />)}
+                    </span>
+                  </span>
+                  <span class="ledger-desc">把「醒梦」做成一整站的知觉距离：一条 14° 的缝，三段稳定的夜。</span>
+                </span>
+              </a>
+            </li>
+            <li>
+              <a href="/projects/">
+                <span class="ledger-date">2026.09.21</span>
+                <span>
+                  <span class="ledger-title">
+                    醒梦 · 视觉母题探索<span class="ledger-status">构想中</span>
+                    <span class="stitch-meter" aria-hidden="true">
+                      {Array.from({ length: 8 }).map((_, i) => <i class:list={{ on: i < 2 }} />)}
+                    </span>
+                  </span>
+                  <span class="ledger-desc">水面、细线、帷幕、巨型空洞，以及一枚被搁置的碎块。</span>
+                </span>
+              </a>
+            </li>
+          </ul>
+        </div>
+      </Spec>
+
+      <Spec
+        name="成形度刻度"
+        cls=".stitch-meter"
+        src="styles/global.css"
+        note="八阶成形 / 浮现度：一格一阶，9×2 的小刻度，14° 同缝线倾斜；点亮为琥珀。项目页把它放大一档（15×3，page-local）。"
+      >
+        <p class="sg-demo-line">
+          <span class="mono">八阶</span>
+          <span class="stitch-meter" aria-hidden="true">
+            {Array.from({ length: 8 }).map(() => <i class="on" />)}
+          </span>
+        </p>
+        <p class="sg-demo-line">
+          <span class="mono">五阶</span>
+          <span class="stitch-meter" aria-hidden="true">
+            {Array.from({ length: 8 }).map((_, i) => <i class:list={{ on: i < 5 }} />)}
+          </span>
+        </p>
+        <p class="sg-demo-line">
+          <span class="mono">二阶</span>
+          <span class="stitch-meter" aria-hidden="true">
+            {Array.from({ length: 8 }).map((_, i) => <i class:list={{ on: i < 2 }} />)}
+          </span>
+        </p>
+      </Spec>
+
+      <Spec
+        name="碎片印记"
+        cls=".shard-mark"
+        src="components/ShardMark.astro"
+        note="站点母题的预告图形，<b>当前全站无引用</b>（backlog 五.3）：要么给它一个落点，要么删掉 —— 摆在这里就是为了让它不再隐形。"
+      >
+        <div class="sg-shard-row">
+          <ShardMark size={14} />
+          <ShardMark size={18} />
+          <ShardMark size={30} />
+          <ShardMark size={54} />
+        </div>
+      </Spec>
+    </GuideSection>
+
+    <!-- ═══ 四 · 醒梦双态 ═══ -->
+    <GuideSection
+      id="dual"
+      n="四"
+      title="醒梦双态"
+      en="TWO FACES"
+      note="全站的换面机制：body[data-reality] 决定哪一面可见，HTML 原文恒为醒面真值（无 JS、读屏、闩锁醒面都读它）。两个闸变量供 CSS 消费 —— <code>--reality-mix</code>（0 = 梦，1 = 醒）与 <code>--still</code>（动效倍率，梦 1 → 醒 0）。用下方面板切面，下面每一格都会跟着变。"
+    >
+      <div class="sg-cols sg-cols--2">
+        <Spec
+          name="文字双面"
+          cls="[data-morph] · [[醒|梦]] · [data-side]"
+          src="markdown/twilight.mjs · scripts/morph.ts"
+          note="行内写作 [[醒|梦]]，块级写作 :::wake / :::dream —— 都渲染成同一元素上的两副文案，换面时乱码过渡。切到醒面看：梦面那一段会让位给醒面那一段。"
+        >
+          <div class="prose prose--essay">
+            <div class="md"><TwoSided /></div>
+          </div>
+        </Spec>
+
+        <Spec
+          name="文字双面 · 项目变体"
+          cls="[data-side]"
+          src="styles/global.css"
+          note="两态块的边距两页不一致：随笔随公共层 1.5em，项目是 1.35em（沿用改造前的既有值）。"
+        >
+          <div class="prose prose--project">
+            <div class="md"><TwoSided /></div>
+          </div>
+        </Spec>
+      </div>
+
+      <Spec
+        name="梦侧浮动"
+        cls=".drift / .drift-soft"
+        src="styles/global.css"
+        note="位移与旋转全乘 --still：醒面振幅归零、彻底静止，梦面才浮。切到醒面，这三块会钉住不动 —— 这就是「醒静梦动」。"
+      >
+        <div class="sg-demo-row">
+          <span class="drift sg-demo-box">.drift</span>
+          <span class="drift drift-soft sg-demo-box">.drift-soft</span>
+          <span class="drift sg-demo-box sg-demo-box--amp">自定义振幅</span>
+        </div>
+      </Spec>
+
+      <Spec
+        name="行内光景"
+        cls=".float-run / .sheen-run"
+        src="markdown/twilight.mjs · styles/global.css"
+        note="正文写作 <code>((浮起))</code> 与 <code>{{流过}}</code>，参数跟在 <code>|</code> 后（<code>((字|amp=6px))</code>）。两条都只在梦面成立：醒面没有动画、没有背景，字就是正文原色。下面五支滑杆写在这一格上 —— 样张里<b>没写参数</b>的那两处会继承它们，写了参数的按自己那份走。"
+      >
+        <div id="sg-inline-fx">
+          <div class="prose prose--essay">
+            <div class="md"><InlineFx /></div>
+          </div>
+          <label class="sg-range">
+            <span>--float-amp</span>
+            <input type="range" min="0" max="8" step="0.5" value="3" data-sg-fx="--float-amp" data-sg-unit="px" />
+            <span class="sg-val" data-sg-fx-val="--float-amp">3px</span>
+          </label>
+          <label class="sg-range">
+            <span>--float-dur</span>
+            <input type="range" min="0.8" max="6" step="0.2" value="2.8" data-sg-fx="--float-dur" data-sg-unit="s" />
+            <span class="sg-val" data-sg-fx-val="--float-dur">2.8s</span>
+          </label>
+          <label class="sg-range">
+            <span>--sheen-span</span>
+            <input type="range" min="120" max="420" step="10" value="300" data-sg-fx="--sheen-span" data-sg-unit="%" />
+            <span class="sg-val" data-sg-fx-val="--sheen-span">300%</span>
+          </label>
+          <label class="sg-range">
+            <span>--sheen-hue</span>
+            <input type="range" min="0" max="100" step="5" value="45" data-sg-fx="--sheen-hue" data-sg-unit="%" />
+            <span class="sg-val" data-sg-fx-val="--sheen-hue">45%</span>
+          </label>
+          <label class="sg-range">
+            <span>--sheen-dur</span>
+            <input type="range" min="2" max="16" step="0.5" value="7" data-sg-fx="--sheen-dur" data-sg-unit="s" />
+            <span class="sg-val" data-sg-fx-val="--sheen-dur">7s</span>
+          </label>
+        </div>
+      </Spec>
+
+      <Spec
+        name="叠影残影"
+        cls=".ghost-pair / --echo"
+        src="styles/global.css"
+        note="真身一层、暖色残影一层，错位量 = --echo × --still × 11px。--echo 原先由滚动驱动，现在没有任何脚本写它（tokens.css 的注释已过时）—— 下面这支滑杆是它目前唯一的驱动。"
+      >
+        <div id="sg-echo-zone">
+          <p class="sg-demo-line ghost-pair">
+            <span class="ghost" aria-hidden="true">2026.09.21 · 建站 · 醒梦</span>2026.09.21 · 建站 · 醒梦
+          </p>
+          <label class="sg-range">
+            <span>--echo</span>
+            <input type="range" min="0" max="1" step="0.01" value="0" data-sg-echo />
+            <span class="sg-val" data-sg-echo-val>0.00</span>
+          </label>
+        </div>
+      </Spec>
+
+      <Spec
+        name="选择与焦点"
+        cls="::selection / :focus-visible"
+        src="styles/global.css"
+        note="选中色是 32% 的琥珀；焦点环用 currentColor（早先的琥珀在浅底上只有 1.8:1，键盘用户看不见）。点一下按钮、或框选上面那段文字即可看到。"
+      >
+        <p class="sg-demo-line">拖选这一行文字，看 selection 的琥珀底色。</p>
+        <p class="sg-demo-row" style="margin-top: 0.9rem">
+          <button type="button" class="sg-demo-btn">按 Tab 走到这里</button>
+        </p>
+      </Spec>
+    </GuideSection>
+
+    <!-- ═══ 五 · 全站仪器层 ═══ -->
+    <GuideSection
+      id="chrome"
+      n="五"
+      title="全站仪器层"
+      en="CHROME LAYERS"
+      note="铺满视口的固定层，装不进框里 —— 它们此刻正活在本页上。用下方面板的「图层消隐」逐层关掉，就能看清各自画了什么。缝线与仪表轨可以装框（靠 transform 让 fixed 认舞台当包含块），下面给出三个变体与三个模式。"
+    >
+      <div class="sg-cols sg-cols--3">
+        <Spec name="缝线 · default" cls=".seam" src="components/chrome/Seam.astro" note="首页用；不透明度 0.62。" flush>
+          <div class="sg-stage">
+            <Seam variant="default" />
+            <span class="sg-stage-tag">SEAM · DEFAULT</span>
+          </div>
+        </Spec>
+        <Spec name="缝线 · faint" cls=".seam--faint" src="components/chrome/Seam.astro" note="内页用；0.3。本页即此档。" flush>
+          <div class="sg-stage">
+            <Seam variant="faint" />
+            <span class="sg-stage-tag">SEAM · FAINT</span>
+          </div>
+        </Spec>
+        <Spec name="缝线 · broken" cls=".seam--broken" src="components/chrome/Seam.astro" note="404 用；线在这里断了。" flush>
+          <div class="sg-stage">
+            <Seam variant="broken" />
+            <span class="sg-stage-tag">SEAM · BROKEN</span>
+          </div>
+        </Spec>
+      </div>
+
+      <div class="sg-cols sg-cols--3">
+        <Spec
+          name="仪表轨 · night"
+          cls=".rail--night"
+          src="components/chrome/Rail.astro"
+          note="首页整夜：1px 发丝基准轨 + 琥珀游标搭载数字时钟与动态脑电微波形（波形形态由 night.ts 按分期换）。"
+        >
+          <div class="sg-stage sg-stage--tall sg-stage--rail">
+            <Rail mode="night" />
+          </div>
+        </Spec>
+        <Spec
+          name="仪表轨 · depth"
+          cls=".rail--depth"
+          src="components/chrome/Rail.astro"
+          note="长文页：醒 / 入梦 / 深梦 / 将醒 四站，游标随正文阅读进度爬行（chrome.ts 按 data-depth 指定的目标算）；下面的钟是夜内时刻。"
+        >
+          <div class="sg-stage sg-stage--tall sg-stage--rail">
+            <Rail
+              mode="depth"
+              depthTarget="#sg-chrome"
+              readout={{ fromMin: 181, durMin: 45, stage: '异相 · 眼动' }}
+            />
+          </div>
+        </Spec>
+        <Spec
+          name="仪表轨 · station"
+          cls=".rail--station"
+          src="components/chrome/Rail.astro"
+          note="列表页与关于页：只有竖排站名与英文注。< 1200px 全站隐藏（退化为顶部发丝线）。"
+        >
+          <div class="sg-stage sg-stage--tall sg-stage--rail">
+            <Rail mode="station" station="随笔 · 浅梦" en="ESSAYS · LIGHT" />
+          </div>
+        </Spec>
+      </div>
+
+      <Spec
+        name="其余四层"
+        cls=".hairline / .eeg / .fld-bg / .bootveil"
+        src="components/chrome/"
+        note="它们只能整页看，故不给样张。用下方面板逐层关掉即可对照。"
+      >
+        <ul class="sg-hints" style="margin-top: 0">
+          <li><b>发丝线 Hairline</b>（z 55）：顶部 2px，醒→琥珀渐变，宽度 = 整页滚动进度。</li>
+          <li><b>脑电 Eeg</b>（z −2）：整视口的两层定频正弦，梦面才有回声层（0.34 / 0.26 / 0.19 × --still）。</li>
+          <li><b>构块场 Constructs</b>（z −2 / −3）：浮在纸后面的方块场；首页走 below，被千层纸压住，滚过首屏才浮现。</li>
+          <li><b>开屏 BootVeil</b>（z 200）：首访 ≳3.1s 的校准揭幕、同会话快版 1.05s；本页用 boot=false 关掉了，不然每次改样式都要等它演完。</li>
+          <li><b>夜幕 NightVeil</b>：data/night.ts 的注释还提到它，但组件已不存在，ZONES 目前也没有消费方（夜色由 StageBackdrop 与各页自己的深色段承担）。</li>
+        </ul>
+      </Spec>
+    </GuideSection>
+
+    <!-- ═══ 六 · 页面专属块 ═══ -->
+    <GuideSection
+      id="local"
+      n="六"
+      title="页面专属块"
+      en="PAGE-LOCAL"
+      note="这些块的样式写在各自页面的 style 块里。Astro 会给它们加上作用域类，所以本页即使照抄同样的类名也拿不到样式 —— 硬抄一份的结果是两边各写一份、迟早走样，故不抄。下表给实物入口。"
+    >
+      <Spec
+        name="页面专属块索引"
+        cls="各页 style 块"
+        src="pages/"
+        note="要把它们也搬进本页预览，得先让样式可复用：把块连同 markup 抽成 src/components/ 下的组件（各页改用组件、本页也用同一个），或把样式挪进 src/styles/ 的公共表 —— 两条路都动真实页面，属下一轮的决定，见 docs/design/styleguide.md 末节。"
+        flush
+      >
+        <div class="sg-table-wrap">
+          <table class="sg-table">
+            <thead>
+              <tr>
+                <th>块</th>
+                <th>类名</th>
+                <th>写在</th>
+                <th>实物</th>
+              </tr>
+            </thead>
+            <tbody>
+              {
+                LOCAL_BLOCKS.map((b) => (
+                  <tr>
+                    <td>{b.name}</td>
+                    <td><code>{b.cls}</code></td>
+                    <td><code>{b.file}</code></td>
+                    <td><a href={b.to}>{b.at} →</a></td>
+                  </tr>
+                ))
+              }
+            </tbody>
+          </table>
+        </div>
+      </Spec>
+    </GuideSection>
+  </div>
+
+  <!-- 控制条：切面 / 逐层消隐 / 参考线。挂在 html 上的开关，见 styles/styleguide.css -->
+  <div class="sg-bar" role="toolbar" aria-label="预览控制" data-nofx>
+    <span class="sg-bar-label">面</span>
+    <button type="button" data-sg-face="wake" aria-pressed="false">醒</button>
+    <button type="button" data-sg-face="dream" aria-pressed="false">梦</button>
+    <span class="sg-bar-sep" aria-hidden="true"></span>
+    <span class="sg-bar-label">图层消隐</span>
+    <button type="button" data-sg-toggle="sg-off-seam" aria-pressed="false" aria-label="消隐缝线">缝线</button>
+    <button type="button" data-sg-toggle="sg-off-hairline" aria-pressed="false" aria-label="消隐发丝线">发丝线</button>
+    <button type="button" data-sg-toggle="sg-off-eeg" aria-pressed="false" aria-label="消隐脑电">脑电</button>
+    <button type="button" data-sg-toggle="sg-off-constructs" aria-pressed="false" aria-label="消隐构块场">构块场</button>
+    <button type="button" data-sg-toggle="sg-off-rail" aria-pressed="false" aria-label="消隐仪表轨">仪表轨</button>
+    <span class="sg-bar-sep" aria-hidden="true"></span>
+    <span class="sg-bar-label">参考线</span>
+    <button type="button" data-sg-toggle="sg-grid" aria-pressed="false">网格</button>
+    <button type="button" data-sg-toggle="sg-outline" aria-pressed="false">轮廓</button>
+    <button type="button" data-sg-reset>复位</button>
+  </div>
+</BaseLayout>
+
+<script>
+  import { forceReality, getReality, onRealityChange } from '../scripts/reality';
+
+  const root = document.documentElement;
+
+  /* 令牌数值回填：一律读计算值，不把色号抄第二处。
+     注意读自定义属性要用连字符原名（驼峰取不到，见 content-typography.md 第五节踩坑 1）。 */
+  const fillTokens = () => {
+    for (const el of document.querySelectorAll<HTMLElement>('[data-sg-token]')) {
+      const name = el.dataset.sgToken ?? '';
+      el.textContent = getComputedStyle(root).getPropertyValue(name).trim() || '—';
+    }
+  };
+
+  /* 实测尺寸回填：取 border box 的矩形（虚框自己带 1px 边，clientWidth 会少 2px） */
+  const rectOf = (id: string | undefined) => {
+    const target = id ? document.getElementById(id) : null;
+    if (!target) return null;
+    return target.getBoundingClientRect();
+  };
+  const fillSizes = () => {
+    for (const el of document.querySelectorAll<HTMLElement>('[data-sg-w]')) {
+      const r = rectOf(el.dataset.sgW);
+      el.textContent = r ? `${Math.round(r.width)}px` : '—';
+    }
+    for (const el of document.querySelectorAll<HTMLElement>('[data-sg-h]')) {
+      const r = rectOf(el.dataset.sgH);
+      el.textContent = r ? `${Math.round(r.height)}px` : '—';
+    }
+  };
+
+  /* 面：走 reality 的闩锁路径，故叠影 / 强调色 / 双面文案 / 跨页记忆都跟着对齐 */
+  const faceBtns = [...document.querySelectorAll<HTMLButtonElement>('[data-sg-face]')];
+  const syncFace = () => {
+    const now = getReality();
+    for (const b of faceBtns) b.setAttribute('aria-pressed', String(b.dataset.sgFace === now));
+  };
+  for (const b of faceBtns) {
+    b.addEventListener('click', () => forceReality(b.dataset.sgFace === 'dream' ? 'dream' : 'wake'));
+  }
+  onRealityChange(() => {
+    syncFace();
+    // 强调色在 notify 之后才写，等两帧再读计算值
+    requestAnimationFrame(() => requestAnimationFrame(fillTokens));
+  });
+
+  /* 图层消隐与参考线：按下 = 加上那个 html 类 */
+  const toggleBtns = [...document.querySelectorAll<HTMLButtonElement>('[data-sg-toggle]')];
+  const syncToggles = () => {
+    for (const b of toggleBtns) {
+      const cls = b.dataset.sgToggle;
+      if (cls) root.classList.toggle(cls, b.getAttribute('aria-pressed') === 'true');
+    }
+  };
+  for (const b of toggleBtns) {
+    b.addEventListener('click', () => {
+      b.setAttribute('aria-pressed', b.getAttribute('aria-pressed') === 'true' ? 'false' : 'true');
+      syncToggles();
+    });
+  }
+
+  /* 叠影滑杆：写在 #sg-echo-zone 上而不是 :root —— 将来若又有脚本按滚动写 --echo，局部值仍优先 */
+  const echoZone = document.getElementById('sg-echo-zone');
+  const echoInput = document.querySelector<HTMLInputElement>('[data-sg-echo]');
+  const echoRead = document.querySelector<HTMLElement>('[data-sg-echo-val]');
+  const applyEcho = () => {
+    const v = echoInput?.value ?? '0';
+    echoZone?.style.setProperty('--echo', v);
+    if (echoRead) echoRead.textContent = Number(v).toFixed(2);
+  };
+  echoInput?.addEventListener('input', applyEcho);
+
+  /* 行内光景滑杆：写在 #sg-inline-fx 的容器上，样张里没写参数的那几处继承它 */
+  const fxZone = document.getElementById('sg-inline-fx');
+  const fxInputs = [...document.querySelectorAll<HTMLInputElement>('[data-sg-fx]')];
+  const applyFx = () => {
+    for (const input of fxInputs) {
+      const prop = input.dataset.sgFx ?? '';
+      const unit = input.dataset.sgUnit ?? '';
+      fxZone?.style.setProperty(prop, input.value + unit);
+      const read = document.querySelector<HTMLElement>(`[data-sg-fx-val="${prop}"]`);
+      if (read) read.textContent = input.value + unit;
+    }
+  };
+  for (const input of fxInputs) input.addEventListener('input', applyFx);
+
+  document.querySelector('[data-sg-reset]')?.addEventListener('click', () => {
+    for (const b of toggleBtns) b.setAttribute('aria-pressed', 'false');
+    syncToggles();
+    if (echoInput) echoInput.value = '0';
+    applyEcho();
+    for (const input of fxInputs) input.value = input.defaultValue;
+    applyFx();
+  });
+
+  addEventListener('resize', fillSizes, { passive: true });
+  addEventListener('load', fillSizes, { passive: true });
+  fillTokens();
+  fillSizes();
+  applyEcho();
+  applyFx();
+</script>

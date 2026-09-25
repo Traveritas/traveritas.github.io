@@ -7,16 +7,43 @@
      :::wake  … :::  → <div data-side="wake">（醒面段落，梦面隐藏）
    未标记的正文两面共读。
 
-   行内（自解析 [[醒|梦]]，纯文本、不嵌 markdown）：
+   行内（自解析，纯文本、不嵌 markdown，三套语法一次扫描）：
      [[醒来|梦见]] → <span data-morph data-true="醒来" data-dream="梦见">醒来</span>
+     ((浮起))      → 逐字 span，梦面各自量化浮起（.float-run，见 global.css）
+     {{流过}}      → 单层 span，梦面有一道暖光流过字面（.sheen-run）
+   后两套可追一段参数：((字|amp=4px,dur=3s)) / {{字|span=260%,hue=55%}}。
+   参数走白名单 + 取值形状校验，认不出的键与值一律丢弃 —— 正文里的一个笔误
+   不该能写进 style 属性。清单见 FLOAT_PARAMS / SHEEN_PARAMS。
+
    产出与站内手写双文案同一约定，morph/reality 引擎自动接管：
    长按线到达换面、梦态走神、无 JS 与读屏恒醒面。
    ───────────────────────────────────────────────────────────── */
 
 const SIDE_NAMES = new Set(['dream', 'wake']);
-const INLINE_DUAL = /\[\[([^[\]|]+)\|([^[\]]+)\]\]/g;
 /** 行内 code 的正文不在 text 节点里，但以防万一：这些父级下的 text 不拆 */
 const LITERAL_PARENTS = new Set(['inlineCode', 'code']);
+
+/** 三套行内语法共用一次扫描：双面文案 / 逐字浮起 / 流光 */
+const INLINE = /\[\[([^[\]|]+)\|([^[\]]+)\]\]|\(\(([^()]+)\)\)|\{\{([^{}]+)\}\}/g;
+
+/** 参数白名单：语法里的键 → [CSS 自定义属性, 取值形状]。
+    形状按单位收窄（px/em/rem、s/ms、%、deg、纯数），避免任何字符串漏进 style。 */
+const FLOAT_PARAMS = {
+  amp: ['--float-amp', /^\d+(\.\d+)?(px|em|rem)$/],
+  dur: ['--float-dur', /^\d+(\.\d+)?(s|ms)$/],
+  stagger: ['--float-stagger', /^-?\d+(\.\d+)?(s|ms)$/],
+  tint: ['--float-tint', /^\d+(\.\d+)?%$/],
+  sway: ['--float-sway', /^\d+(\.\d+)?$/],
+};
+
+const SHEEN_PARAMS = {
+  angle: ['--sheen-angle', /^-?\d+(\.\d+)?deg$/],
+  hue: ['--sheen-hue', /^\d+(\.\d+)?%$/],
+  span: ['--sheen-span', /^\d+(\.\d+)?%$/],
+  dur: ['--sheen-dur', /^\d+(\.\d+)?(s|ms)$/],
+  // 抽帧档数：转成缓动函数（styles/global.css 里 --sheen-ease 默认 linear）
+  steps: ['--sheen-ease', /^\d+$/, (n) => `steps(${n}, end)`],
+};
 
 function escapeHtml(s) {
   return s
@@ -33,17 +60,57 @@ function inlineDualHtml(wake, dream) {
   return `<span data-morph data-true="${w}" data-dream="${d}">${w}</span>`;
 }
 
-/** 把 text 节点值按双面语法拆成 text/html 节点序列；无匹配返回 null */
-function splitDuals(value) {
-  INLINE_DUAL.lastIndex = 0;
-  if (!INLINE_DUAL.test(value)) return null;
-  INLINE_DUAL.lastIndex = 0;
+/** `key=value,key=value` → 已校验的 style 声明串（前缀带空格，可能为空串） */
+function paramStyle(table, raw) {
+  if (!raw) return '';
+  const decls = [];
+  for (const pair of raw.split(',')) {
+    const eq = pair.indexOf('=');
+    if (eq < 1) continue;
+    const spec = table[pair.slice(0, eq).trim()];
+    if (!spec) continue;
+    const value = pair.slice(eq + 1).trim();
+    if (!spec[1].test(value)) continue;
+    decls.push(`${spec[0]}:${spec[2] ? spec[2](value) : value}`);
+  }
+  return decls.length ? ` style="${decls.join(';')}"` : '';
+}
+
+/** ((浮起)) → 包装层 + 一字一盒（--i 供逐字相位错开；参数落在包装层上被继承） */
+function inlineFloatHtml(body) {
+  const [text, params] = splitParams(body);
+  const chars = Array.from(text)
+    .map((ch, i) => `<span class="float-ch" style="--i:${i}">${escapeHtml(ch)}</span>`)
+    .join('');
+  return `<span class="float-run"${paramStyle(FLOAT_PARAMS, params)}>${chars}</span>`;
+}
+
+/** {{流过}} → 单层 span，字不拆（不影响换行与两端对齐） */
+function inlineSheenHtml(body) {
+  const [text, params] = splitParams(body);
+  return `<span class="sheen-run"${paramStyle(SHEEN_PARAMS, params)}>${escapeHtml(text)}</span>`;
+}
+
+/** 行内语法的正文与参数以第一个 `|` 分界；正文里要用竖线请写全角 ｜ */
+function splitParams(body) {
+  const at = body.indexOf('|');
+  if (at < 0) return [body, ''];
+  return [body.slice(0, at), body.slice(at + 1)];
+}
+
+/** 把 text 节点值按三套行内语法拆成 text/html 节点序列；无匹配返回 null */
+function splitInline(value) {
+  INLINE.lastIndex = 0;
+  if (!INLINE.test(value)) return null;
+  INLINE.lastIndex = 0;
   const out = [];
   let last = 0;
   let m;
-  while ((m = INLINE_DUAL.exec(value))) {
+  while ((m = INLINE.exec(value))) {
     if (m.index > last) out.push({ type: 'text', value: value.slice(last, m.index) });
-    out.push({ type: 'html', value: inlineDualHtml(m[1], m[2]) });
+    if (m[1] !== undefined) out.push({ type: 'html', value: inlineDualHtml(m[1], m[2]) });
+    else if (m[3] !== undefined) out.push({ type: 'html', value: inlineFloatHtml(m[3]) });
+    else out.push({ type: 'html', value: inlineSheenHtml(m[4]) });
     last = m.index + m[0].length;
   }
   if (last < value.length) out.push({ type: 'text', value: value.slice(last) });
@@ -63,7 +130,7 @@ export const twilight = {
   text(node, ctx) {
     const parent = ctx.parent(node);
     if (parent && LITERAL_PARENTS.has(parent.type)) return;
-    const parts = splitDuals(node.value);
+    const parts = splitInline(node.value);
     if (parts) ctx.replaceNode(node, parts);
   },
 };

@@ -1,0 +1,697 @@
+/* ─────────────────────────────────────────────────────────────
+   样式预览页（/styleguide/）专用 —— 只在预览页 import，不进全站样式表。
+   原则：这里只写「工具箱自身的框与字」，一切被预览的样式都现取
+   tokens.css / global.css / 各组件，不在此处复制一份（免两处各写一份）。
+   类名一律 sg- 前缀；少数裸类名规则（图层消隐 / 参考线）是刻意的，
+   因为要作用到全站固定层，故限定在 html.sg-* 开关之下。
+   ───────────────────────────────────────────────────────────── */
+
+/* ── 页面骨架：比 container-wide 宽一档，给三栏并置留位置 ── */
+.sg-body {
+  width: min(100% - 3rem, 92rem);
+  margin-inline: auto;
+  padding-block: var(--gap-v) 7rem;
+}
+
+/* ≥1200px 时左侧有仪表轨（固定 left 28px 起、含竖排站名约 90px 宽），
+   栏宽得让出这一段，否则轨压在样张上 */
+@media (min-width: 1200px) {
+  .sg-body {
+    width: min(100% - 15rem, 92rem);
+  }
+}
+
+.sg-lede {
+  margin: 0.75rem 0 0;
+  max-width: 50em;
+  color: var(--fg-soft);
+}
+
+.sg-hints {
+  margin: 1.5rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.4rem;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  color: var(--fg-soft);
+}
+
+.sg-hints li::before {
+  content: '·';
+  margin-right: 0.6em;
+  color: var(--amber);
+}
+
+.sg-hints code,
+.sg-sec-note code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  color: var(--umber);
+}
+
+.sg-toc {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  margin: 2.2rem 0 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.14em;
+}
+
+.sg-toc a {
+  color: var(--fg-soft);
+  text-decoration: none;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 2px;
+}
+
+.sg-toc a:hover {
+  color: var(--fg);
+  border-color: color-mix(in srgb, var(--amber) 55%, transparent);
+}
+
+/* ── 章节 ── */
+.sg-sec {
+  margin-top: clamp(3.4rem, 7vh, 5.5rem);
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--line);
+  scroll-margin-top: 1.5rem;
+}
+
+.sg-sec-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.3rem 0.9rem;
+  margin: 0 0 1.5rem;
+}
+
+.sg-sec-n {
+  font-size: 0.68rem;
+  letter-spacing: 0.2em;
+  color: var(--amber);
+}
+
+.sg-sec-head h2 {
+  font-size: 1.32rem;
+  letter-spacing: 0.04em;
+}
+
+.sg-sec-en {
+  font-size: 0.58rem;
+  letter-spacing: 0.26em;
+  color: var(--fg-soft);
+}
+
+/* 说明独占一行：flex-basis 会被 max-width 截断，故包一层拿宽度 */
+.sg-sec-note {
+  flex: 0 0 100%;
+  margin: 0.2rem 0 0;
+  font-size: 0.84rem;
+  line-height: 1.95;
+  letter-spacing: 0.02em;
+  color: var(--fg-soft);
+}
+
+.sg-sec-note > span {
+  display: block;
+  max-width: 58em;
+}
+
+/* ── 样张框：名称 + 类名 + 说明，下面是实物 ── */
+.sg-specs {
+  display: grid;
+  gap: 1.1rem;
+}
+
+.sg-spec {
+  min-width: 0;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--fg) 2%, transparent);
+}
+
+.sg-spec-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.85rem;
+  padding: 0.5rem 0.8rem 0.45rem;
+  border-bottom: 1px solid var(--line);
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.12em;
+}
+
+.sg-spec-name {
+  color: var(--fg);
+}
+
+.sg-spec-cls {
+  color: var(--umber);
+  letter-spacing: 0.04em;
+}
+
+.sg-spec-src {
+  font-size: 0.58rem;
+  letter-spacing: 0.1em;
+  color: var(--fg-soft);
+}
+
+.sg-spec-note {
+  max-width: 54em;
+  font-family: var(--font-body);
+  font-size: 0.74rem;
+  letter-spacing: 0.05em;
+  color: var(--fg-soft);
+}
+
+.sg-spec-body {
+  padding: 1.3rem 1.05rem;
+}
+
+.sg-spec-body--flush {
+  padding: 0;
+}
+
+/* 收掉样张首末元素的上下边距，免得框内凭空多出空白。
+   第二支选择器是必需的：Astro 把组件自带的 <script> 内联在**首个**实例后面，
+   于是那一格里 :last-child 落在 script 上、真正的末元素反而漏掉
+   （症状：同一构件三个实例，第一个的框比另两个高一个 margin）。 */
+.sg-spec-body > :first-child,
+.sg-spec-body .md > :first-child {
+  margin-top: 0;
+}
+
+.sg-spec-body > :last-child,
+.sg-spec-body > *:has(+ script:last-child),
+.sg-spec-body .md > :last-child {
+  margin-bottom: 0;
+}
+
+/* ── 并置栏 ──
+   轨道下限写成 min(Nrem, 100%)：窄屏上 100% 生效，栏才不会把列挤出容器
+   （直接写 minmax(22rem, 1fr)，容器窄于 22rem 时整格会溢出并顶宽外层 grid）。 */
+.sg-cols {
+  min-width: 0;
+  display: grid;
+  gap: 1.1rem;
+  align-items: start;
+}
+
+.sg-cols--3 {
+  grid-template-columns: repeat(auto-fit, minmax(min(19rem, 100%), 1fr));
+}
+
+.sg-cols--2 {
+  grid-template-columns: repeat(auto-fit, minmax(min(22rem, 100%), 1fr));
+}
+
+/* ── 令牌色板 ── */
+.sg-swatches {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(15rem, 100%), 1fr));
+  gap: 0.55rem;
+}
+
+.sg-swatch {
+  display: grid;
+  grid-template-columns: 2.1rem minmax(0, 1fr);
+  gap: 0.25rem 0.7rem;
+  align-items: center;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--line);
+}
+
+.sg-chip {
+  grid-row: 1 / span 2;
+  width: 2.1rem;
+  height: 2.1rem;
+  border: 1px solid color-mix(in srgb, var(--fg) 14%, transparent);
+}
+
+.sg-swatch-txt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.15rem 0.55rem;
+}
+
+.sg-val {
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.04em;
+  color: var(--fg-soft);
+}
+
+.sg-role {
+  grid-column: 2;
+  font-size: 0.72rem;
+  line-height: 1.6;
+  color: var(--fg-soft);
+}
+
+/* ── 字体样张 ── */
+.sg-fonts {
+  display: grid;
+  gap: 1rem;
+}
+
+.sg-font {
+  border-left: 2px solid var(--line);
+  padding-left: 1rem;
+}
+
+.sg-font-h {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.16em;
+  color: var(--fg-soft);
+}
+
+.sg-font-sample {
+  margin: 0.45rem 0 0;
+  font-size: 1.25rem;
+  line-height: 1.9;
+  color: var(--fg);
+}
+
+.sg-font-en {
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+  color: var(--fg-soft);
+}
+
+.sg-font--display .sg-font-sample {
+  font-family: var(--font-display);
+}
+
+.sg-font--body .sg-font-sample {
+  font-family: var(--font-body);
+}
+
+.sg-font--mono .sg-font-sample {
+  font-family: var(--font-mono);
+  font-size: 1.05rem;
+}
+
+.sg-font--pixel .sg-font-sample {
+  font-family: var(--font-pixel);
+  font-size: 1.05rem;
+  letter-spacing: 0.08em;
+}
+
+/* ── 度量 ── */
+.sg-metrics {
+  display: grid;
+  gap: 1.1rem;
+}
+
+.sg-metric-h {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.2rem 0.7rem;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+  color: var(--fg-soft);
+}
+
+.sg-metric-bar {
+  margin-top: 0.4rem;
+  height: 0.5rem;
+  background: repeating-linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--umber) 42%, transparent) 0 4px,
+    transparent 4px 8px
+  );
+}
+
+.sg-metric-gap {
+  margin-top: 0.4rem;
+  width: 4rem;
+  background: repeating-linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--umber) 42%, transparent) 0 4px,
+    transparent 4px 8px
+  );
+}
+
+.sg-metric-rule {
+  margin-top: 0.5rem;
+  width: 8rem;
+  height: 1px;
+  background: var(--fg-soft);
+  transform: rotate(var(--seam-angle));
+  transform-origin: left center;
+}
+
+/* 示意框：虚线边 + 小字。度量条与演示块共用一套外观，不各写一份 */
+.sg-metric-box,
+.sg-demo-box {
+  border: 1px dashed color-mix(in srgb, var(--umber) 45%, transparent);
+  padding: 0.35rem 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--fg-soft);
+}
+
+.sg-metric-box {
+  margin-top: 0.4rem;
+}
+
+/* 演示用的小构件：让样张里的 markup 不必带行内样式 */
+.sg-demo-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1.6rem;
+}
+
+.sg-demo-box {
+  width: 8rem;
+  text-align: center;
+}
+
+.sg-demo-box--amp {
+  --d-amp: 14px;
+  --d-rot: 1.4deg;
+  --d-dur: 5.5s;
+}
+
+.sg-demo-btn {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  padding: 0.4rem 0.8rem;
+  border: 1px solid var(--line);
+  background: none;
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.sg-shard-row {
+  display: flex;
+  align-items: center;
+  gap: 1.4rem;
+  color: var(--umber);
+}
+
+/* ── 仪表舞台：靠 transform 把 fixed 的仪器收进框内（成其包含块） ──
+   刻意不给舞台底色：仪器的负 z 要在舞台内画得出来；
+   边界由样张框本身给，故这里不另加边框。 */
+.sg-stage {
+  position: relative;
+  transform: translateZ(0);
+  overflow: clip;
+  min-width: 0;
+  height: 14rem;
+}
+
+.sg-stage--tall {
+  height: 18rem;
+}
+
+/* 舞台内的仪器：亮出来、摆正（真实页面上它由 body.past-hero 控制显隐） */
+.sg-stage .rail {
+  opacity: 1;
+  visibility: visible;
+  translate: 0 0;
+}
+
+.sg-stage-tag {
+  position: absolute;
+  right: 0.5rem;
+  bottom: 0.4rem;
+  z-index: 2;
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+  letter-spacing: 0.2em;
+  color: var(--fg-soft);
+}
+
+@media (max-width: 1200px) {
+  .sg-stage--rail::after {
+    content: '轨在 < 1200px 隐藏';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.2em;
+    color: var(--fg-soft);
+  }
+}
+
+/* ── 名录索引表 ── */
+.sg-table-wrap {
+  overflow-x: auto;
+}
+
+.sg-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.sg-table th:nth-child(1) {
+  width: 19%;
+}
+
+.sg-table th:nth-child(2) {
+  width: 33%;
+}
+
+.sg-table th:nth-child(3) {
+  width: 23%;
+}
+
+.sg-table th,
+.sg-table td {
+  text-align: left;
+  padding: 0.55rem 0.7rem 0.55rem 0;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+
+.sg-table th {
+  font-family: var(--font-mono);
+  font-weight: 400;
+  font-size: 0.6rem;
+  letter-spacing: 0.18em;
+  color: var(--fg-soft);
+}
+
+.sg-table code {
+  font-family: var(--font-mono);
+  font-size: 0.82em;
+  color: var(--umber);
+}
+
+.sg-table td:last-child {
+  white-space: nowrap;
+}
+
+.sg-table tbody tr:hover {
+  background: color-mix(in srgb, var(--fg) 2.5%, transparent);
+}
+
+/* ── 复现内页的列宽语境（标签页的 .ledger 住在 42rem 的 .container 里） ── */
+.sg-narrow {
+  max-width: 42rem;
+}
+
+/* ── 夜色舞台：玻璃片一类的梦侧构件只活在夜里 ──
+   深色底是它的设计前提（片底 rgba(255,255,255,.09) 配 #f0f3f6 的字），
+   摆到亮面上会读成白字白底。底色取自 StageBackdrop 的随笔段。 */
+.sg-night-stage {
+  display: grid;
+  gap: 1.7rem;
+  justify-items: start;
+  padding: 2.2rem 1.6rem;
+  background: #171b24;
+}
+
+/* ── 双态演示 ── */
+.sg-demo-line {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--fg);
+}
+
+.sg-range {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin-top: 0.9rem;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+  color: var(--fg-soft);
+}
+
+.sg-range input[type='range'] {
+  width: min(16rem, 34vw);
+  accent-color: var(--amber);
+}
+
+/* ── 控制条（固定底部的小仪器） ── */
+.sg-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 1rem;
+  z-index: 120;
+  transform: translateX(-50%);
+  max-width: calc(100% - 1.6rem);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem 0.45rem;
+  padding: 0.4rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg) 72%, transparent);
+  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+  backdrop-filter: blur(16px) saturate(1.2);
+  box-shadow: 0 20px 44px -24px rgba(10, 13, 20, 0.6);
+}
+
+.sg-bar-label {
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.2em;
+  color: var(--fg-soft);
+}
+
+.sg-bar-sep {
+  width: 1px;
+  align-self: stretch;
+  margin-inline: 0.35rem;
+  background: var(--line);
+}
+
+.sg-bar button {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+  color: var(--fg-soft);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 0.32rem 0.6rem 0.28rem;
+  cursor: pointer;
+  transition:
+    color 0.16s ease,
+    border-color 0.16s ease,
+    background-color 0.16s ease;
+}
+
+.sg-bar button:hover {
+  color: var(--fg);
+  border-color: var(--line);
+}
+
+.sg-bar button[aria-pressed='true'] {
+  color: var(--fg);
+  border-color: color-mix(in srgb, var(--amber) 58%, transparent);
+  background: color-mix(in srgb, var(--amber) 8%, transparent);
+}
+
+/* 窄屏：去掉「面 / 图层消隐 / 参考线」三处标签与竖分隔，胶囊改圆角矩形，
+   否则一排按钮会把手机视口占掉一大块 */
+@media (max-width: 700px) {
+  .sg-bar {
+    bottom: 0.5rem;
+    gap: 0.25rem 0.3rem;
+    padding: 0.35rem 0.5rem;
+    border-radius: 14px;
+  }
+
+  .sg-bar-label,
+  .sg-bar-sep {
+    display: none;
+  }
+
+  .sg-bar button {
+    font-size: 0.62rem;
+    padding: 0.28rem 0.45rem 0.24rem;
+  }
+}
+
+/* ── 参考线（网格 / 轮廓）：开关挂在 html 上 ── */
+.sg-grid-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+html.sg-grid .sg-grid-overlay {
+  opacity: 1;
+}
+
+/* 8px 细格 */
+.sg-grid-overlay::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    repeating-linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--wake) 30%, transparent) 0 1px,
+      transparent 1px 8px
+    ),
+    repeating-linear-gradient(
+      0deg,
+      color-mix(in srgb, var(--wake) 22%, transparent) 0 1px,
+      transparent 1px 8px
+    );
+}
+
+/* 64px 主格 */
+.sg-grid-overlay::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    repeating-linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--amber) 26%, transparent) 0 1px,
+      transparent 1px 64px
+    ),
+    repeating-linear-gradient(
+      0deg,
+      color-mix(in srgb, var(--amber) 18%, transparent) 0 1px,
+      transparent 1px 64px
+    );
+}
+
+html.sg-outline :where(.page, .page *) {
+  outline: 1px solid color-mix(in srgb, var(--amber) 38%, transparent);
+}
+
+/* ── 图层消隐：开关挂在 html 上，作用于全站固定层 ── */
+html.sg-off-seam .seam-wrap,
+html.sg-off-hairline .hairline,
+html.sg-off-eeg .eeg-group,
+html.sg-off-constructs .fld-bg,
+html.sg-off-rail .rail {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sg-grid-overlay,
+  .sg-bar button {
+    transition: none;
+  }
+}

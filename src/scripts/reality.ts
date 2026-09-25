@@ -68,6 +68,28 @@ export function getReality(): Reality {
   return reality;
 }
 
+/** 显式落定某一面（样式预览页的醒 / 梦开关）。
+    与闩锁走同一条路径——强调色插值、双面文案、跨页记忆都随之对齐，
+    所以预览页看到的就是长按入梦后的同一状态；手势进行中不抢占。 */
+export function forceReality(target: Reality) {
+  if (!body || mode !== 'idle' || target === reality) return;
+  dir = target === 'wake' ? 'go' : 'back';
+  reality = target;
+  body.dataset.reality = target;
+  notifyReality(target);
+  try {
+    sessionStorage.setItem(STORE_KEY, target);
+  } catch {
+    /* 隐私模式静默 */
+  }
+  setMorphReality(target);
+  flipAllDuals(true);
+  if (thread) thread.style.display = 'none';
+  hideKnot();
+  c = target === 'wake' ? 1 : 0;
+  setTint(c);
+}
+
 function notifyReality(r: Reality) {
   for (const fn of realityListeners) fn(r);
   if (typeof window !== 'undefined') {
@@ -649,6 +671,10 @@ function wireGestures() {
 
 /* ---------- 启动 ---------- */
 function enterDream() {
+  // 入场只演一次，且不写 reality / data-reality。若这之前已有人显式落定醒面
+  // （样式预览页的 forceReality），就此让位——否则会把刚选好的醒面掀成
+  // 「醒面外壳 + 梦面文案 + 梦色强调」的半截状态。
+  if (reality !== 'dream') return;
   // 入梦：可见 dual 逐个乱码入梦面，其余直接置梦面（醒面真值只在
   // 无 JS / RM 时呈现）
   setMorphReality('dream');

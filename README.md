@@ -20,14 +20,30 @@ src/
     projects/         #   项目
   content.config.ts   # 内容集合定义与字段校验
   layouts/            # 页面骨架
-  components/         # 组件（页头/页脚/印记）
-  pages/              # 路由页面
-  styles/global.css   # 设计令牌（醒梦色彩/字体）与全局样式
+  components/         # 组件（页头/页脚/印记/styleguide 样张原语）
+  pages/              # 路由页面（styleguide.astro = 样式预览工作台）
+  styleguide/         # 样式预览用的 markdown 样张
+  styles/global.css   # 全局样式（令牌/排版分层）
+  styles/tokens.css   # 设计令牌（醒梦色彩/字体）
+  styles/styleguide.css  # 只在 /styleguide/ 载入的工具样式
 docs/
   tech-stack-decision.md   # 技术选型决议
   design/aesthetic-direction.md  # 审美方向简报
+  design/content-typography.md   # 内页正文排版分层地图
+  design/styleguide.md           # 样式预览页怎么用、怎么加新样张
 .github/workflows/deploy.yml   # GitHub Pages 自动部署
 ```
+
+## 样式预览
+
+`/styleguide/` 是摊开全站共用样式与变体的工作台：令牌、内容页正文的三层管道、
+通用构件、醒梦双态、全站仪器层。不进 sitemap、robots 禁止收录、站内无入口。
+
+```bash
+npm run dev   # → http://localhost:4321/styleguide/
+```
+
+加新样张的约定见 `docs/design/styleguide.md`。
 
 ## 写作
 

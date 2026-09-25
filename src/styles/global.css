@@ -213,6 +213,123 @@ hr {
   filter: blur(0.4px);
 }
 
+/* ─────────────────────────────────────────────────────────────
+   行内光景：逐字浮起 .float-run / 流光 .sheen-run
+   正文语法 ((…)) 与 {{…}}（手册 docs/writing.md，参数与边界见
+   docs/design/content-typography.md）。两条都**只在梦面成立**：
+     · 醒面、无 JS、读屏、RM、长按中一律不声明 animation —— 位移为零、
+       字色就是正文原色（与「醒面是唯一真值」「醒静梦动」同一条规矩）；
+     · keyframes 里不乘 --still：逐帧解算这个根变量会让 Blink 每帧 tick，
+       构块场为此把浮动动画收窄到「梦面静置」（Constructs.astro 的实测注）。
+   ───────────────────────────────────────────────────────────── */
+
+/* —— 逐字浮起：包装层只承参数，一个字一个 inline-block 盒 ——
+   相位是插件写在每个字上的 --i，横向方向由奇偶交替。
+   ⚠ 拆字后字串内部不再换行（2–8 字为宜），两端对齐在这里留缺口；
+     流光不拆字，没有这条限制。 */
+.float-run {
+  /* 顶点色：琥珀按 --float-tint 混进正文色，默认 0%（纯位移、不动色） */
+  --float-peak: color-mix(in srgb, var(--amber) var(--float-tint, 0%), currentColor);
+}
+
+.float-ch {
+  display: inline-block;
+  white-space: pre;
+}
+
+.float-ch:nth-child(odd) {
+  --float-dir: 1;
+}
+
+.float-ch:nth-child(even) {
+  --float-dir: -1;
+}
+
+/* will-change 只随动画一起声明：醒面没有动画，也就没有理由把每个字提成合成层 */
+body[data-reality='dream']:not(.reality-holding) .float-ch {
+  will-change: translate;
+  animation: float-char var(--float-dur, 2.8s) step-end infinite;
+  animation-delay: calc(var(--i, 0) * var(--float-stagger, -0.4s));
+}
+
+/* 轨迹：0 → 峰 −1 倍振幅 → 0，step-end 瞬切定格（与品牌字标同一条曲线）。
+   横向只在 --float-sway > 0 时出现，默认 0 = 纯垂直。 */
+@keyframes float-char {
+  0%,
+  87%,
+  100% {
+    translate: 0 0;
+    color: currentColor;
+  }
+  13% {
+    translate: calc(var(--float-amp, 3px) * var(--float-sway, 0) * var(--float-dir, 1) * 0.33)
+      calc(var(--float-amp, 3px) * -0.33);
+  }
+  25% {
+    translate: calc(var(--float-amp, 3px) * var(--float-sway, 0) * var(--float-dir, 1) * 0.66)
+      calc(var(--float-amp, 3px) * -0.66);
+    color: var(--float-peak);
+  }
+  37% {
+    translate: calc(var(--float-amp, 3px) * var(--float-sway, 0) * var(--float-dir, 1))
+      calc(var(--float-amp, 3px) * -1);
+    color: var(--float-peak);
+  }
+  63% {
+    translate: calc(var(--float-amp, 3px) * var(--float-sway, 0) * var(--float-dir, 1) * 0.66)
+      calc(var(--float-amp, 3px) * -0.66);
+    color: var(--float-peak);
+  }
+  75% {
+    translate: calc(var(--float-amp, 3px) * var(--float-sway, 0) * var(--float-dir, 1) * 0.33)
+      calc(var(--float-amp, 3px) * -0.33);
+  }
+}
+
+/* —— 流光：一道暖光自左向右流过字面 ——
+   醒面不设背景，字就是正文原色，没有一丝渐变。位移只动 background-position，
+   不碰字号与字距 ⇒ 不产生布局抖动。整段折行时每行各取一截渐变（见手册）。 */
+body[data-reality='dream'] .sheen-run {
+  background-image: linear-gradient(
+    var(--sheen-angle, 100deg),
+    var(--fg) 0%,
+    var(--fg) 33%,
+    color-mix(in srgb, var(--amber) var(--sheen-hue, 45%), var(--fg)) 50%,
+    var(--fg) 67%,
+    var(--fg) 100%
+  );
+  background-size: var(--sheen-span, 300%) 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: sheen-slide var(--sheen-dur, 7s) var(--sheen-ease, linear) infinite;
+}
+
+/* 100% → 0%：亮带自左向右走过（与阅读方向一致） */
+@keyframes sheen-slide {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0% 0;
+  }
+}
+
+/* 裁字之后字身是透明的，选中高亮会把整段盖成一块色 —— 给选中的那截还回正文色 */
+.sheen-run::selection {
+  color: var(--fg);
+  -webkit-text-fill-color: var(--fg);
+}
+
+/* Windows 高对比度：背景被强制抹掉，透明字身会读不出来 */
+@media (forced-colors: active) {
+  body[data-reality='dream'] .sheen-run {
+    background-image: none;
+    color: var(--fg);
+    -webkit-text-fill-color: var(--fg);
+  }
+}
+
 /* ── 页面骨架 ── */
 .page {
   min-height: 100dvh;
@@ -376,7 +493,17 @@ main {
   }
 }
 
-/* ── 文章排版 ── */
+/* ─────────────────────────────────────────────────────────────
+   内容页排版
+   骨架（.prose / .prose-head / .prose-meta / .prose-rule）与默认层供所有长文列；
+   markdown 正文容器 .md 分两层：
+     · 公共层 = 随笔的长文阅读正典（宋体夜话），随笔 / 项目两页同时生效；
+     · 变体层 .prose--essay / .prose--project 只声明两页相异处。
+   新增 markdown 元素（h3 / ol / table / figure…）写公共层一次即两页生效；
+   尚未分化的 h3 / ol / code / pre / img 由默认层兜底。
+   层序：公共层刻意排在默认层之后，同权重时以公共层为准。
+   全貌与待设计清单见 docs/design/content-typography.md。
+   ───────────────────────────────────────────────────────────── */
 .prose {
   max-width: var(--measure);
 }
@@ -402,6 +529,7 @@ main {
   margin: 1.8rem 0 2.6rem;
 }
 
+/* —— 默认层：非 markdown 长文，以及尚未按页分化的元素 —— */
 .prose p {
   margin: 1.35em 0;
 }
@@ -460,6 +588,476 @@ main {
   margin-block: 1.8em;
 }
 
+/* —— markdown 公共层（.md）：小节编号 · 列表 · 行内强调 · 互链 · 梦侧引文 ——
+   随笔与项目取值一致的部分写在这里；两页相异处一律下移到变体层。 */
+.md {
+  counter-reset: sec;
+}
+
+.md p {
+  margin: 0 0 1.5em;
+}
+
+.md div[data-side] {
+  margin: 0 0 1.5em;
+}
+
+.md h2 {
+  counter-increment: sec;
+}
+
+/* 小节号：汉字序号 · 琥珀；字号与落位由各变体定 */
+.md h2::before {
+  content: counter(sec, cjk-ideographic);
+  font-weight: 600;
+  color: var(--amber);
+}
+
+.md ul {
+  list-style: none;
+  margin: 1.6em 0;
+  padding: 0;
+}
+
+.md li {
+  position: relative;
+  padding-left: 1.75em;
+  margin: 0.62em 0;
+}
+
+/* 列表符号：随笔是 14° 的琥珀微刻度，项目是 mono 空心圈（见变体层）。
+   ★ 一律收窄到 ul > li —— 原先写在 .md li::before 上，于是 ol 会同时吃到自绘记号
+     与浏览器原生序号，且记号相对 li 定位（li 从原生序号之后才起）会压在每项首字上。
+   新增列表类元素时，先确认记号规则的作用域，再动手。 */
+.md ul > li::before {
+  position: absolute;
+}
+
+/* ── 有序列表：保留原生序号，只改颜色与字体（两页同款）
+      序号走 mono 读数，与刻度 / 时刻 / 编号同一套字；嵌套层重新从 1 起。 ── */
+.md ol {
+  margin: 1.6em 0;
+  padding-left: 1.7em;
+}
+
+.md ol ol {
+  margin: 0.5em 0;
+}
+
+.md ol > li {
+  padding-left: 0;
+}
+
+.md ol > li::marker {
+  color: var(--fg-soft);
+  font-family: var(--font-mono);
+  font-size: 0.84em;
+}
+
+/* ── 表格：无框名录——只有横向发丝线，与 .ledger 同源
+      项目变体加成板块（1px 外框 + 2% 底），见变体层。 ── */
+.md table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 2em 0;
+  font-size: 0.93em;
+  line-height: 1.85;
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+
+/* caption 只有正文里写原始 HTML 才吃到（markdown 出不了 <caption>） */
+.md caption {
+  caption-side: top;
+  text-align: left;
+  padding-bottom: 0.75em;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.22em;
+  color: var(--fg-soft);
+}
+
+.md th {
+  font-weight: 600;
+  padding: 0.6em 0.9em 0.5em 0;
+  border-bottom: 1px solid var(--line);
+  vertical-align: bottom;
+}
+
+.md td {
+  padding: 0.62em 0.9em 0.62em 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
+  vertical-align: top;
+}
+
+.md tbody tr:last-child td {
+  border-bottom: 1px solid var(--line);
+}
+
+.md th:last-child,
+.md td:last-child {
+  padding-right: 0;
+}
+
+/* ── 图与图注：图注内容由正文自己给，不自动编号 ──
+   图版本身不带框（随笔侧），项目侧成框见变体层。 */
+.md figure {
+  margin: 2.4em 0;
+}
+
+/* 图版内的图不要再叠 .prose img 的 1.8em 上下边距，否则图注被推远 */
+.md figure img {
+  margin: 0;
+}
+
+.md figcaption {
+  margin-top: 0.85em;
+  font-size: 0.78rem;
+  line-height: 1.85;
+  letter-spacing: 0.05em;
+  color: var(--fg-soft);
+}
+
+/* ── code / pre：引文与代码都是「外来语」，共用一条梦色左缘（随笔侧）──
+   底色用 color-mix(--fg …) 而不是 --bg-sunken：后者是写死的浅色，将来若正文
+   落到深色语境（首页那种夜底）会亮成一块白斑。内页目前不切夜色（initNight 在
+   无首屏的页面直接返回），所以这条是面向未来的稳当，不是现存缺陷。
+   ★ 行内 code 一律写成 :not(pre) > code —— 写在 .md code 上时，底与字号会
+     漏到 pre 里的 code 上（症状：代码块每行多一条底带、字号被二次缩小）。 */
+.md :not(pre) > code {
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  letter-spacing: 0;
+  background: color-mix(in srgb, var(--fg) 6%, transparent);
+  padding: 0.15em 0.4em;
+  border-radius: 3px;
+}
+
+.md pre {
+  position: relative;
+  margin: 2em 0;
+  padding: 1.1em 1.3em;
+  border-left: 2px solid color-mix(in srgb, var(--dream) 50%, transparent);
+  border-radius: 0 4px 4px 0;
+  background: color-mix(in srgb, var(--fg) 4%, transparent);
+  overflow-x: auto;
+  line-height: 1.8;
+  font-size: 0.85em;
+  /* 全站把滚动条藏了（html 与 ::-webkit-scrollbar 两处），代码块自己开一条细的，
+     否则窄屏上横向溢出没有任何提示 */
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--fg) 22%, transparent) transparent;
+}
+
+.md pre code {
+  background: none;
+  padding: 0;
+  font-size: 1em;
+}
+
+.md pre::-webkit-scrollbar {
+  height: 4px;
+}
+
+.md pre::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--fg) 22%, transparent);
+  border-radius: 2px;
+}
+
+/* 语言签：直接吃 Shiki 已有的 data-language，不另立约定 */
+.md pre::after {
+  content: attr(data-language);
+  position: absolute;
+  top: 0.6em;
+  right: 0.9em;
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--fg-soft);
+  opacity: 0.8;
+}
+
+.md pre:not([data-language])::after {
+  content: none;
+}
+
+.md strong {
+  font-weight: 600;
+  background: linear-gradient(transparent 66%, color-mix(in srgb, var(--dream) 30%, transparent) 66%);
+}
+
+.md a {
+  color: var(--umber);
+}
+
+/* 引文是梦侧：暖边 · 左齐 · 轻轻浮动 */
+.md blockquote {
+  margin: 2em 0;
+  padding: 0.3em 0 0.3em 1.5em;
+  border-left: 2px solid var(--dream);
+  color: var(--fg-soft);
+  font-size: 0.96em;
+  letter-spacing: 0.02em;
+  text-align: left;
+  animation: drift 9.5s ease-in-out infinite;
+  --d-amp: 2.6px;
+  --d-rot: 0.15deg;
+}
+
+/* ── 变体：随笔（宋体夜话 · 长文阅读正典）──
+   与项目的黑体方正文只差这些：字号字距两端对齐、行内嵌字小节号、
+   14° 微刻度列表符号、梦色高亮。 */
+.prose--essay {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(1.0625rem, 1.0625rem + 0.32vw, 1.15625rem);
+  line-height: 2.08;
+  letter-spacing: 0.015em;
+  text-align: justify;
+}
+
+@media (max-width: 640px) {
+  .prose--essay {
+    text-align: left;
+  }
+}
+
+.prose--essay .md h2 {
+  font-size: 1.28rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  line-height: 1.6;
+  margin: 2.65em 0 0.95em;
+}
+
+.prose--essay .md h2::before {
+  display: inline-block;
+  margin-right: 0.7em;
+  transform: translateY(-0.12em);
+  font-size: 0.6em;
+  letter-spacing: 0.12em;
+}
+
+/* 随笔的列表刻度：只挂在 ul 上（ol 走原生序号 + mono ::marker，见公共层） */
+.prose--essay .md ul > li::before {
+  content: '';
+  left: 0.22em;
+  top: 1em;
+  width: 0.85em;
+  height: 1.5px;
+  background: var(--amber);
+  opacity: 0.6;
+  transform: rotate(calc(var(--seam-angle) * -1));
+}
+
+/* 随笔的等宽：行内 code 不填底，只在字下压一条梦色发丝（外来语的下划线）；
+   代码块保留公共层的梦色左缘，只是行距与内距松一点。 */
+.prose--essay .md :not(pre) > code {
+  background: none;
+  padding: 0 0.1em;
+  font-size: 0.84em;
+  border-bottom: 1px solid color-mix(in srgb, var(--dream) 55%, transparent);
+  border-radius: 0;
+}
+
+.prose--essay .md pre {
+  padding: 1.05em 1.35em 1.15em;
+}
+
+/* ── 变体：项目（黑体方正文 · 施工信纸）──
+   与随笔的宋体夜话保持体温差。页面独有的块（封面 / 八阶 / 链接区）
+   仍写在 projects/[slug].astro 里。 */
+.prose--project {
+  font-size: 1rem;
+  line-height: 2.05;
+  letter-spacing: 0.02em;
+}
+
+.prose--project .md p {
+  margin: 1.3em 0;
+}
+
+/* 两态块：与各自变体的段落同值（随笔 1.5em 随公共层；项目 1.3em 见变体层），
+   即「两态块与段落同呼吸」——块里可能有多段，读起来就是一个普通段落。 */
+.prose--project .md div[data-side] {
+  margin: 1.3em 0;
+}
+
+.prose--project .md h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.85em;
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  margin: 2.5em 0 0.8em;
+}
+
+.prose--project .md h2::before {
+  flex: none;
+  font-size: 0.66em;
+  letter-spacing: 0.1em;
+  border: 1px solid color-mix(in srgb, var(--amber) 45%, transparent);
+  padding: 0.3em 0.45em 0.25em;
+  line-height: 1;
+}
+
+.prose--project .md h2::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
+.prose--project .md ul {
+  margin: 1.4em 0;
+}
+
+.prose--project .md ul > li {
+  padding-left: 1.9em;
+  margin: 0 0 0.55em;
+}
+
+.prose--project .md ul > li::before {
+  content: '○';
+  left: 0.1em;
+  top: 0;
+  font-family: var(--font-mono);
+  font-size: 0.78em;
+  color: var(--fg-soft);
+}
+
+/* 施工信纸：md 的 - [x] 勾选态渲染成 ✓ 行 */
+.prose--project .md ul > li:has(input) {
+  padding-left: 1.9em;
+}
+
+.prose--project .md ul > li input {
+  display: none;
+}
+
+.prose--project .md ul > li:has(input)::before {
+  content: '○';
+}
+
+.prose--project .md ul > li:has(input:checked)::before {
+  content: '✓';
+  color: var(--amber);
+}
+
+.prose--project .md ul > li:has(input:checked) {
+  color: var(--fg);
+}
+
+.prose--project .md ul > li:not(:has(input:checked)) {
+  color: var(--fg-soft);
+}
+
+.prose--project .md strong {
+  font-weight: 700;
+  background: linear-gradient(transparent 64%, color-mix(in srgb, var(--amber) 24%, transparent) 64%);
+}
+
+/* ── 项目侧的方框语言：表格 / 图版 / 代码块都自成一块（与 .coverband、方框小节号同族）── */
+.prose--project .md table {
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--fg) 2%, transparent);
+  font-size: 0.94em;
+}
+
+.prose--project .md caption {
+  padding-left: 0.1em;
+}
+
+.prose--project .md th {
+  padding: 0.72em 0.95em 0.6em;
+  border-bottom: 1px solid var(--line);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.prose--project .md td {
+  padding: 0.68em 0.95em;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
+}
+
+.prose--project .md tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.prose--project .md th:last-child,
+.prose--project .md td:last-child {
+  padding-right: 0.95em;
+}
+
+.prose--project .md figure {
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--fg) 2%, transparent);
+  padding: 0.9rem 0.9rem 0.75rem;
+}
+
+.prose--project .md figure img {
+  border-radius: 0;
+  margin: 0;
+}
+
+.prose--project .md figcaption {
+  margin-top: 0.7rem;
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.12em;
+  line-height: 1.8;
+}
+
+/* 项目侧行内 code 填底成小块（与方框语言同族；随笔侧是不填底的梦色下划线） */
+.prose--project .md :not(pre) > code {
+  font-size: 0.88em;
+  background: color-mix(in srgb, var(--fg) 7%, transparent);
+  padding: 0.14em 0.38em;
+}
+
+.prose--project .md pre {
+  border: 1px solid var(--line);
+  border-left: 1px solid var(--line);
+  border-radius: 0;
+  padding: 1.15em 1.3em 1.25em;
+}
+
+/* —— 跨页互链块：标签文案与条目由两页各自给 —— */
+.xfile {
+  margin-top: 2.6rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.prose--project .xfile {
+  margin-top: 3rem;
+}
+
+.xfile-t {
+  font-size: 0.58rem;
+  letter-spacing: 0.26em;
+  color: var(--fg-soft);
+}
+
+.xfile a {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  letter-spacing: 0.03em;
+  text-decoration: none;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 2px;
+  align-self: flex-start;
+}
+
+.xfile a:hover {
+  border-color: color-mix(in srgb, var(--amber) 55%, transparent);
+}
+
 /* ── 两态正文块（:::dream / :::wake，语法见 docs/writing.md）──
    默认（无 JS / RM / 闩锁醒面）＝醒面；梦面常驻 DOM 但不占位。
    换面时出现的一侧自 @starting-style 起步淡入浮现（消失侧即时让位）；
@@ -476,8 +1074,8 @@ body[data-reality='dream'] [data-side='wake'] {
   display: none;
 }
 
+/* 边距随变体（公共层 .md div[data-side] / 项目变体），此处只管换面过渡 */
 .prose div[data-side] {
-  margin: 1.35em 0;
   transition:
     opacity 0.9s cubic-bezier(0.2, 0.6, 0.2, 1),
     translate 0.9s cubic-bezier(0.2, 0.6, 0.2, 1);
@@ -504,17 +1102,6 @@ body[data-reality='dream'] [data-side='wake'] {
   margin-bottom: 0;
 }
 
-/* 项目页链接区 */
-.link-list {
-  margin-top: 2.5rem;
-  padding-top: 1.4rem;
-  border-top: 1px solid var(--line);
-  font-size: 0.95rem;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.6rem 1.8rem;
-}
-
 /* ── 动效偏好 ── */
 @view-transition {
   navigation: auto;
@@ -536,11 +1123,24 @@ body[data-reality='dream'] [data-side='wake'] {
   }
 
   .drift,
-  .drift-soft {
+  .drift-soft,
+  .md blockquote {
     animation: none !important;
   }
 
   .ghost-pair .ghost {
     display: none;
+  }
+
+  /* 行内光景：RM 下 reality.ts 本就不落梦面，这两条是给「HTML 被单独打开」兜底 */
+  .float-ch {
+    animation: none !important;
+    translate: none !important;
+  }
+
+  .sheen-run {
+    background-image: none !important;
+    color: inherit !important;
+    -webkit-text-fill-color: inherit !important;
   }
 }

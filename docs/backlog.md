@@ -77,12 +77,61 @@
 5. 404 无 Rail 仪表（全站唯一断档）：补 `rail={{ station: '失线 · 断口' }}` 或明确记录有意免轨。
 6. 390 档正文 18.7–21.4 字/行（理想 30–45）：≤640px 字号再放大半档。手机物理宽度所限，非破相。
 7. （记录）子页进页自动滚过页头、滚动条整站隐藏——均为既定决议，观察使用反馈即可。
+8. 内页正文排版已分层为「公共层 + 随笔/项目两个变体」（`global.css`「内容页排版」一节，地图见 `docs/design/content-typography.md`）。`h3` / `ol` / `table` / `figure` 尚未设计；两态块边距 1.5em vs 1.35em、列宽随笔 629px vs 项目 544px 待拍板。
 
 ## 七、验证欠账
 
 - 全部性能结论为实验室级（无 CrUX/RUM）；上线 `web-vitals` 一方 RUM 后复验字体 P0 与 LCP。
 - GitHub Pages 实际 Cache-Control / br 支持未线上验证（平台不可自定义头，已知限制）。
 - 真实屏幕阅读器（NVDA/VoiceOver）未实测；200% 缩放、Windows 高对比度模式未测。
+
+## 八、样式预览页（/styleguide/）首轮浮现（2026-09-25）
+
+新建 `/styleguide/` 把共用样式摊开后，头一次被摆到台面上的几件事：
+
+1. ~~**代码块是深色的**~~ **已解决（2026-09-25）**：原先 `<pre>` 由 Shiki 的 `github-dark` 上色，
+   元素上带 `style="background-color:#24292e;color:#e1e4e8"`，行内样式盖掉 `.prose pre` 的底。
+   现改为自写主题 `src/markdown/shiki-theme.mjs`：`editor.background` 写成与 `.md pre` 同一条
+   `color-mix(in srgb, var(--fg) 4%, transparent)`。**不能写 `transparent`** —— 主题的值是
+   **行内**样式，永远压过样式表，写 `transparent` 只会把代码块的底抹掉，而不是「交回 CSS」，
+   所以两边必须同值。token 颜色写成 `var(--umber)` / `var(--ghost-ink)` / `var(--fg-soft)`
+   这类字符串 —— Shiki 原样写进行内样式，于是代码配色跟着醒梦两态与夜色走。
+   实测 `dist/styleguide/index.html` 里 `#24292e` 出现 0 次、
+   `<pre>` 的行内底为 `color-mix(in srgb, var(--fg) 4%, transparent)`、`const` → `var(--umber)`、
+   类型 `number` → `var(--ghost-ink)`。琥珀在代码里一次都不出现（数字与运算符回到中性 `--fg`）。
+2. **页面专属块进不了预览**（Astro `<style>` 作用域隔离）：`.essay-ledger` / `.prj-ledger` /
+   `.coverband` / `.wake-card` / `.link-list` / `.signal-list` / `.pill` / `.wake-anchor` /
+   `.lost` / 首页千层纸，眼下只能给实物入口。要进预览得先抽成组件或挪进公共表，
+   两条路与各自代价写在 `docs/design/styleguide.md` 第五节 —— 需要一次拍板。
+   预览页第六节那张索引表就是这条的临时答案。
+3. **三处注释与实现脱节**（本轮顺带发现，均无功能影响）：
+   - `styles/tokens.css:49` 说 `--echo` 由 `chrome.ts` 按滚动更新——`chrome.ts` 里已无此逻辑，
+     全站没有脚本写 `--echo`，它现在恒为 0（预览页给它配了一支滑杆，这条机制才看得见）；
+   - `data/night.ts:65` 提到 `components/chrome/NightVeil.astro`——该组件不存在；
+     同文件的 `ZONES` 也没有消费方；
+   - `scripts/chrome.ts:2` 的头部注释仍写「叠影 --echo」。
+4. **同一个块两页各写一份的老问题仍在**：`.tick` 在 `index.astro`（0.66rem）与
+   `projects/index.astro`（0.64rem）各定义一次；`.vtag` 在 `index.astro`（0.58rem）与
+   `about.astro`（0.62rem）各定义一次，配色配比也不同。抽组件时一并收敛。
+5. **预览页自身的维护点**：新增可预览样式要同时更新 `src/pages/styleguide.astro`
+   与（正文层）`src/styleguide/specimens/*.md`；第 2 条未决前，专属块索引表也得手动补行。
+6. ~~**列表记号不分 ul / ol**~~ **已解决（2026-09-25）**：随笔的 14° 刻度与项目的 mono ○ 原先写在
+   `.md li::before` 上，`ol` 一被用上就会「原生数字 + 记号」同场，且记号相对 `li` 定位
+   （`li` 从原生序号之后才起）⇒ 琥珀刻度压在每项首字上。现全部收窄成 `ul > li::before`，
+   施工清单同步改成 `ul > li:has(input)`。证据（前 / 后）：`design/.shots-p19/19-legacy-ol.png`
+   与 3× 裁片 `zb4-li-essay-legacy.png`（刻度压在「先／再／最」上）对 `zb5-li-essay-fixed.png`。
+   经过见 `design/mocks/p19-notes.md`。
+7. ~~**行内 code 漏到 `pre > code`**~~ **已解决（2026-09-25）**：行内规则全部改写成
+   `:not(pre) > code`（公共层 + 两个变体层），底与字号不再漏进 `pre`（原先项目侧每行多一条底带、
+   随笔侧字号被二次缩到 `.71em`）。证据：`design/.shots-p19/20-legacy-code.png` 对 `z10-code-project.png`。
+8. **正文元素补齐：已裁决并落地（2026-09-25）**。裁决与落地映射见 `design/mocks/p19-notes.md` 首节：
+   `ol` 取 B（保留原生序号 + mono）、`table` / `figure` / `code` 取 A，
+   **图注不自动编号**（内容由正文自己写），`h3` 与小节序号**本体不做**、留给自制的「小节」组件。
+   三处例外也已裁决（同日）：引文**保持两页同款**（不加差别，仅改正误记）、两态块边距项目侧改为 1.3em、
+   起笔标尺**不做**（随笔页原有那枚已移除）。见 `docs/design/content-typography.md` 第三节。
+9. **`<caption>` 与 `figure` 的来源**：两者的样式都已就位，但 markdown 出不了这几个标签，
+   只有正文里写原始 HTML 才吃到。若希望纯 markdown 也能出图注，得给 Sätteri 加一个小插件
+   （把图片的 title 升为 figcaption）——做法与取舍见 `p19-notes.md`。
 
 ---
 
