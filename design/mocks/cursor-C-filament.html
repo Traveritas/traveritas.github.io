@@ -1,0 +1,1741 @@
+<!doctype html>
+<html lang="zh-CN" data-zone="light">
+<!--
+  ═══════════════════════════════════════════════════════════════════════════
+  Cursor 轮 · 共用测试外壳（cursor-shell.html）
+
+  四稿一律：cp design/mocks/cursor-shell.html design/mocks/cursor-<X>-<slug>.html
+  然后**只填 CURSOR SLOT**（#cursor-slot + <style id="cursor-css"> + 一个 <script>）。
+  外壳其余部分（tokens / 三段夜色 / 层序 / 双态引擎 / 四重门控 / 自检面板 /
+  状态试验区 / dock / 品牌字标 / 文案）一律不要动。
+
+  ── 参数（四稿一致） ──────────────────────────────────────────────
+    ?zone=light|deep|paper   三段夜色（照抄 src/data/night.ts 的 ZONES）
+    ?mix=0..1                直接钉住醒度（1 醒 → 0 梦）
+    ?freeze=1                全部 CSS 动画停在 0% 帧（截图严格对照）
+    ?ui=0                    藏 dock、调试角标与自检面板（截图一律用它）
+    ?cursor=off              强制门控失败（URL 门），永不加 fx-cursor-on
+    ?reduced=1               强制走「RM 门控失败」路径（fx-cursor-on 永不出现）
+    ?probe=1                 挂载 window.__cur 与右下自检面板（默认绝不出现）
+    ?state=<name>            派发 new CustomEvent('cursor:state', { detail: { name } })
+                             （无指针环境下强制状态截图用）
+
+  ── 双态引擎（对齐 src/scripts/reality.ts） ───────────────────────
+    空白处长按 2200ms 入醒 / 1300ms 回梦；中途松手 ≤600ms 退回；短按 ≤260ms＝线头一弹；
+    键盘 Shift+空格等价；长按全程逐帧写 --reality-mix，并照抄 reality.ts 的 ACCENT 表插值
+    --amber / --umber / --ghost-ink / --dream / --wash；--still = 1 − --reality-mix。
+    层序：纸 −3 → 背景槽 −2（本轮空） → 脑电 −2 → 缝线 −1 → 正文 0。
+
+  ── 四重门控（外壳拥有；四稿不得自己写 cursor: none） ─────────────
+    body.fx-cursor-on 仅在**全部满足**时出现：
+      ① 发生过 pointermove 且 e.pointerType === 'mouse'（运行时读 PointerEvent，不看媒体查询）
+      ② matchMedia('(prefers-reduced-motion: reduce)').matches === false（?reduced=1 视为失败）
+      ③ matchMedia('(forced-colors: active)').matches === false
+      ④ localStorage['xm-cursor-native'] !== '1'（dock「原生光标」按钮 / 快捷键 C 写入）
+      ⑤ URL 无 ?cursor=off
+    隐藏系统光标的**唯一**规则（别处一律不许再写 cursor: none）：
+      body.fx-cursor-on, body.fx-cursor-on * { cursor: none }
+    指针离开文档 / 页面隐藏（visibilitychange）→ body.fx-cursor-out；重新进入 / 可见 → 移除。
+    之后出现 pointerType !== 'mouse'（touch / pen）→ 立即移除 fx-cursor-on（回原生光标）。
+    注意：门控开启时 .lab-drag 的 grab 语义由**你的光标层**承担，不是系统光标。
+
+  ── 光标层红线（cursor-brief.md §5，逐条照抄） ────────────────────
+    1. 逐帧只写 transform / opacity（禁逐帧改颜色、宽高、圆角、filter、box-shadow、background）。
+    2. 零材质：不用 gradient、glow、box-shadow、filter、blur、次表面、折光——单色 + 透明度，
+       形状只有平面图元。
+    3. 零仪器隐喻（见 cursor-notes.md）：不得出现十字准星、穿过形心的正交线、探针、示波、
+       透镜、读数刻度；文案里也不许出现「测量 / 读数 / 校准 / 增益」。
+    4. 禁用 mix-blend-mode；禁用外部库（GSAP / Framer Motion / Paper.js 一律不许）。
+    5. 禁逐帧 elementFromPoint / getBoundingClientRect / getComputedStyle；
+       状态检测用 pointerover / pointerout 事件委托 + closest。
+    6. 热点同帧：判定与点击的视觉热点与真实指针偏差 ≤ 1 帧；装饰最大偏移 ≤ 12px
+       （自检面板给读数；热点元素用 window.__cur.setHotspot(el) 注册）。
+    7. 四重门控由外壳负责——你的层不得自己写 cursor: none，也不得在门控未开时显示。
+    8. RM 下不得有跟随动画（降级为 1:1 静态形态）；触摸 / 笔设备不接管。
+    9. 不抢字：光标在正文上不得降低正文可读性（文本态必须让出字面）。
+    10. 只动 design/mocks/；不碰 src/；不提交 git；不改依赖。
+
+  ── 光标层的唯一合法输入 ─────────────────────────────────────────
+    CSS 变量：--reality-mix（1 醒 → 0 梦）、--still、--amber / --dream / --umber /
+    --ghost-ink / --wash、--bg / --fg / --fg-soft / --line；
+    以及 body[data-reality] 与 body.reality-holding 两个类。
+    rAF 纪律：由指针事件唤醒、收敛即停；静息 5s 内 0 次；收敛时 will-change 归 auto；
+    dt clamp ≤ 1/30s；拖尾类用节点池，零每帧分配。
+    外壳自身除双态引擎外不开任何 rAF 循环（自检面板用 300ms setInterval）。
+
+  ── 字体 ─────────────────────────────────────────────────────────
+    只用仓库内 @fontsource（../../node_modules/...），无 Google Fonts 外链。
+    serve 脚本对 ../../node_modules 有兜底映射（见 .serve-cursor.cjs）。
+
+  调试：window.__shell = { state(), setMix(m), face(f), hold(), release(), zone(z) }
+        window.__cur   = { set(name), setHotspot(el), report() }   ← 仅 ?probe=1
+  ═══════════════════════════════════════════════════════════════════════════
+-->
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>醒梦 · 光标轮 · 共用测试外壳</title>
+  <link rel="stylesheet" href="../../node_modules/@fontsource/noto-serif-sc/300.css" />
+  <link rel="stylesheet" href="../../node_modules/@fontsource/noto-serif-sc/600.css" />
+  <link rel="stylesheet" href="../../node_modules/@fontsource/ibm-plex-mono/400.css" />
+  <link rel="stylesheet" href="../../node_modules/@fontsource/ibm-plex-mono/500.css" />
+  <link rel="stylesheet" href="../../node_modules/@fontsource/silkscreen/400.css" />
+  <style>
+    /* ═══════════ 1 · tokens（照抄 src/styles/tokens.css 现值） ═══════════ */
+    :root {
+      color-scheme: light;
+      --bg: #e9ecef;
+      --bg-sunken: #e1e5ea;
+      --fg: #262c33;
+      --fg-soft: #59626c;
+      --fg-faint: #8a929b;
+      --line: rgba(38, 44, 51, 0.14);
+
+      --wake: #a7b1ba;
+      --dream: #c2a382;
+      --umber: #765640;
+      --amber: #d9a05b;
+      --seal: #a3452f;
+      --seam-angle: 14deg;
+
+      --reality-mix: 1;
+      --still: calc(1 - var(--reality-mix));
+      --wash: #556270;
+
+      --font-display: 'Noto Serif SC', 'Palatino Linotype', 'Iowan Old Style', Palatino, Georgia,
+        'Source Han Serif SC', 'Source Han Serif CN', 'Songti SC', SimSun, serif;
+      --font-body: system-ui, -apple-system, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei UI',
+        'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+      --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, 'JetBrains Mono', monospace;
+      --font-pixel: 'Silkscreen', ui-monospace, Consolas, monospace;
+
+      --measure: 34em;
+      --gap-v: clamp(3.5rem, 9vh, 6.5rem);
+      --echo: 0;
+      --ghost-ink: #b98f74;
+    }
+
+    /* 三段夜色（照抄 src/data/night.ts 的 ZONES） */
+    html[data-zone='deep'] {
+      color-scheme: dark;
+      --bg: #171b24;
+      --fg: #e5e0d2;
+      --fg-soft: #b9b3a4;
+      --fg-faint: #8a8577;
+      --line: rgba(229, 224, 210, 0.16);
+    }
+    html[data-zone='paper'] {
+      color-scheme: light;
+      --bg: #efe9dd;
+      --fg: #55503f;
+      --fg-soft: #665f50;
+      --fg-faint: #8b8474;
+      --line: rgba(85, 80, 63, 0.16);
+    }
+
+    /* ═══════════ 2 · 基础（照抄 src/styles/global.css 的口径） ═══════════ */
+    *, *::before, *::after { box-sizing: border-box; }
+
+    html { -webkit-text-size-adjust: 100%; overflow-x: clip; scrollbar-width: none; }
+    ::-webkit-scrollbar { width: 0; height: 0; }
+
+    body {
+      margin: 0;
+      font-family: var(--font-body);
+      font-size: 1.0625rem;
+      line-height: 1.9;
+      color: var(--fg);
+      /* 大表面洗染：--wash 由状态机随醒度插值（梦暖褐 ↔ 醒冷灰），仅 7% */
+      background: color-mix(in srgb, var(--bg) 93%, var(--wash));
+      text-rendering: optimizeLegibility;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: clip;
+    }
+
+    h1, h2, h3 { font-family: var(--font-display); font-weight: 600; line-height: 1.55; margin: 0; letter-spacing: 0.01em; }
+    a { color: var(--fg); text-decoration-thickness: 1px; text-underline-offset: 0.3em; }
+    a:hover { color: var(--amber); }
+    .mono { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.14em; color: var(--fg-soft); }
+    .container { width: min(100% - 3rem, 42rem); margin-inline: auto; }
+    .src-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+
+    /* 双态文字：磨砂溶变换面（简版 morph，够用即可） */
+    [data-morph] {
+      transition: opacity 0.18s ease, filter 0.18s ease;
+      display: inline-block;
+    }
+    [data-morph].is-morphing { opacity: 0; filter: blur(3px); }
+
+    /* ═══════════ 3 · 全局 chrome（脑电 / 缝线 / 颗粒） ═══════════ */
+
+    /* 脑电：固定视口层，波轴心恒为视口 50vh，与缝线同轴；z −2 */
+    .eeg {
+      position: fixed; inset: 0; width: 100vw; height: 100vh;
+      z-index: -2; pointer-events: none; overflow: visible;
+    }
+    .eeg .eeg-main { stroke: var(--umber); stroke-width: 1.2; fill: none; opacity: 0.62; stroke-linecap: round; stroke-linejoin: round; }
+
+    /* 缝线：fixed 14°，170vmax，琥珀锚点呼吸 */
+    .seam {
+      position: fixed; left: 50%; top: 50%; width: 170vmax; height: 1px;
+      background: linear-gradient(90deg, var(--wake), var(--dream));
+      transform: translate(-50%, -50%) rotate(var(--seam-angle));
+      z-index: -1; pointer-events: none; opacity: 0.62;
+    }
+    .seam-anchor {
+      position: absolute; top: 50%; left: 50%; width: 8px; height: 8px; margin: -4px 0 0 -4px;
+      border-radius: 50%; background: var(--amber);
+      box-shadow: 0 0 10px 2px color-mix(in srgb, var(--amber) 55%, transparent),
+                  0 0 26px 6px color-mix(in srgb, var(--amber) 20%, transparent);
+      animation: anchor-breathe 5.5s ease-in-out infinite;
+    }
+    @keyframes anchor-breathe { 0%, 100% { opacity: 0.72; transform: scale(1); } 50% { opacity: 1; transform: scale(1.18); } }
+
+    /* 纸面颗粒（照抄 Grain.astro：梦更重，醒更净） */
+    .grain {
+      position: fixed; inset: 0; z-index: 60; pointer-events: none;
+      opacity: calc(0.05 + var(--still, 0) * 0.035);
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    }
+
+    /* ═══════════ 4 · 页面骨架 ═══════════ */
+    .page { display: flex; flex-direction: column; }
+
+    /* 页头叠压首屏（与线上同：absolute + z 40，千层纸的取景框） */
+    .site-header { position: absolute; top: 0; left: 0; right: 0; z-index: 40; }
+    .header-row { padding-block: 1.4rem; display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; }
+    .brand {
+      color: var(--fg); text-decoration: none !important; font-family: var(--font-display);
+      font-weight: 600; font-size: 1.05rem; letter-spacing: 0.02em; white-space: nowrap;
+      display: inline-flex; align-items: baseline; min-width: 6.8em;
+      transition: opacity 0.18s cubic-bezier(0.2, 0.8, 0.3, 1), filter 0.18s cubic-bezier(0.2, 0.8, 0.3, 1), transform 0.18s cubic-bezier(0.2, 0.8, 0.3, 1), color 0.16s ease;
+    }
+    .brand:hover, .brand:focus { color: var(--fg); text-decoration: none !important; }
+    .brand.is-morphing { opacity: 0; filter: blur(2.5px); transform: translateY(-1px) scale(0.98); }
+    .brand-char { display: inline-block; will-change: transform, color; }
+    .brand-char:nth-child(odd) { --drift-x: 1; }
+    .brand-char:nth-child(even) { --drift-x: -1; }
+    .brand.is-dream .brand-char { animation: brand-pixel-float 2.4s step-end infinite alternate; animation-delay: calc(var(--i) * -0.32s); }
+    @keyframes brand-pixel-float {
+      0%   { transform: translate(0, 0); color: var(--fg); }
+      33%  { transform: translate(calc(0.25px * var(--drift-x, 1)), -1.4px); color: var(--fg); }
+      66%  { transform: translate(calc(-0.2px * var(--drift-x, 1)), -2.8px); color: color-mix(in srgb, var(--amber) 16%, var(--fg)); }
+      100% { transform: translate(calc(0.15px * var(--drift-x, 1)), -4.2px); color: color-mix(in srgb, var(--amber) 36%, var(--fg)); }
+    }
+
+    .site-nav { display: flex; align-items: center; gap: 1.15rem; }
+    .site-nav a {
+      display: inline-flex; align-items: center; gap: 0.5rem; font-family: var(--font-mono);
+      font-weight: 500; font-size: 0.75rem; letter-spacing: 0.05em; color: var(--fg-soft);
+      text-decoration: none; padding-block: 0.3rem; transition: color 0.16s ease;
+    }
+    .site-nav a:hover, .site-nav a:focus-visible { color: var(--fg); }
+    .stitch { display: inline-block; flex: none; width: 10px; height: 2px; border-radius: 2px; background: var(--fg-faint); transform: rotate(8deg); transition: width 0.16s ease, background-color 0.16s ease; }
+    .site-nav a:hover .stitch { width: 16px; }
+    .site-nav a.is-current { color: var(--fg); }
+    .site-nav a.is-current .stitch { background: var(--amber); }
+
+    /* ═══════════ 4b · 首屏（贴近 src/pages/index.astro 的千层纸简化版） ═══════════
+       纸壳 z −3（不透明）→ 玻璃叶 z −3（DOM 在后，压纸、被 14° 缝线穿过）
+       → 醒/梦墨 z 1 → 手记 z 2 → 前景 z 3。hero 不得产生层叠上下文。 */
+    .hero {
+      --gfs: clamp(110px, 14.5vw, 190px);
+      --wakeTop: calc(50svh - var(--gfs) - 76px);
+      --noteTop: calc(50svh + 54px);
+      position: relative;
+      height: 100svh;
+    }
+    .hero .plate {
+      position: absolute; inset: 3vh 2.5vw 5vh; z-index: -3;
+      background: color-mix(in srgb, var(--bg) 90%, var(--fg));
+      border: 1px solid var(--line);
+      box-shadow: 0 24px 60px -30px rgba(0, 0, 0, 0.28);
+    }
+    .hero-plane { position: absolute; inset: 0; pointer-events: none; }
+
+    /* 中心引力：50% 50% 琥珀微温光晕 */
+    .amber-bloom {
+      position: absolute; left: 50%; top: 50%; width: clamp(220px, 26vw, 360px); aspect-ratio: 1;
+      transform: translate(-50%, -50%); border-radius: 50%;
+      background: radial-gradient(circle,
+        color-mix(in srgb, var(--amber) 22%, transparent) 0%,
+        color-mix(in srgb, var(--amber) 8%, transparent) 44%,
+        transparent 72%);
+      filter: blur(14px);
+      animation: amber-bloom-breathe 8s ease-in-out infinite;
+    }
+    @keyframes amber-bloom-breathe {
+      0%, 100% { opacity: 0.55; transform: translate(-50%, -50%) scale(0.94); }
+      50% { opacity: 0.88; transform: translate(-50%, -50%) scale(1.1); }
+    }
+
+    /* 三片玻璃之一/之二：醒字伴生冷板 + 梦字叶（暖沙） */
+    .glass {
+      position: absolute;
+      border: 1px solid rgba(255, 255, 255, 0.44);
+      -webkit-backdrop-filter: blur(13px) saturate(130%);
+      backdrop-filter: blur(13px) saturate(130%);
+      box-shadow:
+        inset 0 1.5px 2px rgba(255, 255, 255, 0.66),
+        0 18px 40px -14px rgba(10, 14, 20, 0.26);
+    }
+    .leaf-wake {
+      left: 53vw; top: calc(var(--wakeTop) - 22px);
+      width: clamp(230px, 25vw, 330px); aspect-ratio: 1;
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.44) 0%,
+        color-mix(in srgb, var(--bg) 72%, #d5e1ee) 45%, rgba(210, 224, 238, 0.34) 100%);
+      clip-path: polygon(0 0, 94% 0, 100% 6%, 100% 100%, 6% 100%, 0 94%);
+    }
+    .leaf-dream {
+      left: 12vw; top: 45svh;
+      width: clamp(230px, 25vw, 330px); aspect-ratio: 1;
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.38) 0%,
+        color-mix(in srgb, var(--bg) 68%, #e0d1c2) 45%, rgba(215, 198, 180, 0.32) 100%);
+      clip-path: polygon(0 5.5%, 5% 0, 100% 0, 100% 87%, 94% 100%, 61% 98.6%, 0 100%);
+    }
+
+    /* 醒字（右上，静止） */
+    .ink-wake { z-index: 1; }
+    .ch-wake {
+      position: absolute; left: 56vw; top: var(--wakeTop);
+      font-family: var(--font-display); font-weight: 600; font-size: var(--gfs); line-height: 1;
+      color: var(--fg); letter-spacing: -0.02em;
+    }
+    .vsub {
+      position: absolute; left: calc(56vw + var(--gfs) + 22px); top: calc(var(--wakeTop) + 6px);
+      writing-mode: vertical-rl; font-family: var(--font-display); font-size: 13px; font-weight: 300;
+      letter-spacing: 0.52em; color: var(--fg-soft);
+    }
+    .vlat {
+      position: absolute; left: calc(12vw - 36px); top: calc(45svh + 20px);
+      writing-mode: vertical-rl; font-family: var(--font-mono); font-size: 10px;
+      letter-spacing: 0.42em; color: var(--fg-soft); opacity: 0.78;
+    }
+
+    /* 梦字（左下，随 --still 慢漂：醒静梦动） */
+    .ink-dream { z-index: 1; }
+    .ch-dream {
+      position: absolute; left: 12vw; top: 45svh;
+      width: clamp(230px, 25vw, 330px); aspect-ratio: 1;
+      display: grid; place-items: center;
+      font-family: var(--font-display); font-weight: 600; font-size: var(--gfs); line-height: 1;
+      color: color-mix(in srgb, var(--fg) 76%, var(--dream));
+      animation: leaf-drift 9s ease-in-out infinite;
+    }
+    @keyframes leaf-drift {
+      0%, 100% { transform: translate3d(calc(-3px * var(--still, 0)), calc(-6px * var(--still, 0)), 0) rotate(calc(-0.35deg * var(--still, 0))); }
+      50% { transform: translate3d(calc(4px * var(--still, 0)), calc(7px * var(--still, 0)), 0) rotate(calc(0.3deg * var(--still, 0))); }
+    }
+
+    /* 光学微刻角标（RealityGuide 的同族语言） */
+    .plate-reticle {
+      position: absolute; font-family: var(--font-mono); font-size: 8.5px; line-height: 1;
+      letter-spacing: 0.16em; color: var(--fg-soft); opacity: 0.52; pointer-events: none;
+    }
+    .rt-wake-tl { left: 53vw; top: calc(var(--wakeTop) - 8px); }
+    .rt-wake-br { left: calc(53vw + clamp(230px, 25vw, 330px)); top: calc(var(--wakeTop) + clamp(230px, 25vw, 330px)); }
+    .rt-dream-tr { left: calc(12vw + clamp(230px, 25vw, 330px)); top: calc(45svh + 4px); }
+    .rt-dream-bl { left: calc(12vw + 4px); top: calc(45svh + clamp(230px, 25vw, 330px) + 4px); }
+
+    /* 宣言手记（中右下托盘） */
+    .note-plane { left: 48vw; top: var(--noteTop); right: auto; bottom: auto; width: min(46vw, 640px); z-index: 2; }
+    .note-paper {
+      position: absolute; inset: 0;
+      background: color-mix(in srgb, var(--bg) 65%, #f7f7f7);
+      clip-path: polygon(0 0, 100% 1.6%, 98.7% 17%, 100% 33%, 98.9% 51%, 100% 70%, 98.8% 85%, 100% 100%, 0 100%);
+      filter: drop-shadow(0 18px 40px rgba(38, 44, 51, 0.16));
+    }
+    html[data-zone='deep'] .note-paper { background: color-mix(in srgb, var(--bg) 82%, #f7f7f7); }
+    .note-ink { position: relative; padding: 1.5rem 2.2rem 1.3rem 1.8rem; }
+    .note-stamp {
+      position: absolute; top: 0.55rem; right: 1.15rem;
+      font-family: var(--font-mono); font-size: 0.56rem; letter-spacing: 0.2em; color: var(--fg-soft);
+    }
+    .note-ink .frag {
+      margin: 0 0 0.85rem; font-family: var(--font-display); font-weight: 500; color: var(--fg);
+      font-size: clamp(0.92rem, 1.4vw, 1.1rem);
+    }
+    .note-ink .f1 { font-size: clamp(1.25rem, 1.9vw, 1.6rem); }
+    .note-ink .f2 { margin-left: 9%; letter-spacing: 0.3em; color: var(--fg-soft); }
+    .note-ink .f3 { margin-left: 4%; color: var(--fg-soft); }
+    .note-ink .f4 { margin-left: 6%; font-size: clamp(0.9rem, 1.35vw, 1.15rem); white-space: nowrap; }
+
+    /* 前景：引导微章（RealityGuide 简化版）+ 滚动提示 */
+    .fore-plane { z-index: 3; }
+    .reality-guide {
+      position: absolute; right: 6vw; top: calc(92svh - 56px);
+      display: inline-flex; align-items: center; gap: 0.65rem;
+      padding: 0.44rem 0.95rem 0.42rem 0.85rem;
+      border-radius: 4px; border: 1px solid rgba(255, 255, 255, 0.22);
+      background: color-mix(in srgb, var(--bg) 75%, rgba(255, 255, 255, 0.08));
+      -webkit-backdrop-filter: blur(13px) saturate(125%);
+      backdrop-filter: blur(13px) saturate(125%);
+      box-shadow: 0 10px 30px -8px rgba(10, 14, 20, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.28);
+      color: var(--fg); opacity: 0.92; user-select: none;
+    }
+    .rg-reticle { position: absolute; font-family: var(--font-mono); font-size: 8px; line-height: 1; color: var(--fg-soft); opacity: 0.6; }
+    .rg-rt-tl { top: -4px; left: -3px; }
+    .rg-rt-br { bottom: -4px; right: -3px; }
+    .rg-emitter { position: relative; display: grid; place-items: center; width: 12px; height: 12px; }
+    .rg-dot {
+      display: block; width: 6px; height: 6px; border-radius: 50%; background: var(--amber);
+      box-shadow: 0 0 8px 1px color-mix(in srgb, var(--amber) 65%, transparent);
+      animation: rg-dot-breathe 3.6s ease-in-out infinite;
+    }
+    @keyframes rg-dot-breathe {
+      0%, 100% { opacity: 0.75; transform: scale(0.95); }
+      50% { opacity: 1; transform: scale(1.15); }
+    }
+    .rg-thread {
+      position: absolute; right: 6px; top: 5.5px; width: 34px; height: 1px; opacity: 0.9;
+      background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--amber) 40%, transparent) 20%, var(--amber));
+      transform-origin: 100% 50%; transform: rotate(-4deg);
+    }
+    .rg-text { font-family: var(--font-display); font-size: 0.76rem; font-weight: 500; letter-spacing: 0.12em; color: var(--fg); white-space: nowrap; }
+    .rg-meta {
+      display: inline-flex; align-items: center; gap: 0.38rem; white-space: nowrap;
+      font-family: var(--font-mono); font-size: 0.64rem; letter-spacing: 0.14em; color: var(--fg-soft);
+      border-left: 1px solid color-mix(in srgb, var(--fg-soft) 25%, transparent); padding-left: 0.55rem;
+    }
+    .rg-dur { color: var(--amber); font-weight: 500; }
+    .hero-scroll {
+      position: absolute; right: 6vw; top: 92svh; margin: 0;
+      font-size: 13.5px; font-weight: 300; letter-spacing: 0.26em; color: var(--fg-soft);
+      animation: fore-drift 11s ease-in-out infinite;
+    }
+    .hero-scroll i {
+      display: inline-block; width: 24px; height: 2px; background: var(--amber); opacity: 0.5;
+      transform: rotate(calc(var(--seam-angle) * -1)); vertical-align: middle; margin-right: 12px;
+    }
+    @keyframes fore-drift {
+      0%, 100% { transform: translate3d(calc(-2px * var(--still, 0)), calc(-3px * var(--still, 0)), 0); }
+      50% { transform: translate3d(calc(3px * var(--still, 0)), calc(4px * var(--still, 0)), 0); }
+    }
+    body.reality-holding .rg-dot { animation: none; transform: scale(1.4); box-shadow: 0 0 12px 2px var(--amber); }
+
+    /* ═══════════ 5 · 正文两段（随笔 / 项目） ═══════════ */
+    .sec { padding-block: var(--gap-v); }
+    .sec-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; padding-bottom: 0.9rem; border-bottom: 1px solid var(--line); margin-bottom: 1.6rem; }
+    .sec-head h2 { font-size: 1.28rem; }
+    .rows { display: grid; gap: 1.7rem; }
+    .row { display: grid; gap: 0.35rem; }
+    .row h3 { font-size: 1.02rem; }
+    .row p { margin: 0; color: var(--fg-soft); font-size: 0.94rem; max-width: var(--measure); }
+    .row .tags { display: flex; gap: 0.6rem; }
+    .st { font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.1em; color: var(--amber); border: 1px solid color-mix(in srgb, var(--amber) 45%, transparent); padding: 0.05rem 0.45rem; }
+
+    /* 入口链接（照抄主页 wake-anchor 卡） */
+    .dawn-line { margin: 0 0 2.4rem; font-family: var(--font-display); font-size: 1.02rem; letter-spacing: 0.12em; color: var(--fg-soft); }
+    .wake-row { display: flex; flex-wrap: wrap; gap: 1.1rem; margin-top: 1.6rem; }
+    .wake-anchor {
+      display: grid; gap: 0.32rem; justify-items: center; min-width: 11rem;
+      padding: 1.05rem 1.5rem 0.95rem; border: 1px solid var(--line); border-radius: 4px;
+      text-decoration: none; transition: border-color 0.25s ease, transform 0.25s ease;
+    }
+    .wake-anchor:hover { border-color: color-mix(in srgb, var(--amber) 55%, transparent); transform: translateY(-3px); }
+    .wa-name { font-family: var(--font-display); font-size: 1rem; letter-spacing: 0.1em; color: var(--fg); }
+    .wa-href { font-family: var(--font-mono); font-size: 0.62rem; letter-spacing: 0.14em; color: var(--fg-soft); }
+    .wa-why { font-size: 0.7rem; letter-spacing: 0.08em; color: var(--fg-soft); }
+
+    .site-footer { border-top: 1px solid var(--line); padding-block: 2.4rem 4rem; }
+    .site-footer .ft { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+
+    /* ═══════════ 6 · 状态试验区（#cursor-lab，位于随笔与项目之间） ═══════════ */
+    .lab { border-block: 1px solid var(--line); }
+    .lab-intro { margin: -0.6rem 0 2rem; max-width: var(--measure); color: var(--fg-soft); font-size: 0.92rem; }
+    .lab-grid { display: grid; gap: 1.6rem; }
+    .lab-cell { display: grid; gap: 0.7rem; align-content: start; border: 1px dashed var(--line); padding: 0.95rem 1.1rem 1.15rem; }
+    .lab-cap { color: color-mix(in srgb, var(--amber) 68%, var(--fg)); font-size: 0.66rem; letter-spacing: 0.12em; }
+    .lab-note { color: var(--fg-soft); font-size: 0.64rem; letter-spacing: 0.08em; }
+
+    .lab-chain { display: flex; flex-wrap: wrap; gap: 0.4rem 1.6rem; margin: 0; }
+    .lab-chain a { font-size: 0.95rem; text-decoration-thickness: 1px; text-underline-offset: 0.32em; }
+
+    .lab-prose p { margin: 0 0 0.9rem; color: var(--fg-soft); font-size: 0.95rem; max-width: var(--measure); }
+    .lab-prose p:last-child { margin-bottom: 0; }
+
+    .lab-field { display: grid; gap: 0.35rem; }
+    .lab-field label { font-family: var(--font-mono); font-size: 0.66rem; letter-spacing: 0.12em; color: var(--fg-soft); }
+    .lab-field input, .lab-field textarea {
+      font: inherit; font-size: 0.95rem; color: var(--fg); padding: 0.42rem 0.6rem; border-radius: 2px;
+      border: 1px solid var(--line); background: color-mix(in srgb, var(--fg) 3%, transparent);
+    }
+    .lab-field textarea { min-height: 5.2rem; resize: vertical; }
+
+    .lab-drag {
+      width: 96px; height: 96px; display: grid; place-items: center;
+      border: 1px solid color-mix(in srgb, var(--amber) 45%, transparent);
+      background: color-mix(in srgb, var(--fg) 4%, transparent);
+      font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.12em; color: var(--fg-soft);
+      touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab;
+      will-change: transform;
+    }
+    .lab-drag.is-dragging { cursor: grabbing; border-color: var(--amber); }
+
+    .lab-hold {
+      height: 240px; display: grid; place-items: center; align-content: center; gap: 0.5rem;
+      border: 1px dashed color-mix(in srgb, var(--amber) 38%, transparent);
+      background: color-mix(in srgb, var(--fg) 2%, transparent);
+    }
+    .lab-hold-hint { font-size: 0.66rem; letter-spacing: 0.14em; }
+
+    /* ═══════════ 7 · 入梦检验的特效层（线 / 一弹） ═══════════ */
+    .fx { position: fixed; inset: 0; z-index: 210; pointer-events: none; overflow: hidden; }
+    .fx .thread { position: absolute; left: 0; top: 0; width: 0; height: 0; display: none; transform-origin: 0 0; }
+    .fx .t-core { position: absolute; top: -0.5px; left: 0; width: 0; height: 1px; }
+    .fx .thread.go .t-core { background: linear-gradient(90deg, rgba(167,177,186,0), rgba(167,177,186,.38) 8%, rgba(217,160,91,.8) 50%, rgba(167,177,186,.38) 92%, rgba(167,177,186,0)); }
+    .fx .thread.back .t-core { background: linear-gradient(90deg, rgba(194,163,130,0), rgba(194,163,130,.4) 8%, rgba(217,160,91,.8) 50%, rgba(194,163,130,.4) 92%, rgba(194,163,130,0)); }
+    .fx .flick {
+      position: absolute; left: 0; top: 0; width: 38px; height: 1px; margin: 0 0 0 -19px; display: none;
+      background: linear-gradient(90deg, rgba(167,177,186,0), rgba(167,177,186,.55) 50%, rgba(167,177,186,0));
+      transform: translate(var(--fx, 0px), var(--fy, 0px)) rotate(-4deg);
+    }
+    .fx .flick.go { display: block; animation: xmFlick 0.3s ease-out both; }
+    @keyframes xmFlick {
+      0% { transform: translate(var(--fx, 0px), var(--fy, 0px)) rotate(-4deg) scale(.15); opacity: 0; }
+      35% { transform: translate(var(--fx, 0px), var(--fy, 0px)) rotate(-4deg) scale(1); opacity: 1; }
+      100% { transform: translate(var(--fx, 0px), var(--fy, 0px)) rotate(-4deg) scale(.6); opacity: 0; }
+    }
+    body.reality-holding { user-select: none; -webkit-user-select: none; }
+
+    /* ═══════════ 8 · 光标层槽位与门控 ═══════════
+       #cursor-slot 的底座几何由外壳给（四稿可在 #cursor-css 里覆盖，DOM 在后故同权重后者胜）。
+       门控开启时隐藏系统光标——**全站唯一**的一条 cursor: none 规则就在下面这一条里。 */
+    #cursor-slot { position: fixed; inset: 0; z-index: 240; pointer-events: none; overflow: hidden; }
+    body.fx-cursor-on, body.fx-cursor-on * { cursor: none; }
+
+    /* ═══════════ 9 · dock / 自检面板 / 定格（?ui=0 隐藏调试 chrome） ═══════════ */
+    .dbg {
+      position: fixed; right: 0.9rem; bottom: 0.9rem; z-index: 200;
+      display: flex; align-items: center; gap: 0.5rem;
+      font-family: var(--font-mono); font-size: 0.66rem; letter-spacing: 0.08em;
+      color: var(--fg-soft); background: color-mix(in srgb, var(--bg) 88%, transparent);
+      border: 1px solid var(--line); padding: 0.35rem 0.55rem; opacity: 0.62;
+    }
+    .dbg:hover { opacity: 1; }
+    .dbg button, .dbg a { font: inherit; color: inherit; background: none; border: 1px solid var(--line); padding: 0.1rem 0.4rem; cursor: pointer; text-decoration: none; }
+    .dbg button[aria-pressed='true'] { color: var(--amber); border-color: color-mix(in srgb, var(--amber) 50%, transparent); }
+    .dbg input { width: 7rem; }
+    .dbg .now { color: var(--amber); font-variant-numeric: tabular-nums; }
+
+    .probe {
+      position: fixed; right: 0.9rem; bottom: 3.6rem; z-index: 205;
+      display: grid; gap: 0.14rem; min-width: 20rem; padding: 0.6rem 0.75rem 0.7rem;
+      pointer-events: none; white-space: nowrap;
+      font-family: var(--font-mono); font-size: 0.62rem; line-height: 1.55; letter-spacing: 0.06em;
+      color: var(--fg-soft); background: color-mix(in srgb, var(--bg) 88%, transparent);
+      border: 1px solid var(--line);
+    }
+    .probe[hidden] { display: none; }
+    .probe b { color: var(--amber); font-weight: 500; }
+    .probe .pv { color: var(--fg); }
+    .probe .bad { color: #c2603f; }
+
+    .ui-off .dbg, .ui-off .probe { display: none; }
+
+    .freeze *, .freeze *::before, .freeze *::after {
+      animation-play-state: paused !important;
+      animation-delay: 0s !important;
+      transition: none !important;
+    }
+
+    @media (min-width: 760px) {
+      .lab-grid { grid-template-columns: 1fr 1fr; }
+      .lab-span { grid-column: 1 / -1; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; }
+    }
+    @media (max-width: 760px) {
+      .hero { --gfs: clamp(78px, 20vw, 108px); --wakeTop: calc(16svh); --noteTop: calc(60svh); }
+      .hero .plate { inset: 2vh 0.9rem 4vh; }
+      .container { width: min(100% - 2rem, 42rem); }
+      .leaf-wake, .leaf-dream { width: clamp(150px, 42vw, 200px); }
+      .leaf-wake { left: 34vw; top: calc(var(--wakeTop) - 10px); }
+      .leaf-dream { left: 6vw; top: 40svh; }
+      .ch-wake { left: 40vw; }
+      .vsub { left: auto; right: 5vw; font-size: 11px; letter-spacing: 0.35em; }
+      .vlat { display: none; }
+      .rt-wake-br, .rt-dream-tr, .rt-dream-bl { display: none; }
+      .note-plane { left: 5vw; right: 5vw; width: auto; }
+      .note-ink .f2, .note-ink .f3, .note-ink .f4 { margin-left: 0; white-space: normal; }
+      .reality-guide { right: auto; left: 50%; transform: translateX(-50%); top: calc(100svh - 140px); }
+      .hero-scroll { left: 50%; right: auto; transform: translateX(-50%); top: calc(100svh - 44px); white-space: nowrap; font-size: 12px; }
+    }
+  </style>
+</head>
+
+<body>
+  <!-- 背景层槽位（本轮不用，留空槽）。层序里仍占 −2：脑电 −2 在其上（DOM 在后）、缝线 −1 在其上 -->
+  <div class="bg" id="bg-slot" aria-hidden="true">
+    <div class="p15-slot-empty"></div>
+  </div>
+  <style>
+    .bg { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: -2; }
+    .p15-slot-empty { position: absolute; inset: 0; }
+  </style>
+
+  <!-- 脑电：固定视口层，波轴心视口 50vh，与缝线同轴锁定 -->
+  <svg class="eeg" id="p15-eeg" aria-hidden="true">
+    <g>
+      <path class="eeg-main" />
+    </g>
+  </svg>
+
+  <div class="seam" aria-hidden="true"><span class="seam-anchor"></span></div>
+  <div class="grain" aria-hidden="true"></div>
+
+  <div class="page">
+    <header class="site-header">
+      <div class="container header-row">
+        <a class="brand is-wake" href="/" aria-label="Traveritas">Traveritas</a>
+        <nav class="site-nav" aria-label="主导航">
+          <a href="/articles/"><i class="stitch" aria-hidden="true"></i><span data-morph data-true="随笔" data-dream="断章">随笔</span></a>
+          <a href="/projects/"><i class="stitch" aria-hidden="true"></i><span data-morph data-true="项目" data-dream="造物">项目</span></a>
+          <a href="/about/"><i class="stitch" aria-hidden="true"></i><span data-morph data-true="关于" data-dream="此身">关于</span></a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <!-- ═══ 首屏：千层纸简化版（纸壳 −3 → 玻璃叶 −3 → 醒/梦墨 1 → 手记 2 → 前景 3） ═══ -->
+      <section class="hero" id="ns-hero">
+        <h1 class="src-only">Traveritas —— 在即将醒来的那一瞬，世界究竟是在成形，还是正在融化？</h1>
+
+        <div class="plate" aria-hidden="true">
+          <div class="amber-bloom"></div>
+        </div>
+
+        <!-- 玻璃叶：醒字伴生冷板 / 梦字暖沙叶（z −3，被 14° 缝线穿过） -->
+        <div class="hero-plane glass leaf-wake" aria-hidden="true"></div>
+        <div class="hero-plane glass leaf-dream" aria-hidden="true"></div>
+
+        <!-- 醒字墨（右上，静止） -->
+        <div class="hero-plane ink-wake" aria-hidden="true">
+          <span class="plate-reticle rt-wake-tl">⌜ 01 · WAKE</span>
+          <span class="plate-reticle rt-wake-br">14.0° ⌟</span>
+          <span class="ch-wake">醒</span>
+          <span class="vsub">在醒与梦之间</span>
+          <span class="vlat">LIMINALITY · 23:07</span>
+        </div>
+
+        <!-- 梦字墨（左下，随 --still 慢漂） -->
+        <div class="hero-plane ink-dream" aria-hidden="true">
+          <span class="ch-dream">梦</span>
+          <span class="plate-reticle rt-dream-tr">02 · DREAM ⌝</span>
+          <span class="plate-reticle rt-dream-bl">⌞ λ-589nm</span>
+        </div>
+
+        <!-- 宣言手记 -->
+        <div class="hero-plane note-plane">
+          <div class="note-paper" aria-hidden="true"></div>
+          <div class="note-ink">
+            <span class="note-stamp">手记 · 23:07</span>
+            <p class="frag f1">世界在此停留片刻。</p>
+            <p class="frag f2">它并非梦境，</p>
+            <p class="frag f3">亦非确凿之物。</p>
+            <p class="frag f4">只是人在睁眼之前，最后一眼看见的明亮倒影。</p>
+          </div>
+        </div>
+
+        <!-- 前景：引导微章（RealityGuide 简化版）+ 滚动提示 -->
+        <div class="hero-plane fore-plane">
+          <div class="reality-guide">
+            <span class="rg-reticle rg-rt-tl" aria-hidden="true">⌜</span>
+            <span class="rg-reticle rg-rt-br" aria-hidden="true">⌟</span>
+            <span class="rg-emitter" aria-hidden="true"><i class="rg-dot"></i><i class="rg-thread"></i></span>
+            <span class="rg-text" data-morph data-true="触按长驻 · 重归夜色" data-dream="触按长驻 · 唤醒世界">触按长驻 · 唤醒世界</span>
+            <span class="rg-meta" aria-hidden="true">
+              <span class="rg-dur" data-morph data-true="1.3s" data-dream="2.2s">2.2s</span>
+              <span>HOLD</span>
+              <span>[Shift+Space]</span>
+            </span>
+          </div>
+          <p class="hero-scroll">
+            <i></i><span data-morph data-true="向下轻移 · 穿行于这一夜" data-dream="“万物皆在降落。”——向深处潜行">向下轻移 · 穿行于这一夜</span>
+          </p>
+        </div>
+      </section>
+
+      <section class="sec" id="ns-essays">
+        <div class="container">
+          <div class="sec-head">
+            <h2 data-morph data-true="随笔" data-dream="断章">随笔</h2>
+            <span class="mono">SAYABLE · 可言说的</span>
+          </div>
+          <div class="rows">
+            <article class="row">
+              <h3>两态试笔</h3>
+              <p>同一段话的两面——醒梦两态正文语法示例稿。两态语法只负责分岔的地方：词的换面，或者整段的分岔。</p>
+              <span class="mono">2026.09.21</span>
+            </article>
+            <article class="row">
+              <h3>与智能体一起造一个网站</h3>
+              <p>这个网站不是我一个人写出来的——准确地说，一行代码都不是我写的。我的角色是：描述我想要什么、判断什么是对的。</p>
+              <span class="mono">2026.09.19</span>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══ 状态试验区：四稿共用的测试位，不属于站点内容，接入前整块移除 ═══ -->
+      <section class="sec lab" id="cursor-lab">
+        <div class="container">
+          <div class="sec-head">
+            <h2>状态试验区</h2>
+            <span class="mono">CURSOR LAB · 四稿共用</span>
+          </div>
+          <p class="lab-intro">
+            这一区是四稿共用的测试位：文字链 / 正文 / 输入框 / 可拖元素 / 空白长按区，各一处。
+            它只用来验证光标层在十二种状态（静息 / 移动 / 悬停链接 / 悬停正文 / 输入框 / 可拖元素 /
+            点按 / 长按 / 闩锁 / 滚动 / 离开窗口）下的读法，与站点内容无关。
+          </p>
+
+          <div class="lab-grid">
+            <!-- 测试位 01 · 文字链 -->
+            <div class="lab-cell lab-span" title="测试位 01 · 站内文字链：可点元素（pointer 语义由光标层承担），第三条新窗口打开">
+              <span class="lab-cap mono">测试位 01 · 站内文字链 ×3（第三条 target="_blank"）</span>
+              <p class="lab-chain">
+                <a href="/articles/">全部随笔 · 记录</a>
+                <a href="/projects/">全部项目 · 造物</a>
+                <a href="https://github.com/Traveritas" target="_blank" rel="noopener">GitHub · 活跃坐标</a>
+              </p>
+              <span class="lab-note mono">悬停其上：链接态。点第三条会离开本页（window 失焦 / 页面隐藏路径）</span>
+            </div>
+
+            <!-- 测试位 02 · 正文 -->
+            <div class="lab-cell lab-span" title="测试位 02 · 悬停正文：光标在正文上的读法（文本态必须让出字面，不得降低可读性）">
+              <span class="lab-cap mono">测试位 02 · 悬停正文 · 三行以上真实散文</span>
+              <div class="lab-prose">
+                <p>夜把光收拢成薄薄一层，落在桌面的纸上。字迹显出来的时候很轻，像刚从水里捞起来，还没有干。</p>
+                <p>我常在两种质地之间来回：一边是清楚、可以说出来的；另一边只剩轮廓，一开口就散了。它们共用同一片光，只是被读出的方式不同。</p>
+                <p>于是这一页留了两条声轨。你读到哪一面，世界就偏到哪一面——不是换了一个地方，是同一处换了光。</p>
+              </div>
+            </div>
+
+            <!-- 测试位 03 · 单行输入 -->
+            <div class="lab-cell" title="测试位 03 · 单行输入框：文本态与插入符必须让出字面，且不得抢焦点">
+              <span class="lab-cap mono">测试位 03 · 输入框（text）</span>
+              <div class="lab-field">
+                <label for="lab-text">单行输入 · 测试位 03</label>
+                <input id="lab-text" type="text" placeholder="在此写下半句（测试位）" />
+              </div>
+            </div>
+
+            <!-- 测试位 04 · 多行输入 -->
+            <div class="lab-cell" title="测试位 04 · 多行输入框：换行与选区上的读法">
+              <span class="lab-cap mono">测试位 04 · 多行输入（textarea）</span>
+              <div class="lab-field">
+                <label for="lab-area">多行输入 · 测试位 04</label>
+                <textarea id="lab-area" placeholder="写两句，再换一行（测试位）"></textarea>
+              </div>
+            </div>
+
+            <!-- 测试位 05 · 可拖元素 -->
+            <div class="lab-cell" title="测试位 05 · 可拖元素：pointerdown + setPointerCapture，拖动时只改 transform: translate()">
+              <span class="lab-cap mono">测试位 05 · 可拖元素（data-drag · 抓取态）</span>
+              <div class="lab-drag" data-drag data-nofx title="按住我拖动：pointerdown + setPointerCapture，只写 transform">拖动</div>
+              <span class="lab-note mono">拖动时网格不动（只改 transform）；本元素带 data-nofx，不触发站点长按</span>
+            </div>
+
+            <!-- 测试位 06 · 空白长按区 -->
+            <div class="lab-cell" title="测试位 06 · 空白长按区：高 240px，无 [data-morph]、非可点元素——站点双态机制的长按必须能在此命中">
+              <span class="lab-cap mono">测试位 06 · 空白长按区 · 高 240px</span>
+              <div class="lab-hold" id="lab-hold">
+                <span class="lab-hold-hint mono">空白处 · 长按 2.2s 入醒 / 1.3s 回梦</span>
+                <span class="lab-hold-hint mono">（本区不含双态文字，也不是可点元素）</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="sec" id="ns-projects">
+        <div class="container">
+          <div class="sec-head">
+            <h2 data-morph data-true="项目" data-dream="造物">项目</h2>
+            <span class="mono">BUILDABLE · 可构造的</span>
+          </div>
+          <div class="rows">
+            <article class="row">
+              <h3>醒梦 · 视觉母题探索</h3>
+              <p>为「醒梦」寻找 2—4 个可以反复出现的核心视觉意象。构想仍在深水之下，尚未聚拢出实体。</p>
+              <div class="tags"><span class="st">构想中</span><span class="mono">FIVE DEPTHS</span></div>
+            </article>
+            <article class="row">
+              <h3>这个网站本身</h3>
+              <p>由 Astro 与智能体共建的个人网站，遵循「醒梦」审美。沉在深处的事物并不浮躁，它只是很慢地聚集成形。</p>
+              <div class="tags"><span class="st">进行中</span><span class="mono">✓ 公开仓库</span></div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- 晨醒 · 出口（照抄主页 wake-anchor 卡） -->
+      <section class="sec" id="ns-dawn">
+        <div class="container">
+          <div class="sec-head">
+            <h2 data-morph data-true="关于" data-dream="此身">关于</h2>
+            <span class="mono">PRESENCE · 存在于此</span>
+          </div>
+          <p class="dawn-line" data-morph data-true="这个网站由智能体与我共同建造。" data-dream="“代码与想象在此交叠，共同勾勒出此地的轮廓。”">
+            这个网站由智能体与我共同建造。
+          </p>
+          <div class="wake-row">
+            <a class="wake-anchor" href="https://github.com/Traveritas" target="_blank" rel="noopener">
+              <span class="wa-name">GitHub</span>
+              <span class="wa-href">github.com/Traveritas</span>
+              <span class="wa-why">找我 · 活跃坐标</span>
+            </a>
+            <a class="wake-anchor" href="https://github.com/Traveritas/traveritas.github.io" target="_blank" rel="noopener">
+              <span class="wa-name">本站源码</span>
+              <span class="wa-href">traveritas.github.io</span>
+              <span class="wa-why">仓库 · 源码与构建</span>
+            </a>
+            <a class="wake-anchor" href="/rss.xml">
+              <span class="wa-name">RSS</span>
+              <span class="wa-href">/rss.xml</span>
+              <span class="wa-why">订阅 · 静默投递</span>
+            </a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="container ft">
+        <span class="mono">© 2026 Traveritas</span>
+        <span class="mono"><span data-morph data-true="存在于此" data-dream="此身在此">存在于此</span> · PRESENCE</span>
+      </div>
+    </footer>
+  </div>
+
+  <div class="dbg" id="dbg">
+    <span>醒度</span>
+    <input id="mixrange" type="range" min="0" max="1000" value="1000" aria-label="醒度" />
+    <span class="now" id="mixon">1.00</span>
+    <button data-face="wake" aria-pressed="true">醒</button>
+    <button data-face="dream" aria-pressed="false">梦</button>
+    <button id="nativebtn" aria-pressed="false" title="切换原生光标（快捷键 C）· 写入 localStorage['xm-cursor-native']">原生光标</button>
+  </div>
+
+  <div class="probe" id="probe" hidden aria-hidden="true"></div>
+
+  <!-- ═════════════════════════════════════════════════════════════════════════
+       ▼▼▼ CURSOR SLOT · 四稿唯一允许改动的区域（外壳其余部分一律不要动）▼▼▼
+
+       契约（只填下面三件东西）：
+         · 根节点固定为 <div class="cursor-slot" id="cursor-slot" aria-hidden="true">
+           外壳已给底座几何：position:fixed / inset:0 / z-index:240 / pointer-events:none /
+           overflow:hidden。你可以覆盖（形如 `#cursor-slot { ... }` 写在 #cursor-css 里，
+           DOM 在后、同权重后者胜），但不要让这一层参与布局、不要加可点区域。
+         · 只允许消费这些输入：CSS 变量 --reality-mix（1 醒 → 0 梦）、--still、
+           --amber / --dream / --umber / --ghost-ink / --wash、--bg / --fg / --fg-soft / --line，
+           以及 body[data-reality] 与 body.reality-holding 两个类。
+         · 门控由外壳负责：只有当 body.fx-cursor-on 出现时才显示你的层；
+           指针离开文档时 body 上会有 fx-cursor-out；touch / pen 进来时 fx-cursor-on 会被摘掉。
+           你的层**不得**自己写 cursor: none。
+         · 逐帧只写 transform / opacity；禁逐帧 elementFromPoint / getBoundingClientRect /
+           getComputedStyle；状态检测用 pointerover / pointerout 事件委托 + closest；
+           rAF 由事件唤醒、收敛即停（静息 5s 内 0 次），收敛时 will-change 归 auto。
+         · 调试（仅 ?probe=1）：window.__cur.set(name) 记录状态名；
+           window.__cur.setHotspot(el) 注册热点元素（自检面板按同帧口径比对偏差）；
+           监听 window 的 'cursor:state' 事件（?state=<name> 会派发）做强制状态截图。
+         · 默认实现是空的：不显示任何东西、不加任何监听。
+
+       ▼▼▼ 以下三件东西就是要填的全部内容 ▼▼▼
+       ═════════════════════════════════════════════════════════════════════════ -->
+  <div class="cursor-slot" id="cursor-slot" aria-hidden="true">
+    <i class="cur-line"></i>
+    <i class="cur-dot"></i>
+  </div>
+  <style id="cursor-css">
+    /* 方案 C · 悬丝：一根 1px × 9px 的发丝自 2px 热点悬垂，+ 一个 2px 实心点（热点本体）。
+       两个平面元素、单色、零材质。角度由 JS 弹簧驱动，逐帧只写 transform / opacity。 */
+
+    /* 门控（外壳拥有）：body.fx-cursor-on 出现前，本层不得可见 */
+    #cursor-slot { opacity: 0; }
+    body.fx-cursor-on #cursor-slot { opacity: 1; }
+
+    #cursor-slot .cur-line,
+    #cursor-slot .cur-dot {
+      position: absolute; left: 0; top: 0; display: block;
+      pointer-events: none; transform-origin: 0 0;
+    }
+    /* 发丝：1px × 9px。原点是顶端，静止时 rotate(-4deg) —— 与 reality.ts:217 的
+       drawThread 同一角度（RealityGuide 的演示发丝亦是 rotate(-4deg)）。 */
+    #cursor-slot .cur-line {
+      width: 1px; height: 9px; background: var(--fg);
+      transform: translate3d(-100px, -100px, 0) rotate(-4deg);
+    }
+    /* 热点：2px 实心点，中心恒与真实鼠标同位（1:1、零延迟） */
+    #cursor-slot .cur-dot {
+      width: 2px; height: 2px; background: var(--fg);
+      transform: translate3d(-100px, -100px, 0);
+    }
+
+    /* 收敛即停：只在运动/过渡期间提合成层，静息归 auto（自检面板读的就是这个值） */
+    #cursor-slot.is-live { will-change: transform; }
+    #cursor-slot.is-live .cur-line,
+    #cursor-slot.is-live .cur-dot { will-change: transform, opacity; }
+
+    /* 梦：同一根线读得更软——颜色淡一点（消费 --still），形变由 JS 按 body[data-reality] 给 */
+    body[data-reality='dream'] #cursor-slot .cur-line {
+      background: color-mix(in srgb, var(--fg) calc(100% - var(--still, 0) * 24%), transparent);
+    }
+    body[data-reality='dream'] #cursor-slot .cur-dot {
+      background: color-mix(in srgb, var(--fg) calc(100% - var(--still, 0) * 16%), transparent);
+    }
+  </style>
+  <script>
+    /* ─────────────────────────────────────────────────────────────
+       方案 C · 悬丝（−4° 单笔画）
+
+       两根元素：.cur-dot（2px，热点，1:1 同帧）＋ .cur-line（1px × 9px，发丝）。
+       发丝自热点悬垂，角度是钟摆：等角弹簧  k·(目标 − 角) − c·角速度。
+         · 醒 k=900 ζ=1.00（临界：0 过冲）→ 绷直锁 −4°，几乎不摆
+         · 梦 k=250 ζ=0.24（过冲 46%）→ 随移动自由摆荡，~0.9s 才慢慢落回
+       速度 vx 把目标角吹偏（MAX_LEAN ±22°）：反向移动时角度滞后并过冲一次。
+       静止角 −4° 取自站点自己的抽线（src/scripts/reality.ts 的 drawThread 同角），
+       长按时同一角度被抽长 —— 光标是那根线的种子。
+
+       逐帧只写 transform / opacity；禁 elementFromPoint / getBoundingClientRect /
+       getComputedStyle；状态检测用 pointerover 委托 + closest；
+       门控、长按（2200/1300ms）与抽线特效由外壳负责，本层不自画全屏线、不写 cursor: none。
+       形变全部由 scaleY / rotate 表达，从不逐帧写 height/width；热路径零每帧分配。
+       ───────────────────────────────────────────────────────────── */
+    (function () {
+      'use strict';
+      var slot = document.getElementById('cursor-slot');
+      if (!slot) return;
+      var lineEl = slot.querySelector('.cur-line');
+      var dotEl = slot.querySelector('.cur-dot');
+      if (!lineEl || !dotEl) return;
+
+      var body = document.body;
+      var Q = new URLSearchParams(location.search);
+      var RM = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) || Q.get('reduced') === '1';
+      var BASE_H = 9;                    // CSS 里的线高（缩放基准）
+      /* 严格对照 / 降级：不做弹簧积分，直接取位姿。
+         ?freeze=1 是四稿共用的「严格对照」档（CSS 动画停 0% 帧），本层在此档同样
+         不入弹簧，保证两张静止帧是收敛后的位姿而非摆动中途 —— 真摆动证据见 notes 的采样数字。 */
+      var STATIC = RM || Q.get('freeze') === '1';
+
+      /* 弹簧预设（角度单位 deg，时间 s） */
+      var K_HARD = 900, Z_HARD = 1.0;    // 醒：临界，绷直
+      var K_SOFT = 250, Z_SOFT = 0.24;   // 梦：欠阻尼，摆荡后落回
+      var Z_CLICK = 0.3;                 // 点按颤两下
+      /* 静止位姿：梦态角度略偏、线略长、点略淡（两张 freeze 帧一眼可辨） */
+      var WAKE = { a: -4, len: 9, dot: 1 };
+      var DREAM = { a: -7.2, len: 11.6, dot: 0.6 };
+      var MAX_LEAN = 22, KVEL = 0.016, MAX_EXT = 1.34, KEXT = 0.00024;
+      var CLICK_MS = 260;
+
+      /* 位置与弹簧状态 */
+      var px = -100, py = -100, vx = 0, lastT = 0, hasPtr = false;
+      var ang = -4, vel = 0, len = 9, dop = 1, lop = 1;
+      var tAng = -4, tLen = 9, tDop = 1, tLop = 1;
+
+      /* 状态 */
+      var hover = 'rest', holding = null, holdFace = null, forced = null, forcedOn = false;
+      var leaving = false, clickUntil = 0, latchUntil = 0, scrollUntil = 0, downT = 0;
+      var loopId = 0, lastFrame = 0, reported = '';
+
+      function now() { return performance.now(); }
+      function isDream() { return body.dataset.reality === 'dream'; }
+      function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
+
+      /* 状态检测：pointerover 委托 + closest（不逐帧 elementFromPoint） */
+      function classify(t) {
+        if (!t || t.nodeType !== 1) return 'rest';
+        if (t.closest('[data-drag]')) return 'drag';
+        if (t.closest('input,textarea,select,[contenteditable],label')) return 'input';
+        if (t.closest('a,button,summary')) return 'hover-link';
+        if (t.closest('p,h1,h2,h3,h4,h5,h6,li,blockquote,figcaption,time,code,pre')) return 'hover-text';
+        return 'rest';
+      }
+      function state() {
+        if (forcedOn) return forced;
+        if (leaving) return 'leave';
+        if (holding) return holding;
+        if (now() < latchUntil) return 'latch';
+        if (now() < scrollUntil) return 'scroll';
+        return hover;
+      }
+
+      /* 目标位姿（模块级字段，热路径零每帧分配） */
+      var pA = -4, pM = 1, pDop = 1, pLop = 1;
+      function targets() {
+        var d = isDream();
+        var restA = d ? DREAM.a : WAKE.a;
+        var baseLen = d ? DREAM.len : WAKE.len;
+        var baseDot = d ? DREAM.dot : WAKE.dot;
+        var s = state();
+        var lean = 0, ext = 1;
+        pA = restA; pM = 1; pDop = 1; pLop = 1;
+        switch (s) {
+          case 'hover-link': pA = -90; pM = 1.16; pDop = 0.55; break; /* 躺平成水平短划 */
+          case 'hover-text': pA = 0; pM = 0.86; pDop = 0.26; break;   /* 立起来成竖直插入符 */
+          case 'input': pA = 0; pM = 0.68; pDop = 0.2; break;         /* 更短的插入符 */
+          case 'drag': pA = -18; pM = 1.85; pDop = 0.8; break;        /* 被拉长 */
+          case 'hold1300': pM = 1.9; pDop = 0.92; break;              /* 被抽走、延长 */
+          case 'hold2200': pM = 2.45; break;                          /* 更长的抽走 */
+          case 'latch': pM = 0.5; break;                              /* 闩锁：收拢一次 */
+          case 'scroll': pM = 0.62; pDop = 0.9; break;                /* 收紧变短 */
+          case 'leave': pDop = 0.1; pLop = 0.1; break;                /* 淡出 */
+          case 'move': pM = 1.18; break;
+          default: break;
+        }
+        if (forcedOn) {
+          if (forced === 'move') lean = 20;                 /* 强制帧：给出代表性摆动位姿 */
+          else if (forced === 'click') lean = 13;           /* 强制帧：颤到一侧 */
+          else if (forced === 'leave') { pDop = 0.16; pLop = 0.16; } /* 强制帧：淡出中途 */
+        } else if (s === 'rest' && !STATIC) {
+          lean = clamp(vx * KVEL, -MAX_LEAN, MAX_LEAN);
+          ext = 1 + Math.min(Math.abs(vx) * KEXT, MAX_EXT - 1);
+        }
+        tAng = pA + lean;
+        tLen = baseLen * pM * ext;
+        tDop = pDop * baseDot;
+        tLop = pLop;
+      }
+
+      function render() {
+        lineEl.style.transform = 'translate3d(' + (px - 0.5) + 'px,' + py + 'px,0) rotate(' +
+          ang.toFixed(3) + 'deg) scaleY(' + (len / BASE_H).toFixed(4) + ')';
+        dotEl.style.transform = 'translate3d(' + (px - 1) + 'px,' + (py - 1) + 'px,0)';
+        dotEl.style.opacity = dop.toFixed(3);
+        lineEl.style.opacity = lop.toFixed(3);
+      }
+
+      function step(dt) {
+        targets();
+        var d = isDream();
+        var clicking = now() < clickUntil;
+        var soft = d && (state() === 'rest' || state() === 'move') && !forcedOn;
+        var k = clicking ? K_SOFT : soft ? K_SOFT : K_HARD;
+        var z = clicking ? Z_CLICK : soft ? Z_SOFT : Z_HARD;
+        var wn = Math.sqrt(k), c = 2 * z * wn;
+        vel += (k * (tAng - ang) - c * vel) * dt;
+        ang += vel * dt;
+        len += (tLen - len) * (1 - Math.exp(-dt / (d ? 0.15 : 0.075)));
+        var ko = 1 - Math.exp(-dt / (d ? 0.13 : 0.08));
+        dop += (tDop - dop) * ko;
+        lop += (tLop - lop) * ko;
+        vx *= Math.exp(-dt / 0.075);                      /* 风速退去 */
+        if (Math.abs(vx) < 1.5) vx = 0;
+      }
+
+      function settled() {
+        if (vx !== 0 || now() < clickUntil || now() < latchUntil || now() < scrollUntil) return false;
+        return Math.abs(ang - tAng) < 0.06 && Math.abs(vel) < 0.6 &&
+          Math.abs(len - tLen) < 0.06 && Math.abs(dop - tDop) < 0.005 && Math.abs(lop - tLop) < 0.005;
+      }
+
+      function frame(ts) {
+        loopId = 0;
+        var dt = lastFrame ? Math.min((ts - lastFrame) / 1000, 1 / 30) : 1 / 60;
+        lastFrame = ts;
+        step(dt);
+        render();
+        reportState();
+        if (settled()) { stopLoop(); return; }
+        loopId = requestAnimationFrame(frame);
+      }
+      function stopLoop() {
+        if (loopId) { cancelAnimationFrame(loopId); loopId = 0; }
+        slot.classList.remove('is-live');
+        lastFrame = 0;
+      }
+      function wake() {
+        if (STATIC) { snap(); return; }   /* RM / ?freeze=1：无跟随动画，1:1 静止 */
+        if (loopId) return;
+        slot.classList.add('is-live');
+        loopId = requestAnimationFrame(frame);
+      }
+      function snap() {
+        targets();
+        ang = tAng; vel = 0; len = tLen; dop = tDop; lop = tLop;
+        render(); reportState();
+      }
+
+      function regHotspot() {
+        if (window.__cur && window.__cur.setHotspot) window.__cur.setHotspot(dotEl);
+      }
+      function reportState() {
+        if (!window.__cur || !window.__cur.set) return;
+        var s = state();
+        if (s !== reported) { reported = s; window.__cur.set(s); }
+      }
+
+      /* ── 鼠标：热点同帧写，发丝由 rAF 弹簧追 ── */
+      document.addEventListener('pointermove', function (e) {
+        if (e.pointerType && e.pointerType !== 'mouse') return;
+        var n = now();
+        if (hasPtr && lastT) {
+          var dt = (n - lastT) / 1000;
+          if (dt > 0.0008) vx = clamp(vx * 0.35 + ((e.clientX - px) / dt) * 0.65, -9000, 9000);
+        }
+        lastT = n; hasPtr = true; leaving = false;
+        px = e.clientX; py = e.clientY;
+        if (STATIC) { snap(); regHotspot(); return; }
+        render();                    /* 热点（点）零延迟，同帧 */
+        regHotspot();
+        wake();
+      }, { passive: true });
+
+      document.addEventListener('pointerover', function (e) {
+        if (e.pointerType && e.pointerType !== 'mouse') return;
+        leaving = false;
+        if (forcedOn) return;
+        var h = classify(e.target);
+        if (h !== hover) { hover = h; wake(); }
+      }, { passive: true });
+
+      document.addEventListener('pointerout', function (e) {
+        if (e.relatedTarget) return;
+        leaving = true;
+        wake();
+      }, { passive: true });
+      document.addEventListener('mouseleave', function () { leaving = true; wake(); });
+      window.addEventListener('blur', function () { leaving = true; wake(); });
+      window.addEventListener('focus', function () { leaving = false; });
+      document.addEventListener('visibilitychange', function () {
+        leaving = !!document.hidden;
+        wake();
+      });
+
+      /* ── 点按：线左右各颤一下（冲量 → 欠阻尼响一次） ── */
+      document.addEventListener('pointerdown', function (e) {
+        if (e.pointerType && e.pointerType !== 'mouse') return;
+        if (e.button !== 0) return;
+        downT = now();
+      }, { passive: true });
+      document.addEventListener('pointerup', function (e) {
+        if (e.pointerType && e.pointerType !== 'mouse') return;
+        if (!downT) return;
+        var held = now() - downT;
+        downT = 0;
+        if (forcedOn || RM || held > CLICK_MS) return;
+        clickUntil = now() + 700;
+        vel += 560;
+        ang -= 3;
+        wake();
+      }, { passive: true });
+
+      /* ── 长按 / 闩锁：外壳负责手势与抽线，本层只让发丝被抽长（观察 body 类） ── */
+      new MutationObserver(function () {
+        var h = body.classList.contains('reality-holding');
+        if (h && !holding) {
+          holdFace = body.dataset.reality;
+          holding = holdFace === 'dream' ? 'hold2200' : 'hold1300'; /* 梦→醒 2200 / 醒→梦 1300 */
+          wake();
+        } else if (!h && holding) {
+          holding = null;
+          if (body.dataset.reality !== holdFace) latchUntil = now() + 120; /* 闩锁瞬间：收拢一次 */
+          holdFace = null;
+          wake();
+        }
+      }).observe(body, { attributes: true, attributeFilter: ['class', 'data-reality'] });
+
+      window.addEventListener('scroll', function () {
+        if (forcedOn) return;
+        scrollUntil = now() + 150;
+        wake();
+      }, { passive: true });
+
+      /* ── 强制状态（?state=<name> / 外壳派发 cursor:state），无鼠标环境截图用 ── */
+      var NAMES = {
+        rest: 'rest', move: 'move', hoverlink: 'hover-link', hovertext: 'hover-text',
+        input: 'input', drag: 'drag', click: 'click', hold1300: 'hold1300',
+        hold2200: 'hold2200', latch: 'latch', scroll: 'scroll', leave: 'leave'
+      };
+      window.addEventListener('cursor:state', function (e) {
+        var n = e && e.detail && e.detail.name != null ? String(e.detail.name) : '';
+        n = n.toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (!NAMES[n]) return;
+        forced = NAMES[n]; forcedOn = true;
+        wake();
+      });
+
+      /* 初始：位置未知，两根线都在视口外（slot overflow:hidden） */
+      render();
+      setTimeout(function () { regHotspot(); snap(); }, 0);
+    })();
+  </script>
+  <!-- ▲▲▲ CURSOR SLOT END · 四稿的改动到此为止 ▲▲▲ -->
+
+  <script>
+    /* ═══════════════════════════════════════════════════════════════════════
+       外壳主脚本
+         · rAF 记账（区分外壳引擎 / 四稿的层）
+         · 查询参数与四重门控
+         · 状态机（对齐 src/scripts/reality.ts，简版：特效只留线 / 一弹）
+         · 状态试验区的可拖元素
+         · dock（含「原生光标」开关）与 ?probe=1 自检面板
+       ═══════════════════════════════════════════════════════════════════════ */
+    (function () {
+      const docEl = document.documentElement;
+      const body = document.body;
+      const Q = new URLSearchParams(location.search);
+
+      /* ── rAF 记账：外壳自己的循环用 raf() 注册（打 SHELL_CB 标记），
+            自检面板只统计「别人的」rAF 调用（＝四稿光标层的成本）。 ── */
+      const NATIVE_RAF = window.requestAnimationFrame.bind(window);
+      const SHELL_CB = Symbol('shell-raf');
+      function raf(cb) { cb[SHELL_CB] = true; return NATIVE_RAF(cb); }
+
+      /* ── 查询参数 ── */
+      const zone = Q.get('zone');
+      if (zone) docEl.dataset.zone = zone;
+      if (Q.get('ui') === '0') docEl.classList.add('ui-off');
+      if (Q.get('freeze') === '1') docEl.classList.add('freeze');
+      const FREEZE = Q.get('freeze') === '1';
+      const RM = (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) || Q.get('reduced') === '1';
+
+      /* ═══════════ 四重门控（外壳拥有） ═══════════ */
+      const URL_CURSOR_OFF = Q.get('cursor') === 'off';
+      const mqRM = window.matchMedia ? matchMedia('(prefers-reduced-motion: reduce)') : null;
+      const mqFC = window.matchMedia ? matchMedia('(forced-colors: active)') : null;
+      let nativePref = false;
+      try { nativePref = localStorage.getItem('xm-cursor-native') === '1'; } catch (e) {}
+      let lastPointerType = '(none)';
+
+      const gates = {
+        mouse: false,                                  // ① 运行时读到过真实鼠标指针
+        noReducedMotion: !(Q.get('reduced') === '1' || (mqRM && mqRM.matches)), // ②
+        noForcedColors: !(mqFC && mqFC.matches),       // ③
+        userSwitchOn: !nativePref,                     // ④
+        urlAllowed: !URL_CURSOR_OFF,                   // ⑤
+      };
+      function cursorAllowed() {
+        return gates.mouse && gates.noReducedMotion && gates.noForcedColors && gates.userSwitchOn && gates.urlAllowed;
+      }
+      function applyCursorGate() {
+        const on = cursorAllowed();
+        body.classList.toggle('fx-cursor-on', on);
+        if (!on) body.classList.remove('fx-cursor-out');
+        return on;
+      }
+
+      function syncNativeBtn() {
+        const b = document.getElementById('nativebtn');
+        if (b) b.setAttribute('aria-pressed', String(nativePref));
+      }
+      function toggleNative() {
+        nativePref = !nativePref;
+        try { localStorage.setItem('xm-cursor-native', nativePref ? '1' : '0'); } catch (e) {}
+        gates.userSwitchOn = !nativePref;
+        applyCursorGate();
+        syncNativeBtn();
+        renderProbe();
+      }
+
+      syncNativeBtn();
+      applyCursorGate();
+
+      /* ═══════════ 自检面板 + window.__cur（仅 ?probe=1） ═══════════ */
+      const PROBE = Q.get('probe') === '1';
+      let curState = 'idle';
+      let probeEl = null;
+      let probeHot = null;
+      let hotSample = null;
+      let willChangeCache = '(—)';
+      let probeTick = 0;
+      const rafStats = { total: 0, stamps: [] };
+
+      function sampleHotspot(e) {
+        if (!probeHot || !probeHot.isConnected) { hotSample = null; return; }
+        // 同帧口径：在 pointermove 的同一帧里取热点 rect 中心，与 e.clientX/Y 比对
+        const r = probeHot.getBoundingClientRect();
+        const dx = r.left + r.width / 2 - e.clientX;
+        const dy = r.top + r.height / 2 - e.clientY;
+        hotSample = { dx: +dx.toFixed(2), dy: +dy.toFixed(2), dist: +Math.hypot(dx, dy).toFixed(2), t: performance.now() };
+      }
+      function readings() {
+        const now = performance.now();
+        let last5 = 0;
+        for (let i = rafStats.stamps.length - 1; i >= 0; i--) {
+          if (now - rafStats.stamps[i] <= 5000) last5++;
+          else break;
+        }
+        const slot = document.getElementById('cursor-slot');
+        return {
+          state: curState,
+          hotspot: hotSample
+            ? { dx: hotSample.dx, dy: hotSample.dy, dist: hotSample.dist, ageMs: Math.round(now - hotSample.t) }
+            : null,
+          rafTotal: rafStats.total,
+          rafLast5s: last5,
+          slotElements: slot ? slot.querySelectorAll('*').length : -1,
+          willChange: willChangeCache,
+          gates: {
+            mouse: gates.mouse,
+            noReducedMotion: gates.noReducedMotion,
+            noForcedColors: gates.noForcedColors,
+            userSwitchOn: gates.userSwitchOn,
+            urlAllowed: gates.urlAllowed,
+          },
+          fxCursorOn: body.classList.contains('fx-cursor-on'),
+          fxCursorOut: body.classList.contains('fx-cursor-out'),
+          lastPointerType,
+          zone: docEl.dataset.zone,
+          reality: face,
+          mix: +C.toFixed(3),
+        };
+      }
+      function renderProbe() {
+        if (!PROBE || !probeEl) return;
+        probeTick++;
+        const r = readings();
+        if (probeTick % 4 === 1) {
+          const slot = document.getElementById('cursor-slot');
+          willChangeCache = slot ? getComputedStyle(slot).willChange : '(—)';
+          r.willChange = willChangeCache;
+        }
+        const h = r.hotspot;
+        const hot = h
+          ? `Δx <b>${h.dx >= 0 ? '+' : ''}${h.dx}</b> · Δy <b>${h.dy >= 0 ? '+' : ''}${h.dy}</b> · d <b>${h.dist}</b> px（${h.ageMs}ms 前，同帧口径）`
+          : '<span class="pv">未采样（? 先移动鼠标，四稿用 __cur.setHotspot(el) 注册热点）</span>';
+        const cls = (ok) => (ok ? 'pv' : 'bad');
+        probeEl.innerHTML =
+          `<span>rAF <b>${r.rafTotal}</b> 累计 · 近 5s <b>${r.rafLast5s}</b>（不含外壳引擎）</span>` +
+          `<span>#cursor-slot 元素 <b>${r.slotElements}</b> · will-change <span class="pv">${r.willChange}</span></span>` +
+          `<span>状态 <b>${r.state}</b> · 门控 ` +
+            `mouse<span class="${cls(r.gates.mouse)}">${r.gates.mouse ? 1 : 0}</span> ` +
+            `rm<span class="${cls(r.gates.noReducedMotion)}">${r.gates.noReducedMotion ? 1 : 0}</span> ` +
+            `fc<span class="${cls(r.gates.noForcedColors)}">${r.gates.noForcedColors ? 1 : 0}</span> ` +
+            `user<span class="${cls(r.gates.userSwitchOn)}">${r.gates.userSwitchOn ? 1 : 0}</span> ` +
+            `url<span class="${cls(r.gates.urlAllowed)}">${r.gates.urlAllowed ? 1 : 0}</span> ` +
+            `→ fx-cursor-on <b>${r.fxCursorOn ? 1 : 0}</b>${r.fxCursorOut ? ' · out 1' : ''}</span>` +
+          `<span>pointerType <span class="pv">${r.lastPointerType}</span> · zone <span class="pv">${r.zone}</span> · mix <span class="pv">${r.mix}</span></span>` +
+          `<span>热点偏差 ${hot}</span>`;
+      }
+
+      if (PROBE) {
+        window.requestAnimationFrame = function (cb) {
+          if (!cb || !cb[SHELL_CB]) {
+            rafStats.total++;
+            rafStats.stamps.push(performance.now());
+            if (rafStats.stamps.length > 600) rafStats.stamps.splice(0, 300);
+          }
+          return NATIVE_RAF(cb);
+        };
+        // 面板本体在启动段（C / face 就绪后）才点亮：readings() 要读它们
+        window.__cur = {
+          set: (name) => { curState = String(name); },
+          setHotspot: (el) => { probeHot = el instanceof Element ? el : null; hotSample = null; },
+          report: () => readings(),
+        };
+      }
+
+      /* ── 门控事件 ── */
+      function onDocLeave() { body.classList.add('fx-cursor-out'); }
+      function onDocEnter() { body.classList.remove('fx-cursor-out'); }
+      document.addEventListener('pointermove', (e) => {
+        lastPointerType = e.pointerType || '(unknown)';
+        if (e.pointerType === 'mouse') {
+          gates.mouse = true;
+          body.classList.remove('fx-cursor-out');
+        } else {
+          // touch / pen：不接管
+          gates.mouse = false;
+        }
+        applyCursorGate();
+        if (PROBE) sampleHotspot(e);
+      }, { passive: true });
+      // 触摸 / 笔：一旦出现非 mouse 的指针就回原生光标（pointermove 之外，pointerdown 也要看）
+      document.addEventListener('pointerdown', (e) => {
+        lastPointerType = e.pointerType || '(unknown)';
+        if (e.pointerType !== 'mouse') { gates.mouse = false; applyCursorGate(); }
+      }, { passive: true });
+      document.addEventListener('pointerout', (e) => { if (!e.relatedTarget) onDocLeave(); });
+      document.addEventListener('pointerover', (e) => { if (!e.relatedTarget) onDocEnter(); });
+      document.addEventListener('mouseleave', onDocLeave);
+      document.addEventListener('mouseenter', onDocEnter);
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) body.classList.add('fx-cursor-out');
+        else if (body.classList.contains('fx-cursor-on')) body.classList.remove('fx-cursor-out');
+        renderProbe();
+      });
+      window.addEventListener('blur', onDocLeave);
+      window.addEventListener('focus', onDocEnter);
+      const reGate = () => {
+        gates.noReducedMotion = !(Q.get('reduced') === '1' || (mqRM && mqRM.matches));
+        gates.noForcedColors = !(mqFC && mqFC.matches);
+        applyCursorGate();
+      };
+      if (mqRM && mqRM.addEventListener) mqRM.addEventListener('change', reGate);
+      if (mqFC && mqFC.addEventListener) mqFC.addEventListener('change', reGate);
+
+      /* ── 状态试验区的可拖元素（pointerdown + setPointerCapture 最小实现） ── */
+      const dragEl = document.querySelector('[data-drag]');
+      if (dragEl) {
+        let dragId = -1, baseX = 0, baseY = 0, tx = 0, ty = 0;
+        dragEl.addEventListener('pointerdown', (e) => {
+          if (e.button !== undefined && e.button !== 0) return;
+          dragId = e.pointerId;
+          baseX = e.clientX - tx;
+          baseY = e.clientY - ty;
+          dragEl.classList.add('is-dragging');
+          try { dragEl.setPointerCapture(e.pointerId); } catch (err) {}
+        });
+        dragEl.addEventListener('pointermove', (e) => {
+          if (e.pointerId !== dragId) return;
+          tx = e.clientX - baseX;
+          ty = e.clientY - baseY;
+          dragEl.style.transform = `translate(${tx}px,${ty}px)`;
+        });
+        const dragEnd = (e) => {
+          if (e.pointerId !== dragId) return;
+          dragId = -1;
+          dragEl.classList.remove('is-dragging');
+        };
+        dragEl.addEventListener('pointerup', dragEnd);
+        dragEl.addEventListener('pointercancel', dragEnd);
+      }
+
+      /* ── 强调色双色插值（照抄 reality.ts 的 ACCENT） ── */
+      const hex = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+      const ACCENT = {
+        '--amber': [hex('#d9a05b'), hex('#a7b1ba')],
+        '--umber': [hex('#765640'), hex('#556270')],
+        '--ghost-ink': [hex('#b98f74'), hex('#8e9aa6')],
+        '--dream': [hex('#c2a382'), hex('#a39c92')],
+        '--wash': [hex('#8a5a30'), hex('#556270')],
+      };
+      const mixRgb = (a, b, t) => `rgb(${Math.round(a[0] + (b[0] - a[0]) * t)},${Math.round(a[1] + (b[1] - a[1]) * t)},${Math.round(a[2] + (b[2] - a[2]) * t)})`;
+      let C = 1; // 醒度
+      function setTint(cc) {
+        C = cc;
+        for (const k in ACCENT) docEl.style.setProperty(k, mixRgb(ACCENT[k][0], ACCENT[k][1], cc));
+        docEl.style.setProperty('--reality-mix', cc.toFixed(4));
+        if (mixOn) mixOn.textContent = cc.toFixed(2);
+      }
+
+      /* ── 文字换面（简版 morph：180ms 磨砂溶变） ── */
+      const duals = Array.from(document.querySelectorAll('[data-morph]')).map((el) => ({ el, t: 0 }));
+      function applyFace(face, instant) {
+        for (const d of duals) {
+          const want = face === 'wake' ? d.el.dataset.true : d.el.dataset.dream;
+          if (d.el.textContent === want) continue;
+          if (instant || RM) { d.el.textContent = want; continue; }
+          d.el.classList.add('is-morphing');
+          clearTimeout(d.t);
+          d.t = setTimeout(() => { d.el.textContent = want; d.el.classList.remove('is-morphing'); }, 180);
+        }
+      }
+
+      /* ── 品牌字标：7 步轮转 + 3 秒呼吸（照抄 brand.ts） ── */
+      const WAKE_WORD = 'Traveritas';
+      const CYCLE = ['AveritA', 'VeritaA', 'EritaaV', 'RitaavE', 'ItaaveR', 'TaaverI', 'AaveriT'];
+      const brand = document.querySelector('.brand');
+      let bstep = 0, btimer = 0, brandInit = false, curFace = 'wake';
+      function ensureSpans(n) {
+        let s = brand.querySelectorAll('.brand-char');
+        if (s.length === n) return s;
+        brand.innerHTML = '';
+        for (let i = 0; i < n; i++) {
+          const sp = document.createElement('span');
+          sp.className = 'brand-char';
+          sp.style.setProperty('--i', String(i));
+          brand.appendChild(sp);
+        }
+        return brand.querySelectorAll('.brand-char');
+      }
+      function brandWord(w) {
+        const s = ensureSpans(w.length);
+        for (let i = 0; i < w.length; i++) if (s[i].textContent !== w[i]) s[i].textContent = w[i];
+      }
+      function brandTick() {
+        if (curFace !== 'dream' || RM) return;
+        bstep = (bstep + 1) % CYCLE.length;
+        brandWord(CYCLE[bstep]);
+        btimer = setTimeout(brandTick, bstep === 0 ? 3000 : 1000);
+      }
+      function applyBrand(face) {
+        clearTimeout(btimer);
+        bstep = 0;
+        brand.classList.toggle('is-dream', face === 'dream');
+        brand.classList.toggle('is-wake', face === 'wake');
+        if (face === 'dream') { if (RM) brand.textContent = CYCLE[0]; else { brandWord(CYCLE[0]); btimer = setTimeout(brandTick, 1000); } }
+        else brand.textContent = WAKE_WORD;
+      }
+      function brandTo(face) {
+        if (!brandInit || RM) { brandInit = true; applyBrand(face); return; }
+        brand.classList.add('is-morphing');
+        setTimeout(() => { applyBrand(face); brand.classList.remove('is-morphing'); }, 180);
+      }
+
+      /* ── 脑电（固定视口层；两态同一条曲线，与线上现状一致） ── */
+      const eegSvg = document.getElementById('p15-eeg');
+      const eegG = eegSvg.querySelector('g');
+      const eegPath = eegSvg.querySelector('.eeg-main');
+      const AMP = 3.6, FREQ = 0.5, SPD = 2.6, STEP = 26;
+      function eegPathD(ph) {
+        const W = innerWidth, H = innerHeight, cy = H * 0.5;
+        const half = Math.sqrt(W * W + H * H) / 2 + 60;
+        let s = '', first = true;
+        for (let x = -half; x <= half; x += STEP) {
+          const u = x / 600;
+          const y = Math.sin(u * FREQ * Math.PI * 2 + ph * SPD) * AMP + Math.sin(u * FREQ * 2.7 + ph * 1.3) * AMP * 0.4;
+          s += (first ? 'M' : 'L') + (W / 2 + x).toFixed(1) + ' ' + (cy + y).toFixed(1);
+          first = false;
+        }
+        return s;
+      }
+      let lastEeg = 0;
+      function eegDraw(ph) {
+        eegPath.setAttribute('d', eegPathD(ph));
+        eegG.setAttribute('transform', `rotate(14 ${innerWidth / 2} ${innerHeight * 0.5})`);
+      }
+      function eegTick(ph) { lastEeg = performance.now(); eegDraw(ph); }
+      eegTick(0);
+      if (!RM && !FREEZE) {
+        let last = 0;
+        (function eegLoop(ts) {
+          raf(eegLoop);
+          if (ts - last < 33) return;
+          last = ts;
+          if (!document.hidden) { eegTick(ts / 1000); if (!pinned) setTint(C); }
+        })(0);
+        setInterval(() => { if (!document.hidden && performance.now() - lastEeg > 500) eegTick(performance.now() / 1000); }, 400);
+      }
+
+      /* ── 状态机（对齐 reality.ts：空白长按 2200 / 1300ms） ── */
+      const T_GO = 2200, T_BACK = 1300, RETRACT_MS = 560, SETTLE_MS = 280, CLICK_MS = 260;
+      const EXCLUDE = 'a,button,input,textarea,select,label,summary,[contenteditable],h1,h2,h3,h4,h5,h6,p,li,blockquote,figcaption,time,code,pre,[data-morph],[data-nofx],.dbg,.probe';
+      const STORE = 'xm-reality';
+
+      let face = 'wake', mode = 'idle', dir = 'back', p = 0, px = 0, py = 0, pid = -1;
+      let holdT0 = 0, retractT0 = 0, retractFrom = 0, retractDur = 0, settleFrom = 1, settleTo = 1;
+      let rafId = 0, watchdog = 0, pinned = false, startX = 0, startY = 0, src = null;
+
+      const fx = document.createElement('div');
+      fx.className = 'fx';
+      const thread = document.createElement('div');
+      thread.className = 'thread';
+      const tCore = document.createElement('i');
+      tCore.className = 't-core';
+      thread.appendChild(tCore);
+      const flick = document.createElement('div');
+      flick.className = 'flick';
+      fx.append(thread, flick);
+      body.appendChild(fx);
+
+      const fullW = () => 2 * Math.max(px, innerWidth - px) + 80;
+      function drawThread(W, ang, op) {
+        thread.style.transform = `translate(${px}px,${py}px) rotate(${ang}deg)`;
+        tCore.style.width = `${W}px`;
+        tCore.style.left = `${-W / 2}px`;
+        tCore.style.opacity = String(op);
+      }
+      function latch() {
+        mode = 'freeze';
+        src = null;
+        pid = -1;
+        clearTimeout(watchdog);
+        body.classList.remove('reality-holding');
+        face = dir === 'go' ? 'wake' : 'dream';
+        body.dataset.reality = face;
+        try { sessionStorage.setItem(STORE, face); } catch (e) {}
+        applyFace(face, false);
+        brandTo(face);
+        settleFrom = C; settleTo = dir === 'go' ? 1 : 0;
+        const ft0 = performance.now();
+        if (RM) {
+          setTint(settleTo); thread.style.display = 'none'; mode = 'idle'; p = 0; stopLoop(); return;
+        }
+        watchdog = setTimeout(() => {
+          if (mode !== 'freeze') return;
+          mode = 'idle'; p = 0; thread.style.display = 'none'; stopLoop();
+        }, 520);
+        (function settle() {
+          const k = Math.min(1, (performance.now() - ft0) / SETTLE_MS);
+          setTint(settleFrom + (settleTo - settleFrom) * k);
+          drawThread(fullW() * (1 - k * 0.94), dir === 'go' ? -4 * k : -4, 1 - k);
+          if (k < 1 && mode === 'freeze') raf(settle);
+          else if (mode === 'freeze') thread.style.display = 'none';
+        })();
+      }
+      function releaseHold() {
+        if (mode !== 'hold') return;
+        const held = performance.now() - holdT0;
+        mode = 'retract'; src = null; pid = -1;
+        body.classList.remove('reality-holding');
+        if (held <= CLICK_MS && !RM) {
+          flick.style.setProperty('--fx', `${px}px`);
+          flick.style.setProperty('--fy', `${py}px`);
+          flick.className = 'flick'; void flick.offsetWidth; flick.className = 'flick go';
+        }
+        retractT0 = performance.now(); retractFrom = p; retractDur = Math.min(RETRACT_MS, 200 + p * 380);
+        clearTimeout(watchdog);
+        watchdog = setTimeout(() => { if (mode === 'retract') finishRetract(); }, retractDur + 200);
+      }
+      function finishRetract() {
+        mode = 'idle'; p = 0; thread.style.display = 'none';
+        applyFace(face, false); stopLoop();
+      }
+      function toggleInstant() {
+        dir = face === 'dream' ? 'go' : 'back';
+        face = dir === 'go' ? 'wake' : 'dream';
+        body.dataset.reality = face;
+        try { sessionStorage.setItem(STORE, face); } catch (e) {}
+        applyFace(face, true); brandTo(face);
+        setTint(face === 'wake' ? 1 : 0);
+      }
+      function beginHold(x, y, from) {
+        const now = performance.now();
+        if (mode !== 'idle') { if (mode === 'freeze' && now - retractT0 > 400) { mode = 'idle'; p = 0; } else return; }
+        mode = 'hold'; src = from; dir = face === 'dream' ? 'go' : 'back';
+        px = x; py = y; p = 0; holdT0 = now;
+        body.classList.add('reality-holding');
+        if (!RM) { thread.className = `thread ${dir}`; thread.style.display = 'block'; drawThread(0, -4, 1); }
+        startLoop();
+        clearTimeout(watchdog);
+        watchdog = setTimeout(() => { if (mode === 'hold') latch(); }, (dir === 'go' ? T_GO : T_BACK) + 120);
+      }
+      function startLoop() { if (!rafId) rafId = raf(loop); }
+      function stopLoop() { if (rafId) { cancelAnimationFrame(rafId); rafId = 0; } }
+      function loop(now) {
+        rafId = 0;
+        if (mode === 'hold') {
+          const T = dir === 'go' ? T_GO : T_BACK;
+          p = Math.min(1, (now - holdT0) / T);
+          if (!RM) {
+            setTint(dir === 'go' ? p : 1 - p);
+            drawThread(p * fullW(), -4, 1);
+            applyFace(p >= 0.5 ? (dir === 'go' ? 'wake' : 'dream') : (dir === 'go' ? 'dream' : 'wake'), false);
+          }
+          if (p >= 1) { latch(); return; }
+        } else if (mode === 'retract') {
+          const k = Math.min(1, (now - retractT0) / retractDur);
+          const eo = 1 - Math.pow(1 - k, 3);
+          p = retractFrom * (1 - eo);
+          if (!RM) { setTint(dir === 'go' ? p : 1 - p); drawThread(p * fullW(), -4, 1); }
+          if (k >= 1) { finishRetract(); return; }
+        }
+        if (mode !== 'idle') rafId = raf(loop);
+      }
+
+      function wire() {
+        document.addEventListener('pointerdown', (e) => {
+          if (e.button !== undefined && e.button !== 0) return;
+          const t = e.target;
+          if (t instanceof Element && t.closest(EXCLUDE)) return;
+          if (src !== null) return;
+          pinned = false; mixrange.value = '1000';
+          if (RM) { px = e.clientX; py = e.clientY; toggleInstant(); syncDbg(); return; }
+          pid = e.pointerId; startX = e.clientX; startY = e.clientY;
+          beginHold(e.clientX, e.clientY, 'ptr');
+        });
+        document.addEventListener('pointermove', (e) => {
+          if (mode !== 'hold' || src !== 'ptr' || e.pointerId !== pid) return;
+          if (Math.hypot(e.clientX - startX, e.clientY - startY) > 20) { releaseHold(); syncDbg(); }
+        });
+        const up = (e) => { if (mode === 'hold' && src === 'ptr' && e.pointerId === pid) { releaseHold(); syncDbg(); } };
+        document.addEventListener('pointerup', up);
+        document.addEventListener('pointercancel', up);
+        document.addEventListener('keydown', (e) => {
+          if (e.code !== 'Space' || e.repeat || !e.shiftKey) return;
+          const ae = document.activeElement;
+          if (ae instanceof Element && ae.closest('a,button,input,[contenteditable]')) return;
+          e.preventDefault();
+          if (src !== null) return;
+          pinned = false;
+          if (RM) { toggleInstant(); syncDbg(); return; }
+          beginHold(Math.round(innerWidth / 2), Math.round(innerHeight * 0.45), 'kb');
+        });
+        document.addEventListener('keyup', (e) => { if (e.code === 'Space' && mode === 'hold' && src === 'kb') { releaseHold(); syncDbg(); } });
+        /* 快捷键 C：原生光标对照开关（不依赖指针位置，满足 1.4.13 dismissible） */
+        document.addEventListener('keydown', (e) => {
+          if (e.key !== 'c' && e.key !== 'C') return;
+          if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+          const ae = document.activeElement;
+          if (ae instanceof Element && ae.closest('input,textarea,select,[contenteditable]')) return;
+          e.preventDefault();
+          toggleNative();
+        });
+      }
+
+      /* ── dock ── */
+      const dbg = document.getElementById('dbg');
+      const mixrange = document.getElementById('mixrange');
+      const mixOn = document.getElementById('mixon');
+      function syncDbg() {
+        dbg.querySelectorAll('[data-face]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.face === face)));
+        if (pinned) { mixrange.value = String(Math.round(C * 1000)); }
+      }
+      mixrange.addEventListener('input', () => {
+        mode = 'idle'; thread.style.display = 'none'; stopLoop();
+        pinned = true;
+        const m = Number(mixrange.value) / 1000;
+        setTint(m);
+        const f = m >= 0.5 ? 'wake' : 'dream';
+        if (f !== face) { face = f; body.dataset.reality = face; applyFace(face, true); brandTo(face); }
+        syncDbg();
+      });
+      dbg.querySelectorAll('[data-face]').forEach((b) =>
+        b.addEventListener('click', () => {
+          pinned = true; mode = 'idle'; thread.style.display = 'none'; stopLoop();
+          face = b.dataset.face; body.dataset.reality = face;
+          applyFace(face, true); brandTo(face);
+          setTint(face === 'wake' ? 1 : 0);
+          mixrange.value = face === 'wake' ? '1000' : '0';
+          syncDbg();
+        }),
+      );
+      const nativeBtn = document.getElementById('nativebtn');
+      if (nativeBtn) nativeBtn.addEventListener('click', toggleNative);
+
+      /* ── 启动 ── */
+      let stored = null;
+      try { stored = sessionStorage.getItem(STORE); } catch (e) {}
+      const wantFace = stored || 'wake';
+      face = wantFace === 'dream' ? 'dream' : 'wake';
+      body.dataset.reality = face;
+      applyFace(face, true);
+      applyBrand(face);
+      brandInit = true;
+      if (Q.get('mix') !== null && Q.get('mix') !== undefined) {
+        pinned = true;
+        mixrange.value = String(Math.round(Number(Q.get('mix')) * 1000));
+        setTint(Number(Q.get('mix')));
+        const f = Number(Q.get('mix')) >= 0.5 ? 'wake' : 'dream';
+        if (f !== face) { face = f; body.dataset.reality = face; applyFace(face, true); applyBrand(face); }
+      } else {
+        setTint(face === 'wake' ? 1 : 0);
+      }
+      wire();
+      syncDbg();
+
+      /* ── 自检面板点亮（仅 ?probe=1；此时 C / face 已就绪） ── */
+      if (PROBE) {
+        probeEl = document.getElementById('probe');
+        if (probeEl) probeEl.hidden = false;
+        renderProbe();
+        setInterval(renderProbe, 300);
+      }
+
+      /* ── ?state=<name>：派发强制状态事件（等四稿的监听先注册好） ── */
+      const stateParam = Q.get('state');
+      if (stateParam) {
+        setTimeout(() => {
+          if (window.__cur) window.__cur.set(stateParam);
+          window.dispatchEvent(new CustomEvent('cursor:state', { detail: { name: stateParam } }));
+        }, 0);
+      }
+
+      window.__shell = {
+        state: () => ({ face, mode, progress: +p.toFixed(3), mix: +C.toFixed(3), zone: docEl.dataset.zone, fxCursorOn: body.classList.contains('fx-cursor-on'), lastPointerType }),
+        setMix: (m) => { pinned = true; mixrange.value = String(Math.round(m * 1000)); setTint(m); },
+        face: (f) => { face = f; body.dataset.reality = f; applyFace(f, true); applyBrand(f); setTint(f === 'wake' ? 1 : 0); syncDbg(); },
+        hold: (x, y) => beginHold(x == null ? innerWidth / 2 : x, y == null ? innerHeight / 2 : y, 'kb'),
+        release: releaseHold,
+        zone: (z) => { docEl.dataset.zone = z; },
+        probe: !!PROBE,
+      };
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,2034 @@
+<!doctype html>
+<html lang="zh-CN" data-zone="light">
+<!--
+  ═══════════════════════════════════════════════════════════════════════════
+  Phase 19 · 正文元素补齐（h3 / ol / table / figure / code）
+
+  【题面】docs/design/content-typography.md 第三节「还没有设计的」：
+    h3 —— 只吃默认层，与两套 h2 的字号阶梯没对齐
+    ol —— 两页都把 ul 换成了自绘符号，ol 还是浏览器默认数字
+    table —— 全站零规则
+    figure / figcaption —— 正文内的（项目页 .coverband 是另一套）
+    code / pre —— 只在默认层，两页同款；而 Shiki 的 github-dark 会盖掉 .prose pre 的底
+  另附四处待拍板：引文振幅两页是否要拉开 · 两态块边距 1.5em vs 1.35em ·
+  起笔标尺只有随笔有 · 34em 折算出 629 / 544px 是否疏漏。
+
+  【论旨】只认一条规则，它是 h2 上已经成立的：
+      随笔 ＝ 行内记号（嵌在字里行间、可被读过去）
+      项目 ＝ 方框板块（自成一块、与正文隔开）
+  本轮把这条件规则贯穿到 h3 / ol / table / figure / code 上。
+  于是两页的体温差不再是「这里不一样、那里也不一样」，而是一句话可复述的规则。
+
+  【怎么读】
+    · 左右两栏是同一份样张放进两个变体（列宽就是两页的真实列宽：629 / 544px）。
+    · 第 02–06 节是单元素：A ＝ 本稿主张，B ＝ 备选，右下角可即时切换。
+    · 每节的表头带「实测」数值——由脚本读计算值回填，不是抄的。
+    · 第 07 节收四处待拍板，各给结论。
+
+  【查询参数】
+    ?h3=b&ol=b&tbl=b&fig=b&code=b&quote=b&rule=b   逐项选备选（?opt=b 全部选 B）
+    ?zone=light|deep|paper   三段夜色（照抄 src/data/night.ts 的 ZONES）
+    ?mix=0..1                钉住醒度（1 醒 0 梦），逐帧审视强化色插值
+    ?face=wake|dream         开场在哪一面（默认梦）
+    ?freeze=1                停掉全部 CSS 动画与漂移（严格对照）
+    ?ui=0                    藏右下角控制面板（截图一律用它）
+
+  双态引擎行为对齐 src/scripts/reality.ts：空白处 长按 2200ms 入醒 /
+  1300ms 回梦，中途松手 ≤600ms 退回，短按 ≤260ms 静止，Shift+空格等价，
+  逐帧写 --reality-mix 与 --amber/--umber/--ghost-ink/--dream 的冷暖插值。
+  调试：window.__p19 = { state(), setMix(m), face(f), zone(z) }
+  ═══════════════════════════════════════════════════════════════════════════
+-->
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>醒梦 · Phase 19 · 正文元素补齐（h3 / ol / table / figure / code）</title>
+  <link rel="icon" href="../../public/favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="../../node_modules/@fontsource/noto-serif-sc/300.css" />
+  <link rel="stylesheet" href="../../node_modules/@fontsource/noto-serif-sc/500.css" />
+  <link rel="stylesheet" href="../../node_modules/@fontsource/noto-serif-sc/600.css" />
+  <link rel="stylesheet" href="../../node_modules/@fontsource/noto-serif-sc/900.css" />
+  <link rel="stylesheet" href="../../node_modules/@fontsource/ibm-plex-mono/400.css" />
+  <link rel="stylesheet" href="../../node_modules/@fontsource/ibm-plex-mono/500.css" />
+  <style>
+    /* ═══════════ 1 · tokens（照抄 src/styles/tokens.css） ═══════════ */
+    :root {
+      color-scheme: light;
+      --bg: #e9ecef;
+      --bg-sunken: #e1e5ea;
+      --fg: #262c33;
+      --fg-soft: #59626c;
+      --fg-faint: #8a929b;
+      --line: rgba(38, 44, 51, 0.14);
+
+      --wake: #a7b1ba;
+      --dream: #c2a382;
+      --umber: #765640;
+      --amber: #d9a05b;
+      --seal: #a3452f;
+      --seam-angle: 14deg;
+
+      --reality-mix: 1;
+      --still: calc(1 - var(--reality-mix));
+      --wash: #556270;
+      --ghost-ink: #b98f74;
+
+      --font-display: 'Noto Serif SC', 'Palatino Linotype', Palatino, Georgia, 'Songti SC', SimSun,
+        serif;
+      --font-body: system-ui, -apple-system, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei UI',
+        sans-serif;
+      --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+      --font-pixel: 'Silkscreen', ui-monospace, Consolas, monospace;
+
+      --measure: 34em;
+      --gap-v: clamp(3.5rem, 9vh, 6.5rem);
+      --colgap: 3rem;
+    }
+
+    /* 三段夜色（照抄 src/data/night.ts 的 ZONES） */
+    html[data-zone='deep'] {
+      color-scheme: dark;
+      --bg: #171b24;
+      --fg: #e5e0d2;
+      --fg-soft: #b9b3a4;
+      --fg-faint: #8a8577;
+      --line: rgba(229, 224, 210, 0.16);
+    }
+    html[data-zone='paper'] {
+      color-scheme: light;
+      --bg: #efe9dd;
+      --fg: #55503f;
+      --fg-soft: #665f50;
+      --fg-faint: #8b8474;
+      --line: rgba(85, 80, 63, 0.16);
+    }
+
+    /* ═══════════ 2 · 基础（照抄 global.css 的口径） ═══════════ */
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    html {
+      -webkit-text-size-adjust: 100%;
+      overflow-x: clip;
+      scroll-behavior: smooth;
+      scrollbar-width: none;
+    }
+    ::-webkit-scrollbar {
+      width: 0;
+      height: 0;
+    }
+
+    body {
+      margin: 0;
+      font-family: var(--font-body);
+      font-size: 1.0625rem;
+      line-height: 1.9;
+      color: var(--fg);
+      background: color-mix(in srgb, var(--bg) 93%, var(--wash));
+      text-rendering: optimizeLegibility;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: clip;
+    }
+
+    h1,
+    h2,
+    h3 {
+      font-family: var(--font-display);
+      font-weight: 600;
+      line-height: 1.55;
+      margin: 0;
+      letter-spacing: 0.01em;
+    }
+    a {
+      color: var(--fg);
+      text-decoration-thickness: 1px;
+      text-underline-offset: 0.3em;
+      transition: color 0.18s ease;
+    }
+    a:hover {
+      color: var(--umber);
+    }
+    ::selection {
+      background: color-mix(in srgb, var(--amber) 32%, transparent);
+    }
+    .mono {
+      font-family: var(--font-mono);
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.04em;
+    }
+    .container {
+      width: min(100% - 3rem, 80rem);
+      margin-inline: auto;
+    }
+
+    /* ═══════════ 3 · chrome：缝线 / 构块 / 颗粒 ═══════════
+       脑电在正文页中央被 mask 消隐，本稿省去——它不参与样式判断。 */
+    .seam-wrap {
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      pointer-events: none;
+      overflow: hidden;
+      /* 与 Seam.astro 同一条中央消隐带：正文核心列完全让开 */
+      -webkit-mask-image: linear-gradient(
+        to right,
+        #000 0,
+        #000 calc(50% - 28rem),
+        transparent calc(50% - 21rem),
+        transparent calc(50% + 21rem),
+        #000 calc(50% + 28rem),
+        #000 100%
+      );
+      mask-image: linear-gradient(
+        to right,
+        #000 0,
+        #000 calc(50% - 28rem),
+        transparent calc(50% - 21rem),
+        transparent calc(50% + 21rem),
+        #000 calc(50% + 28rem),
+        #000 100%
+      );
+    }
+    .seam {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 170vmax;
+      height: 1px;
+      background: linear-gradient(90deg, var(--wake), var(--dream));
+      transform: translate(-50%, -50%) rotate(var(--seam-angle));
+      opacity: 0.3;
+    }
+
+    .field {
+      position: fixed;
+      inset: 0;
+      z-index: -3;
+      pointer-events: none;
+      opacity: 0.5;
+    }
+    .field i {
+      position: absolute;
+      width: var(--s);
+      height: var(--s);
+      border: 1px solid color-mix(in srgb, var(--fg) 12%, transparent);
+      transform: rotate(var(--seam-angle));
+    }
+
+    .grain {
+      position: fixed;
+      inset: 0;
+      z-index: 60;
+      pointer-events: none;
+      opacity: calc(0.04 + var(--still, 0) * 0.03);
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    }
+
+    /* ═══════════ 4 · 本稿外壳 ═══════════ */
+    .masthead {
+      padding-block: clamp(3.4rem, 8vh, 5.4rem) 2.4rem;
+    }
+    .kicker {
+      font-size: 0.62rem;
+      letter-spacing: 0.3em;
+      color: var(--fg-soft);
+    }
+    .masthead h1 {
+      margin-top: 0.9rem;
+      font-size: clamp(1.6rem, 3.4vw, 2.1rem);
+      letter-spacing: 0.04em;
+    }
+    .thesis {
+      margin: 1.4rem 0 0;
+      max-width: 52em;
+      font-family: var(--font-display);
+      font-size: 1.06rem;
+      line-height: 2.05;
+      color: var(--fg);
+    }
+    .thesis b {
+      font-weight: 600;
+      background: linear-gradient(
+        transparent 64%,
+        color-mix(in srgb, var(--amber) 24%, transparent) 64%
+      );
+    }
+    .note {
+      margin: 1.1rem 0 0;
+      max-width: 56em;
+      font-size: 0.84rem;
+      line-height: 1.95;
+      color: var(--fg-soft);
+    }
+    .note code,
+    .rowhd code,
+    .gh-cls {
+      font-family: var(--font-mono);
+      font-size: 0.78em;
+      letter-spacing: 0.02em;
+      color: var(--umber);
+    }
+    .note kbd {
+      font-family: var(--font-mono);
+      font-size: 0.82em;
+      border: 1px solid var(--line);
+      border-bottom-width: 2px;
+      border-radius: 3px;
+      padding: 0.05em 0.35em;
+      color: var(--fg-soft);
+    }
+
+    .row {
+      margin-top: clamp(3rem, 7vh, 4.6rem);
+      padding-top: 1.4rem;
+      border-top: 1px solid var(--line);
+      scroll-margin-top: 1.2rem;
+    }
+
+    .rowhd {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 0.3rem 0.9rem;
+    }
+    .rh-n {
+      font-family: var(--font-mono);
+      font-size: 0.66rem;
+      letter-spacing: 0.2em;
+      color: var(--amber);
+    }
+    .rowhd h2 {
+      font-size: 1.24rem;
+      letter-spacing: 0.04em;
+    }
+    .rh-src {
+      font-family: var(--font-mono);
+      font-size: 0.58rem;
+      letter-spacing: 0.14em;
+      color: var(--fg-soft);
+    }
+    /* 实测值：脚本读计算值回填，不手抄 */
+    .rh-m {
+      font-family: var(--font-mono);
+      font-size: 0.6rem;
+      letter-spacing: 0.06em;
+      color: var(--fg-soft);
+      border: 1px solid var(--line);
+      padding: 0.16rem 0.42rem 0.12rem;
+    }
+    .rh-m b {
+      font-weight: 400;
+      color: var(--fg);
+    }
+    .opts {
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      margin-left: auto;
+    }
+    .opts button,
+    .panel button {
+      font-family: var(--font-mono);
+      font-size: 0.62rem;
+      letter-spacing: 0.08em;
+      color: var(--fg-soft);
+      background: none;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 0.24rem 0.55rem 0.2rem;
+      cursor: pointer;
+      transition: color 0.16s ease, border-color 0.16s ease, background-color 0.16s ease;
+    }
+    .opts button:hover,
+    .panel button:hover {
+      color: var(--fg);
+    }
+    .opts button[aria-pressed='true'],
+    .panel button[aria-pressed='true'] {
+      color: var(--fg);
+      border-color: color-mix(in srgb, var(--amber) 58%, transparent);
+      background: color-mix(in srgb, var(--amber) 8%, transparent);
+    }
+    .rh-note {
+      flex: 1 1 100%;
+      margin: 0.15rem 0 0;
+      max-width: 62em;
+      font-size: 0.82rem;
+      line-height: 1.9;
+      color: var(--fg-soft);
+    }
+
+    .cols {
+      display: grid;
+      grid-template-columns: auto auto;
+      gap: var(--colgap);
+      align-items: start;
+      margin-top: 1.3rem;
+    }
+    /* 列宽就是两页的真实列宽：34em 分别按各自字号折算（随笔 18.5 → 629，项目 16 → 544） */
+    .col {
+      width: 34em;
+      min-width: 0;
+    }
+    .col--essay {
+      font-size: clamp(1.0625rem, 1.0625rem + 0.32vw, 1.15625rem);
+    }
+    .col--project {
+      font-size: 1rem;
+    }
+    .colhd {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 1rem;
+      padding-bottom: 0.5rem;
+      margin-bottom: 1.2rem;
+      border-bottom: 1px solid var(--line);
+      font-family: var(--font-mono);
+      font-size: 0.6rem;
+      letter-spacing: 0.16em;
+      color: var(--fg-soft);
+    }
+    .colhd b {
+      font-weight: 400;
+      color: var(--fg);
+    }
+    .colhd .dim {
+      color: var(--fg-soft);
+    }
+
+    @media (max-width: 1300px) {
+      .cols {
+        grid-template-columns: 1fr;
+        gap: 2.8rem;
+      }
+      .col {
+        width: auto;
+      }
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       5 · 本轮提案 —— 公共层（写进 global.css 的「markdown 公共层」，两页同时生效）
+       ═══════════════════════════════════════════════════════════════════ */
+    .prose {
+      max-width: var(--measure);
+    }
+
+    /* ── 现状照抄（**不是**本轮提案，只为让样张读起来是真实的样子）──
+       本节 h2 / p / ul / li / strong / a / img 与 global.css 逐条一致；
+       h3 之所以难，正因为它要在这条已经成形的阶梯里找位置。 */
+    .md {
+      counter-reset: sec fig;
+    }
+    .md p {
+      margin: 0 0 1.5em;
+    }
+    .md h2 {
+      counter-increment: sec;
+    }
+    .md h2::before {
+      content: counter(sec, cjk-ideographic);
+      font-weight: 600;
+      color: var(--amber);
+    }
+    .prose--essay .md h2 {
+      font-size: 1.28rem;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      line-height: 1.6;
+      margin: 2.65em 0 0.95em;
+    }
+    .prose--essay .md h2::before {
+      display: inline-block;
+      margin-right: 0.7em;
+      transform: translateY(-0.12em);
+      font-size: 0.6em;
+      letter-spacing: 0.12em;
+    }
+    .prose--project .md h2 {
+      display: flex;
+      align-items: center;
+      gap: 0.85em;
+      font-size: 1.2rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      margin: 2.5em 0 0.8em;
+    }
+    .prose--project .md h2::before {
+      flex: none;
+      font-size: 0.66em;
+      letter-spacing: 0.1em;
+      border: 1px solid color-mix(in srgb, var(--amber) 45%, transparent);
+      padding: 0.3em 0.45em 0.25em;
+      line-height: 1;
+    }
+    .prose--project .md h2::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--line);
+    }
+    .md ul {
+      list-style: none;
+      margin: 1.6em 0;
+      padding: 0;
+    }
+    .md li {
+      position: relative;
+      padding-left: 1.75em;
+      margin: 0.62em 0;
+    }
+    /* 规范：列表记号一律收窄到 ul > li —— 现状写在 .md li::before 上，
+       于是 ol 一被用上就会同时出现「浏览器数字 + 记号」（全站还没有一篇用有序列表，故尚未踩到）
+       + 项目侧的施工清单 li:has(input) 也一样要收窄 */
+    .prose--essay .md ul > li::before {
+      content: '';
+      position: absolute;
+      left: 0.22em;
+      top: 1em;
+      width: 0.85em;
+      height: 1.5px;
+      background: var(--amber);
+      opacity: 0.6;
+      transform: rotate(calc(var(--seam-angle) * -1));
+    }
+    .prose--project .md ul {
+      margin: 1.4em 0;
+    }
+    .prose--project .md li {
+      padding-left: 1.9em;
+      margin: 0 0 0.55em;
+    }
+    .prose--project .md ul > li::before {
+      content: '○';
+      position: absolute;
+      left: 0.1em;
+      top: 0;
+      font-family: var(--font-mono);
+      font-size: 0.78em;
+      color: var(--fg-soft);
+    }    .md strong {
+      font-weight: 600;
+      background: linear-gradient(
+        transparent 66%,
+        color-mix(in srgb, var(--dream) 30%, transparent) 66%
+      );
+    }
+    .prose--project .md strong {
+      font-weight: 700;
+      background: linear-gradient(
+        transparent 64%,
+        color-mix(in srgb, var(--amber) 24%, transparent) 64%
+      );
+    }
+    .md a {
+      color: var(--umber);
+    }
+    .md img {
+      border-radius: 4px;
+      margin-block: 1.8em;
+    }
+    /* 两态块：与 global.css 同构（本稿只用来量边距） */
+    .md div[data-side='dream'] {
+      display: none;
+    }
+    body[data-reality='dream'] .md div[data-side='dream'] {
+      display: block;
+    }
+    body[data-reality='dream'] .md div[data-side='wake'] {
+      display: none;
+    }
+
+    /* ── h3：公共层只给阶梯（字号/行高/字距/间距），记号交给变体 ── */
+    .md h3 {
+      counter-increment: sub;
+      font-size: 1.06rem;
+      line-height: 1.72;
+      letter-spacing: 0.035em;
+      margin: 2.05em 0 0.7em;
+    }
+    /* 二级序号在 h2 处归零（h2 是「一」，其下依次「一·一 / 一·二」） */
+    .md h2 {
+      counter-reset: sub;
+    }
+
+    /* ── ol：两页都不再要浏览器默认数字；序号一律自绘，与 ul 同一套骨架 ── */
+    .md ol {
+      list-style: none;
+      counter-reset: item;
+      margin: 1.6em 0;
+      padding: 0;
+    }
+    .md ol > li {
+      position: relative;
+      padding-left: 2.05em;
+      margin: 0.62em 0;
+      counter-increment: item;
+    }
+    .md ol > li::before {
+      position: absolute;
+      left: 0.05em;
+      top: 0;
+      font-variant-numeric: tabular-nums;
+      color: var(--fg-soft);
+    }
+    /* 嵌套：序号重新从「一」起，并加一层括号以区分层级 */
+    .md ol ol {
+      counter-reset: item;
+      margin: 0.55em 0 0.55em;
+    }
+
+    /* ── table：无框名录——只有横向发丝线，与 .ledger 同源 ── */
+    .md table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 2em 0;
+      font-size: 0.93em;
+      line-height: 1.85;
+      text-align: left;
+      font-variant-numeric: tabular-nums;
+    }
+    .md caption {
+      caption-side: top;
+      text-align: left;
+      padding-bottom: 0.75em;
+      font-family: var(--font-mono);
+      font-size: 0.6rem;
+      letter-spacing: 0.22em;
+      color: var(--fg-soft);
+    }
+    .md th {
+      font-weight: 600;
+      padding: 0.6em 0.9em 0.5em 0;
+      border-bottom: 1px solid var(--line);
+      vertical-align: bottom;
+    }
+    .md td {
+      padding: 0.62em 0.9em 0.62em 0;
+      border-bottom: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
+      vertical-align: top;
+    }
+    .md tbody tr:last-child td {
+      border-bottom: 1px solid var(--line);
+    }
+    .md th:last-child,
+    .md td:last-child {
+      padding-right: 0;
+    }
+
+    /* ── figure / figcaption：图版与图注 ── */
+    .md figure {
+      margin: 2.4em 0;
+    }
+    .md figcaption {
+      margin-top: 0.85em;
+      font-size: 0.78rem;
+      line-height: 1.85;
+      letter-spacing: 0.05em;
+      color: var(--fg-soft);
+    }
+    /* 图注自动编号：图 01、图 02（与 h2 的汉字序号同一套计数器思路） */
+    .md figcaption::before {
+      counter-increment: fig;
+      content: '图 ' counter(fig, decimal-leading-zero);
+      margin-right: 0.7em;
+      font-family: var(--font-mono);
+      font-size: 0.6rem;
+      letter-spacing: 0.2em;
+      color: var(--umber);
+      vertical-align: 1px;
+    }
+
+    /* ── code / pre：引文与代码都是「外来语」，共用一条梦色左缘 ──
+       底色一律用 color-mix(--fg …) 而不是 --bg-sunken：
+       --bg-sunken 是写死的浅色；将来正文若落到深色语境（首页那种夜底）会亮成白斑。
+       内页目前不切夜色（initNight 在无首屏的页面直接返回），故这条是稳当而非现症。
+       行内 code 一律写成 :not(pre) > code —— 否则它会把底与字号漏到 pre>code 上
+       （症状：代码块每行多一条底带、字号被二次缩到 .71em）。 */
+    .md :not(pre) > code {
+      font-family: var(--font-mono);
+      font-size: 0.88em;
+      letter-spacing: 0;
+      background: color-mix(in srgb, var(--fg) 6%, transparent);
+      padding: 0.15em 0.4em;
+      border-radius: 3px;
+    }
+    .md pre {
+      position: relative;
+      margin: 2em 0;
+      padding: 1.1em 1.3em;
+      border-left: 2px solid color-mix(in srgb, var(--dream) 50%, transparent);
+      border-radius: 0 4px 4px 0;
+      background: color-mix(in srgb, var(--fg) 4%, transparent);
+      overflow-x: auto;
+      line-height: 1.8;
+      font-size: 0.85em;
+      /* 全站把滚动条藏了（html 与 ::-webkit-scrollbar 两处）；代码块得自己开一条细的，
+         否则窄屏上横向溢出没有任何提示 */
+      scrollbar-width: thin;
+      scrollbar-color: color-mix(in srgb, var(--fg) 22%, transparent) transparent;
+    }
+    .md pre code {
+      background: none;
+      padding: 0;
+      font-size: 1em;
+    }
+    .md pre::-webkit-scrollbar {
+      height: 4px;
+    }
+    .md pre::-webkit-scrollbar-thumb {
+      background: color-mix(in srgb, var(--fg) 22%, transparent);
+      border-radius: 2px;
+    }
+    /* 语言签：直接用 Shiki 已有的 data-language 属性，不另写约定 */
+    .md pre::after {
+      content: attr(data-language);
+      position: absolute;
+      top: 0.6em;
+      right: 0.9em;
+      font-family: var(--font-mono);
+      font-size: 0.56rem;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--fg-soft);
+      opacity: 0.8;
+    }
+    .md pre:not([data-language])::after {
+      content: none;
+    }
+
+    /* 代码里的墨：只用全站已有的墨色，琥珀一次都不出现（它属于锚点与进度）。
+       落地时由 astro.config 的 shikiConfig 输出变量，再在这里映射到这五个值。 */
+    .md pre .tk-k {
+      color: var(--umber); /* 关键字：借链接那枚墨 */
+    }
+    .md pre .tk-t {
+      color: color-mix(in srgb, var(--dream) 70%, var(--fg)); /* 类型与字符串：梦色压深 */
+    }
+    .md pre .tk-n {
+      color: var(--fg); /* 数字：中性，靠 tabular 自己对齐 */
+    }
+    .md pre .tk-c {
+      color: var(--fg-soft); /* 注释：退到背景里 */
+    }
+
+    /* ── 两态块与引文的边距：统一到 1.5em（项目变体那 1.35em 是改造前的残留，删掉） ── */
+    .md div[data-side] {
+      margin: 0 0 1.5em;
+    }
+
+    /* ── 引文：梦侧一律浮动，振幅由变体给。
+   勘误：本稿初版照着 content-typography.md 写的「项目页不浮动」是误记 —— 实测两页
+   都吃公共层的 .md blockquote（drift 9.5s / 2.6px），故本节的「现状」实为两页同款，
+   本节比较的是「要不要给项目侧一个更静的振幅」，不是「修不一致」。 ── */
+    .md blockquote {
+      margin: 2em 0;
+      padding: 0.3em 0 0.3em 1.5em;
+      border-left: 2px solid var(--dream);
+      color: var(--fg-soft);
+      font-size: 0.96em;
+      letter-spacing: 0.02em;
+      text-align: left;
+      animation: drift 9.5s ease-in-out infinite;
+      --d-amp: 2.6px;
+      --d-rot: 0.15deg;
+    }
+
+    /* ── 起笔标尺：搬到公共层，两页都有（原先只有随笔页有） ── */
+    hr.prose-rule {
+      position: relative;
+      border: none;
+      border-top: 1px solid var(--line);
+      margin: 1.8rem 0 2.6rem;
+    }
+    hr.prose-rule::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: -1px;
+      width: 3.4rem;
+      height: 1px;
+      background: var(--amber);
+    }
+
+    @keyframes drift {
+      0%,
+      100% {
+        transform: translate3d(0, calc(var(--d-amp) * var(--still, 0) * -0.6), 0)
+          rotate(calc(var(--d-rot) * var(--still, 0) * -1));
+      }
+      50% {
+        transform: translate3d(0, calc(var(--d-amp) * var(--still, 0)), 0)
+          rotate(calc(var(--d-rot) * var(--still, 0)));
+      }
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       6 · 本轮提案 —— 随笔变体（.prose--essay：宋体夜话）
+       记号全部「行内」：一眼读过去是正文，回头找才发现有个记号
+       ═══════════════════════════════════════════════════════════════════ */
+    .prose--essay {
+      font-family: var(--font-display);
+      font-weight: 400;
+      line-height: 2.08;
+      letter-spacing: 0.015em;
+      text-align: justify;
+    }
+
+    /* h3：一枚垂线短横（--wake，与缝线同色），不是琥珀——琥珀留给小节号 */
+    .prose--essay .md h3::before {
+      content: '';
+      display: inline-block;
+      width: 1.15em;
+      height: 1px;
+      background: var(--wake);
+      opacity: 0.85;
+      margin-right: 0.62em;
+      transform: translateY(-0.34em);
+    }
+
+    /* ol：汉字序号，宋体直接读下去（字距略擒，免得「一、」被挤成一团） */
+    .prose--essay .md ol > li::before {
+      content: counter(item, cjk-ideographic) '、';
+      font-size: 0.92em;
+      letter-spacing: 0.06em;
+    }
+    .prose--essay .md ol ol > li::before {
+      content: '(' counter(item, cjk-ideographic) ')';
+      font-size: 0.84em;
+    }
+
+    /* 图注：编号在左、说明跟着走，像一枚随手写下的行注 */
+    .prose--essay .md img {
+      border-radius: 4px;
+    }
+
+    /* 行内 code：不填底，只在字下压一条梦色发丝——外来语的下划线 */
+    .prose--essay .md :not(pre) > code {
+      background: none;
+      padding: 0 0.1em;
+      font-size: 0.84em;
+      border-bottom: 1px solid color-mix(in srgb, var(--dream) 55%, transparent);
+      border-radius: 0;
+    }
+    .prose--essay .md pre {
+      padding: 1.05em 1.35em 1.15em;
+    }
+
+    /* 引文：振幅稍大（夜话里字句本来就在浮） */
+    .prose--essay .md blockquote {
+      --d-amp: 2.6px;
+      --d-rot: 0.15deg;
+    }
+
+    @media (max-width: 640px) {
+      .prose--essay {
+        text-align: left;
+      }
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       7 · 本轮提案 —— 项目变体（.prose--project：黑体方正文）
+       记号全部「成框」：与正文隔开一层，像施工信纸上贴的板
+       ═══════════════════════════════════════════════════════════════════ */
+    .prose--project {
+      line-height: 2.05;
+      letter-spacing: 0.02em;
+    }
+
+    .prose--project .md p {
+      margin: 1.3em 0;
+    }
+
+    /* h3：二级汉字序号（一·一），灰而不是琥珀——琥珀仍属小节号。
+       .7em 是为了在 11–12px 上仍读得出；代价是 h3 必须落在 h2 之下
+       （计数器 sec 由 h2 自增，孤立的 h3 会显示「零·一」）。 */
+    .prose--project .md h3 {
+      font-size: 0.99rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+    }
+    .prose--project .md h3::before {
+      content: counter(sec, cjk-ideographic) '·' counter(sub, cjk-ideographic);
+      margin-right: 0.55em;
+      font-size: 0.7em;
+      letter-spacing: 0.1em;
+      color: var(--fg-soft);
+      font-weight: 400;
+    }
+
+    /* ol：mono 两位数（01/02），与 ul 的 mono ○ 同一套笔画；文本左缘与 ul 对齐（1.9em） */
+    .prose--project .md ol > li {
+      padding-left: 1.9em;
+      margin: 0 0 0.55em;
+    }
+    .prose--project .md ol > li::before {
+      left: 0.1em;
+      content: counter(item, decimal-leading-zero);
+      font-family: var(--font-mono);
+      font-size: 0.78em;
+      letter-spacing: 0.06em;
+    }
+    .prose--project .md ol {
+      margin: 1.4em 0;
+    }
+    .prose--project .md ol ol > li {
+      padding-left: 2.3em;
+    }
+    .prose--project .md ol ol > li::before {
+      content: '(' counter(item, decimal-leading-zero) ')';
+      font-size: 0.7em;
+    }
+
+    /* table：板块——外框 + 表头底线，与 .coverband / 方框小节号同一族 */
+    .prose--project .md table {
+      border: 1px solid var(--line);
+      background: color-mix(in srgb, var(--fg) 2%, transparent);
+      font-size: 0.94em;
+    }
+    .prose--project .md caption {
+      padding-left: 0.1em;
+    }
+    .prose--project .md th {
+      padding: 0.72em 0.95em 0.6em;
+      border-bottom: 1px solid var(--line);
+      font-weight: 700;
+      letter-spacing: 0.05em;
+    }
+    .prose--project .md td {
+      padding: 0.68em 0.95em;
+      border-bottom: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
+    }
+    .prose--project .md tbody tr:last-child td {
+      border-bottom: none;
+    }
+    .prose--project .md th:last-child,
+    .prose--project .md td:last-child {
+      padding-right: 0.95em;
+    }
+
+    /* figure：成框的图版，注记在框内左下（与 .coverband 的 mono 角注同构） */
+    .prose--project .md figure {
+      border: 1px solid var(--line);
+      background: color-mix(in srgb, var(--fg) 2%, transparent);
+      padding: 0.9rem 0.9rem 0.75rem;
+    }
+    .prose--project .md figure img {
+      border-radius: 0;
+      margin: 0;
+      width: 100%;
+    }
+    .prose--project .md figcaption {
+      margin-top: 0.7rem;
+      font-family: var(--font-mono);
+      font-size: 0.58rem;
+      letter-spacing: 0.12em;
+      line-height: 1.8;
+    }
+    .prose--project .md figcaption::before {
+      font-size: 0.58rem;
+      letter-spacing: 0.18em;
+      margin-right: 0.6em;
+    }
+
+    /* code：方框（与 figure / table 同族），行内 code 填底成小块 */
+    .prose--project .md :not(pre) > code {
+      font-size: 0.88em;
+      background: color-mix(in srgb, var(--fg) 7%, transparent);
+      padding: 0.14em 0.38em;
+    }
+    .prose--project .md pre {
+      border: 1px solid var(--line);
+      border-left: 1px solid var(--line);
+      border-radius: 0;
+      padding: 1.15em 1.3em 1.25em;
+    }
+
+    /* 引文：同一条梦色左缘，振幅收小（深眠里浮得慢而少） */
+    .prose--project .md blockquote {
+      --d-amp: 1.2px;
+      --d-rot: 0.08deg;
+      animation-duration: 12s;
+    }
+
+    /* 起笔标尺：--line 的尺身 + 左端一枚 5px 琥珀方块（方框语言的标尺） */
+    .prose--project hr.prose-rule::before {
+      width: 3.4rem;
+      height: 1px;
+      background: var(--line);
+    }
+    .prose--project hr.prose-rule::after {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: -2.5px;
+      width: 5px;
+      height: 5px;
+      background: var(--amber);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       7.5 · ?legacy=1 还原现状的两处写法缺陷（只为出「前 / 后」对照图，不是设计选项）
+       ① 列表记号写在 .md li::before（不分 ul / ol）→ ol 会同时出现浏览器数字与记号
+       ② 行内 code 写在 .md code（漏到 pre > code）→ 代码块每行多一条底带、字号二次缩小
+       ═══════════════════════════════════════════════════════════════════ */
+    .legacy .prose--essay .md li::before {
+      content: '';
+      position: absolute;
+      left: 0.22em;
+      top: 1em;
+      width: 0.85em;
+      height: 1.5px;
+      background: var(--amber);
+      opacity: 0.6;
+      transform: rotate(calc(var(--seam-angle) * -1));
+    }
+    .legacy .prose--project .md li::before {
+      content: '○';
+      position: absolute;
+      left: 0.1em;
+      top: 0;
+      font-family: var(--font-mono);
+      font-size: 0.78em;
+      color: var(--fg-soft);
+    }
+    .legacy .md code {
+      font-family: var(--font-mono);
+      font-size: 0.88em;
+      letter-spacing: 0;
+      background: color-mix(in srgb, var(--fg) 6%, transparent);
+      padding: 0.15em 0.4em;
+      border-radius: 3px;
+    }
+    .legacy .prose--essay .md code {
+      background: none;
+      padding: 0 0.1em;
+      font-size: 0.84em;
+      border-bottom: 1px solid color-mix(in srgb, var(--dream) 55%, transparent);
+      border-radius: 0;
+    }
+    .legacy .prose--project .md code {
+      font-size: 0.88em;
+      background: color-mix(in srgb, var(--fg) 7%, transparent);
+      padding: 0.14em 0.38em;
+    }
+    /* ol 也退回现状：原生 decimal 序号 + 默认层的 padding-left 1.5em，
+       且完全没有自绘序号 ⇒ 「浏览器数字 ＋ 琥珀刻度／○」同时出现
+       （上面那两条 .legacy … li::before 已按 (0,3,1) 压过本稿的 ol 规则，故不必再写 content: none） */
+    .legacy .md ol {
+      list-style: decimal;
+      padding-left: 1.5em;
+    }
+    .legacy .md ol > li {
+      padding-left: 0;
+      margin: 0.4em 0;
+      counter-increment: none;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       8 · 备选（B 稿）——切换后覆盖上面的主张，用来对照
+       ═══════════════════════════════════════════════════════════════════ */
+
+    /* h3 · B：不要记号，全靠字重与留白分层 */
+    .x-h3-b .md h3 {
+      margin: 2.2em 0 0.75em;
+      letter-spacing: 0.06em;
+    }
+    .x-h3-b .md h3::before {
+      content: none;
+      display: none;
+    }
+    .x-h3-b .prose--essay .md h3 {
+      font-size: 1.14rem;
+      font-weight: 600;
+    }
+    .x-h3-b .prose--project .md h3 {
+      font-size: 1.02rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+    }
+
+    /* ol · B：保留浏览器原生数字，只换颜色与字体（最省事的那条路） */
+    .x-ol-b .md ol {
+      list-style: decimal;
+      padding-left: 1.7em;
+    }
+    .x-ol-b .md ol > li {
+      padding-left: 0;
+    }
+    .x-ol-b .md ol > li::before {
+      content: none;
+    }
+    .x-ol-b .md ol > li::marker {
+      color: var(--fg-soft);
+      font-family: var(--font-mono);
+      font-size: 0.84em;
+    }
+
+    /* table · B：两页同款无框名录（不要项目侧的板块） */
+    .x-tbl-b .prose--project .md table {
+      border: none;
+      background: none;
+    }
+    .x-tbl-b .prose--project .md th,
+    .x-tbl-b .prose--project .md td {
+      padding-left: 0;
+      padding-right: 0.9em;
+    }
+    .x-tbl-b .prose--project .md th:last-child,
+    .x-tbl-b .prose--project .md td:last-child {
+      padding-right: 0;
+    }
+    .x-tbl-b .prose--project .md tbody tr:last-child td {
+      border-bottom: 1px solid var(--line);
+    }
+
+    /* figure · B：两页同款松散图版（项目侧不要框） */
+    .x-fig-b .prose--project .md figure {
+      border: none;
+      background: none;
+      padding: 0;
+    }
+    .x-fig-b .prose--project .md figure img {
+      border-radius: 4px;
+      width: auto;
+    }
+    .x-fig-b .prose--project .md figcaption {
+      font-family: var(--font-body);
+      font-size: 0.78rem;
+      letter-spacing: 0.05em;
+    }
+
+    /* code · B：两页同款方框（随笔也成框，去掉梦色左缘） */
+    .x-code-b .prose--essay .md pre {
+      border-left: 1px solid var(--line);
+      border-top: 1px solid var(--line);
+      border-right: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      border-radius: 0;
+    }
+    .x-code-b .prose--essay .md :not(pre) > code {
+      background: color-mix(in srgb, var(--fg) 6%, transparent);
+      border-bottom: none;
+      padding: 0.15em 0.4em;
+      font-size: 0.86em;
+    }
+
+    /* h3 · C：随笔仍是一枚短横；项目改用一根竖发丝（同一根线，横置／竖置之分） */
+    .x-h3-c .prose--project .md h3::before {
+      content: none;
+      display: none;
+    }
+    .x-h3-c .prose--project .md h3 {
+      border-left: 1px solid var(--line);
+      padding-left: 0.62em;
+      margin-left: -0.63em;
+    }
+
+    /* 引文 · B：项目页不浮动（本稿初版的「现状」是误记，见上） */
+    .x-quote-b .prose--project .md blockquote {
+      animation: none;
+    }
+
+    /* 起笔标尺 · B：两页同款琥珀标尺（项目侧不要方块） */
+    .x-rule-b .prose--project hr.prose-rule::before {
+      background: var(--amber);
+    }
+    .x-rule-b .prose--project hr.prose-rule::after {
+      content: none;
+    }
+
+    /* 两态块边距 · B：保留项目侧的 1.35em（现状） */
+    .x-side-b .prose--project .md div[data-side] {
+      margin: 1.35em 0;
+    }
+
+    /* ═══════════ 9 · 控制面板（右下角；截图用 ?ui=0 藏掉） ═══════════ */
+    .panel {
+      position: fixed;
+      right: 1rem;
+      bottom: 1rem;
+      z-index: 120;
+      width: min(20rem, calc(100% - 2rem));
+      padding: 0.7rem 0.8rem;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: color-mix(in srgb, var(--bg) 82%, transparent);
+      -webkit-backdrop-filter: blur(16px) saturate(1.2);
+      backdrop-filter: blur(16px) saturate(1.2);
+      box-shadow: 0 20px 44px -24px rgba(10, 13, 20, 0.55);
+      font-family: var(--font-mono);
+      font-size: 0.6rem;
+      letter-spacing: 0.1em;
+      color: var(--fg-soft);
+      display: grid;
+      gap: 0.45rem;
+    }
+    .panel .prow {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.3rem;
+    }
+    .panel .prow > span:first-child {
+      width: 3.6em;
+      flex: none;
+    }
+    .ui-hidden .panel {
+      display: none;
+    }
+
+    /* ═══════════ 10 · 动效偏好与冻结 ═══════════ */
+    .frozen * {
+      animation-play-state: paused !important;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .md blockquote {
+        animation: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="seam-wrap"><div class="seam"></div></div>
+  <div class="field" aria-hidden="true">
+    <i style="left: 4%; top: 12%; --s: 90px"></i>
+    <i style="left: 88%; top: 22%; --s: 64px"></i>
+    <i style="left: 12%; top: 58%; --s: 120px"></i>
+    <i style="left: 78%; top: 74%; --s: 76px"></i>
+  </div>
+  <div class="grain" aria-hidden="true"></div>
+
+  <header class="masthead container">
+    <div class="kicker">醒梦 · PHASE 19 · 正文元素补齐</div>
+    <h1>把 h2 的规则，贯穿到其余元素</h1>
+    <p class="thesis">
+      h2 上其实早就定下了一条规则：<b>随笔是行内记号，项目是方框板块</b>——随笔的小节号嵌在字里（琥珀、
+      0.6em、被正文读过就忘），项目的小节号是方框加一条右侧细线（自成一块）。
+      本轮把这条件规则铺到 <code>h3</code> / <code>ol</code> / <code>table</code> /
+      <code>figure</code> / <code>code</code> 上。<b>两页的体温差因此变成一句话可复述的规则</b>，
+      而不是「这里也不一样、那里也不一样」。
+    </p>
+    <p class="note">
+      左右两栏是同一份样张放进两个变体，列宽就是两页的真实列宽（34em 各自折算：随笔 18.5px →
+      629px，项目 16px → 544px）。第 02–06 节逐个元素给 <b>A（本稿主张）与 B（备选）</b>，右下角可即时切。
+      每节表头的数值框是<b>实测值</b>——脚本读计算值回填。长按空白 2.2 秒入梦、1.3 秒回醒，<kbd>Shift</kbd> +
+      <kbd>空格</kbd> 等价；右下角还能切夜段（浅/深/纸）、钉住醒度、冻结动效。
+    </p>
+  </header>
+
+  <main class="container">
+    <!-- ══════════ 01 · 连读 ══════════ -->
+    <section class="row" id="r01">
+      <header class="rowhd">
+        <span class="rh-n">01</span>
+        <h2>连读：整篇一起看</h2>
+        <span class="rh-src">同一份样张 × 两个变体</span>
+      </header>
+      <p class="rh-note">
+        先看它作为一篇东西读起来的样子：记号是否退到了该退的位置、块与块之间的呼吸是否均匀。
+        下面各节的单元素样张都取自这一段。
+      </p>
+
+      <div class="cols">
+        <div class="col col--essay">
+          <div class="colhd">
+            <b>随笔 · 宋体夜话</b>
+            <span
+              ><span class="dim">34em →</span>
+              <span class="rh-m" data-probe=".col--essay .prose" data-prop="width">—</span></span
+            >
+          </div>
+          <article class="prose prose--essay">
+            <div class="md">
+              <h2>两处光源</h2>
+              <p>
+                醒来之前，房间里其实有两处光。<strong>一处是窗帘缝</strong>，另一处来自更远的地方——它没有来源，却把
+                <code>23:07</code> 这一刻照得很亮。
+              </p>
+              <h3>灯绳</h3>
+              <p>灯绳只是垂着，不动。<em>它并不发光</em>，但你若一直看着，会听见被拉长的寂静。</p>
+              <ol>
+                <li>先记住它垂下的长度</li>
+                <li>再记住它摆动的幅度</li>
+                <li>最后把这两件事一起忘掉</li>
+              </ol>
+              <h3>窗纸</h3>
+              <p>窗纸把外面的世界筛成一层薄薄的灰。</p>
+              <ul>
+                <li>灰里有一点暖</li>
+                <li>暖里有一点湿</li>
+                <li>湿气打在纸上，又慢慢退回去</li>
+              </ul>
+              <blockquote>
+                <p>梦里的句子总比醒来时短一些。因为有些成分，只在闭上眼之后才被允许存在。</p>
+              </blockquote>
+              <table>
+                <thead>
+                  <tr>
+                    <th>分期</th>
+                    <th>时刻</th>
+                    <th>波形</th>
+                    <th>体温</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>浅梦</td>
+                    <td>23:19</td>
+                    <td>θ 波</td>
+                    <td>微凉</td>
+                  </tr>
+                  <tr>
+                    <td>深眠</td>
+                    <td>01:11</td>
+                    <td>δ 波</td>
+                    <td>沉静</td>
+                  </tr>
+                  <tr>
+                    <td>异相</td>
+                    <td>02:08</td>
+                    <td>眼动</td>
+                    <td>微温</td>
+                  </tr>
+                </tbody>
+              </table>
+              <figure>
+                <img
+                  src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 190'%3E%3Crect width='640' height='190' fill='%23e1e5ea'/%3E%3Cpath d='M0 126 Q 40 102 80 126 T 160 126 T 240 126 T 320 126 T 400 126 T 480 126 T 560 126 T 640 126' stroke='%23a7b1ba' stroke-width='1' fill='none'/%3E%3Cpath d='M0 64 Q 40 40 80 64 T 160 64 T 240 64 T 320 64 T 400 64 T 480 64 T 560 64 T 640 64' stroke='%23c2a382' stroke-width='1' fill='none'/%3E%3C/svg%3E"
+                  alt="δ 波纹底板：两条同相位的正弦，上缘暖沙、下缘冷灰"
+                  width="640"
+                  height="190"
+                />
+                <figcaption>δ 波纹底板 · 0.5–3 Hz · 两条同相位正弦</figcaption>
+              </figure>
+              <pre data-language="ts"><code><span class="tk-k">const</span> at = (m: <span class="tk-t">number</span>) =&gt; <span class="tk-n">23</span> * <span class="tk-n">60</span> + <span class="tk-n">7</span> + m;   <span class="tk-c">/* 夜内分钟 → 挂钟 */</span>
+<span class="tk-k">const</span> stage = STAGE_INFO[stageAt(at(<span class="tk-n">181</span>))];   <span class="tk-c">// 异相 · 眼动</span>
+<span class="tk-k">const</span> still = <span class="tk-n">1</span> - realityMix;                 <span class="tk-c">// 醒静梦动</span></code></pre>
+              <hr class="prose-rule" />
+              <p>横线是缝线的简写。下一页从这里开始。</p>
+            </div>
+          </article>
+        </div>
+
+        <div class="col col--project">
+          <div class="colhd">
+            <b>项目 · 黑体方正文</b>
+            <span
+              ><span class="dim">34em →</span>
+              <span class="rh-m" data-probe=".col--project .prose" data-prop="width">—</span></span
+            >
+          </div>
+          <article class="prose prose--project">
+            <div class="md">
+              <h2>两处光源</h2>
+              <p>
+                醒来之前，房间里其实有两处光。<strong>一处是窗帘缝</strong>，另一处来自更远的地方——它没有来源，却把
+                <code>23:07</code> 这一刻照得很亮。
+              </p>
+              <h3>灯绳</h3>
+              <p>灯绳只是垂着，不动。<em>它并不发光</em>，但你若一直看着，会听见被拉长的寂静。</p>
+              <ol>
+                <li>先记住它垂下的长度</li>
+                <li>再记住它摆动的幅度</li>
+                <li>最后把这两件事一起忘掉</li>
+              </ol>
+              <h3>窗纸</h3>
+              <p>窗纸把外面的世界筛成一层薄薄的灰。</p>
+              <ul>
+                <li>灰里有一点暖</li>
+                <li>暖里有一点湿</li>
+                <li>湿气打在纸上，又慢慢退回去</li>
+              </ul>
+              <blockquote>
+                <p>梦里的句子总比醒来时短一些。因为有些成分，只在闭上眼之后才被允许存在。</p>
+              </blockquote>
+              <table>
+                <thead>
+                  <tr>
+                    <th>分期</th>
+                    <th>时刻</th>
+                    <th>波形</th>
+                    <th>体温</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>浅梦</td>
+                    <td>23:19</td>
+                    <td>θ 波</td>
+                    <td>微凉</td>
+                  </tr>
+                  <tr>
+                    <td>深眠</td>
+                    <td>01:11</td>
+                    <td>δ 波</td>
+                    <td>沉静</td>
+                  </tr>
+                  <tr>
+                    <td>异相</td>
+                    <td>02:08</td>
+                    <td>眼动</td>
+                    <td>微温</td>
+                  </tr>
+                </tbody>
+              </table>
+              <figure>
+                <img
+                  src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 190'%3E%3Crect width='640' height='190' fill='%23e1e5ea'/%3E%3Cpath d='M0 126 Q 40 102 80 126 T 160 126 T 240 126 T 320 126 T 400 126 T 480 126 T 560 126 T 640 126' stroke='%23a7b1ba' stroke-width='1' fill='none'/%3E%3Cpath d='M0 64 Q 40 40 80 64 T 160 64 T 240 64 T 320 64 T 400 64 T 480 64 T 560 64 T 640 64' stroke='%23c2a382' stroke-width='1' fill='none'/%3E%3C/svg%3E"
+                  alt="δ 波纹底板：两条同相位的正弦，上缘暖沙、下缘冷灰"
+                  width="640"
+                  height="190"
+                />
+                <figcaption>δ 波纹底板 · 0.5–3 Hz · 两条同相位正弦</figcaption>
+              </figure>
+              <pre data-language="ts"><code><span class="tk-k">const</span> at = (m: <span class="tk-t">number</span>) =&gt; <span class="tk-n">23</span> * <span class="tk-n">60</span> + <span class="tk-n">7</span> + m;   <span class="tk-c">/* 夜内分钟 → 挂钟 */</span>
+<span class="tk-k">const</span> stage = STAGE_INFO[stageAt(at(<span class="tk-n">181</span>))];   <span class="tk-c">// 异相 · 眼动</span>
+<span class="tk-k">const</span> still = <span class="tk-n">1</span> - realityMix;                 <span class="tk-c">// 醒静梦动</span></code></pre>
+              <hr class="prose-rule" />
+              <p>横线是缝线的简写。下一页从这里开始。</p>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════ 02 · h3 ══════════ -->
+    <section class="row" id="r02">
+      <header class="rowhd">
+        <span class="rh-n">02</span>
+        <h2>三级小节 h3</h2>
+        <span class="rh-src">.md h3（公共）→ ::before（变体）</span>
+        <span class="rh-m"
+          >随笔字号 <b data-probe=".col--essay .md h3" data-prop="font-size">—</b> · 项目字号 <b
+            data-probe=".col--project .md h3"
+            data-prop="font-size">—</b
+          ></span
+        >
+        <span class="rh-m"
+          >随笔记号 <b data-probe=".col--essay .md h3" data-pseudo="::before" data-prop="content"
+            >—</b
+          > · 项目记号 <b data-probe=".col--project .md h3" data-pseudo="::before" data-prop="content"
+            >—</b
+          ></span
+        >
+        <div class="opts" data-optgroup="h3">
+          <button type="button" data-opt="h3" data-v="a" aria-pressed="true">A 记号</button>
+          <button type="button" data-opt="h3" data-v="b" aria-pressed="false">B 无记号</button>
+          <button type="button" data-opt="h3" data-v="c" aria-pressed="false">C 项目的竖线</button>
+        </div>
+        <p class="rh-note">
+          <b>A：</b>随笔一枚 <code>--wake</code> 冷灰短横（与缝线同色，不用琥珀——琥珀是小节号的专利）；项目是二级汉字序号
+          <code>一·一</code>，灰而非琥珀，代价是 h3 必须落在 h2 之下（计数器由 h2 自增，孤立的 h3 会显示「零·一」）。<b>B：</b>两边都不加记号，只靠字号、字重与留白分层。<b>C：</b>随笔照旧，项目改成一根竖发丝——同一根线横置与竖置之别，代价是丢掉层级定位。
+        </p>
+      </header>
+      <div class="cols">
+        <div class="col col--essay">
+          <article class="prose prose--essay">
+            <div class="md">
+              <h2>两处光源</h2>
+              <h3>灯绳</h3>
+              <p>灯绳只是垂着，不动。它并不发光，但你若一直看着，会听见被拉长的寂静。</p>
+              <h3>窗纸</h3>
+              <p>窗纸把外面的世界筛成一层薄薄的灰。</p>
+            </div>
+          </article>
+        </div>
+        <div class="col col--project">
+          <article class="prose prose--project">
+            <div class="md">
+              <h2>两处光源</h2>
+              <h3>灯绳</h3>
+              <p>灯绳只是垂着，不动。它并不发光，但你若一直看着，会听见被拉长的寂静。</p>
+              <h3>窗纸</h3>
+              <p>窗纸把外面的世界筛成一层薄薄的灰。</p>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════ 03 · ol ══════════ -->
+    <section class="row" id="r03">
+      <header class="rowhd">
+        <span class="rh-n">03</span>
+        <h2>有序列表 ol</h2>
+        <span class="rh-src">.md ol &gt; li::before（变体）</span>
+        <span class="rh-m"
+          >随笔序号 <b data-probe=".col--essay .md ol > li" data-prop="padding-left">—</b> · 项目 <b
+            data-probe=".col--project .md ol > li"
+            data-prop="padding-left">—</b
+          ></span
+        >
+        <span class="rh-m"
+          >随笔记号 <b data-probe=".col--essay .md ol > li" data-pseudo="::before" data-prop="content"
+            >—</b
+          > · 项目记号 <b
+            data-probe=".col--project .md ol > li"
+            data-pseudo="::before"
+            data-prop="content">—</b
+          ></span
+        >
+        <div class="opts" data-optgroup="ol">
+          <button type="button" data-opt="ol" data-v="a" aria-pressed="true">A 自绘序号</button>
+          <button type="button" data-opt="ol" data-v="b" aria-pressed="false">B 原生 marker</button>
+        </div>
+        <p class="rh-note">
+          <b>A：</b>随笔是宋体汉字「一、二、三」（与 h2 的汉字序号同源，只是不点琥珀）；项目是 mono
+          两位数「01/02」（与 ul 的 mono ○、页面上的 PRJ-01 同源）。两页的项目侧，ol 与 ul
+          的正文左缘对齐在同一个 <code>1.9em</code>。<b>B：</b>保留浏览器原生数字，只换颜色与字体。
+          <b>另有一条必修（与选项无关）：</b>随笔的刻度与项目的 ○ 现在写在
+          <code>.md li::before</code> 上，不分 ul / ol —— 于是 ol 一被用上就会同时出现「浏览器数字 ＋ 记号」。
+          全站还没有一篇用过有序列表，所以一直没被踩到；落地时必须收窄成
+          <code>ul &gt; li::before</code>（项目侧那套 <code>li:has(input)</code> 施工清单同理）。
+        </p>
+      </header>
+      <div class="cols">
+        <div class="col col--essay">
+          <article class="prose prose--essay">
+            <div class="md">
+              <h2>两处光源</h2>
+              <ol>
+                <li>先记住它垂下的长度</li>
+                <li>再记住它摆动的幅度</li>
+                <li>最后把这两件事一起忘掉</li>
+              </ol>
+              <p>更细的次序会嵌一层：</p>
+              <ol>
+                <li>
+                  灯绳
+                  <ol>
+                    <li>长度</li>
+                    <li>幅度</li>
+                  </ol>
+                </li>
+                <li>窗纸</li>
+              </ol>
+            </div>
+          </article>
+        </div>
+        <div class="col col--project">
+          <article class="prose prose--project">
+            <div class="md">
+              <h2>两处光源</h2>
+              <ol>
+                <li>先记住它垂下的长度</li>
+                <li>再记住它摆动的幅度</li>
+                <li>最后把这两件事一起忘掉</li>
+              </ol>
+              <p>更细的次序会嵌一层：</p>
+              <ol>
+                <li>
+                  灯绳
+                  <ol>
+                    <li>长度</li>
+                    <li>幅度</li>
+                  </ol>
+                </li>
+                <li>窗纸</li>
+              </ol>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════ 04 · table ══════════ -->
+    <section class="row" id="r04">
+      <header class="rowhd">
+        <span class="rh-n">04</span>
+        <h2>表格 table</h2>
+        <span class="rh-src">.md table / th / td（公共）→（项目）</span>
+        <span class="rh-m"
+          >行距 <b data-probe=".col--essay .md td" data-prop="padding-top">—</b> · 项目框 <b
+            data-probe=".col--project .md table"
+            data-prop="border-top-width">—</b
+          ></span
+        >
+        <div class="opts" data-optgroup="tbl">
+          <button type="button" data-opt="tbl" data-v="a" aria-pressed="true">A 名录 / 板块</button>
+          <button type="button" data-opt="tbl" data-v="b" aria-pressed="false">B 两页同款</button>
+        </div>
+        <p class="rh-note">
+          <b>A：</b>公共层只有横向发丝线（表头一条 <code>--line</code>、行间 55% 淡线、末行收口），与
+          <code>.ledger</code> 同源；项目侧加成板块——1px 外框 + 2% 底，与
+          <code>.coverband</code>、方框小节号同族。<b>B：</b>两页都只用发丝线，不要外框。
+        </p>
+      </header>
+      <div class="cols">
+        <div class="col col--essay">
+          <article class="prose prose--essay">
+            <div class="md">
+              <table>
+                <thead>
+                  <tr>
+                    <th>分期</th>
+                    <th>夜内分钟</th>
+                    <th>波形</th>
+                    <th>体温</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>浅梦</td>
+                    <td>12 – 124</td>
+                    <td>θ / 纺锤</td>
+                    <td>微凉</td>
+                  </tr>
+                  <tr>
+                    <td>深眠</td>
+                    <td>124 – 181</td>
+                    <td>δ</td>
+                    <td>沉静</td>
+                  </tr>
+                  <tr>
+                    <td>异相</td>
+                    <td>181 – 352</td>
+                    <td>眼动</td>
+                    <td>微温</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+        </div>
+        <div class="col col--project">
+          <article class="prose prose--project">
+            <div class="md">
+              <table>
+                <thead>
+                  <tr>
+                    <th>分期</th>
+                    <th>夜内分钟</th>
+                    <th>波形</th>
+                    <th>体温</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>浅梦</td>
+                    <td>12 – 124</td>
+                    <td>θ / 纺锤</td>
+                    <td>微凉</td>
+                  </tr>
+                  <tr>
+                    <td>深眠</td>
+                    <td>124 – 181</td>
+                    <td>δ</td>
+                    <td>沉静</td>
+                  </tr>
+                  <tr>
+                    <td>异相</td>
+                    <td>181 – 352</td>
+                    <td>眼动</td>
+                    <td>微温</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════ 05 · figure ══════════ -->
+    <section class="row" id="r05">
+      <header class="rowhd">
+        <span class="rh-n">05</span>
+        <h2>图与图注 figure / figcaption</h2>
+        <span class="rh-src">.md figure / figcaption（公共）→（项目）</span>
+        <span class="rh-m"
+          >图注 <b data-probe=".col--essay .md figcaption" data-prop="font-size">—</b> · 项目框 <b
+            data-probe=".col--project .md figure"
+            data-prop="border-top-width">—</b
+          ></span
+        >
+        <span class="rh-m"
+          >编号 <b data-probe=".col--essay .md figcaption" data-pseudo="::before" data-prop="content"
+            >—</b
+          ></span
+        >
+        <div class="opts" data-optgroup="fig">
+          <button type="button" data-opt="fig" data-v="a" aria-pressed="true">A 松散 / 图版</button>
+          <button type="button" data-opt="fig" data-v="b" aria-pressed="false">B 两页同款</button>
+        </div>
+        <p class="rh-note">
+          <b>A：</b>图注自动编号「图 01」（与 h2 的汉字序号同一套计数器思路），随笔的号在
+          <code>--umber</code> 上、说明跟着走；项目侧整块成框、注记降成 mono 小角注，与
+          <code>.coverband</code> 同构。<b>B：</b>两页同款松散图版。
+        </p>
+      </header>
+      <div class="cols">
+        <div class="col col--essay">
+          <article class="prose prose--essay">
+            <div class="md">
+              <figure>
+                <img
+                  src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 190'%3E%3Crect width='640' height='190' fill='%23e1e5ea'/%3E%3Cpath d='M0 126 Q 40 102 80 126 T 160 126 T 240 126 T 320 126 T 400 126 T 480 126 T 560 126 T 640 126' stroke='%23a7b1ba' stroke-width='1' fill='none'/%3E%3Cpath d='M0 64 Q 40 40 80 64 T 160 64 T 240 64 T 320 64 T 400 64 T 480 64 T 560 64 T 640 64' stroke='%23c2a382' stroke-width='1' fill='none'/%3E%3C/svg%3E"
+                  alt="δ 波纹底板"
+                  width="640"
+                  height="190"
+                />
+                <figcaption>δ 波纹底板 · 0.5–3 Hz · 两条同相位正弦</figcaption>
+              </figure>
+            </div>
+          </article>
+        </div>
+        <div class="col col--project">
+          <article class="prose prose--project">
+            <div class="md">
+              <figure>
+                <img
+                  src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 190'%3E%3Crect width='640' height='190' fill='%23e1e5ea'/%3E%3Cpath d='M0 126 Q 40 102 80 126 T 160 126 T 240 126 T 320 126 T 400 126 T 480 126 T 560 126 T 640 126' stroke='%23a7b1ba' stroke-width='1' fill='none'/%3E%3Cpath d='M0 64 Q 40 40 80 64 T 160 64 T 240 64 T 320 64 T 400 64 T 480 64 T 560 64 T 640 64' stroke='%23c2a382' stroke-width='1' fill='none'/%3E%3C/svg%3E"
+                  alt="δ 波纹底板"
+                  width="640"
+                  height="190"
+                />
+                <figcaption>δ 波纹底板 · 0.5–3 Hz · 两条同相位正弦</figcaption>
+              </figure>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════ 06 · code ══════════ -->
+    <section class="row" id="r06">
+      <header class="rowhd">
+        <span class="rh-n">06</span>
+        <h2>等宽 code / pre</h2>
+        <span class="rh-src">.md code / pre（公共）→（变体）</span>
+        <span class="rh-m"
+          >随笔左缘 <b data-probe=".col--essay .md pre" data-prop="border-left-width">—</b> · 项目框
+          <b data-probe=".col--project .md pre" data-prop="border-left-width">—</b></span
+        >
+        <div class="opts" data-optgroup="code">
+          <button type="button" data-opt="code" data-v="a" aria-pressed="true">A 梦色左缘</button>
+          <button type="button" data-opt="code" data-v="b" aria-pressed="false">B 两页同款方框</button>
+        </div>
+        <p class="rh-note">
+          <b>A：</b>代码与引文都是「外来语」，共用一条梦色左缘（随笔）；项目侧成方框，与 table / figure
+          同族。底色一律 <code>color-mix(--fg …)</code> 而不是 <code>--bg-sunken</code>——后者是写死的浅色，将来正文若落到深色语境会亮成白斑（内页目前不切夜色，所以这是稳当而非现症）。
+          语言签直接吃 Shiki 已有的 <code>data-language</code>。
+          <b>两条与选项无关的必修项：</b>① Shiki 现在给 <code>&lt;pre&gt;</code> 写了行内
+          <code>background-color:#24292e</code>（github-dark），会盖掉这里的一切底色；落地时须在
+          <code>astro.config.mjs</code> 关掉默认主题（见 notes）。② 行内 code 要写成
+          <code>:not(pre) &gt; code</code>：现状的 <code>.md code</code> 会把底与字号漏到 pre 里的 code 上
+          （症状是项目侧每行多一条底带、随笔侧字号被二次缩到 <code>.71em</code>）。代码里的墨只用全站已有的色（关键字
+          <code>--umber</code>、类型与字符串梦色压深、注释 <code>--fg-soft</code>、数字中性）——<b>琥珀在这里一次都不出现</b>，它属于锚点与进度。
+        </p>
+      </header>
+      <div class="cols">
+        <div class="col col--essay">
+          <article class="prose prose--essay">
+            <div class="md">
+              <p>夜内分钟与挂钟之间的换算写成 <code>at(m)</code> 就够了。</p>
+              <pre data-language="ts"><code><span class="tk-k">const</span> at = (m: <span class="tk-t">number</span>) =&gt; <span class="tk-n">23</span> * <span class="tk-n">60</span> + <span class="tk-n">7</span> + m;
+<span class="tk-k">const</span> stage = STAGE_INFO[stageAt(at(<span class="tk-n">181</span>))];  <span class="tk-c">// 异相 · 眼动</span>
+<span class="tk-k">const</span> still = <span class="tk-n">1</span> - realityMix;                <span class="tk-c">// 醒静梦动</span></code></pre>
+            </div>
+          </article>
+        </div>
+        <div class="col col--project">
+          <article class="prose prose--project">
+            <div class="md">
+              <p>夜内分钟与挂钟之间的换算写成 <code>at(m)</code> 就够了。</p>
+              <pre data-language="ts"><code><span class="tk-k">const</span> at = (m: <span class="tk-t">number</span>) =&gt; <span class="tk-n">23</span> * <span class="tk-n">60</span> + <span class="tk-n">7</span> + m;
+<span class="tk-k">const</span> stage = STAGE_INFO[stageAt(at(<span class="tk-n">181</span>))];  <span class="tk-c">// 异相 · 眼动</span>
+<span class="tk-k">const</span> still = <span class="tk-n">1</span> - realityMix;                <span class="tk-c">// 醒静梦动</span></code></pre>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════ 07 · 四处待拍板 ══════════ -->
+    <section class="row" id="r07">
+      <header class="rowhd">
+        <span class="rh-n">07</span>
+        <h2>顺带收掉四处待拍板</h2>
+        <span class="rh-src">content-typography.md 第三节与 backlog 六.8</span>
+      </header>
+
+      <div class="cols">
+        <div class="col col--essay">
+          <div class="colhd"><b>随笔</b><span class="dim">同左栏样张</span></div>
+          <article class="prose prose--essay">
+            <div class="md">
+              <div data-side="wake">
+                <p>
+                  两态块的上边距在这里读得出来：<b data-probe=".col--essay .md div[data-side]" data-prop="margin-bottom"
+                    >—</b
+                  >。引文在动——随笔本来就该浮。
+                </p>
+              </div>
+              <div data-side="dream">
+                <p>梦面这一段是同一处边距的另一侧：<b data-probe=".col--essay .md div[data-side]" data-prop="margin-bottom">—</b>。</p>
+              </div>
+              <blockquote>
+                <p>梦里的句子总比醒来时短一些。</p>
+              </blockquote>
+              <hr class="prose-rule" />
+            </div>
+          </article>
+        </div>
+        <div class="col col--project">
+          <div class="colhd"><b>项目</b><span class="dim">同左栏样张</span></div>
+          <article class="prose prose--project">
+            <div class="md">
+              <div data-side="wake">
+                <p>
+                  同一处边距：<b data-probe=".col--project .md div[data-side]" data-prop="margin-bottom">—</b
+                  >。引文也在动，只是振幅只有随笔的一半（1.2px / 12s）。起笔标尺是尺身加一枚琥珀方块。
+                </p>
+              </div>
+              <div data-side="dream">
+                <p>梦面这一侧同一处边距：<b data-probe=".col--project .md div[data-side]" data-prop="margin-bottom">—</b>。</p>
+              </div>
+              <blockquote>
+                <p>梦里的句子总比醒来时短一些。</p>
+              </blockquote>
+              <hr class="prose-rule" />
+            </div>
+          </article>
+        </div>
+      </div>
+
+      <p class="rh-note" style="max-width: 76em">
+        <b>① 引文</b>：<b>勘误</b>——实测两页已经同款（都吃公共层 <code>.md blockquote</code> 的
+        <code>drift 9.5s / 2.6px</code>），原先记的「项目页不浮动」是误记。故这里的选项是「要不要给项目侧一个更静的振幅」（随笔
+        2.6px / 9.5s，项目 1.2px / 12s），不是「修不一致」。<b>② 两态块边距</b>：项目侧那条
+        <code>1.35em</code> 改成 <code>1.3em</code>（＝项目自己的段落值），让「两态块与段落同呼吸」在两页都成立；
+        早先提的「统一到 1.5em」会让项目侧比自己的段落松 3.2px，已放弃。<b>③ 起笔标尺</b>：搬进公共层，两页都有；随笔是琥珀尺，项目是 <code>--line</code> 尺身 + 左端 5px
+        琥珀方块（方框语言的尺）。<b>④ 列宽 34em</b>：<b>不是疏漏</b>——em 在中文字体里约等于一个汉字宽，所以
+        34em 就是「一行 34 字」，两页的行字数一模一样，只是字号不同（18.5 → 629px / 16 →
+        544px）。建议保持现状，把这条账记进 content-typography.md。
+      </p>
+    </section>
+
+    <div style="height: 6rem"></div>
+  </main>
+
+  <aside class="panel" id="panel">
+    <div class="prow"><span>面</span><button type="button" data-face="wake">醒</button><button type="button" data-face="dream" aria-pressed="true">梦</button></div>
+    <div class="prow">
+      <span>夜段</span>
+      <button type="button" data-zone="light" aria-pressed="true">浅</button>
+      <button type="button" data-zone="deep">深</button>
+      <button type="button" data-zone="paper">纸</button>
+    </div>
+    <div class="prow">
+      <span>醒度</span>
+      <input type="range" min="0" max="1" step="0.01" value="0" id="mix" style="flex:1;accent-color:var(--amber)" />
+      <b id="mixv" style="color:var(--fg)">0.00</b>
+    </div>
+    <div class="prow">
+      <span>备选</span>
+      <button type="button" data-all="a" aria-pressed="true">全 A</button>
+      <button type="button" data-all="b">全 B</button>
+      <button type="button" data-freeze>冻结</button>
+      <button type="button" data-ui>藏面板</button>
+    </div>
+  </aside>
+
+  <script>
+    /* ═══ 双态引擎（行为对齐 src/scripts/reality.ts，简化但不改语义）═══ */
+    var ACCENT = {
+      '--amber': [
+        [217, 160, 91],
+        [167, 177, 186]
+      ],
+      '--umber': [
+        [118, 86, 64],
+        [85, 98, 112]
+      ],
+      '--ghost-ink': [
+        [185, 143, 116],
+        [142, 154, 166]
+      ],
+      '--dream': [
+        [194, 163, 130],
+        [163, 156, 146]
+      ]
+    };
+    var docEl = document.documentElement;
+    var mix = 1; // 1 = 醒，0 = 梦
+    var T_GO = 2200;
+    var T_BACK = 1300;
+    var RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    function mixRgb(a, b, t) {
+      return (
+        'rgb(' +
+        Math.round(a[0] + (b[0] - a[0]) * t) +
+        ',' +
+        Math.round(a[1] + (b[1] - a[1]) * t) +
+        ',' +
+        Math.round(a[2] + (b[2] - a[2]) * t) +
+        ')'
+      );
+    }
+    function setMix(v) {
+      mix = Math.max(0, Math.min(1, v));
+      for (var k in ACCENT) docEl.style.setProperty(k, mixRgb(ACCENT[k][0], ACCENT[k][1], mix));
+      docEl.style.setProperty('--reality-mix', mix.toFixed(3));
+      var m = document.getElementById('mix');
+      if (m) m.value = String(mix);
+      var mv = document.getElementById('mixv');
+      if (mv) mv.textContent = mix.toFixed(2);
+      document.body.dataset.reality = mix > 0.5 ? 'wake' : 'dream';
+    }
+
+    /* 长按手势：空白处按下 → 到点跳到对面 */
+    var holdT0 = 0;
+    var holdTimer = 0;
+    var holding = false;
+    var EXCLUDE = 'a,button,input,textarea,select,label,summary,pre,code,.panel,.opts';
+    function target() {
+      return mix > 0.5 ? 0 : 1;
+    }
+    function beginHold() {
+      holding = true;
+      holdT0 = performance.now();
+      var to = target();
+      var dur = to === 1 ? T_GO : T_BACK;
+      var t0 = performance.now();
+      var from = mix;
+      (function step(now) {
+        if (!holding) return;
+        var p = Math.min(1, (now - t0) / dur);
+        if (RM) p = 1;
+        setMix(from + (to - from) * p);
+        if (p < 1) requestAnimationFrame(step);
+      })(t0);
+      holdTimer = setTimeout(function () {
+        setMix(to);
+        holding = false;
+      }, dur + 60);
+    }
+    function endHold() {
+      if (!holding) return;
+      holding = false;
+      clearTimeout(holdTimer);
+      var held = performance.now() - holdT0;
+      if (held <= 260) setMix(mix); // 短按：静止
+      else if (mix !== 0 && mix !== 1) setMix(mix > 0.5 ? 1 : 0); // 中途松手：退回最近的一面
+    }
+    document.addEventListener('pointerdown', function (e) {
+      if (e.target.closest(EXCLUDE)) return;
+      beginHold();
+    });
+    document.addEventListener('pointerup', function () {
+      endHold();
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.code !== 'Space' || !e.shiftKey || e.repeat) return;
+      if (e.target.closest('input')) return;
+      e.preventDefault();
+      setMix(target());
+    });
+
+    /* ═══ 查询参数 ═══ */
+    var q = new URLSearchParams(location.search);
+    var OPTS = ['h3', 'ol', 'tbl', 'fig', 'code', 'quote', 'rule', 'side'];
+    function setOpt(name, v, silent) {
+      ['a', 'b', 'c'].forEach(function (w) {
+        docEl.classList.toggle('x-' + name + '-' + w, v === w);
+      });
+      document.querySelectorAll('[data-opt="' + name + '"]').forEach(function (b) {
+        b.setAttribute('aria-pressed', String(b.dataset.v === v));
+      });
+      if (!silent) syncUrl();
+    }
+    if (q.get('opt') === 'b') OPTS.forEach(function (n) { setOpt(n, 'b', true); });
+    OPTS.forEach(function (n) { if (q.get(n)) setOpt(n, q.get(n), true); });
+
+    document.querySelectorAll('[data-opt]').forEach(function (b) {
+      b.addEventListener('click', function () { setOpt(b.dataset.opt, b.dataset.v); });
+    });
+    document.querySelectorAll('[data-all]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        OPTS.forEach(function (n) { setOpt(n, b.dataset.all, true); });
+        document.querySelectorAll('[data-all]').forEach(function (x) {
+          x.setAttribute('aria-pressed', String(x === b));
+        });
+        syncUrl();
+      });
+    });
+    document.querySelectorAll('[data-face]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        setMix(b.dataset.face === 'wake' ? 1 : 0);
+        document.querySelectorAll('[data-face]').forEach(function (x) {
+          x.setAttribute('aria-pressed', String(x === b));
+        });
+      });
+    });
+    document.querySelectorAll('[data-zone]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        docEl.dataset.zone = b.dataset.zone;
+        document.querySelectorAll('[data-zone]').forEach(function (x) {
+          x.setAttribute('aria-pressed', String(x === b));
+        });
+      });
+    });
+    document.querySelector('[data-freeze]') &&
+      document.querySelector('[data-freeze]').addEventListener('click', function (e) {
+        document.body.classList.toggle('frozen');
+        e.target.setAttribute('aria-pressed', String(document.body.classList.contains('frozen')));
+      });
+    document.querySelector('[data-ui]') &&
+      document.querySelector('[data-ui]').addEventListener('click', function () {
+        docEl.classList.add('ui-hidden');
+      });
+    function syncUrl() {
+      var p = new URLSearchParams();
+      OPTS.forEach(function (n) {
+        ['a', 'b', 'c'].some(function (w) {
+          if (docEl.classList.contains('x-' + n + '-' + w)) {
+            p.set(n, w);
+            return true;
+          }
+          return false;
+        });
+      });
+      history.replaceState(null, '', '?' + p.toString());
+    }
+
+    /* ═══ 实测值回填：读计算值，不手抄（伪元素要显式给第二个参数）═══ */
+    function probe() {
+      document.querySelectorAll('[data-probe]').forEach(function (el) {
+        var t = document.querySelector(el.dataset.probe);
+        if (!t) return;
+        var v = getComputedStyle(t, el.dataset.pseudo || null).getPropertyValue(el.dataset.prop || '');
+        el.textContent = v.trim() || '—';
+      });
+    }
+
+    /* 起始态 */
+    if (q.get('zone')) docEl.dataset.zone = q.get('zone');
+    var startMix = q.get('mix') !== null ? parseFloat(q.get('mix')) : 0;
+    setMix(startMix);
+    if (q.get('freeze') === '1') document.body.classList.add('frozen');
+    if (q.get('legacy') === '1') docEl.classList.add('legacy');
+    if (q.get('ui') === '0') docEl.classList.add('ui-hidden');
+    var mixEl = document.getElementById('mix');
+    mixEl.addEventListener('input', function () { setMix(parseFloat(mixEl.value)); });
+    probe();
+    addEventListener('resize', probe);
+
+    window.__p19 = {
+      state: function () {
+        return { mix: mix, face: document.body.dataset.reality, zone: docEl.dataset.zone };
+      },
+      setMix: setMix,
+      face: function (f) { setMix(f === 'wake' ? 1 : 0); },
+      zone: function (z) { docEl.dataset.zone = z; },
+      opt: setOpt,
+      probe: probe
+    };
+  </script>
+</body>
+</html>
