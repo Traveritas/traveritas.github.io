@@ -103,6 +103,11 @@ npm run new:article -- "标题" my-slug
 - 随笔模板：`docs/templates/article-template.md`
 - 项目模板：`docs/templates/project-template.md`
 
+另有两份写完的示例稿，演示成稿的样子（模板管字段，示例稿管写法）：
+
+- 随笔示例：`docs/templates/article-example.md`（两态换字 / 换段、浮起与流光、引文与列表）
+- 项目示例：`docs/templates/project-example.md`（links / related / note 都填上、任务清单、两态段落）
+
 两份模板都是逐字段注释的完整示例，可直接复制进内容目录后改名。模板本身放在 `docs/` 下，
 不会被内容 loader 收走（loader 只扫 `src/content/` 下不以 `_` 开头的 `.md`）。
 
