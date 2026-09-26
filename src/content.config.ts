@@ -9,7 +9,7 @@ const articles = defineCollection({
     date: z.coerce.date(),
     tags: z.array(z.string()).default([]),
     draft: z.boolean().default(false),
-    // 跨页互链（素夜：文末「相关档案」）；href 为站内路径，不做 url 校验
+    // 跨页互链（素夜：文末「关联篇章」）；href 为站内路径，不做 url 校验
     related: z.array(z.object({ label: z.string(), href: z.string() })).default([]),
   }),
 });
@@ -25,7 +25,7 @@ const projects = defineCollection({
     links: z.array(z.object({ label: z.string(), href: z.string().url() })).default([]),
     draft: z.boolean().default(false),
     related: z.array(z.object({ label: z.string(), href: z.string() })).default([]),
-    // 深眠注记（素夜：账目页尾的琥珀左边注，醒/梦双声轨）
+    // 深眠注记（素夜：项目页尾的琥珀左边注，醒/梦双声轨）
     note: z.object({ awake: z.string(), dream: z.string() }).optional(),
   }),
 });

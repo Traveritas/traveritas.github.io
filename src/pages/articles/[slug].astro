@@ -25,7 +25,7 @@ function countChars(md: string): number {
 
 export async function getStaticPaths() {
   const articles = (await getCollection('articles', (a) => !a.data.draft)).sort(
-    (a, b) => a.data.date.valueOf() - b.data.date.valueOf(),
+    (a, b) => a.data.date.valueOf() - b.data.date.valueOf() || a.id.localeCompare(b.id),
   );
   /* 夜时刻：与随笔列表同一规则（写作先后在浅梦段 12→124 分内等分）；
      getStaticPaths 编译在独立 chunk，段落常量需本地定义 */
@@ -40,9 +40,9 @@ export async function getStaticPaths() {
     props: {
       article: a,
       nightMin: nightMin.get(a.id) ?? SEG_FROM,
-      // 列表为倒序：较早的一篇在后面，较晚的一篇在前面
-      older: i < articles.length - 1 ? articles[i + 1] : undefined,
-      newer: i > 0 ? articles[i - 1] : undefined,
+      // 此处按旧→新排列：较早的一篇在前面，较晚的一篇在后面
+      older: i > 0 ? articles[i - 1] : undefined,
+      newer: i < articles.length - 1 ? articles[i + 1] : undefined,
     },
   }));
 }

@@ -14,8 +14,8 @@ export default defineConfig({
   ],
   markdown: {
     // 醒梦两态正文语法（:::dream/:::wake 块、[[醒|梦]] 行内），见 docs/writing.md
-    // + 小节序号：h2 的「点阵显影」记号在构建期注入（醒＝等宽数字 / 梦＝点阵），
-    //   见 src/markdown/ordinal.mjs —— 内容页因此仍然零客户端 JS
+    // + 小节序号：h2 的「定格漂浮」序号在构建期注入（醒梦共用同一套数字，梦面逐枚定格漂浮、醒面不动），
+    //   见 src/markdown/ordinal.mjs 与 docs/design/content-typography.md —— 内容页因此仍然零客户端 JS
     processor: satteri({
       features: { directive: true },
       mdastPlugins: [twilight, ordinal],
