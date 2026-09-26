@@ -829,6 +829,175 @@
     }
 
     /* ═══════════════════════════════════════════════════════════════════
+       RAIL · 侧栏仪表轨（探针微示波仪 · 浅色背景适配）
+       ═══════════════════════════════════════════════════════════════════ */
+    .rail {
+      position: fixed;
+      left: 28px;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 50;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      pointer-events: none;
+      color: var(--fg-soft);
+      opacity: 0;
+      visibility: hidden;
+      translate: -16px 0;
+      transition:
+        opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+        translate 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+        visibility 0.5s;
+    }
+
+    body.past-hero .rail {
+      opacity: 1;
+      visibility: visible;
+      translate: 0 0;
+    }
+
+    .rail--night {
+      --fg: #232830;
+      --fg-soft: #56606d;
+      --line: rgba(35, 40, 48, 0.18);
+    }
+    html[data-palette="original"] .rail--night {
+      --fg: #dce1e8;
+      --fg-soft: #9aa4b2;
+      --line: rgba(220, 225, 232, 0.16);
+    }
+
+    .rail-meter--night {
+      position: relative;
+      width: 60px;
+      height: 180px;
+    }
+
+    .rail-meter--night .rail-track {
+      position: absolute;
+      left: 4px;
+      top: 0;
+      width: 1px;
+      height: 100%;
+      background: var(--line);
+    }
+
+    .rail-meter--night .rail-track::before,
+    .rail-meter--night .rail-track::after {
+      content: '';
+      position: absolute;
+      left: 0;
+      width: 1px;
+      height: 24px;
+      pointer-events: none;
+    }
+
+    .rail-meter--night .rail-track::before {
+      bottom: 100%;
+      background: linear-gradient(to top, var(--line), transparent);
+    }
+
+    .rail-meter--night .rail-track::after {
+      top: 100%;
+      background: linear-gradient(to bottom, var(--line), transparent);
+    }
+
+    .rail-meter--night .rail-probe {
+      position: absolute;
+      left: 1.5px;
+      top: 10%;
+      transform: translateY(-50%);
+      display: flex !important;
+      align-items: center;
+      gap: 9px;
+      pointer-events: none;
+      transition: top 0.15s linear;
+    }
+
+    .rail-meter--night .rail-dot {
+      position: relative !important;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--amber);
+      box-shadow:
+        0 0 8px 1px color-mix(in srgb, var(--amber) 55%, transparent),
+        0 1px 3px rgba(35, 40, 48, 0.16);
+      flex-shrink: 0;
+    }
+
+    .probe-capsule {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 3px;
+      padding: 3px 6px 3px 5px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.62);
+      -webkit-backdrop-filter: blur(10px) saturate(130%);
+      backdrop-filter: blur(10px) saturate(130%);
+      border: 1px solid rgba(255, 255, 255, 0.85);
+      box-shadow:
+        0 2px 8px -2px rgba(35, 40, 48, 0.08),
+        inset 0 1px 1px rgba(255, 255, 255, 0.9);
+    }
+
+    html[data-palette="original"] .probe-capsule {
+      background: rgba(255, 255, 255, 0.06);
+      border-color: rgba(255, 255, 255, 0.12);
+    }
+
+    .probe-capsule #rail-time {
+      color: var(--fg);
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      font-weight: 500;
+      line-height: 1;
+      letter-spacing: 0.08em;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .probe-wave-box {
+      width: 38px;
+      height: 12px;
+      display: flex;
+      align-items: center;
+      overflow: visible;
+      opacity: 0.92;
+    }
+
+    .probe-svg {
+      width: 38px;
+      height: 12px;
+      overflow: visible;
+    }
+
+    .probe-path-bg {
+      stroke: color-mix(in srgb, var(--fg) 22%, transparent);
+      stroke-width: 1;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .probe-path-live {
+      stroke: var(--amber);
+      stroke-width: 1.35;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      filter: drop-shadow(0 1px 2px color-mix(in srgb, var(--amber) 40%, transparent));
+      transition: d 0.3s ease;
+    }
+
+    @media (max-width: 1200px) {
+      .rail {
+        display: none;
+      }
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
        CONSTRUCTS BG · 构块场（静态版 · 真实几何对齐 · 零复杂动画）
        ═══════════════════════════════════════════════════════════════════ */
     .fld-bg {
@@ -1068,6 +1237,25 @@
   <div class="seam-wrap" aria-hidden="true">
     <div class="seam"><span class="seam-anchor"></span></div>
   </div>
+
+  <!-- 侧栏仪表轨（探针微示波仪 · 浅色背景适配） -->
+  <aside class="rail rail--night" id="site-rail" aria-hidden="true">
+    <div class="rail-meter rail-meter--night">
+      <i class="rail-track"></i>
+      <div class="rail-probe" id="rail-probe">
+        <i class="rail-dot"></i>
+        <div class="probe-capsule">
+          <span id="rail-time" class="mono">23:07</span>
+          <div class="probe-wave-box" id="probe-wave-box">
+            <svg class="probe-svg" width="38" height="12" viewBox="0 0 38 12" fill="none" aria-hidden="true">
+              <path class="probe-path-bg" id="probe-wave-bg" d="M 0 6 Q 2 4.5 4 6 T 8 6 T 12 6 T 16 6 T 20 6 T 24 6 T 28 6 T 32 6 T 36 6 L 38 6" />
+              <path id="probe-wave-path" class="probe-path-live" d="M 0 6 Q 2 4.5 4 6 T 8 6 T 12 6 T 16 6 T 20 6 T 24 6 T 28 6 T 32 6 T 36 6 L 38 6" />
+            </svg>
+          </div>
+        </div>
+      </div>
+    </div>
+  </aside>
 
   <svg class="eeg-bg" viewBox="0 0 1440 900" preserveAspectRatio="none" aria-hidden="true">
     <path d="M 0 450 Q 180 435, 360 450 T 720 450 Q 820 410, 860 490 Q 900 420, 940 450 T 1440 450" fill="none" stroke="rgba(35, 40, 48, 0.08)" stroke-width="1.2" />
@@ -1470,6 +1658,35 @@
       else if (y >= offsets.essays) next = 'essays';
       else next = 'hero';
       setActiveStage(next);
+
+      // 侧栏仪表轨探针与时钟驱动
+      const pastHero = y >= (offsets.essays || 300) - 120;
+      document.body.classList.toggle('past-hero', pastHero);
+      const probe = document.getElementById('rail-probe');
+      const time = document.getElementById('rail-time');
+      const livePath = document.getElementById('probe-wave-path');
+      const bgPath = document.getElementById('probe-wave-bg');
+      if (probe) {
+        const totalH = Math.max(1, document.documentElement.scrollHeight - innerHeight);
+        const progress = Math.max(0, Math.min(1, y / totalH));
+        probe.style.top = `${(4 + progress * 92).toFixed(1)}%`;
+      }
+      if (time) {
+        if (next === 'dawn') time.textContent = '04:59';
+        else if (next === 'rem') time.textContent = '02:08';
+        else if (next === 'projects') time.textContent = '01:11';
+        else if (next === 'essays') time.textContent = '23:19';
+        else time.textContent = '23:07';
+      }
+      const WAVES = {
+        hero: 'M 0 6 Q 2 4.5 4 6 T 8 6 T 12 6 T 16 6 T 20 6 T 24 6 T 28 6 T 32 6 T 36 6 L 38 6',
+        essays: 'M 0 6 Q 2 3 4 6 T 8 6 T 12 6 T 16 6 T 20 6 T 24 6 T 28 6 T 32 6 T 36 6 L 38 6',
+        projects: 'M 0 6 Q 6 1 12 6 T 24 6 T 36 6 L 38 6',
+        rem: 'M 0 6 Q 3 2 6 6 T 12 6 T 18 6 T 24 6 T 30 6 T 36 6 L 38 6',
+        dawn: 'M 0 6 Q 2 4.5 4 6 T 8 6 T 12 6 T 16 6 T 20 6 T 24 6 T 28 6 T 32 6 T 36 6 L 38 6'
+      };
+      if (livePath && WAVES[next]) livePath.setAttribute('d', WAVES[next]);
+      if (bgPath && WAVES[next]) bgPath.setAttribute('d', WAVES[next]);
     }
 
     function scrollToId(id) {
