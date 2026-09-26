@@ -829,6 +829,84 @@
     }
 
     /* ═══════════════════════════════════════════════════════════════════
+       CONSTRUCTS BG · 构块场（静态版 · 真实几何对齐 · 零复杂动画）
+       ═══════════════════════════════════════════════════════════════════ */
+    .fld-bg {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      overflow: hidden;
+      z-index: -3;
+      contain: strict;
+      transform: translateZ(0);
+      --ghost-ink: #b98f74;
+    }
+    .fld-bg[data-layer='through'] {
+      z-index: -2;
+    }
+    .fld-bg[data-layer='below'] {
+      z-index: -3;
+    }
+
+    .fld-field {
+      position: absolute;
+      inset: 0;
+    }
+    .fld-pan {
+      position: absolute;
+      inset: 0;
+    }
+    .fld-cell {
+      position: absolute;
+      inset: 0;
+    }
+    .fld-cl {
+      position: absolute;
+      width: 0;
+      height: 0;
+    }
+    .fld-sq {
+      position: absolute;
+      transform-origin: center center;
+      transition: background-color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease, opacity 0.25s ease;
+    }
+
+    /* 样式 1：现行线上（暖褐 --ghost-ink: #b98f74，当前线上效果） */
+    .fld-bg[data-style='live'] .fld-sq {
+      background: color-mix(in srgb, #b98f74 7%, transparent);
+      border: 1px solid color-mix(in srgb, #b98f74 13%, transparent);
+    }
+
+    /* 样式 2：磨砂石英白印（白透微光，与浅色高调纸感及玻璃芯片呼应） */
+    .fld-bg[data-style='white'] .fld-sq {
+      background: rgba(255, 255, 255, 0.40);
+      border: 1px solid rgba(255, 255, 255, 0.78);
+      box-shadow: 0 4px 14px -4px rgba(35, 40, 48, 0.04);
+    }
+
+    /* 样式 3：冷墨淡影（与页面正文字墨同源，极淡） */
+    .fld-bg[data-style='ink'] .fld-sq {
+      background: color-mix(in srgb, var(--fg) 3.5%, transparent);
+      border: 1px solid color-mix(in srgb, var(--fg) 7.5%, transparent);
+    }
+
+    /* 样式 4：隐藏方块 */
+    .fld-bg[data-style='off'] {
+      display: none;
+    }
+
+    /* 原版死黑下的适配 */
+    html[data-palette='original'] .fld-bg[data-style='live'] .fld-sq {
+      background: color-mix(in srgb, #b98f74 7%, transparent);
+      border: 1px solid color-mix(in srgb, #b98f74 13%, transparent);
+    }
+    html[data-palette='original'] .fld-bg[data-style='white'] .fld-sq,
+    html[data-palette='original'] .fld-bg[data-style='ink'] .fld-sq {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.09);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
        INTERACTIVE TOOLBAR · 调色谱控制台
        ═══════════════════════════════════════════════════════════════════ */
     .palette-dock {
@@ -837,7 +915,7 @@
       left: 50%;
       transform: translateX(-50%);
       z-index: 100;
-      background: rgba(255, 255, 255, 0.9);
+      background: rgba(255, 255, 255, 0.92);
       -webkit-backdrop-filter: blur(20px) saturate(140%);
       backdrop-filter: blur(20px) saturate(140%);
       border: 1px solid rgba(255, 255, 255, 0.95);
@@ -847,13 +925,28 @@
       display: flex;
       align-items: center;
       gap: 0.4rem;
+      max-width: 95vw;
+    }
+    .dock-group {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+    .dock-label {
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      letter-spacing: 0.06em;
+      color: var(--fg-faint);
+      padding-inline: 0.2rem 0.1rem;
+      user-select: none;
+      white-space: nowrap;
     }
     .dock-mode-btn {
-      padding: 0.45rem 0.9rem;
+      padding: 0.4rem 0.8rem;
       border-radius: 999px;
       border: none;
       font-family: var(--font-body);
-      font-size: 0.8rem;
+      font-size: 0.78rem;
       font-weight: 500;
       cursor: pointer;
       transition: all 0.2s ease;
@@ -872,19 +965,44 @@
       background: rgba(0, 0, 0, 0.05);
       color: var(--fg);
     }
+    .dock-block-btn {
+      padding: 0.32rem 0.7rem;
+      border-radius: 999px;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      background: rgba(255, 255, 255, 0.6);
+      font-family: var(--font-body);
+      font-size: 0.74rem;
+      font-weight: 500;
+      color: var(--fg-soft);
+      cursor: pointer;
+      transition: all 0.18s ease;
+      white-space: nowrap;
+    }
+    .dock-block-btn.active {
+      background: #3b5f4c;
+      color: #ffffff;
+      border-color: #3b5f4c;
+      box-shadow: 0 2px 8px rgba(59, 95, 76, 0.25);
+    }
+    .dock-block-btn:not(.active):hover {
+      background: #ffffff;
+      border-color: var(--amber);
+      color: var(--fg);
+    }
     .dock-sep {
       width: 1px;
       height: 18px;
       background: rgba(0, 0, 0, 0.12);
       margin-inline: 0.2rem;
+      flex-shrink: 0;
     }
     .dock-nav-btn {
-      padding: 0.35rem 0.75rem;
+      padding: 0.32rem 0.65rem;
       border-radius: 999px;
       border: 1px solid rgba(0, 0, 0, 0.08);
       background: rgba(255, 255, 255, 0.6);
       font-family: var(--font-mono);
-      font-size: 0.72rem;
+      font-size: 0.7rem;
       color: var(--fg);
       cursor: pointer;
       transition: all 0.18s ease;
@@ -897,9 +1015,9 @@
     }
     .dock-indicator {
       font-family: var(--font-mono);
-      font-size: 0.72rem;
+      font-size: 0.7rem;
       letter-spacing: 0.06em;
-      padding: 0.35rem 0.85rem;
+      padding: 0.32rem 0.75rem;
       background: rgba(0, 0, 0, 0.04);
       border-radius: 999px;
       display: flex;
@@ -915,13 +1033,20 @@
       border: 1px solid rgba(0, 0, 0, 0.15);
     }
 
-    @media (max-width: 900px) {
+    @media (max-width: 1250px) {
       .palette-dock {
-        width: calc(100% - 2rem);
+        flex-wrap: wrap;
+        justify-content: center;
+        border-radius: 16px;
+        padding: 0.5rem 0.8rem;
+        bottom: 0.6rem;
+      }
+    }
+    @media (max-width: 800px) {
+      .palette-dock {
+        width: calc(100% - 1.5rem);
         overflow-x: auto;
         justify-content: flex-start;
-        border-radius: 12px;
-        bottom: 0.6rem;
       }
     }
   </style>
@@ -933,6 +1058,11 @@
     <div class="stage-layer is-projects" data-stage="projects"></div>
     <div class="stage-layer is-rem" data-stage="rem"></div>
     <div class="stage-layer is-dawn" data-stage="dawn"></div>
+  </div>
+
+  <!-- 背景构块场（静态还原，零复杂动画，对齐 Constructs.astro 真实几何） -->
+  <div class="fld-bg" id="fld-bg" data-layer="below" data-style="live" aria-hidden="true">
+    <div class="fld-field" id="fld-field"></div>
   </div>
 
   <div class="seam-wrap" aria-hidden="true">
@@ -1194,18 +1324,31 @@
     </div>
   </footer>
 
-  <!-- ═════════ 调色控制台 ═════════ -->
+  <!-- ═════════ 调色与构块控制台 ═════════ -->
   <div class="palette-dock" id="dock">
-    <button class="dock-mode-btn active" id="btn-mineral" onclick="setPalette('mineral')">2B 矿物青瓷 (色相分流 · 推荐)</button>
-    <button class="dock-mode-btn" id="btn-depth" onclick="setPalette('depth')">2A 沉降铅灰 (加大阶差)</button>
-    <button class="dock-mode-btn" id="btn-contrast" onclick="setPalette('contrast')">2C 砂岩白垩 (冷暖对冲)</button>
-    <button class="dock-mode-btn" id="btn-original" onclick="setPalette('original')">原版黑底</button>
+    <div class="dock-group">
+      <span class="dock-label">底色:</span>
+      <button class="dock-mode-btn active" id="btn-mineral" onclick="setPalette('mineral')">2B 矿物青瓷 (推荐)</button>
+      <button class="dock-mode-btn" id="btn-depth" onclick="setPalette('depth')">2A 沉降铅灰</button>
+      <button class="dock-mode-btn" id="btn-contrast" onclick="setPalette('contrast')">2C 砂岩白垩</button>
+      <button class="dock-mode-btn" id="btn-original" onclick="setPalette('original')">原版黑底</button>
+    </div>
     <div class="dock-sep"></div>
-    <button class="dock-nav-btn" onclick="scrollToId('ns-hero')">Hero</button>
-    <button class="dock-nav-btn" onclick="scrollToId('ns-essays')">随笔</button>
-    <button class="dock-nav-btn" onclick="scrollToId('ns-projects')">项目</button>
-    <button class="dock-nav-btn" onclick="scrollToId('ns-rem')">试验场</button>
-    <button class="dock-nav-btn" onclick="scrollToId('ns-dawn')">关于</button>
+    <div class="dock-group">
+      <span class="dock-label">方块:</span>
+      <button class="dock-block-btn active" id="btn-block-live" onclick="setBlockStyle('live')">现行暖褐 (当前线上)</button>
+      <button class="dock-block-btn" id="btn-block-white" onclick="setBlockStyle('white')">磨砂白印 (推荐)</button>
+      <button class="dock-block-btn" id="btn-block-ink" onclick="setBlockStyle('ink')">冷墨淡影</button>
+      <button class="dock-block-btn" id="btn-block-off" onclick="setBlockStyle('off')">关闭方块</button>
+    </div>
+    <div class="dock-sep"></div>
+    <div class="dock-group">
+      <button class="dock-nav-btn" onclick="scrollToId('ns-hero')">Hero</button>
+      <button class="dock-nav-btn" onclick="scrollToId('ns-essays')">随笔</button>
+      <button class="dock-nav-btn" onclick="scrollToId('ns-projects')">项目</button>
+      <button class="dock-nav-btn" onclick="scrollToId('ns-rem')">试验场</button>
+      <button class="dock-nav-btn" onclick="scrollToId('ns-dawn')">关于</button>
+    </div>
     <div class="dock-sep"></div>
     <div class="dock-indicator" id="stage-indicator">
       <span class="dock-indicator-swatch" id="cur-swatch" style="background: #f0f3f6;"></span>
@@ -1265,6 +1408,7 @@
 
     let currentPalette = 'mineral';
     let currentStage = 'hero';
+    let currentBlockStyle = 'live';
 
     function setPalette(name) {
       currentPalette = name;
@@ -1275,6 +1419,18 @@
       });
       updateIndicator();
     }
+    window.setPalette = setPalette;
+
+    function setBlockStyle(style) {
+      currentBlockStyle = style;
+      const fld = document.getElementById('fld-bg');
+      if (fld) fld.dataset.style = style;
+      ['live', 'white', 'ink', 'off'].forEach((s) => {
+        const btn = document.getElementById(`btn-block-${s}`);
+        if (btn) btn.classList.toggle('active', s === style);
+      });
+    }
+    window.setBlockStyle = setBlockStyle;
 
     function setActiveStage(name) {
       if (name === currentStage) return;
@@ -1321,8 +1477,270 @@
       if (el) el.scrollIntoView({ behavior: 'smooth' });
     }
 
+    /* ═══════════════════════════════════════════════════════════════════
+       CONSTRUCTS FIELD · 构块场（静态还原，零复杂动画，对齐 Constructs.astro 真实几何）
+       ═══════════════════════════════════════════════════════════════════ */
+    function initConstructs() {
+      const fldField = document.getElementById('fld-field');
+      if (!fldField) return;
+
+      const SEED = 20260925;
+      let S = SEED;
+      const rnd = () => ((S = (Math.imul(S, 1664525) + 1013904223) >>> 0) / 4294967296);
+
+      const COS = 0.9702957, SIN = 0.2419219; // 14°
+      const PERIOD = 2400;
+      const DX = Math.round(PERIOD * COS); // 2329
+      const DY = Math.round(PERIOD * SIN); // 581
+
+      const BANDS = [
+        { n: 6, span: [225, 280], o: 0.66, gap: 4, gapU: 300 },
+        { n: 6, span: [250, 320], o: 0.84, gap: 6, gapU: 330 },
+        { n: 6, span: [295, 380], o: 1.0,  gap: 8, gapU: 360 },
+      ];
+
+      const UMAX = 830, VMAX = 760, UEDGE = 1180;
+      const idx = (i, j) => i + ',' + j;
+      const NB = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+      const has = (cs, i, j) => cs.some((c) => c[0] === i && c[1] === j);
+
+      function nbCount(c, cs) {
+        let n = 0;
+        for (const [di, dj] of NB) if (has(cs, c[0] + di, c[1] + dj)) n++;
+        return n;
+      }
+
+      function connected(cs) {
+        if (!cs.length) return false;
+        const seen = new Set([idx(cs[0][0], cs[0][1])]);
+        const q = [cs[0]];
+        while (q.length) {
+          const [i, j] = q.pop();
+          for (const [di, dj] of NB) {
+            const k = idx(i + di, j + dj);
+            if (seen.has(k) || !has(cs, i + di, j + dj)) continue;
+            seen.add(k);
+            q.push([i + di, j + dj]);
+          }
+        }
+        return seen.size === cs.length;
+      }
+
+      const SHAPES = [
+        { w: 2, h: 2, n: 4 }, { w: 3, h: 2, n: 4 }, { w: 3, h: 2, n: 5 },
+        { w: 2, h: 3, n: 4 }, { w: 2, h: 3, n: 5 }, { w: 3, h: 3, n: 5 },
+        { w: 3, h: 3, n: 6 }, { w: 3, h: 3, n: 7 },
+      ];
+
+      function mkShape(spec) {
+        const { w, h, n } = spec;
+        let out = [];
+        for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) out.push([i, j]);
+        const corner = new Set([idx(0, 0), idx(w - 1, 0), idx(0, h - 1), idx(w - 1, h - 1)]);
+        let guard = 0;
+        while (out.length > n && guard++ < 60) {
+          const cs = out.filter((c) => corner.has(idx(c[0], c[1])));
+          const es = out.filter((c) => (c[0] === 0 || c[1] === 0 || c[0] === w - 1 || c[1] === h - 1) && !corner.has(idx(c[0], c[1])));
+          const pool = cs.length && (rnd() < 0.6 || !es.length) ? cs : es.length ? es : out;
+          const pick = pool[Math.floor(rnd() * pool.length)];
+          const rest = out.filter((c) => c !== pick);
+          if (connected(rest) && rest.every((c) => nbCount(c, rest) >= 1)) out = rest;
+        }
+        const mi = Math.min(...out.map((c) => c[0])), mj = Math.min(...out.map((c) => c[1]));
+        return out.map((c) => [c[0] - mi, c[1] - mj]);
+      }
+
+      function uRange(rs) {
+        let lo = 1e9, hi = -1e9;
+        for (const r of rs) {
+          const ps = [[r.x, r.y], [r.x + r.w, r.y], [r.x, r.y + r.h], [r.x + r.w, r.y + r.h]];
+          for (const p of ps) {
+            const uu = p[0] * COS + p[1] * SIN;
+            if (uu < lo) lo = uu;
+            if (uu > hi) hi = uu;
+          }
+        }
+        return { lo, hi };
+      }
+
+      function bbox(rs) {
+        let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+        for (const r of rs) {
+          x0 = Math.min(x0, r.x); y0 = Math.min(y0, r.y);
+          x1 = Math.max(x1, r.x + r.w); y1 = Math.max(y1, r.y + r.h);
+        }
+        return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+      }
+
+      function pairOverlaps(rs) {
+        const res = [];
+        for (let i = 0; i < rs.length; i++) {
+          for (let j = i + 1; j < rs.length; j++) {
+            const a = rs[i], b = rs[j];
+            const x1 = Math.max(a.x, b.x), x2 = Math.min(a.x + a.w, b.x + b.w);
+            const y1 = Math.max(a.y, b.y), y2 = Math.min(a.y + a.h, b.y + b.h);
+            if (x2 > x1 && y2 > y1) res.push({ x: x1, y: y1, w: x2 - x1, h: y2 - y1 });
+          }
+        }
+        return res;
+      }
+      function maxDepth(rs) {
+        let mx = 1;
+        for (const o of pairOverlaps(rs)) {
+          for (let y = o.y + 0.5; y < o.y + o.h; y += 3) {
+            for (let x = o.x + 0.5; x < o.x + o.w; x += 3) {
+              let d = 0;
+              for (const r of rs) if (x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) d++;
+              if (d > mx) mx = d;
+            }
+          }
+        }
+        return mx;
+      }
+      function depthWith(nr, others) {
+        let mx = 1;
+        for (const a of nr) {
+          for (const b of others) {
+            const x1 = Math.max(a.x, b.x), x2 = Math.min(a.x + a.w, b.x + b.w);
+            const y1 = Math.max(a.y, b.y), y2 = Math.min(a.y + a.h, b.y + b.h);
+            if (x2 <= x1 || y2 <= y1) continue;
+            for (let y = y1 + 0.5; y < y2; y += 3) {
+              for (let x = x1 + 0.5; x < x2; x += 3) {
+                let d = 0;
+                for (const r of nr) if (x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) d++;
+                for (const r of others) if (x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) d++;
+                if (d > mx) mx = d;
+              }
+            }
+          }
+        }
+        return mx;
+      }
+
+      function mkCluster(band) {
+        const g = band.gap;
+        let best = null;
+        for (let k = 0; k < 40; k++) {
+          const spec = SHAPES[Math.floor(rnd() * SHAPES.length)];
+          const cells = mkShape(spec);
+          const ext = Math.max(spec.w, spec.h);
+          const m = Math.min(146, Math.max(44, Math.round((band.span[0] + rnd() * (band.span[1] - band.span[0])) / ext)));
+          const s = m - g;
+          const tiled = cells.map(([i, j]) => ({ x: i * m + g, y: j * m + g, w: s, h: s }));
+          const loose = tiled.map((t, n) => {
+            const c = cells[n];
+            const nbs = NB.filter(([di, dj]) => has(cells, c[0] + di, c[1] + dj));
+            const nb = nbs[Math.floor(rnd() * nbs.length)];
+            const away = rnd() < 0.68 ? 1 : -1;
+            const mag = m * (0.3 + rnd() * 0.22);
+            const tan = Math.round((rnd() - 0.5) * 0.24 * m);
+            const ox = nb[0] !== 0 ? -nb[0] * away * mag : tan;
+            const oy = nb[1] !== 0 ? -nb[1] * away * mag : tan;
+            return { x: Math.round(t.x + ox), y: Math.round(t.y + oy), w: s, h: s };
+          });
+          const depth = maxDepth(loose);
+          const bbT = bbox(tiled), bbL = bbox(loose);
+          const x0 = Math.min(bbT.x, bbL.x), y0 = Math.min(bbT.y, bbL.y);
+          const x1 = Math.max(bbT.x + bbT.w, bbL.x + bbL.w), y1 = Math.max(bbT.y + bbT.h, bbL.y + bbL.h);
+          const bb = { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+          const span = Math.max(bbL.w, bbL.h);
+          const bad = (depth > 3 ? 1 : 0) + (span > 420 ? 1 : 0) + (span < 160 ? 1 : 0);
+          if (!best || bad < best.bad) best = { m, sz: s, gap: g, tiled, loose, bb, span, depth, bad };
+          if (!bad) break;
+        }
+        return best;
+      }
+
+      const placed = [];
+      const tiledAll = [];
+      const looseAll = [];
+
+      function tryPlace(band) {
+        for (let a = 0; a < 260; a++) {
+          const g = mkCluster(band);
+          const ut = uRange(g.tiled), ul = uRange(g.loose);
+          const ext = Math.max(Math.abs(ut.lo), Math.abs(ut.hi), Math.abs(ul.lo), Math.abs(ul.hi));
+          const u = Math.round((rnd() * 2 - 1) * UMAX);
+          const v = Math.round((rnd() * 2 - 1) * VMAX);
+          if (Math.abs(u) + ext > UEDGE) continue;
+          let ok = true;
+          for (const it of placed) {
+            if (it.band === band && Math.hypot(it.u - u, it.v - v) < band.gapU) {
+              ok = false;
+              break;
+            }
+          }
+          if (!ok) continue;
+          const X = Math.round(u * COS - v * SIN);
+          const Y = Math.round(u * SIN + v * COS);
+          const box = { x: X + g.bb.x, y: Y + g.bb.y, w: g.bb.w, h: g.bb.h };
+          ok = true;
+          for (const p of placed) {
+            if (
+              box.x < p.box.x + p.box.w + 26 &&
+              box.x + box.w + 26 > p.box.x &&
+              box.y < p.box.y + p.box.h + 26 &&
+              box.y + box.h + 26 > p.box.y
+            ) {
+              ok = false;
+              break;
+            }
+          }
+          if (!ok) continue;
+          const nr = g.loose.map((r) => ({ x: X + r.x, y: Y + r.y, w: r.w, h: r.h }));
+          if (depthWith(nr, looseAll) > 3) continue;
+          return { band, u, v, X, Y, m: g.m, sz: g.sz, tiled: g.tiled, loose: g.loose, bb: g.bb, span: g.span, box, nr };
+        }
+        return null;
+      }
+
+      const frag = document.createDocumentFragment();
+      for (const band of BANDS) {
+        const items = [];
+        let guard = 0;
+        while (items.length < band.n && guard++ < 60) {
+          const g = tryPlace(band);
+          if (!g) break;
+          for (const r of g.tiled) tiledAll.push({ x: g.X + r.x, y: g.Y + r.y, w: r.w, h: r.h });
+          for (const r of g.nr) looseAll.push(r);
+          placed.push(g);
+          items.push(g);
+        }
+        const bandDiv = document.createElement('div');
+        bandDiv.className = 'fld-pan';
+        bandDiv.style.opacity = String(band.o);
+
+        for (let c = 0; c < 2; c++) {
+          const cell = document.createElement('div');
+          cell.className = 'fld-cell';
+          if (c) cell.style.transform = `translate3d(${-DX}px, ${-DY}px, 0)`;
+
+          for (const g of items) {
+            const cl = document.createElement('div');
+            cl.className = 'fld-cl';
+            cl.style.left = `calc(50% + ${g.X}px)`;
+            cl.style.top = `calc(50% + ${g.Y}px)`;
+            for (const ti of g.tiled) {
+              const d = document.createElement('div');
+              d.className = 'fld-sq';
+              d.style.left = ti.x + 'px';
+              d.style.top = ti.y + 'px';
+              d.style.width = g.sz + 'px';
+              d.style.height = g.sz + 'px';
+              cl.appendChild(d);
+            }
+            cell.appendChild(cl);
+          }
+          bandDiv.appendChild(cell);
+        }
+        frag.appendChild(bandDiv);
+      }
+      fldField.appendChild(frag);
+    }
+
     measure();
     updateScroll();
+    initConstructs();
 
     window.addEventListener('scroll', () => requestAnimationFrame(updateScroll), { passive: true });
     window.addEventListener('resize', () => { measure(); updateScroll(); });

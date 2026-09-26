@@ -61,11 +61,12 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const page = await browser.newPage();
   await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 1 });
 
-  async function snap(name, targetSel, palette = 'mineral') {
+  async function snap(name, targetSel, palette = 'mineral', blockStyle = 'live') {
     await page.goto(`${base}`, { waitUntil: 'networkidle2' });
-    await page.evaluate((pal) => {
-      window.setPalette(pal);
-    }, palette);
+    await page.evaluate((pal, bStyle) => {
+      if (window.setPalette) window.setPalette(pal);
+      if (window.setBlockStyle) window.setBlockStyle(bStyle);
+    }, palette, blockStyle);
     await wait(200);
 
     if (targetSel) {
@@ -81,17 +82,17 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
     console.log(`Captured: ${name}.png`);
   }
 
-  // 1. Option 2B (Mineral Celadon: 随笔薄雾天青 vs 项目矿物青瓷)
-  await snap('2b-essays-mineral', '#ns-essays', 'mineral');
-  await snap('2b-projects-mineral', '#ns-projects', 'mineral');
+  // 1. Current Live block style on 2B (Brown --ghost-ink) - The issue user noticed
+  await snap('2b-essays-live', '#ns-essays', 'mineral', 'live');
+  await snap('2b-projects-live', '#ns-projects', 'mineral', 'live');
 
-  // 2. Option 2A (Depth: 随笔浅水蓝 vs 项目沉降铅石灰)
-  await snap('2a-essays-depth', '#ns-essays', 'depth');
-  await snap('2a-projects-depth', '#ns-projects', 'depth');
+  // 2. Recommended Frosted White block style on 2B (Pure frosted watermark)
+  await snap('2b-essays-white', '#ns-essays', 'mineral', 'white');
+  await snap('2b-projects-white', '#ns-projects', 'mineral', 'white');
 
-  // 3. Option 2C (Contrast: 随笔冷天青 vs 项目砂岩暖灰)
-  await snap('2c-essays-contrast', '#ns-essays', 'contrast');
-  await snap('2c-projects-contrast', '#ns-projects', 'contrast');
+  // 3. Cold Ink Whisper block style on 2B (Faint mineral ink)
+  await snap('2b-essays-ink', '#ns-essays', 'mineral', 'ink');
+  await snap('2b-projects-ink', '#ns-projects', 'mineral', 'ink');
 
   await browser.close();
   server.close();

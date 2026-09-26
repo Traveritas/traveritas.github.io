@@ -94,7 +94,7 @@ export const ZONES: Zone[] = [
   },
   {
     name: 'deep',
-    bg: '#cfdbd5',
+    bg: '#c4ceda',
     ink: '#232830',
     soft: '#56606d',
     line: 'rgba(35, 40, 48, 0.12)',
