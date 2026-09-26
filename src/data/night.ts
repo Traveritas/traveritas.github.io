@@ -86,32 +86,27 @@ export interface Zone {
 export const ZONES: Zone[] = [
   {
     name: 'light',
-    bg: '#e9ecef',
-    ink: '#262c33',
-    soft: '#59626c',
-    line: 'rgba(38, 44, 51, 0.16)',
+    bg: '#f0f3f6',
+    ink: '#232830',
+    soft: '#56606d',
+    line: 'rgba(35, 40, 48, 0.12)',
     enter: null,
   },
   {
     name: 'deep',
-    bg: '#171b24',
-    ink: '#e5e0d2',
-    soft: '#b9b3a4',
-    line: 'rgba(229, 224, 210, 0.16)',
-    // 熄灯在「随笔段顶走到视口 38%」处（比首屏完全离场早约半屏）：
-    // 此时 hero 的千层纸仍有大半在屏，纸面（color-mix(--bg …) 派生）与
-    // 纸上文字会一起翻到夜面——首屏因此也有一套「夜面版」需要可读
-    // （普查槽位「首屏腰·暗面」就是守它的）。
+    bg: '#cfdbd5',
+    ink: '#232830',
+    soft: '#56606d',
+    line: 'rgba(35, 40, 48, 0.12)',
+    // 换面在「随笔段顶走到视口 38%」处
     enter: { section: 'ns-essays', vh: 0.38 },
   },
   {
     name: 'paper',
-    bg: '#efe9dd',
-    ink: '#55503f',
-    soft: '#665f50',
-    line: 'rgba(85, 80, 63, 0.16)',
-    // 见晨在「关于段顶走到视口中央」——正是 SECTIONS 的段锚点、
-    // StitchHeader 所在，比原先的 85% 滞后约 1/3 屏
+    bg: '#f5f2eb',
+    ink: '#232830',
+    soft: '#56606d',
+    line: 'rgba(35, 40, 48, 0.12)',
     enter: { section: 'ns-dawn', vh: 0.5 },
   },
 ];

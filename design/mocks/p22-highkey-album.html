@@ -1,0 +1,1332 @@
+<!doctype html>
+<html lang="zh-CN" data-palette="mineral">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>醒梦 · Phase 22 原型：全浅色画册（多调色谱微调）</title>
+  <link rel="stylesheet" href="../../node_modules/@fontsource/noto-serif-sc/300.css" />
+  <link rel="stylesheet" href="../../node_modules/@fontsource/noto-serif-sc/500.css" />
+  <link rel="stylesheet" href="../../node_modules/@fontsource/noto-serif-sc/600.css" />
+  <link rel="stylesheet" href="../../node_modules/@fontsource/ibm-plex-mono/400.css" />
+  <link rel="stylesheet" href="../../node_modules/@fontsource/ibm-plex-mono/500.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Serif+SC:wght@300;500;600&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f0f3f6;
+      --bg-sunken: #e5ebf2;
+      --fg: #232830;
+      --fg-soft: #56606d;
+      --fg-faint: #858f9d;
+      --line: rgba(35, 40, 48, 0.12);
+
+      --wake: #8a96a3;
+      --dream: #b89774;
+      --umber: #72523b;
+      --amber: #d9a05b;
+      --seam-angle: 14deg;
+
+      --font-display: 'Noto Serif SC', 'Songti SC', SimSun, serif;
+      --font-body: system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei UI', sans-serif;
+      --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      -webkit-text-size-adjust: 100%;
+      scroll-behavior: smooth;
+      overflow-x: clip;
+      scrollbar-width: none;
+    }
+    ::-webkit-scrollbar { width: 0; height: 0; }
+
+    body {
+      font-family: var(--font-body);
+      font-size: 1.0625rem;
+      line-height: 1.9;
+      color: var(--fg);
+      background: var(--bg);
+      text-rendering: optimizeLegibility;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: clip;
+      transition: color 0.5s ease;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       STAGE BACKDROP · 背景画布与色谱方案配置
+       ═══════════════════════════════════════════════════════════════════ */
+    .stage-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: -4;
+      pointer-events: none;
+      overflow: hidden;
+      background-color: #f0f3f6;
+      transition: background-color 0.85s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .stage-layer {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      transition: opacity 0.85s cubic-bezier(0.4, 0, 0.2, 1);
+      will-change: opacity;
+    }
+
+    .stage-layer.on {
+      opacity: 1;
+    }
+
+    /* ── 方案 2B（推荐 · 矿物青瓷色相分流）：随笔清冷水蓝 ↔ 项目矿物青灰 ── */
+    html[data-palette="mineral"] .stage-layer.is-hero     { background-color: #f0f3f6; } /* 95% 晨雾银白 */
+    html[data-palette="mineral"] .stage-layer.is-essays   { background-color: #dce6f2; } /* 90% 薄雾冷天青 */
+    html[data-palette="mineral"] .stage-layer.is-projects { background-color: #cfdbd5; } /* 84% 矿物青瓷灰（明显区别于蓝） */
+    html[data-palette="mineral"] .stage-layer.is-rem      { background-color: #e6dfea; } /* 90% 幽微薄暮淡紫 */
+    html[data-palette="mineral"] .stage-layer.is-dawn     { background-color: #f5f2eb; } /* 95% 破晓暖白素宣 */
+
+    /* ── 方案 2A（阶差沉降）：随笔水蓝 ↔ 项目沉稳深铅石灰（大幅拉开明度差） ── */
+    html[data-palette="depth"] .stage-layer.is-hero     { background-color: #f0f3f6; }
+    html[data-palette="depth"] .stage-layer.is-essays   { background-color: #e0e8f2; } /* 91% 浅水蓝 */
+    html[data-palette="depth"] .stage-layer.is-projects { background-color: #c4ceda; } /* 79% 沉深铅石（深 12%） */
+    html[data-palette="depth"] .stage-layer.is-rem      { background-color: #e5dfea; }
+    html[data-palette="depth"] .stage-layer.is-dawn     { background-color: #f5f2eb; }
+
+    /* ── 方案 2C（冷暖对冲）：随笔冷雾天青 ↔ 项目砂岩白垩暖灰 ── */
+    html[data-palette="contrast"] .stage-layer.is-hero     { background-color: #f0f3f6; }
+    html[data-palette="contrast"] .stage-layer.is-essays   { background-color: #dce6f2; } /* 冷蓝 */
+    html[data-palette="contrast"] .stage-layer.is-projects { background-color: #e4ded4; } /* 暖沙白垩 */
+    html[data-palette="contrast"] .stage-layer.is-rem      { background-color: #e6dfea; }
+    html[data-palette="contrast"] .stage-layer.is-dawn     { background-color: #f6f3eb; }
+
+    /* ── 模式：原版死黑对比 ── */
+    html[data-palette="original"] .stage-backdrop { background-color: #e9ecef; }
+    html[data-palette="original"] .stage-layer.is-hero     { background-color: #e9ecef; }
+    html[data-palette="original"] .stage-layer.is-essays   { background-color: #171b24; }
+    html[data-palette="original"] .stage-layer.is-projects { background-color: #131824; }
+    html[data-palette="original"] .stage-layer.is-rem      { background-color: #191522; }
+    html[data-palette="original"] .stage-layer.is-dawn     { background-color: #efe9dd; }
+
+    html[data-palette="original"] .band-essays,
+    html[data-palette="original"] .band-projects,
+    html[data-palette="original"] .band-rem {
+      --fg: #dce1e8;
+      --fg-soft: #9aa4b2;
+      --fg-faint: #6f7885;
+      --line: rgba(220, 225, 232, 0.13);
+      color: var(--fg);
+    }
+    html[data-palette="original"] .chip-glass {
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.09) 0%, rgba(255, 255, 255, 0.03) 100%) !important;
+      border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    }
+    html[data-palette="original"] .pill-skin {
+      background: color-mix(in srgb, var(--fg) 3%, transparent) !important;
+      border: 1px solid color-mix(in srgb, var(--dream) 42%, transparent) !important;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       全站 CHROME · 14° 发丝线 / 脑电 / 呼吸锚点
+       ═══════════════════════════════════════════════════════════════════ */
+    .seam-wrap {
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      pointer-events: none;
+      overflow: hidden;
+    }
+    .seam {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 170vmax;
+      height: 1px;
+      background: linear-gradient(90deg, var(--wake), var(--dream));
+      transform: translate(-50%, -50%) rotate(var(--seam-angle));
+      opacity: 0.62;
+    }
+    .seam-anchor {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 8px;
+      height: 8px;
+      margin: -4px 0 0 -4px;
+      border-radius: 50%;
+      background: var(--amber);
+      box-shadow:
+        0 0 10px 2px color-mix(in srgb, var(--amber) 55%, transparent),
+        0 0 26px 6px color-mix(in srgb, var(--amber) 20%, transparent);
+      animation: anchor-breathe 5.5s ease-in-out infinite;
+    }
+    @keyframes anchor-breathe {
+      0%, 100% { transform: scale(1); opacity: 0.8; }
+      50% { transform: scale(1.25); opacity: 1; }
+    }
+
+    .eeg-bg {
+      position: fixed;
+      inset: 0;
+      z-index: -2;
+      pointer-events: none;
+      width: 100vw;
+      height: 100vh;
+      opacity: 0.42;
+    }
+
+    .site-header {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 40;
+      padding: 1.8rem clamp(1.5rem, 5vw, 4rem);
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+    }
+    .brand {
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 1.15rem;
+      letter-spacing: 0.08em;
+      color: var(--fg);
+      text-decoration: none;
+    }
+    .nav {
+      display: flex;
+      gap: 1.8rem;
+    }
+    .nav a {
+      font-size: 0.88rem;
+      letter-spacing: 0.12em;
+      color: var(--fg-soft);
+      text-decoration: none;
+      transition: color 0.2s ease;
+    }
+    .nav a:hover {
+      color: var(--fg);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       SECTION 1: HERO · 千层纸
+       ═══════════════════════════════════════════════════════════════════ */
+    .hero {
+      --gfs: clamp(130px, 16vw, 210px);
+      --wakeTop: calc(50svh - var(--gfs) - 60px);
+      --noteTop: calc(50svh + 60px);
+      position: relative;
+      height: 100svh;
+      overflow: hidden;
+    }
+    .ps-plane {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .ps-sheet-base { z-index: -3; }
+    .p-base {
+      position: absolute;
+      left: -2%;
+      top: -2%;
+      width: 104%;
+      height: 104%;
+      background: color-mix(in srgb, var(--bg) 90%, #d8e2eb);
+      box-shadow:
+        0 30px 70px -34px rgba(35, 40, 48, 0.12),
+        inset 0 -8px 10px -8px rgba(35, 40, 48, 0.08);
+    }
+    .amber-bloom {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: clamp(240px, 30vw, 420px);
+      aspect-ratio: 1 / 1;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      background: radial-gradient(
+        circle,
+        color-mix(in srgb, var(--amber) 22%, transparent) 0%,
+        color-mix(in srgb, var(--amber) 8%, transparent) 45%,
+        transparent 72%
+      );
+      filter: blur(16px);
+      animation: amber-bloom-breathe 8s ease-in-out infinite;
+    }
+    @keyframes amber-bloom-breathe {
+      0%, 100% { opacity: 0.5; transform: translate(-50%, -50%) scale(0.95); }
+      50% { opacity: 0.85; transform: translate(-50%, -50%) scale(1.08); }
+    }
+
+    .ps-sheet-wake { z-index: -3; }
+    .p-wake {
+      position: absolute;
+      left: -1%;
+      top: -2%;
+      width: 103%;
+      height: 104%;
+      background: #ffffff;
+      box-shadow:
+        0 24px 60px -28px rgba(35, 40, 48, 0.1),
+        inset 0 6px 8px -6px rgba(35, 40, 48, 0.06);
+    }
+
+    .wake-leaf-paper {
+      position: absolute;
+      left: 53vw;
+      top: calc(var(--wakeTop) - 20px);
+      width: clamp(260px, 26vw, 360px);
+      aspect-ratio: 1 / 1;
+      background: linear-gradient(
+        135deg,
+        rgba(255, 255, 255, 0.72) 0%,
+        rgba(230, 238, 246, 0.52) 50%,
+        rgba(215, 228, 240, 0.35) 100%
+      );
+      -webkit-backdrop-filter: blur(18px) saturate(120%);
+      backdrop-filter: blur(18px) saturate(120%);
+      border: 1px solid rgba(255, 255, 255, 0.85);
+      clip-path: polygon(0 0, 94% 0, 100% 6%, 100% 100%, 6% 100%, 0 94%);
+      box-shadow:
+        inset 0 1.5px 2px rgba(255, 255, 255, 0.9),
+        0 18px 40px -10px rgba(35, 40, 48, 0.08);
+    }
+
+    .ch-wake {
+      position: absolute;
+      left: 56vw;
+      top: var(--wakeTop);
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: var(--gfs);
+      line-height: 1;
+      color: var(--fg);
+      letter-spacing: -0.02em;
+      z-index: 2;
+    }
+    .vsub {
+      position: absolute;
+      left: calc(56vw + var(--gfs) + 20px);
+      top: calc(var(--wakeTop) + 6px);
+      writing-mode: vertical-rl;
+      font-family: var(--font-display);
+      font-size: 13px;
+      font-weight: 300;
+      letter-spacing: 0.5em;
+      color: var(--fg-soft);
+      z-index: 2;
+    }
+
+    .leaf-paper {
+      position: absolute;
+      left: 10vw;
+      top: 45svh;
+      width: clamp(260px, 26vw, 360px);
+      aspect-ratio: 1 / 1;
+      background: linear-gradient(
+        135deg,
+        rgba(255, 255, 255, 0.65) 0%,
+        rgba(240, 232, 222, 0.48) 50%,
+        rgba(228, 218, 204, 0.3) 100%
+      );
+      -webkit-backdrop-filter: blur(18px) saturate(120%);
+      backdrop-filter: blur(18px) saturate(120%);
+      border: 1px solid rgba(255, 255, 255, 0.75);
+      clip-path: polygon(0 5.5%, 5% 0, 100% 0, 100% 87%, 94% 100%, 61% 98.6%, 0 100%);
+      box-shadow:
+        inset 0 1.5px 2px rgba(255, 255, 255, 0.8),
+        0 20px 44px -10px rgba(35, 40, 48, 0.09);
+      z-index: -3;
+    }
+    .ch-dream {
+      position: absolute;
+      left: 13vw;
+      top: 45svh;
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: var(--gfs);
+      line-height: 1;
+      color: color-mix(in srgb, var(--fg) 78%, var(--dream));
+      z-index: 2;
+      animation: dream-drift 9s ease-in-out infinite;
+    }
+    @keyframes dream-drift {
+      0%, 100% { transform: translate3d(-3px, -5px, 0); }
+      50% { transform: translate3d(3px, 6px, 0); }
+    }
+
+    .ps-note {
+      position: absolute;
+      left: 48vw;
+      top: var(--noteTop);
+      width: min(48vw, 660px);
+      z-index: 2;
+    }
+    .note-paper {
+      position: absolute;
+      inset: 0;
+      background: #ffffff;
+      clip-path: polygon(0 0, 100% 1.6%, 98.7% 17%, 100% 33%, 98.9% 51%, 100% 70%, 98.8% 85%, 100% 100%, 0 100%);
+      box-shadow: 0 18px 40px -10px rgba(35, 40, 48, 0.12), 0 2px 6px rgba(35, 40, 48, 0.04);
+    }
+    .note-ink {
+      position: relative;
+      padding: 1.6rem 2.2rem 1.4rem 1.8rem;
+    }
+    .note-stamp {
+      position: absolute;
+      top: 0.6rem;
+      right: 1.2rem;
+      font-family: var(--font-mono);
+      font-size: 0.58rem;
+      letter-spacing: 0.2em;
+      color: var(--fg-soft);
+    }
+    .note-ink .frag {
+      margin: 0 0 0.85rem;
+      font-family: var(--font-display);
+      font-weight: 500;
+      color: var(--fg);
+    }
+    .note-ink .f1 { font-size: clamp(1.3rem, 2vw, 1.65rem); }
+    .note-ink .f2 { margin-left: 8%; font-size: 0.95rem; color: var(--fg-soft); letter-spacing: 0.28em; }
+    .note-ink .f3 { margin-left: 4%; font-size: 0.95rem; color: var(--fg-soft); }
+    .note-ink .f4 { margin-left: 6%; font-size: 1.15rem; }
+
+    .hero-scroll {
+      position: absolute;
+      right: 6vw;
+      top: 92svh;
+      margin: 0;
+      font-size: 13px;
+      font-weight: 300;
+      letter-spacing: 0.25em;
+      color: var(--fg-soft);
+      z-index: 10;
+    }
+    .hero-scroll i {
+      display: inline-block;
+      width: 22px;
+      height: 2px;
+      background: var(--amber);
+      margin-right: 10px;
+      vertical-align: middle;
+      transform: rotate(-14deg);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       各段通用样式 BAND
+       ═══════════════════════════════════════════════════════════════════ */
+    .band {
+      position: relative;
+      padding-block: clamp(6rem, 14vh, 10rem);
+    }
+    .container {
+      width: min(100% - 3.5rem, 42rem);
+      margin-inline: auto;
+    }
+    .container-wide {
+      width: min(100% - 3.5rem, 58rem);
+      margin-inline: auto;
+    }
+
+    .stitch-head {
+      margin-bottom: 2.2rem;
+    }
+    .stitch-title-row {
+      display: flex;
+      align-items: baseline;
+      gap: 1.2rem;
+    }
+    .stitch-title {
+      font-family: var(--font-display);
+      font-size: 2.2rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      color: var(--fg);
+    }
+    .stitch-stage {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      letter-spacing: 0.16em;
+      color: var(--fg-soft);
+    }
+    .stitch-time {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      letter-spacing: 0.12em;
+      color: var(--fg-faint);
+      margin-top: 0.25rem;
+    }
+
+    .verdict {
+      display: flex;
+      align-items: baseline;
+      margin: -1.2rem 0 3.2rem;
+    }
+    .vtag {
+      font-family: var(--font-mono);
+      font-size: 0.58rem;
+      letter-spacing: 0.2em;
+      padding: 0.28rem 0.65rem;
+      border: 1px solid color-mix(in srgb, var(--fg) 30%, transparent);
+      color: var(--fg-soft);
+      background: rgba(255, 255, 255, 0.4);
+    }
+
+    .band-more {
+      margin-top: 2.8rem;
+      font-size: 0.9rem;
+      letter-spacing: 0.1em;
+    }
+    .band-more a {
+      color: var(--fg);
+      text-decoration: none;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 3px;
+      transition: border-color 0.2s ease, color 0.2s ease;
+    }
+    .band-more a:hover {
+      color: var(--amber);
+      border-color: var(--amber);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       SECTION 2: 随笔 (浅梦 · N1/N2)
+       ═══════════════════════════════════════════════════════════════════ */
+    .ladder {
+      display: flex;
+      flex-direction: column;
+      gap: 3.2rem;
+    }
+    .rung {
+      margin-left: calc(var(--step, 0) * 1%);
+      padding-left: 1.4rem;
+      border-left: 1px solid var(--line);
+    }
+
+    .chip {
+      display: block;
+      text-decoration: none;
+      color: inherit;
+    }
+    .chip-glass {
+      position: relative;
+      padding: 1.8rem 2.2rem 1.6rem;
+      border-radius: 4px;
+      background: linear-gradient(
+        135deg,
+        rgba(255, 255, 255, 0.72) 0%,
+        rgba(255, 255, 255, 0.42) 100%
+      );
+      -webkit-backdrop-filter: blur(14px) saturate(130%);
+      backdrop-filter: blur(14px) saturate(130%);
+      border: 1px solid rgba(255, 255, 255, 0.85);
+      box-shadow:
+        0 14px 34px -10px rgba(35, 40, 48, 0.07),
+        inset 0 1px 2px rgba(255, 255, 255, 0.95),
+        inset 0 -1px 2px rgba(35, 40, 48, 0.04);
+      transition: transform 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
+    }
+    .chip:hover .chip-glass {
+      transform: translateY(-3px);
+      background: linear-gradient(
+        135deg,
+        rgba(255, 255, 255, 0.88) 0%,
+        rgba(255, 255, 255, 0.58) 100%
+      );
+      border-color: #ffffff;
+      box-shadow:
+        0 20px 46px -10px rgba(35, 40, 48, 0.12),
+        inset 0 1.5px 2px rgba(255, 255, 255, 1);
+    }
+    .chip-meta {
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      letter-spacing: 0.18em;
+      color: var(--amber);
+      margin-bottom: 0.4rem;
+    }
+    .chip-title {
+      font-family: var(--font-display);
+      font-size: 1.35rem;
+      font-weight: 600;
+      color: var(--fg);
+      margin-bottom: 0.4rem;
+    }
+    .chip-desc {
+      font-size: 0.95rem;
+      line-height: 1.75;
+      color: var(--fg-soft);
+    }
+    .rung-label {
+      margin: 0.8rem 0 0 0.2rem;
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      letter-spacing: 0.08em;
+      color: var(--fg-faint);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       SECTION 3: 项目 (深眠 · N3)
+       ═══════════════════════════════════════════════════════════════════ */
+    .ledger {
+      list-style: none;
+      border-top: 1px solid var(--line);
+    }
+    .ledger li a {
+      display: grid;
+      grid-template-columns: 8.5rem 1fr auto;
+      gap: 1.5rem;
+      padding: 1.35rem 0.8rem;
+      border-bottom: 1px solid var(--line);
+      text-decoration: none;
+      color: inherit;
+      align-items: baseline;
+      transition: background 0.2s ease, padding 0.2s ease;
+      border-radius: 2px;
+    }
+    .ledger li a:hover {
+      background: rgba(255, 255, 255, 0.5);
+      padding-inline: 1.2rem;
+    }
+    .ledger-date {
+      font-family: var(--font-mono);
+      font-size: 0.76rem;
+      letter-spacing: 0.06em;
+      color: var(--fg-soft);
+    }
+    .ledger-title {
+      font-family: var(--font-display);
+      font-size: 1.12rem;
+      font-weight: 600;
+      color: var(--fg);
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+      flex-wrap: wrap;
+    }
+    .ledger-status {
+      font-family: var(--font-mono);
+      font-size: 0.62rem;
+      letter-spacing: 0.1em;
+      color: var(--fg-soft);
+      padding: 0.15rem 0.4rem;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.5);
+    }
+    .stitch-meter {
+      display: inline-flex;
+      gap: 3.5px;
+    }
+    .stitch-meter i {
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: rgba(35, 40, 48, 0.16);
+    }
+    .stitch-meter i.on {
+      background: var(--amber);
+    }
+    .ledger-desc {
+      font-size: 0.88rem;
+      color: var(--fg-soft);
+      margin-top: 0.3rem;
+      display: block;
+    }
+    .tick {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      letter-spacing: 0.1em;
+      white-space: nowrap;
+      color: var(--fg-soft);
+    }
+    .tick.tick-ok {
+      color: #3b5f4c;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       SECTION 4: 试验场 (REM · 异相)
+       ═══════════════════════════════════════════════════════════════════ */
+    .rem-field {
+      display: grid;
+      gap: 3.5rem;
+    }
+    @media (min-width: 900px) {
+      .rem-field {
+        grid-template-columns: minmax(0, 32rem) minmax(16rem, auto);
+        align-items: center;
+        gap: 4.5rem;
+      }
+    }
+    .pill-field {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.1rem;
+    }
+    .pill-skin {
+      display: grid;
+      gap: 0.28rem;
+      padding: 0.85rem 1.4rem 0.75rem;
+      border-radius: 999px;
+      border: 1px solid rgba(138, 110, 150, 0.3);
+      background: rgba(255, 255, 255, 0.55);
+      -webkit-backdrop-filter: blur(10px);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 8px 20px -6px rgba(138, 110, 150, 0.08);
+      transition: all 0.25s ease;
+    }
+    .pill-skin:hover {
+      background: rgba(255, 255, 255, 0.85);
+      border-color: rgba(138, 110, 150, 0.65);
+      transform: translateY(-2px);
+    }
+    .pill-skin b {
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 1rem;
+      color: var(--fg);
+    }
+    .pill-skin small {
+      font-size: 0.72rem;
+      line-height: 1.6;
+      color: var(--fg-soft);
+    }
+    .pill-skin.dead {
+      border-style: dashed;
+      opacity: 0.6;
+    }
+    .pill-skin.dead b {
+      text-decoration: line-through;
+    }
+
+    .slip-fallback {
+      width: min(290px, 75vw);
+      height: 380px;
+      display: grid;
+      place-content: center;
+      justify-items: center;
+      gap: 1.5rem;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.85);
+      background: linear-gradient(
+        135deg,
+        rgba(255, 255, 255, 0.68) 0%,
+        rgba(235, 230, 242, 0.4) 100%
+      );
+      -webkit-backdrop-filter: blur(14px);
+      backdrop-filter: blur(14px);
+      box-shadow: 0 20px 48px -15px rgba(35, 40, 48, 0.12);
+      transform: rotate(-1.5deg);
+    }
+    .slip-fallback .sf-t {
+      font-family: var(--font-display);
+      font-size: 1.5rem;
+      letter-spacing: 0.14em;
+      color: var(--fg);
+      text-align: center;
+      line-height: 1.9;
+    }
+    .slip-fallback .sf-b {
+      font-family: var(--font-mono);
+      font-size: 0.58rem;
+      letter-spacing: 0.28em;
+      color: var(--fg-soft);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       SECTION 5: 关于与出口 (晨醒 · 破晓)
+       ═══════════════════════════════════════════════════════════════════ */
+    .band-dawn {
+      text-align: center;
+    }
+    .band-dawn .stitch-head {
+      text-align: left;
+    }
+    .dawn-time {
+      margin: 0 0 2.8rem;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      letter-spacing: 0.35em;
+      color: var(--fg-soft);
+    }
+    .dawn-card {
+      margin: 0 auto 3.5rem;
+      max-width: 38rem;
+      padding: 2.2rem 2.5rem;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.65);
+      border: 1px solid rgba(255, 255, 255, 0.85);
+      box-shadow: 0 16px 40px -12px rgba(85, 80, 63, 0.08);
+    }
+    .dawn-line {
+      font-family: var(--font-display);
+      font-size: 1.15rem;
+      letter-spacing: 0.12em;
+      color: var(--fg);
+      line-height: 2;
+    }
+    .wake-row {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 1.2rem;
+      margin-bottom: 3.5rem;
+    }
+    .wake-anchor {
+      display: grid;
+      gap: 0.35rem;
+      min-width: 11.5rem;
+      padding: 1.1rem 1.6rem 1rem;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.5);
+      text-decoration: none;
+      transition: all 0.25s ease;
+    }
+    .wake-anchor:hover {
+      background: #ffffff;
+      border-color: var(--amber);
+      transform: translateY(-3px);
+      box-shadow: 0 12px 24px -8px rgba(35, 40, 48, 0.08);
+    }
+    .wa-name {
+      font-family: var(--font-display);
+      font-size: 1rem;
+      color: var(--fg);
+    }
+    .wa-href {
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      letter-spacing: 0.1em;
+      color: var(--fg-soft);
+    }
+    .wa-why {
+      font-size: 0.72rem;
+      color: var(--fg-faint);
+    }
+
+    .site-footer {
+      padding: 4rem 1.5rem 7rem;
+      text-align: center;
+      border-top: 1px solid var(--line);
+    }
+    .site-footer .ft {
+      display: flex;
+      justify-content: space-between;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      letter-spacing: 0.12em;
+      color: var(--fg-soft);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       INTERACTIVE TOOLBAR · 调色谱控制台
+       ═══════════════════════════════════════════════════════════════════ */
+    .palette-dock {
+      position: fixed;
+      bottom: 1.2rem;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 100;
+      background: rgba(255, 255, 255, 0.9);
+      -webkit-backdrop-filter: blur(20px) saturate(140%);
+      backdrop-filter: blur(20px) saturate(140%);
+      border: 1px solid rgba(255, 255, 255, 0.95);
+      box-shadow: 0 16px 40px -10px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.06);
+      border-radius: 999px;
+      padding: 0.45rem 0.65rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .dock-mode-btn {
+      padding: 0.45rem 0.9rem;
+      border-radius: 999px;
+      border: none;
+      font-family: var(--font-body);
+      font-size: 0.8rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+    .dock-mode-btn.active {
+      background: var(--fg);
+      color: #ffffff;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+    .dock-mode-btn:not(.active) {
+      background: transparent;
+      color: var(--fg-soft);
+    }
+    .dock-mode-btn:not(.active):hover {
+      background: rgba(0, 0, 0, 0.05);
+      color: var(--fg);
+    }
+    .dock-sep {
+      width: 1px;
+      height: 18px;
+      background: rgba(0, 0, 0, 0.12);
+      margin-inline: 0.2rem;
+    }
+    .dock-nav-btn {
+      padding: 0.35rem 0.75rem;
+      border-radius: 999px;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      background: rgba(255, 255, 255, 0.6);
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--fg);
+      cursor: pointer;
+      transition: all 0.18s ease;
+      white-space: nowrap;
+    }
+    .dock-nav-btn:hover {
+      background: #ffffff;
+      border-color: var(--amber);
+      color: var(--amber);
+    }
+    .dock-indicator {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      letter-spacing: 0.06em;
+      padding: 0.35rem 0.85rem;
+      background: rgba(0, 0, 0, 0.04);
+      border-radius: 999px;
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      color: var(--fg);
+      white-space: nowrap;
+    }
+    .dock-indicator-swatch {
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      border: 1px solid rgba(0, 0, 0, 0.15);
+    }
+
+    @media (max-width: 900px) {
+      .palette-dock {
+        width: calc(100% - 2rem);
+        overflow-x: auto;
+        justify-content: flex-start;
+        border-radius: 12px;
+        bottom: 0.6rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="stage-backdrop" id="stage-backdrop" aria-hidden="true">
+    <div class="stage-layer is-hero on" data-stage="hero"></div>
+    <div class="stage-layer is-essays" data-stage="essays"></div>
+    <div class="stage-layer is-projects" data-stage="projects"></div>
+    <div class="stage-layer is-rem" data-stage="rem"></div>
+    <div class="stage-layer is-dawn" data-stage="dawn"></div>
+  </div>
+
+  <div class="seam-wrap" aria-hidden="true">
+    <div class="seam"><span class="seam-anchor"></span></div>
+  </div>
+
+  <svg class="eeg-bg" viewBox="0 0 1440 900" preserveAspectRatio="none" aria-hidden="true">
+    <path d="M 0 450 Q 180 435, 360 450 T 720 450 Q 820 410, 860 490 Q 900 420, 940 450 T 1440 450" fill="none" stroke="rgba(35, 40, 48, 0.08)" stroke-width="1.2" />
+  </svg>
+
+  <header class="site-header">
+    <a class="brand" href="#">Traveritas</a>
+    <nav class="nav">
+      <a href="#ns-essays">随笔</a>
+      <a href="#ns-projects">项目</a>
+      <a href="#ns-rem">试验场</a>
+      <a href="#ns-dawn">关于</a>
+    </nav>
+  </header>
+
+  <main>
+    <!-- 01 HERO -->
+    <section class="hero" id="ns-hero">
+      <div class="ps-plane ps-sheet-base" aria-hidden="true">
+        <div class="p-base"></div>
+        <div class="amber-bloom"></div>
+      </div>
+      <div class="ps-plane ps-sheet-wake" aria-hidden="true">
+        <div class="p-wake"></div>
+        <div class="wake-leaf-paper"></div>
+      </div>
+
+      <div class="ch-wake">醒</div>
+      <div class="vsub">在即将醒来的那一瞬</div>
+
+      <div class="leaf-paper" aria-hidden="true"></div>
+      <div class="ch-dream">梦</div>
+
+      <div class="ps-note">
+        <div class="note-paper"></div>
+        <div class="note-ink">
+          <span class="note-stamp">23:07 · 入夜</span>
+          <p class="frag f1">世界在此停留片刻。</p>
+          <p class="frag f2">它并非梦境，</p>
+          <p class="frag f3">亦非确凿之物。</p>
+          <p class="frag f4">只是人在睁眼之前，最后一眼看见的明亮倒影。</p>
+        </div>
+      </div>
+
+      <p class="hero-scroll"><i></i>向下滚动以过夜</p>
+    </section>
+
+    <!-- 02 随笔 -->
+    <section class="band band-essays" id="ns-essays">
+      <div class="container-wide">
+        <div class="stitch-head">
+          <div class="stitch-title-row">
+            <h2 class="stitch-title">随笔</h2>
+            <span class="stitch-stage">浅梦 · N1 θ / N2 纺锤波</span>
+          </div>
+          <p class="stitch-time">23:19 → 01:11 · 浅梦阶段</p>
+        </div>
+        <div class="verdict">
+          <span class="vtag">可言说的 · SAYABLE</span>
+        </div>
+
+        <div class="ladder">
+          <div class="rung" style="--step: 0">
+            <a class="chip" href="#">
+              <div class="chip-glass">
+                <p class="chip-meta">随笔 · 01</p>
+                <h3 class="chip-title">与智能体一起造一个网站</h3>
+                <p class="chip-desc">这个网站不是我一个人写出来的——准确地说，一行代码都不是我写的。我的角色是：描述我想要什么、判断什么是对的，并在意识与代码之间建立秩序。</p>
+              </div>
+            </a>
+            <p class="rung-label">2026.09.25 · 智能体 · 建站 · 醒梦</p>
+          </div>
+
+          <div class="rung" style="--step: 9">
+            <a class="chip" href="#">
+              <div class="chip-glass">
+                <p class="chip-meta">随笔 · 02</p>
+                <h3 class="chip-title">醒梦 · 视觉母题探索记录</h3>
+                <p class="chip-desc">为「醒梦」寻找核心视觉意象的四轮尝试。从碎块的过于生硬，到百合形态的重塑，记录每一次否定与重新开始。</p>
+              </div>
+            </a>
+            <p class="rung-label">2026.09.21 · 醒梦 · 设计 · 母题</p>
+          </div>
+
+          <div class="rung" style="--step: 18">
+            <a class="chip" href="#">
+              <div class="chip-glass">
+                <p class="chip-meta">随笔 · 03</p>
+                <h3 class="chip-title">你好，醒梦</h3>
+                <p class="chip-desc">关于这个站点的起点：在白昼与黑夜的交界处，记录下那些尚未蒸发的轮廓。语言无法触及之处，皆为回声。</p>
+              </div>
+            </a>
+            <p class="rung-label">2026.09.19 · 随笔 · 醒梦</p>
+          </div>
+        </div>
+
+        <p class="band-more"><a href="#">全部随笔 →</a></p>
+      </div>
+    </section>
+
+    <!-- 03 项目 -->
+    <section class="band band-projects" id="ns-projects">
+      <div class="container">
+        <div class="stitch-head">
+          <div class="stitch-title-row">
+            <h2 class="stitch-title">项目</h2>
+            <span class="stitch-stage">深眠 · DEEP · N3 δ</span>
+          </div>
+          <p class="stitch-time">01:11 → 02:08 · 深眠阶段</p>
+        </div>
+        <div class="verdict">
+          <span class="vtag">可构造的 · BUILDABLE</span>
+        </div>
+
+        <ul class="ledger">
+          <li>
+            <a href="#">
+              <span class="ledger-date">2026.09.24</span>
+              <span>
+                <span class="ledger-title">
+                  这个网站本身
+                  <span class="ledger-status">进行中</span>
+                  <span class="stitch-meter" title="成形度第 5 阶 / 八阶">
+                    <i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i>
+                  </span>
+                </span>
+                <span class="ledger-desc">由 Astro 与智能体共建的个人网站，遵循「醒梦」审美与八阶成形度刻度。</span>
+              </span>
+              <span class="tick tick-ok">✓ 公开仓库</span>
+            </a>
+          </li>
+          <li>
+            <a href="#">
+              <span class="ledger-date">2026.09.24</span>
+              <span>
+                <span class="ledger-title">
+                  醒梦 · 视觉母题探索
+                  <span class="ledger-status">构想中</span>
+                  <span class="stitch-meter" title="成形度第 2 阶 / 八阶">
+                    <i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i>
+                  </span>
+                </span>
+                <span class="ledger-desc">为「醒梦」寻找 2—4 个可以反复出现的核心视觉意象，构想仍在深水之下。</span>
+              </span>
+              <span class="tick">○ 暂无公开</span>
+            </a>
+          </li>
+        </ul>
+
+        <p class="band-more"><a href="#">全部项目 →</a></p>
+      </div>
+    </section>
+
+    <!-- 04 试验场 -->
+    <section class="band band-rem" id="ns-rem">
+      <div class="container-wide">
+        <div class="stitch-head">
+          <div class="stitch-title-row">
+            <h2 class="stitch-title">试验场</h2>
+            <span class="stitch-stage">异相 · REM · 眼动</span>
+          </div>
+          <p class="stitch-time">02:08 → 04:59 · 异相睡眠</p>
+        </div>
+        <div class="verdict">
+          <span class="vtag">未命名的 · UNNAMED</span>
+        </div>
+
+        <div class="rem-field">
+          <div class="pill-field">
+            <span class="pill-skin">
+              <b>水面</b>
+              <small>微光与水汽漫开的边缘，没有确凿的轮廓。</small>
+            </span>
+            <span class="pill-skin">
+              <b>细线</b>
+              <small>微光与轮廓的边界，圆环正在聚拢。</small>
+            </span>
+            <span class="pill-skin">
+              <b>帷幕</b>
+              <small>遮蔽与展露之间的一层薄纱。</small>
+            </span>
+            <span class="pill-skin">
+              <b>巨型空洞</b>
+              <small>尺度本身作为母题，悬于视界边缘。</small>
+            </span>
+            <span class="pill-skin">
+              <b>花</b>
+              <small>抽象形态探索中，待重塑。</small>
+            </span>
+            <span class="pill-skin dead">
+              <b>碎块</b>
+              <small>过于规整与生硬，已搁置。</small>
+            </span>
+          </div>
+
+          <div class="slip-stage">
+            <div class="slip-fallback">
+              <span class="sf-t">它可能<br />马上消失。</span>
+              <span class="sf-b">GLASS SLIP · 玻璃签</span>
+            </div>
+          </div>
+        </div>
+
+        <p class="band-more"><a href="#">母题探索记录 →</a></p>
+      </div>
+    </section>
+
+    <!-- 05 关于 -->
+    <section class="band band-dawn" id="ns-dawn">
+      <div class="container">
+        <div class="stitch-head">
+          <div class="stitch-title-row">
+            <h2 class="stitch-title">关于</h2>
+            <span class="stitch-stage">晨醒 · WAKE · β</span>
+          </div>
+          <p class="stitch-time">04:59 → 06:31 · 晨光重现</p>
+        </div>
+        <div class="verdict" style="justify-content: center;">
+          <span class="vtag">存在于此 · PRESENCE</span>
+        </div>
+
+        <p class="dawn-time">06:31 · 晨光破晓</p>
+        <div class="dawn-card">
+          <p class="dawn-line">做一些安静的软件与界面。<br />偏爱轻盈的秩序、留白充裕的版面，以及能在时间里留存得久一点的事物。</p>
+        </div>
+
+        <div class="wake-row">
+          <a class="wake-anchor" href="https://github.com/Traveritas" target="_blank" rel="noopener">
+            <span class="wa-name">GitHub</span>
+            <span class="wa-href">github.com/Traveritas</span>
+            <span class="wa-why">日常行迹</span>
+          </a>
+          <a class="wake-anchor" href="https://github.com/Traveritas/traveritas.github.io" target="_blank" rel="noopener">
+            <span class="wa-name">本站源码</span>
+            <span class="wa-href">traveritas.github.io</span>
+            <span class="wa-why">构建与记录</span>
+          </a>
+          <a class="wake-anchor" href="/rss.xml">
+            <span class="wa-name">RSS</span>
+            <span class="wa-href">/rss.xml</span>
+            <span class="wa-why">静默投递</span>
+          </a>
+        </div>
+
+        <p class="band-more"><a href="#">关于本站与作者 →</a></p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container ft">
+      <span>© 2026 Traveritas</span>
+      <span>存在于此 · PRESENCE</span>
+    </div>
+  </footer>
+
+  <!-- ═════════ 调色控制台 ═════════ -->
+  <div class="palette-dock" id="dock">
+    <button class="dock-mode-btn active" id="btn-mineral" onclick="setPalette('mineral')">2B 矿物青瓷 (色相分流 · 推荐)</button>
+    <button class="dock-mode-btn" id="btn-depth" onclick="setPalette('depth')">2A 沉降铅灰 (加大阶差)</button>
+    <button class="dock-mode-btn" id="btn-contrast" onclick="setPalette('contrast')">2C 砂岩白垩 (冷暖对冲)</button>
+    <button class="dock-mode-btn" id="btn-original" onclick="setPalette('original')">原版黑底</button>
+    <div class="dock-sep"></div>
+    <button class="dock-nav-btn" onclick="scrollToId('ns-hero')">Hero</button>
+    <button class="dock-nav-btn" onclick="scrollToId('ns-essays')">随笔</button>
+    <button class="dock-nav-btn" onclick="scrollToId('ns-projects')">项目</button>
+    <button class="dock-nav-btn" onclick="scrollToId('ns-rem')">试验场</button>
+    <button class="dock-nav-btn" onclick="scrollToId('ns-dawn')">关于</button>
+    <div class="dock-sep"></div>
+    <div class="dock-indicator" id="stage-indicator">
+      <span class="dock-indicator-swatch" id="cur-swatch" style="background: #f0f3f6;"></span>
+      <span id="cur-text">Hero: #f0f3f6</span>
+    </div>
+  </div>
+
+  <script>
+    const backdrop = document.getElementById('stage-backdrop');
+    const layers = {
+      hero: backdrop.querySelector('.is-hero'),
+      essays: backdrop.querySelector('.is-essays'),
+      projects: backdrop.querySelector('.is-projects'),
+      rem: backdrop.querySelector('.is-rem'),
+      dawn: backdrop.querySelector('.is-dawn')
+    };
+
+    const STAGE_ORDER = ['hero', 'essays', 'projects', 'rem', 'dawn'];
+    const sectionIds = [
+      { id: 'ns-hero', name: 'hero' },
+      { id: 'ns-essays', name: 'essays' },
+      { id: 'ns-projects', name: 'projects' },
+      { id: 'ns-rem', name: 'rem' },
+      { id: 'ns-dawn', name: 'dawn' }
+    ];
+
+    const PALETTE_META = {
+      mineral: {
+        hero:     { hex: '#f0f3f6', desc: 'Hero: #f0f3f6 (晨雾白 · 95%)' },
+        essays:   { hex: '#dce6f2', desc: '随笔: #dce6f2 (薄雾天青 · 90%)' },
+        projects: { hex: '#cfdbd5', desc: '项目: #cfdbd5 (矿物青瓷 · 84% 独立冷青)' },
+        rem:      { hex: '#e6dfea', desc: '试验场: #e6dfea (薄暮淡紫 · 90%)' },
+        dawn:     { hex: '#f5f2eb', desc: '关于: #f5f2eb (破晓暖宣 · 95%)' }
+      },
+      depth: {
+        hero:     { hex: '#f0f3f6', desc: 'Hero: #f0f3f6 (晨雾白 · 95%)' },
+        essays:   { hex: '#e0e8f2', desc: '随笔: #e0e8f2 (浅水蓝 · 91%)' },
+        projects: { hex: '#c4ceda', desc: '项目: #c4ceda (沉降铅石 · 79% 明显下沉)' },
+        rem:      { hex: '#e5dfea', desc: '试验场: #e5dfea (薄暮淡紫 · 90%)' },
+        dawn:     { hex: '#f5f2eb', desc: '关于: #f5f2eb (破晓暖宣 · 95%)' }
+      },
+      contrast: {
+        hero:     { hex: '#f0f3f6', desc: 'Hero: #f0f3f6 (晨雾白 · 95%)' },
+        essays:   { hex: '#dce6f2', desc: '随笔: #dce6f2 (冷雾天青 · 90%)' },
+        projects: { hex: '#e4ded4', desc: '项目: #e4ded4 (砂岩白垩暖灰 · 87%)' },
+        rem:      { hex: '#e6dfea', desc: '试验场: #e6dfea (薄暮淡紫 · 90%)' },
+        dawn:     { hex: '#f6f3eb', desc: '关于: #f6f3eb (破晓暖宣 · 95%)' }
+      },
+      original: {
+        hero:     { hex: '#e9ecef', desc: 'Hero: #e9ecef (冷水泥灰 · 92%)' },
+        essays:   { hex: '#171b24', desc: '随笔: #171b24 (死黑一 · 11%)' },
+        projects: { hex: '#131824', desc: '项目: #131824 (死黑二 · 11%)' },
+        rem:      { hex: '#191522', desc: '试验场: #191522 (死黑三 · 11%)' },
+        dawn:     { hex: '#efe9dd', desc: '关于: #efe9dd (发黄卡纸 · 92%)' }
+      }
+    };
+
+    let currentPalette = 'mineral';
+    let currentStage = 'hero';
+
+    function setPalette(name) {
+      currentPalette = name;
+      document.documentElement.dataset.palette = name;
+      ['mineral', 'depth', 'contrast', 'original'].forEach((p) => {
+        const btn = document.getElementById(`btn-${p}`);
+        if (btn) btn.classList.toggle('active', p === name);
+      });
+      updateIndicator();
+    }
+
+    function setActiveStage(name) {
+      if (name === currentStage) return;
+      currentStage = name;
+      const targetIdx = STAGE_ORDER.indexOf(name);
+      if (targetIdx < 0) return;
+
+      for (let i = 0; i < STAGE_ORDER.length; i++) {
+        const el = layers[STAGE_ORDER[i]];
+        if (el) el.classList.toggle('on', i <= targetIdx);
+      }
+      updateIndicator();
+    }
+
+    function updateIndicator() {
+      const meta = PALETTE_META[currentPalette][currentStage];
+      document.getElementById('cur-swatch').style.background = meta.hex;
+      document.getElementById('cur-text').textContent = meta.desc;
+    }
+
+    const offsets = { hero: 0, essays: Infinity, projects: Infinity, rem: Infinity, dawn: Infinity };
+
+    function measure() {
+      const vh = innerHeight;
+      for (const s of sectionIds) {
+        const el = document.getElementById(s.id);
+        if (el) offsets[s.name] = el.getBoundingClientRect().top + scrollY - vh * 0.45;
+      }
+    }
+
+    function updateScroll() {
+      const y = scrollY;
+      let next = 'hero';
+      if (y >= offsets.dawn) next = 'dawn';
+      else if (y >= offsets.rem) next = 'rem';
+      else if (y >= offsets.projects) next = 'projects';
+      else if (y >= offsets.essays) next = 'essays';
+      else next = 'hero';
+      setActiveStage(next);
+    }
+
+    function scrollToId(id) {
+      const el = document.getElementById(id);
+      if (el) el.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    measure();
+    updateScroll();
+
+    window.addEventListener('scroll', () => requestAnimationFrame(updateScroll), { passive: true });
+    window.addEventListener('resize', () => { measure(); updateScroll(); });
+    window.addEventListener('load', () => { measure(); updateScroll(); });
+  </script>
+</body>
+</html>
