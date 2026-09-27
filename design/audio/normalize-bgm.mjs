@@ -1,0 +1,323 @@
+/* ─────────────────────────────────────────────────────────────
+   等响流水线：把两态 BGM 源文件处理成站点可用的等响成片。
+
+   源（默认 D:/myDownloads，不进仓库）：
+     personalwebsite-<awake|dream>-<intro|loopAB|outro>.<wav|mp3>
+   出（public/audio/，进仓库）：
+     <wake|dream>-<intro|loop|outro>.mp3
+   醒面在代码里叫 wake（src/scripts/reality.ts 的 Reality = 'wake' | 'dream'），
+   故源里的 awake 落到站点文件名 wake。
+
+   对齐方式（ALIGN）：
+     · whole（默认）：把一态的 intro+loop+outro 拼成一段 programme 量积分响度，
+       两态之间用**一个**增益差对齐。整态的内部起伏（intro→loop 的落差）原样保留，
+       不重写编曲；代价是逐段仍有小的残差（本片源实测：loop 0.48 dB、intro 1.93 dB）。
+     · segment：intro/loop/outro 逐段对齐到参考形态的对应段落，换面时任何时刻都不跳音量，
+       代价是会把 awake 自己的 intro→loop 落差改成 dream 的落差（3.0 dB → 5.6 dB）。
+       审美简报要求「醒与梦之间不应有明显开关」，所以这个模式在需要「任意时刻可换面」
+       时更贴题；而整体对齐更尊重编曲。默认整体，按需切换。
+
+   用什么量「响度」：EBU R128 积分响度（LUFS），取 K 加权——两态的音色分工正是
+   「醒=更清晰、梦=更模糊」，同样 RMS 下更亮的那条听起来更响，按 LUFS 才是听感对齐。
+   参考形态（默认 dream）保持原始电平不动，只调另一态。
+
+   用法：
+     node design/audio/normalize-bgm.mjs                       # 整体对齐，写入 public/audio/
+     node design/audio/normalize-bgm.mjs --align segment
+     node design/audio/normalize-bgm.mjs --src <目录>
+     node design/audio/normalize-bgm.mjs --check               # 只测量，不写文件
+     node design/audio/normalize-bgm.mjs --quality 2           # LAME VBR 档（默认 4 ≈165kbps）
+   ───────────────────────────────────────────────────────────── */
+
+import { spawnSync } from 'node:child_process';
+import { existsSync, mkdirSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+
+/* ---------- 可调参数 ---------- */
+const DEFAULTS = {
+  src: 'D:/myDownloads',
+  out: 'public/audio',
+  align: 'whole', // whole | segment
+  ref: 'dream', // 参考形态：实测电平即目标，保持不动
+  quality: '4', // libmp3lame VBR 档，4 ≈ 165 kbps
+  tolerance: 0.25, // 成片实测与目标的允许偏差（dB），超出则用残余量从源再编一次
+};
+/* 绝对目标（LUFS）。null = 跟随参考形态的实测值。
+   想让两态整体更靠后（例如作为阅读背景），填一组数即可，如
+   { whole: -20 } 或 { intro: -20, loop: -16, outro: -20 }（按 ALIGN 取用）。 */
+const ABSOLUTE_TARGETS = null;
+
+const FORMS = ['awake', 'dream'];
+const SEGS = ['intro', 'loopAB', 'outro'];
+const SEG_OUT = { intro: 'intro', loopAB: 'loop', outro: 'outro' }; // 源后缀 → 站点段落名
+const FORM_OUT = { awake: 'wake', dream: 'dream' }; // 源形态 → 代码形态
+
+const args = process.argv.slice(2);
+const opt = (name, fallback) => {
+  const i = args.indexOf(`--${name}`);
+  return i >= 0 && args[i + 1] && !args[i + 1].startsWith('--') ? args[i + 1] : fallback;
+};
+const SRC = resolve(opt('src', DEFAULTS.src));
+const OUT = resolve(opt('out', DEFAULTS.out));
+const ALIGN = opt('align', DEFAULTS.align);
+const REF = opt('ref', DEFAULTS.ref);
+const QUALITY = opt('quality', DEFAULTS.quality);
+const CHECK_ONLY = args.includes('--check');
+if (!['whole', 'segment'].includes(ALIGN)) throw new Error(`--align 只能是 whole 或 segment，收到 ${ALIGN}`);
+if (!FORMS.includes(REF)) throw new Error(`--ref 只能是 ${FORMS.join(' / ')}`);
+
+const run = (bin, argv) => {
+  const r = spawnSync(bin, argv, { encoding: 'utf8', maxBuffer: 1 << 28 });
+  if (r.error) throw r.error;
+  return r;
+};
+const ffmpeg = (argv) => {
+  const r = run('ffmpeg', ['-hide_banner', '-nostats', ...argv]);
+  if (r.status !== 0) throw new Error(`ffmpeg 失败 (${r.status}):\n${r.stderr.slice(-1500)}`);
+  return r;
+};
+
+/** 单次解码量积分响度与真峰值（loudnorm 第一遍：只读不处理） */
+function measure(file) {
+  const r = ffmpeg(['-i', file, '-af', 'loudnorm=print_format=json', '-f', 'null', '-']);
+  const m = r.stderr.match(/\{[\s\S]*"input_i"[\s\S]*\}/);
+  if (!m) throw new Error(`读不到 loudnorm 输出：${file}\n${r.stderr.slice(-600)}`);
+  const j = JSON.parse(m[0]);
+  return { lufs: Number(j.input_i), tp: Number(j.input_tp), lra: Number(j.input_lra) };
+}
+
+/** 采样帧数：供运行时核对 mp3 解码后有没有干净裁掉编码填充（循环无缝的前提） */
+function probe(file) {
+  const r = run('ffprobe', [
+    '-v', 'error', '-select_streams', 'a:0',
+    '-show_entries', 'stream=sample_rate,channels,duration',
+    '-of', 'json', file,
+  ]);
+  const s = JSON.parse(r.stdout).streams[0];
+  const dur = Number(s.duration);
+  const sr = Number(s.sample_rate);
+  return { sr, channels: Number(s.channels), duration: dur, samples: Math.round(dur * sr) };
+}
+
+let tmpSeq = 0;
+const tmpFile = (tag) => join(tmpdir(), `bgm-${tag}-${process.pid}-${tmpSeq++}.wav`);
+const cleanups = [];
+/** 把若干音频顺序拼成一段临时 wav（同一采样率/声道，仅用于量整态响度） */
+function concatMeasure(files, tag) {
+  const dst = tmpFile(tag);
+  cleanups.push(dst);
+  const inputs = files.flatMap((f) => ['-i', f]);
+  ffmpeg([
+    '-y', ...inputs,
+    '-filter_complex', `concat=n=${files.length}:v=0:a=1`,
+    '-ar', '48000', '-ac', '2', dst,
+  ]);
+  return measure(dst);
+}
+
+const db = (x) => (Number.isFinite(x) ? x.toFixed(2) : '-∞');
+const pad = (s, n) => String(s).padEnd(n);
+const padL = (s, n) => String(s).padStart(n);
+const sgn = (x) => `${x >= 0 ? '+' : ''}${x.toFixed(2)}`;
+const mb = (b) => (b / 1024 / 1024).toFixed(2);
+
+/* ---------- 1. 找源、测量 ---------- */
+const items = [];
+for (const form of FORMS) {
+  for (const seg of SEGS) {
+    const base = join(SRC, `personalwebsite-${form}-${seg}`);
+    const src = ['.wav', '.mp3'].map((e) => base + e).find((p) => existsSync(p));
+    if (!src) {
+      console.error(`✗ 缺源文件：${base}.wav|.mp3`);
+      process.exit(2);
+    }
+    items.push({ form, seg, src, outName: `${FORM_OUT[form]}-${SEG_OUT[seg]}.mp3` });
+  }
+}
+
+console.log(`源目录   ${SRC}`);
+console.log(`出目录   ${OUT}${CHECK_ONLY ? '   （--check：只测量）' : ''}`);
+console.log(`对齐方式 ${ALIGN === 'whole' ? '整体（每态一个增益，保留编曲起伏）' : '逐段（intro/loop/outro 各自对齐）'}`);
+console.log(`参考形态 ${REF}（保持原始电平）\n`);
+
+for (const it of items) {
+  Object.assign(it, probe(it.src), measure(it.src));
+  console.log(
+    `测  ${pad(`${it.form}-${it.seg}`, 18)} ${padL(db(it.lufs), 7)} LUFS  ` +
+      `TP ${padL(db(it.tp), 6)}  LRA ${padL(db(it.lra), 5)}  ${it.duration.toFixed(3)}s ${it.sr}Hz ${it.channels}ch`,
+  );
+}
+
+/* ---------- 2. 定目标与增益 ---------- */
+const perForm = {};
+for (const form of FORMS) {
+  perForm[form] = concatMeasure(
+    SEGS.map((seg) => items.find((x) => x.form === form && x.seg === seg).src),
+    `${form}-src`,
+  );
+}
+console.log('\n整态 programme 响度（intro+loop+outro 拼接）：');
+for (const form of FORMS) {
+  console.log(`  ${pad(form, 6)} ${padL(db(perForm[form].lufs), 7)} LUFS  TP ${padL(db(perForm[form].tp), 6)}  LRA ${db(perForm[form].lra)}`);
+}
+
+/** 每一态的增益：整体模式一态一个，逐段模式一段一个 */
+const gainOf = {};
+if (ALIGN === 'whole') {
+  const target = ABSOLUTE_TARGETS?.whole ?? perForm[REF].lufs;
+  for (const form of FORMS) gainOf[form] = { all: target - perForm[form].lufs };
+} else {
+  for (const form of FORMS) {
+    gainOf[form] = {};
+    for (const seg of SEGS) {
+      const it = items.find((x) => x.form === form && x.seg === seg);
+      const target = ABSOLUTE_TARGETS?.[SEG_OUT[seg]] ?? items.find((x) => x.form === REF && x.seg === seg).lufs;
+      gainOf[form][seg] = target - it.lufs;
+    }
+  }
+}
+const gainFor = (it) => (ALIGN === 'whole' ? gainOf[it.form].all : gainOf[it.form][it.seg]);
+
+console.log('\n增益（目标 = 参考形态）：');
+for (const form of FORMS) {
+  if (ALIGN === 'whole') {
+    console.log(`  ${pad(form, 6)} 全段 ${sgn(gainOf[form].all)} dB`);
+  } else {
+    console.log(`  ${pad(form, 6)} ${SEGS.map((seg) => `${SEG_OUT[seg]} ${sgn(gainOf[form][seg])}dB`).join('   ')}`);
+  }
+}
+const boosted = items.filter((x) => gainFor(x) > 0.05);
+if (boosted.length) {
+  console.log(
+    `\n⚠ ${boosted.length} 项需要正增益（${boosted.map((x) => `${x.form}-${x.seg}`).join(', ')}）：` +
+      `会推高峰值；成片真峰值若 > -1 dBTP 需要下调目标。`,
+  );
+}
+
+if (CHECK_ONLY) {
+  cleanups.forEach((f) => existsSync(f) && unlinkSync(f));
+  console.log('\n--check：未写文件。');
+  process.exit(0);
+}
+
+/* ---------- 3. 编码 ---------- */
+mkdirSync(OUT, { recursive: true });
+const encode = (src, gain, dst) =>
+  ffmpeg([
+    '-y', '-i', src,
+    '-af', `volume=${gain.toFixed(3)}dB`,
+    '-c:a', 'libmp3lame', '-q:a', QUALITY,
+    '-ar', '48000', '-ac', '2',
+    '-map_metadata', '-1',
+    dst,
+  ]);
+const outPath = (it) => join(OUT, it.outName);
+
+/** 每个文件当前的增益（整态模式下一态共用一个值） */
+const gains = new Map();
+for (const it of items) {
+  gains.set(it, ALIGN === 'whole' ? gainOf[it.form].all : gainOf[it.form][it.seg]);
+}
+
+/** 编一遍：写文件 → 逐个量 → 拼出整态 programme 量（量的是真正要发布的文件） */
+function renderPass() {
+  for (const it of items) encode(it.src, gains.get(it), outPath(it));
+  const enc = {};
+  for (const form of FORMS) {
+    enc[form] = {
+      segs: {},
+      prog: concatMeasure(
+        SEGS.map((seg) => outPath(items.find((x) => x.form === form && x.seg === seg))),
+        `${form}-enc`,
+      ),
+    };
+    for (const seg of SEGS) {
+      const p = outPath(items.find((x) => x.form === form && x.seg === seg));
+      enc[form].segs[seg] = { ...measure(p), bytes: statSync(p).size };
+    }
+  }
+  return enc;
+}
+
+/** 参考形态实测 − 本项实测：>0 表示本项还偏轻，需要再加（参考形态不自调，保持原始电平） */
+const residualOf = (it) =>
+  ALIGN === 'whole'
+    ? enc[REF].prog.lufs - enc[it.form].prog.lufs
+    : enc[REF].segs[it.seg].lufs - enc[it.form].segs[it.seg].lufs;
+const other = FORMS.find((f) => f !== REF);
+const worstResidual = () => Math.max(...items.filter((it) => it.form !== REF).map((it) => Math.abs(residualOf(it))));
+
+console.log('\n编码：');
+let enc = renderPass();
+let passes = 1;
+if (worstResidual() > DEFAULTS.tolerance) {
+  console.log(`  残余 ${worstResidual().toFixed(2)} dB > 容差 ${DEFAULTS.tolerance} dB：用残余量从源重编一次`);
+  for (const it of items) {
+    if (it.form === REF) continue;
+    gains.set(it, gains.get(it) + residualOf(it));
+  }
+  enc = renderPass();
+  passes++;
+}
+
+for (const it of items) {
+  const e = enc[it.form].segs[it.seg];
+  Object.assign(it, { gain: gains.get(it), outLufs: e.lufs, outTp: e.tp, bytes: e.bytes });
+  console.log(
+    `出  ${pad(it.outName, 18)} ${padL(db(e.lufs), 7)} LUFS  TP ${padL(db(e.tp), 6)}  ${pad(mb(e.bytes) + 'MB', 9)}` +
+      `增益 ${sgn(it.gain)}dB`,
+  );
+}
+
+/* ---------- 4. 成片自检：拿真正要发布的六个文件比对 ---------- */
+console.log(`\n成片核对（编码 ${passes} 遍）`);
+console.log(
+  `  整态 programme  ${pad(REF, 6)} ${padL(db(enc[REF].prog.lufs), 7)}  vs  ${pad(other, 6)} ` +
+    `${padL(db(enc[other].prog.lufs), 7)}  →  Δ ${sgn(enc[other].prog.lufs - enc[REF].prog.lufs)} dB`,
+);
+let worstSeg = 0;
+for (const seg of SEGS) {
+  const d = enc[other].segs[seg].lufs - enc[REF].segs[seg].lufs;
+  worstSeg = Math.max(worstSeg, Math.abs(d));
+  console.log(
+    `  ${pad(SEG_OUT[seg], 6)}         ${pad(REF, 6)} ${padL(db(enc[REF].segs[seg].lufs), 7)}  vs  ` +
+      `${pad(other, 6)} ${padL(db(enc[other].segs[seg].lufs), 7)}  →  Δ ${sgn(d)} dB`,
+  );
+}
+if (ALIGN === 'whole') {
+  console.log(`  逐段残差最大 ${worstSeg.toFixed(2)} dB（整体对齐下必然存在：两态编曲起伏本就不同）`);
+}
+
+const totalBytes = items.reduce((s, it) => s + it.bytes, 0);
+console.log(`\n六条合计 ${mb(totalBytes)}MB`);
+for (const form of FORMS.map((f) => FORM_OUT[f])) {
+  const fs = items.filter((it) => it.outName.startsWith(form));
+  const head = fs.filter((it) => it.outName !== `${form}-outro.mp3`).reduce((s, it) => s + it.bytes, 0);
+  console.log(`  ${pad(form, 6)} 全 ${pad(mb(fs.reduce((s, it) => s + it.bytes, 0)) + 'MB', 8)} 首次开启所需（intro+loop）${mb(head)}MB`);
+}
+
+const report = {
+  generatedAt: new Date().toISOString(),
+  align: ALIGN, reference: REF, quality: QUALITY, srcDir: SRC, passes,
+  programLufs: Object.fromEntries(FORMS.map((f) => [f, Number(enc[f].prog.lufs.toFixed(2))])),
+  files: items.map((it) => ({
+    form: it.form, formOut: FORM_OUT[it.form], seat: SEG_OUT[it.seg], out: it.outName, src: it.src,
+    srcLufs: it.lufs, srcTp: it.tp, gainDb: Number(it.gain.toFixed(2)),
+    outLufs: Number(it.outLufs.toFixed(2)), outTp: Number(it.outTp.toFixed(2)),
+    duration: it.duration, samples: it.samples, sampleRate: it.sr, bytes: it.bytes,
+  })),
+};
+mkdirSync(resolve('design/audio/out'), { recursive: true });
+const reportPath = resolve('design/audio/out/normalize-report.json');
+writeFileSync(reportPath, JSON.stringify(report, null, 2));
+console.log(`\n报告 ${reportPath}`);
+
+cleanups.forEach((f) => existsSync(f) && unlinkSync(f));
+
+const progDelta = Math.abs(enc[other].prog.lufs - enc[REF].prog.lufs);
+if (progDelta > DEFAULTS.tolerance) {
+  console.error(`\n✗ 两态整态响度差 ${progDelta.toFixed(2)} dB 超出容差 ${DEFAULTS.tolerance} dB`);
+  process.exit(1);
+}
+console.log(`✓ 两态整体等响（差值 ${progDelta.toFixed(2)} dB）`);

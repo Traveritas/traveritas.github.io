@@ -1,0 +1,192 @@
+---
+/* ─────────────────────────────────────────────────────────────
+   环境声 · 开关微章
+   · 固定在左下角：左侧中段留给 Rail 的仪表，首屏右下留给 RealityGuide，
+     移动端 RealityGuide 居中下，左下角始终是空着的。
+   · 与 RealityGuide 同一族材质：⌜ ⌟ 光学微刻角标 + 呼吸光核 + 磨砂树脂微章。
+   · 文案双态（[data-morph] + data-dream，随长按换面）；开关态只由
+     html[data-sound="on"] 决定呈现哪一组——脚本不重写文案，避免与
+     morph 引擎抢注册表。
+   · 无 JS 时整块隐藏（BaseLayout 的 noscript 里），不留一个按不动的键。
+   ───────────────────────────────────────────────────────────── */
+---
+
+<button class="snd" type="button" data-sound-toggle data-nofx>
+  <span class="snd-reticle snd-rt-tl mono" aria-hidden="true">⌜</span>
+  <span class="snd-reticle snd-rt-br mono" aria-hidden="true">⌟</span>
+
+  <span class="snd-core" aria-hidden="true"><i></i></span>
+
+  <span class="snd-label snd-on" data-morph data-true="关闭环境声" data-dream="让声音沉落">关闭环境声</span>
+  <span class="snd-label snd-off" data-morph data-true="开启环境声" data-dream="让声音浮起">开启环境声</span>
+
+  <span class="snd-tag snd-tag-on mono" aria-hidden="true">AUDIBLE</span>
+  <span class="snd-tag snd-tag-off mono" aria-hidden="true">SILENT</span>
+</button>
+
+<style>
+  .snd {
+    position: fixed;
+    left: 24px;
+    bottom: 22px;
+    z-index: 60;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.4rem 0.78rem 0.38rem 0.7rem;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    background: color-mix(in srgb, var(--bg) 75%, rgba(255, 255, 255, 0.08));
+    backdrop-filter: blur(16px) saturate(125%);
+    -webkit-backdrop-filter: blur(16px) saturate(125%);
+    box-shadow:
+      0 10px 30px -8px rgba(10, 14, 20, 0.35),
+      0 0 1px 1px rgba(255, 255, 255, 0.1),
+      inset 0 1px 0 rgba(255, 255, 255, 0.28);
+    color: var(--fg-soft);
+    font: inherit;
+    font-size: 0.72rem;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+    -webkit-user-select: none;
+    user-select: none;
+    /* 常驻构件，比一次性引导标尺更退后一步；但高调画册底色上再低就看不清了 */
+    opacity: 0.8;
+    transition:
+      opacity 0.5s cubic-bezier(0.2, 0.8, 0.3, 1),
+      border-color 0.25s ease,
+      box-shadow 0.25s ease,
+      color 0.25s ease;
+  }
+
+  .snd:hover,
+  .snd:focus-visible {
+    opacity: 1;
+    color: var(--fg);
+    border-color: color-mix(in srgb, var(--amber) 50%, rgba(255, 255, 255, 0.35));
+    box-shadow:
+      0 12px 32px -6px rgba(10, 14, 20, 0.42),
+      0 0 16px 1px color-mix(in srgb, var(--amber) 22%, transparent),
+      inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    outline: none;
+  }
+
+  /* 光学微刻角标 ⌜ ⌟ */
+  .snd-reticle {
+    position: absolute;
+    font-size: 8px;
+    line-height: 1;
+    color: var(--fg-soft);
+    opacity: 0.6;
+    pointer-events: none;
+  }
+  .snd-rt-tl {
+    top: -4px;
+    left: -3px;
+  }
+  .snd-rt-br {
+    bottom: -4px;
+    right: -3px;
+  }
+
+  /* 光核：静＝中空细环，响＝琥珀微核呼吸（与 RealityGuide 同族） */
+  .snd-core {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 12px;
+    height: 12px;
+    flex: none;
+  }
+  .snd-core i {
+    display: block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    border: 1px solid currentColor;
+    opacity: 0.75;
+    transition:
+      background 0.3s ease,
+      border-color 0.3s ease,
+      box-shadow 0.3s ease,
+      transform 0.3s ease;
+  }
+  :global(html[data-sound='on']) .snd-core i {
+    background: var(--amber);
+    border-color: var(--amber);
+    box-shadow: 0 0 8px 1px color-mix(in srgb, var(--amber) 65%, transparent);
+    animation: snd-breathe 3.6s ease-in-out infinite;
+  }
+  @keyframes snd-breathe {
+    0%,
+    100% {
+      opacity: 0.78;
+      transform: scale(0.94);
+      box-shadow: 0 0 6px 1px color-mix(in srgb, var(--amber) 45%, transparent);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.12);
+      box-shadow: 0 0 10px 2px color-mix(in srgb, var(--amber) 80%, transparent);
+    }
+  }
+
+  /* 开关态：文案与英文签成对切换（默认呈现「静」的一组） */
+  .snd-on,
+  .snd-tag-on {
+    display: none;
+  }
+  :global(html[data-sound='on']) .snd-on {
+    display: inline;
+  }
+  :global(html[data-sound='on']) .snd-off,
+  :global(html[data-sound='on']) .snd-tag-off {
+    display: none;
+  }
+  :global(html[data-sound='on']) .snd-tag-on {
+    display: inline;
+  }
+
+  .snd-label {
+    white-space: nowrap;
+  }
+  /* 英文签：静时退成雾灰，响时才点着（琥珀在醒面会被 reality 的强调色插值
+     褪成冷灰，故亮/不亮由状态决定，而不是靠色相本身区分） */
+  .snd-tag {
+    font-size: 0.6rem;
+    letter-spacing: 0.18em;
+    color: var(--fg-faint);
+    opacity: 0.9;
+    transition: color 0.3s ease;
+  }
+  :global(html[data-sound='on']) .snd-tag {
+    color: var(--amber);
+    opacity: 1;
+  }
+  :global(html[data-sound='on']) .snd {
+    color: var(--fg);
+  }
+
+  @media (max-width: 760px) {
+    .snd {
+      left: 14px;
+      bottom: 12px;
+      padding: 0.34rem 0.66rem 0.32rem 0.6rem;
+      font-size: 0.68rem;
+    }
+    .snd-tag {
+      display: none !important;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .snd,
+    .snd-core i {
+      transition: none;
+    }
+    :global(html[data-sound='on']) .snd-core i {
+      animation: none;
+    }
+  }
+</style>

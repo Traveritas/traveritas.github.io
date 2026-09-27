@@ -55,6 +55,8 @@
   👉 必读 `docs/writing.md`（包含双态行内 `[[醒|梦]]`、块级 `:::wake / :::dream`、行内光景 `((浮起))` / `{{流过}}` 参数表、导航与版块映射、维特根斯坦命题徽标体系等）。
 - **样式开发 / 组件设计 / 视觉验收**：
   👉 必读 `docs/design/styleguide.md` 与 `docs/design/content-typography.md`（包含样式预览页 `/styleguide/` 规范、设计令牌、以及自动化截图验证脚本 `node design/.shot-styleguide.cjs`）。
+- **环境声 / 两态 BGM / 换音频**：
+  👉 必读 `docs/design/bgm.md`（等响流水线 `design/audio/normalize-bgm.mjs`、两态交叉换面机制、换音频后的重跑与验收步骤）。
 - **深层审美判定 / 视觉母题与哲学背景**：
   👉 查阅 `docs/design/aesthetic-direction.md`（包含“醒梦”核心概念、花/玻璃母题、色彩分工与验收自检清单）。
 - **新建内容模板**：
