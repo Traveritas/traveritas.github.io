@@ -30,7 +30,8 @@
    ───────────────────────────────────────────────────────────── */
 
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
@@ -308,10 +309,29 @@ const report = {
     duration: it.duration, samples: it.samples, sampleRate: it.sr, bytes: it.bytes,
   })),
 };
-mkdirSync(resolve('design/audio/out'), { recursive: true });
 const reportPath = resolve('design/audio/out/normalize-report.json');
 writeFileSync(reportPath, JSON.stringify(report, null, 2));
-console.log(`\n报告 ${reportPath}`);
+
+/* ---------- 5. 内容版本号 ----------
+   成片文件名是固定的（wake-loop.mp3 等），换稿后 URL 不变——浏览器就会一直拿缓存里的
+   旧曲子（fetch 带 force-cache 更不会回源），用户听到的仍是上一版。故按六个成片的
+   内容算一个短版本号，运行时装进 URL 查询串，内容一变 URL 就变。
+   写进 src/data/bgm-assets.ts（要一起提交，构建时被 sound.ts 引用）。 */
+const hashOf = (p) => createHash('sha1').update(readFileSync(p)).digest('hex');
+const version = createHash('sha1')
+  .update(report.files.map((f) => `${f.out}:${hashOf(join(OUT, f.out))}`).join('|'))
+  .digest('hex')
+  .slice(0, 8);
+const verPath = resolve('src/data/bgm-assets.ts');
+const verBody = `/* 本文件由 design/audio/normalize-bgm.mjs 生成，勿手改。
+   成片在 public/audio/，文件名固定；靠这个版本号把 URL 区分开，换稿后浏览器
+   才会取新曲子而不是缓存里的旧曲子。换音频重跑流水线即可，记得一起提交。 */
+export const BGM_VERSION = '${version}';
+`;
+const verOld = existsSync(verPath) ? readFileSync(verPath, 'utf8') : '';
+if (verOld !== verBody) writeFileSync(verPath, verBody);
+console.log(`\n成片版本 ${version}  →  src/data/bgm-assets.ts${verOld === verBody ? '（未变）' : ''}`);
+console.log(`报告 ${reportPath}`);
 
 cleanups.forEach((f) => existsSync(f) && unlinkSync(f));
 

@@ -21,6 +21,8 @@ outro 成片目前**备而不用**（见 §3.3）。
 
 源文件**不进仓库**（`D:\myDownloads\personalwebsite-<awake|dream>-<intro|loopAB|outro>.wav`）。
 换音频要重跑流水线，成片才跟着变；仓库里存成片，是为了别处 clone 下来也能直接 build。
+重跑会一并刷新 `src/data/bgm-assets.ts`（成片版本号），**别漏提交它**——它是换稿后
+浏览器肯取新曲子的唯一依据（详见 §2）。
 
 > **换稿注意**：两态 intro 与两态 loop **必须同长**，这是两态相位与 bed 时间轴的前提
 > （`sound.ts` 取两态时长的较小者当共同长度，不等长会把另一边截胡）。
@@ -54,6 +56,11 @@ node design/audio/normalize-bgm.mjs --src <目录>  # 换源目录
   编完再量一遍，偏差超 0.25 dB 就用残余量从源重编。
 - **自检**：最后拿真正要发布的六个文件拼成整态再量一次，两态差值与容差一起打印，
   报告落在 `design/audio/out/normalize-report.json`。
+- **成片版本号**：成片文件名是固定的（`wake-loop.mp3` 等），换稿后 URL 不变，浏览器
+  就会一直拿缓存里的旧曲子——早先 `fetch` 还带着 `force-cache`，更不回源，于是出现
+  「线上文件明明已更新，耳朵听到的还是上一版」。故流水线按六个成片内容算一个短版本号，
+  写进 **`src/data/bgm-assets.ts`**（生成物，**必须一起提交**），运行时装进 URL 查询串：
+  `/audio/wake-loop.mp3?v=2cf1d45f`。内容一变 URL 就变，缓存自然失效。
 
 顺带一个体检脚本：`node design/audio/analyze.mjs <目录>`——看循环边界连续性、
 intro 与 loop 的关系、分段包络。**换音频后建议先跑它**：循环文件若在末尾淡出、

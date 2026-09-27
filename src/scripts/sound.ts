@@ -16,12 +16,16 @@
    ───────────────────────────────────────────────────────────── */
 
 import { clamp } from './lib';
+import { BGM_VERSION } from '../data/bgm-assets';
 import { getReality, wakeMix, type Reality } from './reality';
 
 type Seg = 'intro' | 'loop';
 const FORMS: Reality[] = ['wake', 'dream'];
 const DIR = '/audio';
 const STORE_KEY = 'xm-sound';
+/* 成片文件名固定，换稿后路径不变——URL 上挂内容版本号，否则浏览器会把缓存里的
+   旧曲子一直用下去（换音频后重跑 design/audio/normalize-bgm.mjs 会更新版本号） */
+const url = (key: string) => `${DIR}/${key}.mp3?v=${BGM_VERSION}`;
 
 /* ── 参数 ───────────────────────────────────────────── */
 /** 出场淡入（秒）。点开是明确手势，不必太软 */
@@ -104,7 +108,7 @@ function load(form: Reality, seg: Seg): Promise<AudioBuffer | null> {
   if (flying) return flying;
   const p = (async () => {
     if (!ctx) return null;
-    const res = await fetch(`${DIR}/${key}.mp3`, { cache: 'force-cache' });
+    const res = await fetch(url(key));
     if (!res.ok) throw new Error(`${key}: HTTP ${res.status}`);
     const decoded = await ctx.decodeAudioData(await res.arrayBuffer());
     buffers.set(key, decoded);
