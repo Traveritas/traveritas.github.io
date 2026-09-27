@@ -4,20 +4,21 @@
      样点数与源 wav 逐个相等，故 loop=true 即刻无缝、且两态天然对齐）。
      醒度（reality.ts 的 wakeMix）驱动等功率交叉——长按入梦时，声音是跟着
      那根线一起换面，而不是切歌。
-   · intro 接入 loop，outro 收束关声：关声＝loop 交叉淡入 outro，outro 放完
-     停机，期间再点即刻唤回。
+   · intro 接入 loop；关声＝直接淡出，不接 outro（见 docs/design/bgm.md §3.4：
+     outro 成片留着备查，运行时不用）。
    · 相位用墙钟锚定（sessionStorage 存 epoch = 弧线零点对应的墙钟 ms）：
-     站内换页、关声再开，都落在同一条时间线上，不会每次从零重来。
+     站内换页、以及「关一下就回来」都落在同一条时间线上；但关了超过
+     OFF_RESET_MS（10s）再打开，当作走远了——弧线弃掉，从零点重演开场。
    · 自动播放：首屏绝不出声（浏览器也拦）；用户点开过之后，站内换页尝试续播，
      被策略拦下就如实退回待开启态——不假装在播。
-   · 未开启时一个字节都不取；开启后先要当前形态的 intro，loop 与另一态、
-     outro 随后（闲时）预取。
+   · 未开启时一个字节都不取；开启后先要当前形态的 intro，另一态 loop 随后
+     （闲时）预取，换面要交叉时不会晚。
    ───────────────────────────────────────────────────────────── */
 
 import { clamp } from './lib';
 import { getReality, wakeMix, type Reality } from './reality';
 
-type Seg = 'intro' | 'loop' | 'outro';
+type Seg = 'intro' | 'loop';
 const FORMS: Reality[] = ['wake', 'dream'];
 const DIR = '/audio';
 const STORE_KEY = 'xm-sound';
@@ -25,10 +26,11 @@ const STORE_KEY = 'xm-sound';
 /* ── 参数 ───────────────────────────────────────────── */
 /** 出场淡入（秒）。点开是明确手势，不必太软 */
 const FADE_IN = 1.1;
-/** 关声时 loop → outro 的交叉（秒） */
-const OUTRO_XFADE = 0.9;
-/** outro 末段补淡出（秒）：awake-outro 结尾是满电平硬断，不补会留一记咔 */
-const OUTRO_TAIL = 1.2;
+/** 关声淡出（秒）：直接收干净，不接 outro */
+const FADE_OUT = 1.0;
+/** 关声多久算「走远了」（ms）：超过它再打开就从弧线零点重来（开场重演），
+     以内则当作暂时压掉，接着原相位续上 */
+const OFF_RESET_MS = 10_000;
 /** 换面被缓冲迟到拦下时，补上交叉的时长（秒） */
 const LATE_GLIDE = 0.8;
 /** 醒度采样间隔（ms）/ 跟手时间常数（秒） */
@@ -49,6 +51,8 @@ interface Stored {
   on: boolean;
   /** 弧线零点（intro 起点）对应的墙钟毫秒 */
   epoch: number;
+  /** 关声那一刻的墙钟毫秒：再打开时据此判断该续上还是从头（见 OFF_RESET_MS） */
+  offAt?: number;
   /** 段落时长（首次放出来后记下）：站内换页时缓冲还没到手也要能算相位 */
   durs?: { intro?: number; loop?: number };
 }
@@ -59,7 +63,6 @@ let master: GainNode | null = null; // 进出场
 let headroom: GainNode | null = null; // 交叉余量 × 悬停
 let bedGain: GainNode | null = null; // bed 生命周期
 let gIntro: GainNode | null = null;
-let gOutro: GainNode | null = null;
 const chain: Partial<Record<Reality, { gain: GainNode; src: AudioBufferSourceNode | null }>> = {};
 
 const buffers = new Map<string, AudioBuffer>();
@@ -67,10 +70,10 @@ const inflight = new Map<string, Promise<AudioBuffer | null>>();
 
 let introSrc: AudioBufferSourceNode | null = null;
 let introForm: Reality = 'dream';
-let outroSrc: AudioBufferSourceNode | null = null;
 /** bed 时间轴：ctx 时间 bedAtCtx 处对应弧线里的 introDur（即 loop 的 0） */
 let bedAtCtx: number | null = null;
 let epoch: number | null = null;
+let offAt: number | null = null;
 let on = false;
 let mixWanted = 0; // 目标醒度（reality 给的值）
 let mixApplied = 0; // 实际落下的醒度（缓冲迟到时会被拦在能听到的那一面）
@@ -162,12 +165,10 @@ function buildGraph() {
   headroom = ctx.createGain();
   bedGain = ctx.createGain();
   gIntro = ctx.createGain();
-  gOutro = ctx.createGain();
   master.gain.value = 0;
   headroom.gain.value = 1;
   bedGain.gain.value = 1;
   gIntro.gain.value = 0;
-  gOutro.gain.value = 0;
   for (const f of FORMS) {
     const g = ctx.createGain();
     g.gain.value = 0;
@@ -176,7 +177,6 @@ function buildGraph() {
   }
   bedGain.connect(headroom);
   gIntro.connect(headroom);
-  gOutro.connect(headroom);
   headroom.connect(master);
   master.connect(ctx.destination);
 }
@@ -293,48 +293,6 @@ function stopIntro(fade: number) {
   setTimeout(() => src.disconnect(), fade * 2000 + 300);
 }
 
-/** 关声：loop 淡出，outro 收束（outro 没到就先淡出，到了再接上） */
-function startOutro() {
-  if (!ctx || !gOutro) return;
-  const side: Reality = mixApplied >= 0.5 ? 'wake' : 'dream';
-  void load(side, 'outro').then((b) => {
-    if (!b || !ctx || !gOutro || on) return; // 期间又开了：作废
-    const at = now() + 0.05;
-    const src = ctx.createBufferSource();
-    src.buffer = b;
-    src.connect(gOutro);
-    outroSrc = src;
-    const tail = Math.min(OUTRO_TAIL, b.duration * 0.3);
-    gOutro.gain.cancelScheduledValues(at);
-    gOutro.gain.setValueAtTime(0, at);
-    gOutro.gain.linearRampToValueAtTime(1, at + OUTRO_XFADE);
-    gOutro.gain.setValueAtTime(1, at + b.duration - tail);
-    gOutro.gain.linearRampToValueAtTime(0, at + b.duration);
-    src.onended = () => {
-      stopOutro();
-      if (on || !ctx) return;
-      master?.gain.setTargetAtTime(0, now(), 0.25);
-      for (const f of FORMS) stopLoop(f);
-      bedAtCtx = null;
-      setTimeout(() => {
-        if (!on) ctx?.suspend().catch(() => {});
-      }, 900);
-    };
-    src.start(at);
-  });
-}
-function stopOutro() {
-  const src = outroSrc;
-  if (!src) return;
-  outroSrc = null;
-  try {
-    src.stop();
-  } catch {
-    /* 已停 */
-  }
-  src.disconnect();
-}
-
 /* ── 播放生命周期 ─────────────────────────────────── */
 async function startPlayback() {
   if (!ctx) return;
@@ -358,26 +316,35 @@ async function startPlayback() {
   paint();
 }
 
+/** 关声：master 直接淡出（intro / loop 一起收），随后停源挂起。
+    挂的是 master 而非 bed，所以开场演到一半关声也是同一条淡出。 */
 function haltPlayback() {
   stopPoll();
   if (!ctx) return;
-  stopIntro(0.5);
+  stopIntro(0.4);
   const t = now();
-  bedGain?.gain.cancelScheduledValues(t);
-  bedGain?.gain.setTargetAtTime(0, t, OUTRO_XFADE / 3);
-  startOutro();
+  master?.gain.cancelScheduledValues(t);
+  master?.gain.setTargetAtTime(0, t, FADE_OUT / 3);
   setTimeout(
     () => {
       if (on) return;
       for (const f of FORMS) stopLoop(f);
       bedAtCtx = null;
+      ctx?.suspend().catch(() => {});
     },
-    OUTRO_XFADE * 1000 + 250,
+    FADE_OUT * 2000 + 250,
   );
 }
 
 async function turnOn() {
   on = true;
+  // 关了太久（> OFF_RESET_MS）再打开：旧的弧线弃掉，从零点重来（开场重演）；
+  // 关一下就回来则接着原相位续上，不打断
+  if (offAt !== null && Date.now() - offAt > OFF_RESET_MS) {
+    epoch = Date.now();
+    bedAtCtx = null;
+  }
+  offAt = null;
   persist();
   if (!ctx) {
     try {
@@ -387,7 +354,6 @@ async function turnOn() {
     }
     buildGraph();
   }
-  stopOutro();
   if (ctx.state !== 'running') {
     try {
       await ctx.resume();
@@ -408,19 +374,17 @@ async function turnOn() {
 
 function turnOff() {
   on = false;
+  offAt = Date.now();
   persist();
   paint();
   haltPlayback();
 }
 
-/** 闲时把另一态 loop 与 outro 取回来。页面常驻动画会把 requestIdleCallback
-    饿住，故带 timeout 兜底，再补一道定时器；load 自身去重，多调无妨。 */
+/** 闲时把另一态的 loop 取回来（换面要交叉，到时才取就晚了）。页面常驻动画会把
+    requestIdleCallback 饿住，故带 timeout 兜底，再补一道定时器；load 自身去重。 */
 function prefetchRest() {
   const later = () => {
-    for (const f of FORMS) {
-      void load(f, 'loop');
-      void load(f, 'outro');
-    }
+    for (const f of FORMS) void load(f, 'loop');
   };
   const ric = (
     window as unknown as {
@@ -463,6 +427,7 @@ function stopPoll() {
 function persist() {
   if (epoch === null) return;
   const rec: Stored = { on, epoch };
+  if (offAt !== null) rec.offAt = offAt;
   if (storedDurs.intro || storedDurs.loop) {
     rec.durs = { intro: storedDurs.intro, loop: storedDurs.loop };
   }
@@ -516,8 +481,8 @@ export function initSound(): void {
         pageGain: +pageGain.toFixed(4),
         bed: +(bedGain?.gain.value ?? 0).toFixed(3),
         intro: +(gIntro?.gain.value ?? 0).toFixed(3),
-        outro: gOutro ? (outroSrc ? +gOutro.gain.value.toFixed(3) : 0) : null,
         bedIn: bedAtCtx === null ? null : +(bedAtCtx - now()).toFixed(2),
+        offFor: offAt === null ? null : +((Date.now() - offAt) / 1000).toFixed(2),
       }),
       /* 量输出端实际电平：只看调度不算数，要看到样本在流 */
       probe: async (ms = 320) => {
@@ -548,6 +513,7 @@ export function initSound(): void {
     if (raw) {
       const rec = JSON.parse(raw) as Stored;
       epoch = rec.epoch;
+      offAt = rec.offAt ?? null;
       storedDurs = { intro: rec.durs?.intro || undefined, loop: rec.durs?.loop || undefined };
       wanted = rec.on === true;
     }

@@ -1,7 +1,8 @@
 # 环境声（BGM）· 两态音频与流水线
 
-站点的背景音乐：醒 / 梦各一套 **intro → loop → outro**，两态同长同格、并行同相位，
+站点的背景音乐：醒 / 梦各一套 **intro → loop（→ outro）**，两态同长同格、并行同相位，
 长按入梦时不是「切歌」，而是**跟着那根 -4° 线一起交叉换面**。
+outro 成片目前**备而不用**（见 §3.3）。
 
 ---
 
@@ -13,10 +14,10 @@
 | --- | --- | --- | --- | --- |
 | `wake-intro.mp3` | 醒 · 开场 | 25.455s | −17.83 LUFS | −6.18 dBTP |
 | `wake-loop.mp3` | 醒 · 循环 | 50.909s | −14.86 LUFS | −5.60 dBTP |
-| `wake-outro.mp3` | 醒 · 收束 | 18.182s | −18.05 LUFS | −6.38 dBTP |
+| `wake-outro.mp3` | 醒 · 收束（**运行时不用**） | 18.182s | −18.05 LUFS | −6.38 dBTP |
 | `dream-intro.mp3` | 梦 · 开场 | 25.455s | −19.77 LUFS | −6.64 dBTP |
 | `dream-loop.mp3` | 梦 · 循环 | 50.909s | −14.38 LUFS | −0.77 dBTP |
-| `dream-outro.mp3` | 梦 · 收束 | 19.091s | −18.52 LUFS | −5.48 dBTP |
+| `dream-outro.mp3` | 梦 · 收束（**运行时不用**） | 19.091s | −18.52 LUFS | −5.48 dBTP |
 
 源文件**不进仓库**（`D:\myDownloads\personalwebsite-<awake|dream>-<intro|loopAB|outro>.wav`）。
 换音频要重跑流水线，成片才跟着变；仓库里存成片，是为了别处 clone 下来也能直接 build。
@@ -65,8 +66,10 @@ t <  introDur        → 开场，从 intro 的 t 秒处接上
 t ≥  introDur        → loop，相位 = (t − introDur) mod loopDur
 ```
 
-于是站内换页、关声再开、标签页切走再回来，音乐都落在**同一条时间线上**，
+于是站内换页、以及「关一下就回来」，音乐都落在**同一条时间线上**，
 不会每次从零重来——「它可能随时消失，又随时可能重新被记起」。
+**例外**：关声超过 `OFF_RESET_MS`（10 秒）再打开，就当人走远了——弧线弃掉
+（`epoch` 重设），从零点重演开场。关了多久由存下来的 `offAt` 判断，跨页也有效。
 段落时长也一并存下，换页时缓冲还没到手也能算准相位（否则会退化成从 loop 头重来）。
 
 ### 3.2 两态并行、等功率交叉
@@ -79,23 +82,23 @@ t ≥  introDur        → loop，相位 = (t − introDur) mod loopDur
 冲到 +2.34 dBFS。故按解码后素材的真实峰值算一条 `1 − D·sin(πm)` 余量曲线
 （本片源 D ≈ 0.16，交叉中段压到 0.86），把峰按在 −0.5 dB 之下。素材换了会自动重算。
 
-### 3.3 intro / outro
+### 3.3 intro
 
-- **intro**：一态一套。首次开启按当时那一面从 0 接入；弧线还在 intro 段内就接着放，
-  过了就直接落 loop（**不会每次重演开场**）。1.1 s 淡入。
+- **intro**：一态一套。首次开启按当时那一面从 0 接入；弧线还在 intro 段内就接着放
+  （关一下就回来时，开场也从中断处续上），过了就直接落 loop。1.1 s 淡入。
   若开场还在演而人已长按换到对面，开场收掉、bed 立刻接上并把这半段弧线抹掉。
-- **outro**：关声＝收束。loop 在 0.9 s 内淡出，当前那一态的 outro 接手放完，
-  然后停机（`ctx.suspend()`），期间再点即刻唤回 bed。
-  末段补 1.2 s 淡出——`wake-outro` 结尾是满电平硬断，不补会留一记咔。
-  想要「一按就静」可以把它换成直接淡出，改 `startOutro()` 一处即可。
+- **outro：运行时不用**（2026-09-27 用户裁定「结束时直接淡出，不需要再切换到 outro」）。
+  关声＝ `master` 直接淡出 1.0 s（intro / loop 一起收，所以开场演到一半关声也是同一条淡出），
+  随后停源并 `ctx.suspend()`。`public/audio/*-outro.mp3` 与流水线里的 outro 一格留着备查，
+  但站上一个字节都不会请求它；要用回来，改 `haltPlayback()` 一处。
 
 ### 3.4 自动播放与省流
 
 - **首屏绝不出声**，也不假装在播：首次开启必须是一次点击（浏览器策略）。
 - 点开过之后，站内换页尝试直接续播；被策略拦下就**如实退回待开启态**（epoch 留着，点开即续上）。
 - 未开启时**一个字节都不取**；开启后先要当前形态的 intro（真要演开场时才等它），
-  loop 并行起步，另一态 loop 与 outro 随后预取（`requestIdleCallback` 带 timeout 兜底，
-  页面常驻动画会把纯 idle 回调饿住）。
+  loop 并行起步，另一态 loop 随后预取（`requestIdleCallback` 带 timeout 兜底，
+  页面常驻动画会把纯 idle 回调饿住）。outro 不在预取之列。
 - 切走标签页：声音退到 0.22（「世界在此处悬停」），回来即复原；时间轴不中断。
 - 关声后 `ctx.suspend()`，不留后台音频。
 
@@ -103,7 +106,7 @@ t ≥  introDur        → loop，相位 = (t − introDur) mod loopDur
 
 长文页与关于页用 `BaseLayout` 的 `bgm="reading"` 声明意图（落到 `body[data-bgm="reading"]`），
 整支曲子退 **−5 dB**（`sound.ts` 的 `READING_TRIM_DB`）——只是让开路，不是换一套音。
-挂的是 `master`（进场包络那个节点），所以 intro / loop / outro 一起退，两态等响关系不变。
+挂的是 `master`（进场包络那个节点），所以 intro / loop 一起退，两态等响关系不变。
 数字只在那一个常数里，改它两态同时挪。项目详情页若也想要，加同一个 prop 即可。
 
 ### 3.6 微章
@@ -128,8 +131,9 @@ node design/audio/normalize-bgm.mjs --check   # 换音频后：先确认两态�
 2. 开场走完 → `loops: wake:run dream:run`，两态同相位；
 3. 长按入梦 → 2.2 秒内 `mix` 0→1、两态增益沿 sin/cos 交叉、余量同步下压；
 4. 换页 → `arc` 连续、不开场重演；
-5. 关声 → bed 归零、outro 接手、放完 `ctx: suspended`、探针电平为 0；
-6. 长文页 / 关于页 → `state().master` ≈ 0.562（−5 dB），首页为 1。
+5. 关声 → `master` 直接归零（不接 outro）、`ctx: suspended`、探针电平为 0；
+6. 关 3 秒再开 → `arc` 接着走（不重置）；关 12 秒再开 → `arc` 重置到 ~0、开场从头；
+7. 长文页 / 关于页 → `state().master` ≈ 0.562（−5 dB），首页为 1。
 
 ## 5. 已知取舍
 
