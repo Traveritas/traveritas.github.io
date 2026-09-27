@@ -61,6 +61,20 @@ const { layer = 'through' } = Astro.props;
                      一节两枚、一段数字的量级，2026-09-25 起改成「动画常驻、
                      振幅乘 --still」以换掉换面时的一下骤停；本层是 160 枚，
                      常驻的代价按 Constructs 的实测是每帧 2.5ms，两族的取舍因此相反。
+       --fld-ink     方块墨色（填充 5% / 边线 9%），默认 var(--fg) ＝ 中性墨。
+                     ★ 浓淡只由这两个百分数决定，别处不用动：
+                       5 / 9  （现值）淡，砌而不抢；醒面拼合仍读得出缝。
+                       7 / 13（2026-09-28 之前）偏浓，梦面重叠时抢眼。
+                       ⇒ 由 --ghost-ink（梦端暖墨 #b98f74）改来。底色上已经有
+                       一层暖洗染（.wash-backdrop 梦端暖褐 7%），暖墨再叠一层，
+                       梦态方块各自放大 1.2–3x 互相重叠时整片读成米黄斑块、
+                       背景发花。换中性墨后同一片场按**明度**分层，读作
+                       「灰玻璃叠层」，暖色只剩洗染那一处。面 : 缝 ≈ 0.55，
+                       两档一致 ⇒ 面与缝的明暗关系不变，只整体退后一档。
+                     ☆ 本层叠在**地面之上**（z −2；首页 −3），地面换什么色都与它无关：
+                       全站地面（tokens 的 --bg 与首页 StageBackdrop 五段）的墨
+                       都是 --fg，故一处取值通吃。回到暖墨：写 var(--ghost-ink)，
+                       浓淡改回 7 / 13。
      ═══════════════════════════════════════════════════════════════════════ */
   .fld-bg {
     position: fixed;
@@ -71,6 +85,8 @@ const { layer = 'through' } = Astro.props;
     contain: strict;
     transform: translateZ(0);
     --fld-rewind: 260px;
+    /* 方块墨色：中性墨（见顶部调参总闸）。底色已带暖洗染，暖墨会二次加暖 */
+    --fld-ink: var(--fg);
     --rw-x: 252px; /* = 260×cos14° 取整（生成器启动时按 --fld-rewind 重算） */
     --rw-y: 63px; /* = 260×sin14° 取整 */
     /* 一个漂移周期的向量：2400px 沿 14° ⇒ (2329, 581)。两份副本按它错开 */
@@ -161,14 +177,15 @@ const { layer = 'through' } = Astro.props;
   /* 一枚正方形：left/top 停在**梦态（loose）**位置，用 transform 滑到醒态（tiled）。
      醒态是「相邻边之间空出 1–2px」的拼接：渲染尺寸 = 格距 m − 缝宽 g，
      两档同一套尺寸 ⇒ 过渡只动 transform（不会逐帧改 width/height）。
-     7% 面 / 13% 边线：缝两侧各一条 1px 边线，中间留 1–2px 底色 ⇒ 读得出「拼接」。
+     5% 面 / 9% 边线：缝两侧各一条 1px 边线，中间留 1–2px 底色 ⇒ 读得出「拼接」。
+     两值同比例，调浓淡就是同时改这两个数（见顶部调参总闸 --fld-ink）。
      梦态独立小块浮动：参考标题（AveritA）实现，采用 Celeste 风格简谐位置量化
      （3px 最大幅值，1px 整像素阶跃，step-end 零 tween 瞬切，波峰波谷 26% 滞空缓动）。
      ★ 浮动动画的声明在下面那条梦面规则里，**不写在这里** —— 原因见该处注释。 */
   .fld-sq {
     position: absolute;
-    background: color-mix(in srgb, var(--ghost-ink) 7%, transparent);
-    border: 1px solid color-mix(in srgb, var(--ghost-ink) 13%, transparent);
+    background: color-mix(in srgb, var(--fld-ink) 5%, transparent);
+    border: 1px solid color-mix(in srgb, var(--fld-ink) 9%, transparent);
     transform: translate3d(calc(var(--fld-tx, 0px) * var(--fld-tk, 1)), calc(var(--fld-ty, 0px) * var(--fld-tk, 1)), 0);
     transform-origin: center center;
     scale: calc(1 + var(--sq-scale-delta, 0) * var(--rw-k, 0));
