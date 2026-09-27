@@ -8,6 +8,10 @@ import { xingmeng } from './src/markdown/shiki-theme.mjs';
 // https://astro.build/config
 export default defineConfig({
   site: 'https://traveritas.github.io',
+  // 钉死 IPv4：不设 host 时 dev server 按 dns.lookup('localhost') 的第一个结果绑定，
+  // Mihomo TUN 网卡在位时系统把 ::1 排在前面 → 只绑 IPv6 loopback，浏览器打开
+  // 打印出来的 http://localhost:4321 直接 ERR_CONNECTION_REFUSED（petween-desktop 同款坑）。
+  server: { host: '127.0.0.1' },
   integrations: [
     // 样式预览（/styleguide/）是工作台不是内容页：不进 sitemap（robots.txt 同档禁收）
     sitemap({ filter: (page) => !page.includes('/styleguide') }),
