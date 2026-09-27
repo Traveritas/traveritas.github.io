@@ -861,10 +861,11 @@
         <circle r="24.5" /><path class="gap-star" d="M0,-10C0.5,-3 2,-0.9 6.5,0C2,0.9 0.5,3 0,10C-0.5,3 -2,0.9 -6.5,0C-2,-0.9 -0.5,-3 0,-10Z" />
       </svg>
     </div></div></div>
+    <div class="caret" id="caret"><div class="caret-tilt"><svg viewBox="-12 -12 24 24" width="24" height="24" aria-hidden="true"><path d="M0,-11V-4.6M0,4.6V11" /></svg></div></div>
     <div class="star" id="star">
       <div class="star-tilt">
         <div class="star-halo"></div>
-        <svg class="star-svg" viewBox="-12 -12 24 24" width="15" height="15" aria-hidden="true">
+        <svg class="star-svg" viewBox="-12.8 -12.8 25.6 25.6" width="16" height="16" aria-hidden="true">
           <g class="star-twinkle" id="star-twinkle">
             <path class="s-minor" transform="rotate(45) scale(0.5)" d="M0,-10C0.5,-3 2,-0.9 6.5,0C2,0.9 0.5,3 0,10C-0.5,3 -2,0.9 -6.5,0C-2,-0.9 -0.5,-3 0,-10Z" />
             <path class="s-main" d="M0,-10C0.5,-3 2,-0.9 6.5,0C2,0.9 0.5,3 0,10C-0.5,3 -2,0.9 -6.5,0C-2,-0.9 -0.5,-3 0,-10Z" />
@@ -896,6 +897,7 @@
     body.fx-cursor-out #cursor-slot { opacity: 0; }
 
     #cursor-slot .ring,
+    #cursor-slot .caret,
     #cursor-slot .star {
       position: absolute;
       left: 0;
@@ -906,6 +908,7 @@
       pointer-events: none;
     }
     #cursor-slot.is-live .ring,
+    #cursor-slot.is-live .caret,
     #cursor-slot.is-live .star { will-change: transform, opacity; }
 
     /* ── 环 ─────────────────────────────────────────────────────────── */
@@ -952,12 +955,34 @@
     #cursor-slot .r2 .ring-spin { animation-delay: -26s; }
     @keyframes ringSpin { to { transform: rotate(360deg); } }
 
+    /* ── 插入线：正文 / 输入框上接替系统 I 形指针，中空处是星；梦态随星偏 14° ── */
+    #cursor-slot .caret { opacity: 0; }
+    #cursor-slot .caret-tilt {
+      transform: rotate(calc(var(--s) * 14deg));
+    }
+    /* 与星同一坐标系画两段：中间留 9.2px 空给星（正文态星敛到 0.55，约 7px 高） */
+    #cursor-slot .caret svg {
+      position: absolute;
+      display: block;
+      overflow: visible;
+      max-width: none;
+      left: -12px;
+      top: -12px;
+    }
+    #cursor-slot .caret path {
+      fill: none;
+      stroke: color-mix(in srgb, var(--fg) calc(var(--m) * 100%), var(--amber));
+      stroke-width: 1;
+      stroke-linecap: round;
+      stroke-opacity: 0.72;
+    }
+
     /* ── 星 ─────────────────────────────────────────────────────────── */
     #cursor-slot .star-tilt { transform: rotate(calc(var(--s) * 14deg)); }
     #cursor-slot .star-svg {
       position: absolute;
-      left: -7.5px;
-      top: -7.5px;
+      left: -8px;
+      top: -8px;
       overflow: visible;
       display: block;
       max-width: none;
@@ -1008,8 +1033,9 @@
       var star = document.getElementById('star');
       var knot = document.getElementById('s-knot');
       var twinkle = document.getElementById('star-twinkle');
+      var caret = document.getElementById('caret');
       var ringEls = [0, 1, 2].map(function (i) { return document.getElementById('ring' + i); });
-      if (!slot || !star || !knot || !twinkle || ringEls.some(function (e) { return !e; })) return;
+      if (!slot || !star || !knot || !twinkle || !caret || ringEls.some(function (e) { return !e; })) return;
 
       // 每环：弹簧角频率 ω（内快外慢）、离星软上限 cap（px）、滚动带动增益
       var RING = [
@@ -1026,7 +1052,7 @@
         return { c: c, el: ringEls[i], p: { x: -200, y: -200 }, v: { x: 0, y: 0 },
                  sx: [1, 1], sy: [1, 1], op: [1, 1] };
       });
-      var S = { ss: [1, 1], sop: [1, 1], srot: [0, 0], kop: [0, 0] };
+      var S = { ss: [1, 1], sop: [1, 1], srot: [0, 0], kop: [0, 0], cop: [0, 0], csy: [0.4, 0.4] };
       var hoverKind = '', linkC = null, forced = '';
       var holding = false, holdT0 = 0, holdDur = 2200;
       var clickT0 = -1e9, latchT0 = -1e9;
@@ -1054,17 +1080,16 @@
 
       // 目标：星 {ss, sop, srot, kop}，环 [{sx, sy, op}] ×3
       function targets(st, t) {
-        var T = { ss: 1, sop: 1, srot: 0, kop: 0, r: [0, 1, 2].map(function () { return { sx: 1, sy: 1, op: 1 }; }) };
+        var T = { ss: 1, sop: 1, srot: 0, kop: 0, cop: 0, csy: 0.4, r: [0, 1, 2].map(function () { return { sx: 1, sy: 1, op: 1 }; }) };
         var i;
         if (st === 'hover-link') {
           // 三环依次张开一点
           T.ss = 1.18;
           for (i = 0; i < 3; i++) T.r[i].sx = T.r[i].sy = 1.16 + i * 0.05;
         } else if (st === 'hover-text' || st === 'input') {
-          // 让字：内环收成一道竖线（插入位置），外两环收拢隐去，星敛小
-          T.ss = 0.55; T.sop = 0.85;
-          T.r[0].sx = 0.07; T.r[0].sy = st === 'input' ? 0.8 : 0.95; T.r[0].op = 0.9;
-          for (i = 1; i < 3; i++) { T.r[i].sx = T.r[i].sy = 0.55; T.r[i].op = 0; }
+          // 让字：三环向星收拢隐去，一道插入线穿星浮出（接替系统 I 形指针），星敛小
+          T.ss = 0.55; T.sop = 0.9; T.cop = 1; T.csy = st === 'input' ? 0.85 : 1;
+          for (i = 0; i < 3; i++) { T.r[i].sx = T.r[i].sy = 0.45; T.r[i].op = 0; }
         } else if (st === 'drag') {
           T.srot = 45;
           for (i = 0; i < 3; i++) { T.r[i].sx = 1.1; T.r[i].sy = 0.9; }
@@ -1090,6 +1115,7 @@
         var pulse = 1, pc = (now() - clickT0) / 360;
         if (pc >= 0 && pc < 1) pulse = 1 - 0.34 * Math.exp(-pc * 4.5) * Math.cos(pc * 9.5);
         place(star, ptr.x, ptr.y, ' rotate(' + f3(S.srot[0]) + 'deg) scale(' + f3(S.ss[0] * pulse) + ')');
+        place(caret, ptr.x, ptr.y, ' scale(1,' + f3(S.csy[0]) + ')');
       }
       function ease(pair, target, k, eps) {
         pair[1] = target;
@@ -1117,7 +1143,10 @@
         busy = ease(S.sop, T.sop, kS, 0.002) || busy;
         busy = ease(S.srot, T.srot, kS, 0.05) || busy;
         busy = ease(S.kop, T.kop, kS, 0.002) || busy;
+        busy = ease(S.cop, T.cop, kS, 0.004) || busy;
+        busy = ease(S.csy, T.csy, kS, 0.002) || busy;
         writeStar();
+        caret.style.opacity = f3(S.cop[0]);
         twinkle.style.opacity = f3(S.sop[0]);
         knot.style.opacity = f3(S.kop[0]);
 

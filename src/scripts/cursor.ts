@@ -59,8 +59,9 @@ export function initCursor() {
   const star = document.getElementById('star');
   const knot = document.getElementById('s-knot');
   const twinkle = document.getElementById('star-twinkle');
+  const caret = document.getElementById('caret');
   const ringEls = [...document.querySelectorAll<HTMLElement>('.cursor-slot [data-ring]')];
-  if (!slot || !star || !knot || !twinkle || ringEls.length !== RING.length) return;
+  if (!slot || !star || !knot || !twinkle || !caret || ringEls.length !== RING.length) return;
 
   const root = document.documentElement;
   const body = document.body;
@@ -118,7 +119,14 @@ export function initCursor() {
     sy: [1, 1],
     op: [1, 1],
   }));
-  const S = { ss: [1, 1] as Pair, sop: [1, 1] as Pair, srot: [0, 0] as Pair, kop: [0, 0] as Pair };
+  const S = {
+    ss: [1, 1] as Pair, // 星：缩放 / 不透明 / 旋转（°）
+    sop: [1, 1] as Pair,
+    srot: [0, 0] as Pair,
+    kop: [0, 0] as Pair, // 结 ◆：不透明
+    cop: [0, 0] as Pair, // 插入线：不透明 / 竖向缩放
+    csy: [0.4, 0.4] as Pair,
+  };
   let kind: Kind = '';
   let linkC: { x: number; y: number } | null = null;
   let holding = false;
@@ -160,6 +168,8 @@ export function initCursor() {
       sop: 1,
       srot: 0,
       kop: 0,
+      cop: 0,
+      csy: 0.4,
       r: RING.map(() => ({ sx: 1, sy: 1, op: 1 })),
     };
     if (st === 'link') {
@@ -167,16 +177,15 @@ export function initCursor() {
       T.ss = 1.18;
       T.r.forEach((r, i) => (r.sx = r.sy = 1.16 + i * 0.05));
     } else if (st === 'text' || st === 'input') {
-      // 让字：内环收成一道竖线（插入位置），外两环收拢隐去，星敛小
+      // 让字：三环向星收拢隐去，一道插入线穿星浮出（接替系统 I 形指针），星敛小
       T.ss = 0.55;
-      T.sop = 0.85;
-      T.r[0].sx = 0.07;
-      T.r[0].sy = st === 'input' ? 0.8 : 0.95;
-      T.r[0].op = 0.9;
-      for (let i = 1; i < T.r.length; i++) {
-        T.r[i].sx = T.r[i].sy = 0.55;
-        T.r[i].op = 0;
-      }
+      T.sop = 0.9;
+      T.cop = 1;
+      T.csy = st === 'input' ? 0.85 : 1;
+      T.r.forEach((r) => {
+        r.sx = r.sy = 0.45;
+        r.op = 0;
+      });
     } else if (st === 'drag') {
       T.srot = 45;
       T.r.forEach((r) => {
@@ -212,6 +221,7 @@ export function initCursor() {
     const pc = (now() - clickT0) / 360;
     if (pc >= 0 && pc < 1) pulse = 1 - 0.34 * Math.exp(-pc * 4.5) * Math.cos(pc * 9.5);
     place(star!, ptr.x, ptr.y, ` rotate(${f3(S.srot[0])}deg) scale(${f3(S.ss[0] * pulse)})`);
+    place(caret!, ptr.x, ptr.y, ` scale(1,${f3(S.csy[0])})`);
   }
 
   function loop(t: number) {
@@ -231,7 +241,10 @@ export function initCursor() {
     busy = ease(S.sop, T.sop, k, 0.002) || busy;
     busy = ease(S.srot, T.srot, k, 0.05) || busy;
     busy = ease(S.kop, T.kop, k, 0.002) || busy;
+    busy = ease(S.cop, T.cop, k, 0.004) || busy;
+    busy = ease(S.csy, T.csy, k, 0.002) || busy;
     writeStar();
+    caret!.style.opacity = String(f3(S.cop[0]));
     twinkle!.style.opacity = String(f3(S.sop[0]));
     knot!.style.opacity = String(f3(S.kop[0]));
 
