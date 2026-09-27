@@ -12,9 +12,9 @@ outro 成片目前**备而不用**（见 §3.3）。
 
 | 文件 | 段落 | 时长 | 成片响度 | 真峰值 |
 | --- | --- | --- | --- | --- |
-| `wake-intro.mp3` | 醒 · 开场 | 25.455s | −18.43 LUFS | −6.32 dBTP |
-| `wake-loop.mp3` | 醒 · 循环 | 50.909s | −14.79 LUFS | −5.62 dBTP |
-| `wake-outro.mp3` | 醒 · 收束（**运行时不用**） | 18.182s | −17.98 LUFS | −6.26 dBTP |
+| `wake-intro.mp3` | 醒 · 开场 | 25.455s | −18.41 LUFS | −6.02 dBTP |
+| `wake-loop.mp3` | 醒 · 循环 | 50.909s | −14.89 LUFS | −5.66 dBTP |
+| `wake-outro.mp3` | 醒 · 收束（**运行时不用**） | 18.182s | −17.90 LUFS | −6.05 dBTP |
 | `dream-intro.mp3` | 梦 · 开场 | 25.455s | −19.77 LUFS | −6.64 dBTP |
 | `dream-loop.mp3` | 梦 · 循环 | 50.909s | −14.38 LUFS | −0.77 dBTP |
 | `dream-outro.mp3` | 梦 · 收束（**运行时不用**） | 19.091s | −18.52 LUFS | −5.48 dBTP |
@@ -22,11 +22,13 @@ outro 成片目前**备而不用**（见 §3.3）。
 源文件**不进仓库**（`D:\myDownloads\personalwebsite-<awake|dream>-<intro|loopAB|outro>.wav`）。
 换音频要重跑流水线，成片才跟着变；仓库里存成片，是为了别处 clone 下来也能直接 build。
 
-> **换稿注意**：两态 intro 必须同长，这是两态相位与 bed 时间轴的前提
+> **换稿注意**：两态 intro 与两态 loop **必须同长**，这是两态相位与 bed 时间轴的前提
 > （`sound.ts` 取两态时长的较小者当共同长度，不等长会把另一边截胡）。
-> 2026-09-28 醒的开场换过一稿：旧稿在源目录里留档为 `personalwebsite-awake-intro.old.wav/.mp3`，
-> 当前 `personalwebsite-awake-intro.wav` ＝ 用户给的 `awake-intro-fixed.wav`（同为 25.454562s）。
-> 换完 awake 全段增益由 −6.02 变 −5.95 dB（新稿本身轻约 0.7 dB，整体对齐自动吸收）。
+> 醒的两段已换过两轮稿，源目录按顺序留档：
+> `personalwebsite-awake-intro.old.*`（首版）→ `.prev.*`（第二版）→ 当前（第三版，
+> 用户给的 `awake-intro-new.wav`）；loop 同理 `.prev.*` 是旧版，当前＝`awake-loopAB-new.wav`。
+> 每次换稿都重跑流水线：整体对齐会把新稿的电平差自动吸收掉，awake 全段增益随之走
+> （−6.02 → −5.95 → −5.87 dB），两态 programme 响度始终对齐到 0.01 dB 内。
 
 ## 2. 等响流水线
 
@@ -40,9 +42,9 @@ node design/audio/normalize-bgm.mjs --src <目录>  # 换源目录
   不用 RMS：K 加权计入高频，而两态的音色分工正是「醒＝更清晰、梦＝更模糊」，
   同样 RMS 下更亮的那条听起来更响，按 LUFS 才是听感对齐。
 - **怎么对齐**：默认 `--align whole`——把一态的 intro+loop+outro 拼成一段 programme
-  量积分响度，两态之间用**一个**增益差对齐（本片源：awake 全段 −5.95 dB）。
+  量积分响度，两态之间用**一个**增益差对齐（本片源：awake 全段 −5.87 dB）。
   这样整态的内部起伏（intro→loop 的落差）原样保留，不重写编曲。
-  代价是逐段仍有小残差，实测 loop 差 0.41 dB、intro 差 1.34 dB——loop 占播放时间的
+  代价是逐段仍有小残差，实测 loop 差 0.51 dB、intro 差 1.36 dB——loop 占播放时间的
   绝大部分，听感上足够。
   另有一档 `--align segment`：intro/loop/outro 逐段各自对齐，换面时任何时刻都不跳音量，
   但会把 awake 自己的 intro→loop 落差（3.0 dB）改成 dream 的（5.6 dB）。
