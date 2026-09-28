@@ -189,39 +189,66 @@ const wakeAnchors = [
     </div>
   </section>
 
-  <!-- ═══ N3 深眠 · 项目：静止名录与八阶成形度 ═══ -->
+  <!-- ═══ N3 深眠 · 项目：造物晶板与八阶成形度 ═══ -->
   <section class="band band-projects" id="ns-projects">
     <div class="still-col">
       <StitchHeader title="项目" stage="深眠 · DEEP · N3 δ" time={`${fmtNightTime(124)} → ${fmtNightTime(181)}`} />
       <p class="verdict">
         <span class="vtag cool">可构造的 · BUILDABLE</span>
       </p>
-      <ul class="ledger">
+      <div class="projects-grid" style={`--count: ${Math.min(projects.length, 3)}`}>
         {
-          projects.map((p) => (
-            <li>
-              <a href={`/projects/${p.id}/`}>
-                <span class="ledger-date">{fmt(p.date)}</span>
-                <span>
-                  <span class="ledger-title">
-                    {p.title}
-                    <span class="ledger-status">{p.status}</span>
-                    <span class="stitch-meter" title={`成形度第 ${pinsOf(p.status)} 阶 / 八阶`}>
-                      {Array.from({ length: 8 }).map((_, i) => (
-                        <i class:list={{ on: i < pinsOf(p.status) }} />
-                      ))}
+          projects.map((p, i) => {
+            const tilt = ([-0.9, 0.8, -0.6][i % 3]).toFixed(1);
+            const dur = (8.4 + i * 0.9).toFixed(1);
+            const phase = (-i * 2.3).toFixed(1);
+            const lift = [0, 10, 4][i % 3];
+            const pinCount = pinsOf(p.status);
+            return (
+              <div
+                class="project-slab-wrap drift"
+                style={`--d-amp: 6px; --d-dur: ${dur}s; --d-phase: ${phase}s; --d-rot: 0.35deg; --lift: ${lift}px`}
+              >
+                <a href={`/projects/${p.id}/`} class="project-slab" style={`--tilt: ${tilt}deg`}>
+                  <header class="slab-head mono">
+                    <span class="slab-date">{fmt(p.date)}</span>
+                    <span class="slab-status-pill">{p.status}</span>
+                  </header>
+
+                  <div class="slab-main">
+                    <h3 class="slab-title">{p.title}</h3>
+                    {p.description && <p class="slab-desc">{p.description}</p>}
+                    {p.note && (
+                      <p
+                        class="slab-note"
+                        data-morph
+                        data-true={p.note.awake}
+                        data-dream={p.note.dream}
+                      >
+                        {p.note.awake}
+                      </p>
+                    )}
+                  </div>
+
+                  <footer class="slab-foot mono">
+                    <div class="slab-depth" title={`成形度第 ${pinCount} 阶 / 八阶`}>
+                      <span class="depth-label">DEPTH · {pinCount}/8</span>
+                      <span class="stitch-meter">
+                        {Array.from({ length: 8 }).map((_, idx) => (
+                          <i class:list={{ on: idx < pinCount }} />
+                        ))}
+                      </span>
+                    </div>
+                    <span class:list={['slab-repo', { 'repo-ok': repoOf(p), 'repo-na': !repoOf(p) }]}>
+                      {repoOf(p) ? '✓ 源码' : '○ 暂无公开'}
                     </span>
-                  </span>
-                  {p.description && <span class="ledger-desc">{p.description}</span>}
-                </span>
-                <span class:list={['tick', { 'tick-ok': repoOf(p), 'tick-na': !repoOf(p) }]}>
-                  {repoOf(p) ? '✓ 公开仓库' : '○ 暂无公开'}
-                </span>
-              </a>
-            </li>
-          ))
+                  </footer>
+                </a>
+              </div>
+            );
+          })
         }
-      </ul>
+      </div>
       <p class="band-more"><a href="/projects/">全部项目 →</a></p>
     </div>
   </section>
@@ -1025,7 +1052,7 @@ const wakeAnchors = [
     color: var(--fg-soft);
   }
 
-  /* ── 深眠 · 放宽一档的静止名录（仓库列收在行尾） ── */
+  /* ── 深眠 · 造物晶板：磨砂建筑厚晶板（三列并排浮动） ── */
   .band-projects {
     min-height: 108vh;
     display: flex;
@@ -1035,29 +1062,191 @@ const wakeAnchors = [
   .still-col {
     position: relative;
     z-index: 2;
-    width: min(100% - 3rem, 68rem);
+    width: min(100% - 3rem, 74rem);
     margin-inline: auto;
   }
 
-  .band-projects .ledger a {
-    grid-template-columns: 7.5em 1fr auto;
-    gap: 0 2rem;
+  .projects-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+    align-items: stretch;
+    margin-bottom: 2.4rem;
   }
 
-  .tick {
-    font-family: var(--font-mono);
-    font-size: 0.66rem;
-    letter-spacing: 0.16em;
+  @media (min-width: 800px) {
+    .projects-grid {
+      grid-template-columns: repeat(var(--count, 3), minmax(0, 1fr));
+      gap: clamp(1.2rem, 2vw, 2.2rem);
+    }
+  }
+
+  .project-slab-wrap {
+    margin-top: var(--lift, 0px);
+    display: flex;
+    min-width: 0;
+  }
+
+  .project-slab {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    width: 100%;
+    min-width: 0;
+    padding: 1.6rem 1.65rem 1.4rem;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.82);
+    background: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.74) 0%,
+      rgba(255, 255, 255, 0.44) 100%
+    );
+    -webkit-backdrop-filter: blur(16px) saturate(125%);
+    backdrop-filter: blur(16px) saturate(125%);
+    box-shadow:
+      inset 0 1px 1.5px rgba(255, 255, 255, 0.85),
+      inset 0 -1px 2px rgba(35, 40, 48, 0.03),
+      0 12px 32px -10px rgba(38, 44, 51, 0.07);
+    text-decoration: none !important;
+    color: var(--fg);
+    transform: rotate(var(--tilt, 0deg));
+    transition:
+      border-color 0.3s ease,
+      background 0.3s ease,
+      box-shadow 0.3s ease,
+      transform 0.35s cubic-bezier(0.2, 0.8, 0.3, 1.15);
+  }
+
+  .project-slab:hover {
+    border-color: color-mix(in srgb, var(--amber) 50%, #ffffff);
+    background: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.92) 0%,
+      rgba(255, 255, 255, 0.65) 100%
+    );
+    box-shadow:
+      inset 0 1.5px 2px #ffffff,
+      0 18px 42px -10px rgba(38, 44, 51, 0.12);
+    transform: rotate(0deg) translateY(-4px);
+  }
+
+  .slab-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.8rem;
+    font-size: 0.68rem;
+    letter-spacing: 0.14em;
+    color: var(--fg-soft);
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .slab-date {
+    color: var(--fg-faint);
+  }
+
+  .slab-status-pill {
+    padding: 0.16rem 0.5rem 0.14rem;
+    border-radius: 3px;
+    font-size: 0.62rem;
+    letter-spacing: 0.14em;
+    background: rgba(255, 255, 255, 0.45);
+    border: 1px solid var(--line);
+    color: var(--fg-soft);
+  }
+
+  .slab-main {
+    padding-block: 1.1rem 1.3rem;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    min-width: 0;
+  }
+
+  .slab-title {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: clamp(1.08rem, 1.3vw, 1.2rem);
+    letter-spacing: 0.02em;
+    color: var(--fg);
+    margin: 0;
+    transition: color 0.2s ease;
+    word-break: break-word;
+  }
+
+  .project-slab:hover .slab-title {
+    color: var(--amber-dark, #8f5a18);
+  }
+
+  .slab-desc {
+    font-family: var(--font-serif);
+    font-size: 0.84rem;
+    line-height: 1.72;
+    letter-spacing: 0.02em;
+    color: var(--fg-soft);
+    margin: 0;
+  }
+
+  .slab-note {
+    font-family: var(--font-serif);
+    font-size: 0.76rem;
+    line-height: 1.68;
+    letter-spacing: 0.03em;
+    color: var(--umber);
+    opacity: 0.88;
+    margin: 0.3rem 0 0;
+    padding-left: 0.7rem;
+    border-left: 2px solid color-mix(in srgb, var(--amber) 45%, transparent);
+    font-style: italic;
+  }
+
+  .slab-foot {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem 0.6rem;
+    font-size: 0.64rem;
+    letter-spacing: 0.12em;
+    padding-top: 0.8rem;
+    border-top: 1px solid var(--line);
+  }
+
+  .slab-depth {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    color: var(--fg-soft);
+  }
+
+  .slab-depth .stitch-meter {
+    gap: 3.5px;
+  }
+
+  .slab-depth .stitch-meter i {
+    width: 7px;
+    height: 2px;
+  }
+
+  .depth-label {
+    opacity: 0.75;
+  }
+
+  .slab-repo {
     white-space: nowrap;
-    padding-top: 0.42em;
+    font-size: 0.64rem;
+    letter-spacing: 0.12em;
   }
 
-  .tick-ok {
+  .repo-ok {
     color: color-mix(in srgb, var(--wake) 50%, var(--fg) 50%);
   }
 
-  .tick-na {
-    color: var(--fg-soft);
+  .repo-na {
+    color: var(--fg-faint);
   }
 
   /* 高调画册下的磨砂晶体：在浅色底上展现纯净白雾微光 */
@@ -1069,18 +1258,6 @@ const wakeAnchors = [
   :global(body[data-stage='n1'] .chip:hover .chip-glass, body[data-stage='n2'] .chip:hover .chip-glass, body[data-stage='n3'] .chip:hover .chip-glass, body[data-stage='rem'] .chip:hover .chip-glass, body[data-stage='waso'] .chip:hover .chip-glass) {
     background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.6) 100%);
     border-color: #ffffff;
-  }
-
-  @media (max-width: 34em) {
-    .band-projects .ledger a {
-      grid-template-columns: 1fr;
-      gap: 0.25rem;
-    }
-
-    .tick {
-      margin-top: 0.4rem;
-      padding-top: 0;
-    }
   }
 
   /* ── REM · 瞬间便签场：7 枚磨砂晶体便签错落漂浮在玻璃签左侧 ── */
