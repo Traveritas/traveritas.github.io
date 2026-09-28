@@ -13,16 +13,17 @@
 
 | 文件 | 段落 | 时长 | 成片响度 | 真峰值 |
 | --- | --- | --- | --- | --- |
-| `wake-open.mp3` | 醒 · 开场（intro+一遍 loop） | 76.364s | −15.60 LUFS | −5.64 dBTP |
-| `wake-loop.mp3` | 醒 · 循环 | 50.909s | −14.89 LUFS | −5.66 dBTP |
-| `wake-outro.mp3` | 醒 · 收束（**运行时不用**） | 18.182s | −17.90 LUFS | −6.05 dBTP |
+| `wake-open.mp3` | 醒 · 开场（intro+一遍 loop） | 76.364s | −15.19 LUFS | −7.37 dBTP |
+| `wake-loop.mp3` | 醒 · 循环 | 50.909s | −14.46 LUFS | −7.38 dBTP |
+| `wake-outro.mp3` | 醒 · 收束（**运行时不用**） | 18.182s | −19.93 LUFS | −8.15 dBTP |
 | `dream-open.mp3` | 梦 · 开场（intro+一遍 loop） | 76.364s | −15.38 LUFS | −0.83 dBTP |
 | `dream-loop.mp3` | 梦 · 循环 | 50.909s | −14.38 LUFS | −0.77 dBTP |
 | `dream-outro.mp3` | 梦 · 收束（**运行时不用**） | 19.091s | −18.52 LUFS | −5.48 dBTP |
 
 源文件**不进仓库**（`D:\myDownloads\personalwebsite-<awake|dream>-<intro+loopAB|loopAB|outro>.wav`）。
-开场是 `intro+loopAB` 合并母带（2026-09-28 换稿，接缝修在母带内部一整次渲染）；
-loop 与 outro 仍用各自的独立源，本轮**一字未动**。换音频要重跑流水线，成片才跟着变；
+开场是 `intro+loopAB` 合并母带、loop 是独立源，都是各自一整次渲染（接缝修在母带内部）；
+醒面最近一轮换稿（2026-09-28 深夜的 `-newest`）**母带与 loop 同批换掉**，梦面与醒面的
+outro 一字未动。换音频要重跑流水线，成片才跟着变；
 仓库里存成片，是为了别处 clone 下来也能直接 build。
 重跑会一并刷新 `src/data/bgm-assets.ts`（成片版本号 + `OPEN_SEAM`），**别漏提交它**——
 它是换稿后浏览器肯取新曲子的唯一依据（详见 §2）。
@@ -32,10 +33,13 @@ loop 与 outro 仍用各自的独立源，本轮**一字未动**。换音频要�
 > 开场母带里 intro→loop 的边界目前定在 25.454562s（1221819 样本 @48k，经互相关核实：
 > dream 的 intro 段与旧 intro 源逐样本一致正好到此，awake 的 loop 头窗也在同一位置
 > 对齐），记在流水线的 `OPEN_SEAM_SAMPLE`。换稿重渲染母带若动了 intro 长度，要改它，
-> 并用 `analyze.mjs` 的接缝体检重新核实。
+> 并用 `analyze.mjs` 的接缝体检重新核实。`-newest` 一稿按同法复核过：母带尾段与 loop 源
+> 全长相关 0.80（旧稿 0.69），峰值仍落在旧稿同样的 +2 样本偏置上——边界未动。
 > 醒侧换稿留档：`personalwebsite-awake-intro.old.*`（首版）→ `.prev.*`（第二版）→
-> 独立 intro（第三版）→ 合并进 `intro+loopAB` 母带（第四版，接缝修在内部）；
-> loop 源仍为第三版（`awake-loopAB-new.wav` 那一轮）。
+> 独立 intro（第三版）→ 合并进 `intro+loopAB` 母带（第四版，接缝修在内部）→
+> `-newest`（第五版母带 + 第四版 loop 源，2026-09-28 深夜，母带与 loop 同批换）。
+> 第四版母带存档为 `personalwebsite-awake-intro+loopAB.v4.*`；第三版 loop 源仍是
+> `awake-loopAB-new.wav`（与第五版换稿前的 `personalwebsite-awake-loopAB.wav` 逐字节相同）。
 
 ## 2. 等响流水线
 
@@ -56,10 +60,9 @@ node design/audio/normalize-bgm.mjs --src <目录>  # 换源目录
   另有一档 `--align segment`：open/loop/outro 逐段各自对齐，换面时任何时刻都不跳音量，
   但会把 awake 自己的 intro→loop 落差改成 dream 的。
   **用户 2026-09-27 选定「先整体对齐」**，故默认 whole。
-- **本轮（2026-09-28，先听效果）冻结了增益**：loop/outro 成片保持既有文件一字未动，
-  open 按各态既有增益手编（awake −5.87 dB；dream 是参考态，不动）。
-  `--check` 实测：全量重跑会把 awake 调到 −5.76 dB，与冻结值差 0.11 dB——
-  听感定稿后重跑一次流水线即可收拢。
+- **增益已收拢**：2026-09-28 深夜换 `-newest` 稿后全量重跑，awake 落在 **−7.89 dB**
+  （新母带比上一版热约 2 dB，故比冻结期的 −5.87 dB 更退）；dream 是参考态，仍 0 dB。
+  成片整态差 0.01 dB，逐段残差最大 1.41 dB（outro 段，整体对齐的必然代价）。
 - **参考形态**：`dream`。它的电平即目标，一个 bit 不动；只调另一态。
 - **编码**：始终从无损源编一次（`libmp3lame -q:a 4` ≈165 kbps），不二次编码；
   编完再量一遍，偏差超 0.25 dB 就用残余量从源重编。
@@ -175,8 +178,8 @@ node design/audio/analyze.mjs        # 换音频后：接缝与循环边界体�
 - 两态的 open 是**不同形状**：dream 从近乎无声涨起来，awake 一上来就在。
   整体等响对齐的是积分响度，故开场头几秒两态仍有明显落差——这是编曲的性格差异
   （醒＝边界明确、梦＝模糊），不是没对齐。
-- `awake-open` 的源母带真峰值 +0.02 dBTP（轻微超界）；套上本态增益 −5.87 dB 后成片
-  −5.64 dBTP，安全。若未来把 awake 调回 0 dB 附近，需先在源上留峰顶余量。
+- `awake-open` 的源母带真峰值 +0.16 dBTP（超界）；套上本态增益 −7.89 dB 后成片
+  −7.37 dBTP，安全。若未来把 awake 调回 0 dB 附近，需先在源上留峰顶余量。
 - 母带里的 loop 一遍与独立的 loop 源**不是逐样本同一渲染**（重渲染差异；两处边界
   实测与 loop 自身循环边界几乎一致，接力点成立，见 `analyze.mjs`）。若实听开场→loop
   的接力仍有可闻错位，后备方案：流水线改为从母带按 `OPEN_SEAM_SAMPLE` 切出 loop 成片
@@ -185,6 +188,13 @@ node design/audio/analyze.mjs        # 换音频后：接缝与循环边界体�
   改 `normalize-bgm.mjs` 的 `ABSOLUTE_TARGETS`（一组数，两态一起挪）。
 - 运行时不做整体衰减（`master` 从 1 起），交付的就是用户自己的电平；
   若嫌作为阅读背景偏响，在 `sound.ts` 的 `master` 上挂一个常数即可（两态同时降，等响关系不变）。
+- **iOS 的侧边静音拨片会连 Web Audio 一起静掉**（`<video>` 不受影响、Web Audio 受影响）：
+  拨片开着时页面管线照常运转、耳朵里却是无声，某些版本上是极低电平的失真残余
+  （听感即「很小的杂音」）。JS 读不到拨片状态，属系统行为——排查「iOS 没声音」先看拨片
+  （2026-09-28 实测归因：iOS 18.7 诊断数据全绿，ctx 恒 48k、mp3 解码样本数与源 wav
+  逐样本一致、信号管线完好，而拨片开着时全程无声）。同日 AudioContext 改为随设备
+  采样率创建（原先锁 48000）：锁固定率就得走 WebKit 的实时重采样（Bug 154538 一族
+  的失真路径），跟随设备让 `decodeAudioData` 的离线重采样把 48k 素材对齐过去，更稳。
 - mp3 的无缝依赖解码器按 LAME 标签裁掉编码填充：**Chromium 实测样点数与源 wav 逐个相等**
   （`design/audio/out/normalize-report.json` 的 `samples` 字段），故 `loop=true` 即刻无缝。
   换格式（如 ogg/opus）需重新验证这一条。
