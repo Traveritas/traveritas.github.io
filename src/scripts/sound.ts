@@ -4,22 +4,28 @@
      样点数与源 wav 逐个相等，故 loop=true 即刻无缝、且两态天然对齐）。
      醒度（reality.ts 的 wakeMix）驱动等功率交叉——长按入梦时，声音是跟着
      那根线一起换面，而不是切歌。
-   · intro 接入 loop；关声＝直接淡出，不接 outro（见 docs/design/bgm.md §3.4：
-     outro 成片留着备查，运行时不用）。
+   · 开场＝intro+一遍 loop 的合并稿（open，一态一条），从 0 整段接入；走到尽头
+     由 bed（loop）在同一采样点上续上——bed 的起点在开场起步时就按音频钟预排好
+     （start 一个未来时刻），轮询只补位迟到的缓冲，接缝处没有空档。
+     关声＝直接淡出，不接 outro（见 docs/design/bgm.md §3.4：outro 成片留着
+     备查，运行时不用）。
    · 相位用墙钟锚定（sessionStorage 存 epoch = 弧线零点对应的墙钟 ms）：
      站内换页、以及「关一下就回来」都落在同一条时间线上；但关了超过
      OFF_RESET_MS（10s）再打开，当作走远了——弧线弃掉，从零点重演开场。
+   · 开场还在演就换了面：intro 段内＝收掉开场、bed 从 loop 0 接上（这半段弧线
+     抹掉）；已在开场自带的 loop 一遍里＝bed 按当前相位无缝续上（弧线向后挪
+     一整个 loop），音乐不回头、不重播刚听过的那一段。
    · 自动播放：首屏绝不出声（浏览器也拦）；用户点开过之后，站内换页尝试续播，
      被策略拦下就如实退回待开启态——不假装在播。
-   · 未开启时一个字节都不取；开启后先要当前形态的 intro，另一态 loop 随后
+   · 未开启时一个字节都不取；开启后先要当前形态的 open，另一态 loop 随后
      （闲时）预取，换面要交叉时不会晚。
    ───────────────────────────────────────────────────────────── */
 
 import { clamp } from './lib';
-import { BGM_VERSION } from '../data/bgm-assets';
+import { BGM_VERSION, OPEN_SEAM } from '../data/bgm-assets';
 import { getReality, wakeMix, type Reality } from './reality';
 
-type Seg = 'intro' | 'loop';
+type Seg = 'open' | 'loop';
 const FORMS: Reality[] = ['wake', 'dream'];
 const DIR = '/audio';
 const STORE_KEY = 'xm-sound';
@@ -53,12 +59,12 @@ const READING_TRIM_DB = -5;
 
 interface Stored {
   on: boolean;
-  /** 弧线零点（intro 起点）对应的墙钟毫秒 */
+  /** 弧线零点（开场起点）对应的墙钟毫秒 */
   epoch: number;
   /** 关声那一刻的墙钟毫秒：再打开时据此判断该续上还是从头（见 OFF_RESET_MS） */
   offAt?: number;
   /** 段落时长（首次放出来后记下）：站内换页时缓冲还没到手也要能算相位 */
-  durs?: { intro?: number; loop?: number };
+  durs?: { open?: number; loop?: number };
 }
 
 /* ── 运行时 ─────────────────────────────────────────── */
@@ -66,16 +72,20 @@ let ctx: AudioContext | null = null;
 let master: GainNode | null = null; // 进出场
 let headroom: GainNode | null = null; // 交叉余量 × 悬停
 let bedGain: GainNode | null = null; // bed 生命周期
-let gIntro: GainNode | null = null;
+let gOpen: GainNode | null = null;
 const chain: Partial<Record<Reality, { gain: GainNode; src: AudioBufferSourceNode | null }>> = {};
 
 const buffers = new Map<string, AudioBuffer>();
 const inflight = new Map<string, Promise<AudioBuffer | null>>();
 
-let introSrc: AudioBufferSourceNode | null = null;
-let introForm: Reality = 'dream';
-/** bed 时间轴：ctx 时间 bedAtCtx 处对应弧线里的 introDur（即 loop 的 0） */
+let openSrc: AudioBufferSourceNode | null = null;
+let openForm: Reality = 'dream';
+/** 开场源的接入点（ctx 时间 / open 里的偏移）：换面接力时算它此刻演到哪 */
+let openAt: { ctx: number; offset: number } | null = null;
+/** bed 时间轴：ctx 时间 bedAtCtx 处对应弧线 openDur + bedPhase（即 loop 的 bedPhase 处）。
+     一般 bedPhase = 0（开场尽头接 loop 0）；开场中段被拦下换面时 > 0（按当前相位续） */
 let bedAtCtx: number | null = null;
+let bedPhase = 0;
 let epoch: number | null = null;
 let offAt: number | null = null;
 let on = false;
@@ -96,7 +106,7 @@ const buf = (form: Reality, seg: Seg) => buffers.get(`${form}-${seg}`);
 /** 时长：优先用已解码的缓冲；缓冲还没到手就用存下来的值，否则算不出相位 */
 const durOf = (seg: Seg, form: Reality) => buf(form, seg)?.duration ?? storedDurs[seg] ?? Infinity;
 /** 两态同长（源保证；实测解码后逐条相等）。取短的那个当共同长度，防外扩 */
-const introDur = () => Math.min(...FORMS.map((f) => durOf('intro', f)));
+const openDur = () => Math.min(...FORMS.map((f) => durOf('open', f)));
 const loopDur = () => Math.min(...FORMS.map((f) => durOf('loop', f)));
 
 /* ── 取音频（只在开启后发生）─────────────────────────── */
@@ -113,7 +123,7 @@ function load(form: Reality, seg: Seg): Promise<AudioBuffer | null> {
     const decoded = await ctx.decodeAudioData(await res.arrayBuffer());
     buffers.set(key, decoded);
     if (seg === 'loop') peaks.set(key, peakOf(decoded));
-    if (seg === 'intro' || seg === 'loop') {
+    if (seg === 'open' || seg === 'loop') {
       const cur = storedDurs[seg];
       if (!cur || decoded.duration < cur) {
         storedDurs[seg] = decoded.duration;
@@ -168,11 +178,11 @@ function buildGraph() {
   master = ctx.createGain();
   headroom = ctx.createGain();
   bedGain = ctx.createGain();
-  gIntro = ctx.createGain();
+  gOpen = ctx.createGain();
   master.gain.value = 0;
   headroom.gain.value = 1;
   bedGain.gain.value = 1;
-  gIntro.gain.value = 0;
+  gOpen.gain.value = 0;
   for (const f of FORMS) {
     const g = ctx.createGain();
     g.gain.value = 0;
@@ -180,7 +190,7 @@ function buildGraph() {
     chain[f] = { gain: g, src: null };
   }
   bedGain.connect(headroom);
-  gIntro.connect(headroom);
+  gOpen.connect(headroom);
   headroom.connect(master);
   master.connect(ctx.destination);
 }
@@ -239,62 +249,79 @@ function stopLoop(form: Reality) {
   }
   src.disconnect();
 }
-/** 两条 loop 都追上 bed 时间轴；缓冲迟到就等它到（offset 由时间轴推出） */
+/** 两条 loop 都追上 bed 时间轴；缓冲迟到就等它到（相位由时间轴推出）。
+    bed 起点在弧线定下来时就预排好（at 落在未来就原样排上，音频钟准点起音），
+    轮询只补迟到的缓冲——接缝处不靠运气，没有空档。 */
 function ensureBed() {
   if (!ctx || bedAtCtx === null) return;
-  if (introSrc && now() < bedAtCtx) return; // 开场还没走完
   for (const f of FORMS) {
     if (chain[f]?.src || !buf(f, 'loop')) continue;
     const at = Math.max(bedAtCtx, now() + 0.06);
-    startLoop(f, at, at - bedAtCtx);
+    startLoop(f, at, bedPhase + Math.max(0, at - bedAtCtx));
   }
 }
-/** 把 bed 时间轴挪到「ctx 时间 at 处 = 弧线 introDur 处」（提前切掉开场时用） */
-function anchorBed(at: number) {
-  epoch = Date.now() + (at - now()) * 1000 - introDur() * 1000;
+/** 把 bed 时间轴挪到「ctx 时间 at 处 = 弧线 arcPos 处」（提前切掉开场时用）。
+    arcPos 落在 open 段内的部分折进 loop 相位（bedPhase） */
+function anchorBed(at: number, arcPos: number) {
+  epoch = Date.now() + (at - now()) * 1000 - arcPos * 1000;
+  bedPhase = Math.max(0, arcPos - openDur());
   persist();
 }
-/** 从弧线当前所在的位置接入：intro 里就接着放开场，过了就直接落 bed */
+/** 从弧线当前所在的位置接入：开场里就接着放 open，过了就直接落 bed */
 function startFromArc() {
-  if (!ctx || !gIntro) return;
+  if (!ctx || !gOpen) return;
   const a = arcNow();
-  const id = introDur();
-  if (Number.isFinite(id) && a < id && !introSrc) {
-    const b = buf(getReality(), 'intro');
+  const od = openDur();
+  if (Number.isFinite(od) && a < od && !openSrc) {
+    const b = buf(getReality(), 'open');
     if (b) {
-      introForm = getReality();
+      openForm = getReality();
+      // 重进开场＝旧 bed 作废（arc < openDur 时还在响的 bed 一定是上一次弧线的）
+      for (const f of FORMS) stopLoop(f);
       const at = now() + 0.06;
       const src = ctx.createBufferSource();
       src.buffer = b;
-      src.connect(gIntro);
+      src.connect(gOpen);
       src.start(at, a);
+      openAt = { ctx: at, offset: a };
       src.onended = () => {
-        if (introSrc === src) introSrc = null;
+        if (openSrc === src) {
+          openSrc = null;
+          openAt = null;
+        }
       };
-      introSrc = src;
-      gIntro.gain.cancelScheduledValues(at);
-      gIntro.gain.setValueAtTime(0, at);
-      gIntro.gain.linearRampToValueAtTime(1, at + FADE_IN);
-      bedAtCtx = at + (id - a); // 开场尽头正好落在 loop 的 0
-      ensureBed();
+      openSrc = src;
+      gOpen.gain.cancelScheduledValues(at);
+      gOpen.gain.setValueAtTime(0, at);
+      gOpen.gain.linearRampToValueAtTime(1, at + FADE_IN);
+      bedPhase = 0;
+      bedAtCtx = at + (od - a); // 开场尽头正好落在 loop 的 0
+      ensureBed(); // bed 当场预排到尽头那个采样点
       return;
     }
   }
   // 直接落 bed：相位由时间轴推出
-  const off = Number.isFinite(id) && Number.isFinite(loopDur()) ? a - id : 0;
+  const off = Number.isFinite(od) && Number.isFinite(loopDur()) ? a - od : 0;
+  bedPhase = 0;
   bedAtCtx = now() + 0.06 - off;
   ensureBed();
 }
-function stopIntro(fade: number) {
-  const src = introSrc;
-  if (!ctx || !gIntro || !src) return;
-  introSrc = null;
+function stopOpen(fade: number, stopAt = now()) {
+  const src = openSrc;
+  if (!ctx || !gOpen || !src) return;
+  openSrc = null;
+  openAt = null;
   const t = now();
-  gIntro.gain.cancelScheduledValues(t);
-  // τ = fade/3 ⇒ fade*2 处已落到 e⁻⁶ ≈ 0.2%，此时停源不留咔
-  gIntro.gain.setTargetAtTime(0, t, Math.max(0.05, fade / 3));
-  src.stop(t + fade * 2);
-  setTimeout(() => src.disconnect(), fade * 2000 + 300);
+  gOpen.gain.cancelScheduledValues(t);
+  if (fade > 0) {
+    // τ = fade/3 ⇒ fade*2 处已落到 e⁻⁶ ≈ 0.2%，此时停源不留咔
+    gOpen.gain.setTargetAtTime(0, t, Math.max(0.05, fade / 3));
+    src.stop(stopAt + fade * 2);
+  } else {
+    // 硬停：只用于内容由 bed 同相位续上的接力，音乐不多淡一笔
+    src.stop(stopAt);
+  }
+  setTimeout(() => src.disconnect(), Math.max(0, stopAt - t) * 1000 + fade * 2000 + 300);
 }
 
 /* ── 播放生命周期 ─────────────────────────────────── */
@@ -302,9 +329,9 @@ async function startPlayback() {
   if (!ctx) return;
   const form = getReality();
   void load(form, 'loop'); // loop 永远要，先并行起步
-  // 只有真要演开场（弧线还在 intro 段内）才等 intro；否则等 loop 到手再出声，
+  // 只有真要演开场（弧线还在 open 段内）才等 open；否则等 loop 到手再出声，
   // 免得淡入追上一片空场（站内换页时开场多半已经演过了）
-  if (arcNow() < introDur()) await load(form, 'intro');
+  if (arcNow() < openDur()) await load(form, 'open');
   else await load(form, 'loop');
   if (!on || !ctx) return;
   mixWanted = mixApplied = form === 'wake' ? 1 : 0;
@@ -320,12 +347,12 @@ async function startPlayback() {
   paint();
 }
 
-/** 关声：master 直接淡出（intro / loop 一起收），随后停源挂起。
+/** 关声：master 直接淡出（open / loop 一起收），随后停源挂起。
     挂的是 master 而非 bed，所以开场演到一半关声也是同一条淡出。 */
 function haltPlayback() {
   stopPoll();
   if (!ctx) return;
-  stopIntro(0.4);
+  stopOpen(0.4);
   const t = now();
   master?.gain.cancelScheduledValues(t);
   master?.gain.setTargetAtTime(0, t, FADE_OUT / 3);
@@ -411,11 +438,21 @@ function startPoll() {
       mixWanted = m;
       setMix(m);
     }
-    // 开场还在演、人已换到对面：收掉开场，bed 立刻接上（并把这半段弧线抹掉）
-    if (introSrc && Math.abs(mixWanted - (introForm === 'wake' ? 1 : 0)) > 0.55) {
+    // 开场还在演、人已换到对面：
+    // intro 段内 → 收掉开场，bed 从 loop 0 接上（这半段弧线抹掉）；
+    // 已在开场自带的 loop 一遍里 → bed 按当前相位无缝续上（弧线向后挪一整个 loop），
+    // 音乐不回头、不重播刚听过的那一段
+    if (openSrc && Math.abs(mixWanted - (openForm === 'wake' ? 1 : 0)) > 0.55) {
       const at = now() + 0.5;
-      stopIntro(0.45);
-      anchorBed(at);
+      const pos = openAt ? openAt.offset + (at - openAt.ctx) : arcNow();
+      if (pos < OPEN_SEAM) {
+        stopOpen(0.45);
+        anchorBed(at, openDur());
+      } else {
+        stopOpen(0, at);
+        anchorBed(at, openDur() + mod(pos - OPEN_SEAM, loopDur()));
+      }
+      for (const f of FORMS) stopLoop(f); // 预排的 bed 作废，按新锚点重排
       bedAtCtx = at;
       ensureBed();
       persist();
@@ -432,8 +469,8 @@ function persist() {
   if (epoch === null) return;
   const rec: Stored = { on, epoch };
   if (offAt !== null) rec.offAt = offAt;
-  if (storedDurs.intro || storedDurs.loop) {
-    rec.durs = { intro: storedDurs.intro, loop: storedDurs.loop };
+  if (storedDurs.open || storedDurs.loop) {
+    rec.durs = { open: storedDurs.open, loop: storedDurs.loop };
   }
   try {
     sessionStorage.setItem(STORE_KEY, JSON.stringify(rec));
@@ -484,8 +521,9 @@ export function initSound(): void {
         master: +(master?.gain.value ?? 0).toFixed(4),
         pageGain: +pageGain.toFixed(4),
         bed: +(bedGain?.gain.value ?? 0).toFixed(3),
-        intro: +(gIntro?.gain.value ?? 0).toFixed(3),
+        open: +(gOpen?.gain.value ?? 0).toFixed(3),
         bedIn: bedAtCtx === null ? null : +(bedAtCtx - now()).toFixed(2),
+        bedPhase: +bedPhase.toFixed(3),
         offFor: offAt === null ? null : +((Date.now() - offAt) / 1000).toFixed(2),
       }),
       /* 量输出端实际电平：只看调度不算数，要看到样本在流 */
@@ -518,7 +556,7 @@ export function initSound(): void {
       const rec = JSON.parse(raw) as Stored;
       epoch = rec.epoch;
       offAt = rec.offAt ?? null;
-      storedDurs = { intro: rec.durs?.intro || undefined, loop: rec.durs?.loop || undefined };
+      storedDurs = { open: rec.durs?.open || undefined, loop: rec.durs?.loop || undefined };
       wanted = rec.on === true;
     }
   } catch {

@@ -2,18 +2,25 @@
    等响流水线：把两态 BGM 源文件处理成站点可用的等响成片。
 
    源（默认 D:/myDownloads，不进仓库）：
-     personalwebsite-<awake|dream>-<intro|loopAB|outro>.<wav|mp3>
+     personalwebsite-<awake|dream>-intro+loopAB.<wav|mp3>  开场母带：intro + 一遍 loop
+                                                           （接缝修在母带内部，一整次渲染）
+     personalwebsite-<awake|dream>-loopAB.<wav|mp3>        循环段（与母带里的 loop 同编曲）
+     personalwebsite-<awake|dream>-outro.<wav|mp3>         收束（运行时不用，备查）
    出（public/audio/，进仓库）：
-     <wake|dream>-<intro|loop|outro>.mp3
+     <wake|dream>-open.mp3 / -loop.mp3 / -outro.mp3
    醒面在代码里叫 wake（src/scripts/reality.ts 的 Reality = 'wake' | 'dream'），
    故源里的 awake 落到站点文件名 wake。
 
+   开场与循环的关系：运行时先放 open（intro+一遍 loop，76.364s），走到尽头由 bed
+   无缝续上 loop（见 src/scripts/sound.ts）。所以 open 必须与本态 loop **同电平**，
+   否则开场尽头会跳一下音量——两态各自的增益是整态统一的那一个，天然满足。
+
    对齐方式（ALIGN）：
-     · whole（默认）：把一态的 intro+loop+outro 拼成一段 programme 量积分响度，
-       两态之间用**一个**增益差对齐。整态的内部起伏（intro→loop 的落差）原样保留，
-       不重写编曲；代价是逐段仍有小的残差（本片源实测：loop 0.48 dB、intro 1.93 dB）。
-     · segment：intro/loop/outro 逐段对齐到参考形态的对应段落，换面时任何时刻都不跳音量，
-       代价是会把 awake 自己的 intro→loop 落差改成 dream 的落差（3.0 dB → 5.6 dB）。
+     · whole（默认）：把一态的 open+outro 拼成一段 programme 量积分响度（loop 已在
+       open 里，不重复计入），两态之间用**一个**增益差对齐。整态的内部起伏
+       （intro→loop 的落差）原样保留，不重写编曲；代价是逐段仍有小残差。
+     · segment：open/loop/outro 逐段对齐到参考形态的对应段落，换面时任何时刻都不跳
+       音量，代价是会把 awake 自己的 intro→loop 落差改成 dream 的落差。
        审美简报要求「醒与梦之间不应有明显开关」，所以这个模式在需要「任意时刻可换面」
        时更贴题；而整体对齐更尊重编曲。默认整体，按需切换。
 
@@ -46,13 +53,28 @@ const DEFAULTS = {
 };
 /* 绝对目标（LUFS）。null = 跟随参考形态的实测值。
    想让两态整体更靠后（例如作为阅读背景），填一组数即可，如
-   { whole: -20 } 或 { intro: -20, loop: -16, outro: -20 }（按 ALIGN 取用）。 */
+   { whole: -20 } 或 { open: -20, loop: -16, outro: -20 }（按 ALIGN 取用）。 */
 const ABSOLUTE_TARGETS = null;
 
+const SR = 48000;
+/* 开场母带里 intro→loop 的边界（样本数，48k；25.454562s 处，与旧 intro 源同长，
+   经互相关核实：dream 的 intro 段与旧源逐样本一致正好到此，awake 的 loop 头窗也
+   在同一位置对齐）。它随 OPEN_SEAM 写进 src/data/bgm-assets.ts，运行时在开场中段
+   被换面拦下时，用它从 bed 接上 loop 的当前相位。
+   ⚠ 换稿若重渲染了母带，边界可能移动：改这里，并可用
+   node design/audio/analyze.mjs 里的接缝体检（或互相关）重新核实。 */
+const OPEN_SEAM_SAMPLE = 1221819;
+
 const FORMS = ['awake', 'dream'];
-const SEGS = ['intro', 'loopAB', 'outro'];
-const SEG_OUT = { intro: 'intro', loopAB: 'loop', outro: 'outro' }; // 源后缀 → 站点段落名
+/* 源后缀 → 站点段落名。loopAB 是独立循环源（成片保持既有电平），不参与母带切分 */
+const SEGS = [
+  { src: 'intro+loopAB', out: 'open' },
+  { src: 'loopAB', out: 'loop' },
+  { src: 'outro', out: 'outro' },
+];
 const FORM_OUT = { awake: 'wake', dream: 'dream' }; // 源形态 → 代码形态
+/** 整态 programme 的构成：loop 已包含在 open（母带 = intro+一遍 loop）里，不重复计入 */
+const PROGRAMME = ['open', 'outro'];
 
 const args = process.argv.slice(2);
 const opt = (name, fallback) => {
@@ -79,9 +101,10 @@ const ffmpeg = (argv) => {
   return r;
 };
 
-/** 单次解码量积分响度与真峰值（loudnorm 第一遍：只读不处理） */
-function measure(file) {
-  const r = ffmpeg(['-i', file, '-af', 'loudnorm=print_format=json', '-f', 'null', '-']);
+/** 单次解码量积分响度与真峰值（loudnorm 第一遍：只读不处理）。trim = 起始样本数 */
+function measure(file, trim) {
+  const af = trim ? `atrim=start_sample=${trim},asetpts=PTS-STARTPTS,` : '';
+  const r = ffmpeg(['-i', file, '-af', `${af}loudnorm=print_format=json`, '-f', 'null', '-']);
   const m = r.stderr.match(/\{[\s\S]*"input_i"[\s\S]*\}/);
   if (!m) throw new Error(`读不到 loudnorm 输出：${file}\n${r.stderr.slice(-600)}`);
   const j = JSON.parse(m[0]);
@@ -124,26 +147,38 @@ const sgn = (x) => `${x >= 0 ? '+' : ''}${x.toFixed(2)}`;
 const mb = (b) => (b / 1024 / 1024).toFixed(2);
 
 /* ---------- 1. 找源、测量 ---------- */
+const srcCache = new Map();
+function loadSrc(base) {
+  if (!srcCache.has(base)) {
+    const p = ['.wav', '.mp3'].map((e) => join(SRC, base) + e).find((q) => existsSync(q));
+    if (!p) {
+      console.error(`✗ 缺源文件：${join(SRC, base)}.wav|.mp3`);
+      process.exit(2);
+    }
+    srcCache.set(base, { path: p, ...probe(p) });
+  }
+  return srcCache.get(base);
+}
+
 const items = [];
 for (const form of FORMS) {
   for (const seg of SEGS) {
-    const base = join(SRC, `personalwebsite-${form}-${seg}`);
-    const src = ['.wav', '.mp3'].map((e) => base + e).find((p) => existsSync(p));
-    if (!src) {
-      console.error(`✗ 缺源文件：${base}.wav|.mp3`);
-      process.exit(2);
-    }
-    items.push({ form, seg, src, outName: `${FORM_OUT[form]}-${SEG_OUT[seg]}.mp3` });
+    const s = loadSrc(`personalwebsite-${form}-${seg.src}`);
+    items.push({
+      form, seg: seg.out, src: s.path,
+      outName: `${FORM_OUT[form]}-${seg.out}.mp3`,
+      sr: s.sr, channels: s.channels, duration: s.duration, samples: s.samples,
+      ...measure(s.path),
+    });
   }
 }
 
 console.log(`源目录   ${SRC}`);
 console.log(`出目录   ${OUT}${CHECK_ONLY ? '   （--check：只测量）' : ''}`);
-console.log(`对齐方式 ${ALIGN === 'whole' ? '整体（每态一个增益，保留编曲起伏）' : '逐段（intro/loop/outro 各自对齐）'}`);
+console.log(`对齐方式 ${ALIGN === 'whole' ? '整体（每态一个增益，保留编曲起伏）' : '逐段（open/loop/outro 各自对齐）'}`);
 console.log(`参考形态 ${REF}（保持原始电平）\n`);
 
 for (const it of items) {
-  Object.assign(it, probe(it.src), measure(it.src));
   console.log(
     `测  ${pad(`${it.form}-${it.seg}`, 18)} ${padL(db(it.lufs), 7)} LUFS  ` +
       `TP ${padL(db(it.tp), 6)}  LRA ${padL(db(it.lra), 5)}  ${it.duration.toFixed(3)}s ${it.sr}Hz ${it.channels}ch`,
@@ -151,14 +186,15 @@ for (const it of items) {
 }
 
 /* ---------- 2. 定目标与增益 ---------- */
+const srcOf = (form, seat) => items.find((x) => x.form === form && x.seg === seat).src;
 const perForm = {};
 for (const form of FORMS) {
   perForm[form] = concatMeasure(
-    SEGS.map((seg) => items.find((x) => x.form === form && x.seg === seg).src),
+    PROGRAMME.map((seat) => srcOf(form, seat)),
     `${form}-src`,
   );
 }
-console.log('\n整态 programme 响度（intro+loop+outro 拼接）：');
+console.log(`\n整态 programme 响度（${PROGRAMME.join('+')} 拼接；loop 已在 open 里）：`);
 for (const form of FORMS) {
   console.log(`  ${pad(form, 6)} ${padL(db(perForm[form].lufs), 7)} LUFS  TP ${padL(db(perForm[form].tp), 6)}  LRA ${db(perForm[form].lra)}`);
 }
@@ -172,9 +208,9 @@ if (ALIGN === 'whole') {
   for (const form of FORMS) {
     gainOf[form] = {};
     for (const seg of SEGS) {
-      const it = items.find((x) => x.form === form && x.seg === seg);
-      const target = ABSOLUTE_TARGETS?.[SEG_OUT[seg]] ?? items.find((x) => x.form === REF && x.seg === seg).lufs;
-      gainOf[form][seg] = target - it.lufs;
+      const it = items.find((x) => x.form === form && x.seg === seg.out);
+      const target = ABSOLUTE_TARGETS?.[seg.out] ?? items.find((x) => x.form === REF && x.seg === seg.out).lufs;
+      gainOf[form][seg.out] = target - it.lufs;
     }
   }
 }
@@ -185,7 +221,7 @@ for (const form of FORMS) {
   if (ALIGN === 'whole') {
     console.log(`  ${pad(form, 6)} 全段 ${sgn(gainOf[form].all)} dB`);
   } else {
-    console.log(`  ${pad(form, 6)} ${SEGS.map((seg) => `${SEG_OUT[seg]} ${sgn(gainOf[form][seg])}dB`).join('   ')}`);
+    console.log(`  ${pad(form, 6)} ${SEGS.map((seg) => `${seg.out} ${sgn(gainOf[form][seg.out])}dB`).join('   ')}`);
   }
 }
 const boosted = items.filter((x) => gainFor(x) > 0.05);
@@ -229,13 +265,13 @@ function renderPass() {
     enc[form] = {
       segs: {},
       prog: concatMeasure(
-        SEGS.map((seg) => outPath(items.find((x) => x.form === form && x.seg === seg))),
+        PROGRAMME.map((seat) => outPath(items.find((x) => x.form === form && x.seg === seat))),
         `${form}-enc`,
       ),
     };
     for (const seg of SEGS) {
-      const p = outPath(items.find((x) => x.form === form && x.seg === seg));
-      enc[form].segs[seg] = { ...measure(p), bytes: statSync(p).size };
+      const p = outPath(items.find((x) => x.form === form && x.seg === seg.out));
+      enc[form].segs[seg.out] = { ...measure(p), bytes: statSync(p).size };
     }
   }
   return enc;
@@ -279,11 +315,11 @@ console.log(
 );
 let worstSeg = 0;
 for (const seg of SEGS) {
-  const d = enc[other].segs[seg].lufs - enc[REF].segs[seg].lufs;
+  const d = enc[other].segs[seg.out].lufs - enc[REF].segs[seg.out].lufs;
   worstSeg = Math.max(worstSeg, Math.abs(d));
   console.log(
-    `  ${pad(SEG_OUT[seg], 6)}         ${pad(REF, 6)} ${padL(db(enc[REF].segs[seg].lufs), 7)}  vs  ` +
-      `${pad(other, 6)} ${padL(db(enc[other].segs[seg].lufs), 7)}  →  Δ ${sgn(d)} dB`,
+    `  ${pad(seg.out, 6)}         ${pad(REF, 6)} ${padL(db(enc[REF].segs[seg.out].lufs), 7)}  vs  ` +
+      `${pad(other, 6)} ${padL(db(enc[other].segs[seg.out].lufs), 7)}  →  Δ ${sgn(d)} dB`,
   );
 }
 if (ALIGN === 'whole') {
@@ -295,15 +331,16 @@ console.log(`\n六条合计 ${mb(totalBytes)}MB`);
 for (const form of FORMS.map((f) => FORM_OUT[f])) {
   const fs = items.filter((it) => it.outName.startsWith(form));
   const head = fs.filter((it) => it.outName !== `${form}-outro.mp3`).reduce((s, it) => s + it.bytes, 0);
-  console.log(`  ${pad(form, 6)} 全 ${pad(mb(fs.reduce((s, it) => s + it.bytes, 0)) + 'MB', 8)} 首次开启所需（intro+loop）${mb(head)}MB`);
+  console.log(`  ${pad(form, 6)} 全 ${pad(mb(fs.reduce((s, it) => s + it.bytes, 0)) + 'MB', 8)} 首次开启所需（open+loop）${mb(head)}MB`);
 }
 
 const report = {
   generatedAt: new Date().toISOString(),
   align: ALIGN, reference: REF, quality: QUALITY, srcDir: SRC, passes,
+  openSeamSample: OPEN_SEAM_SAMPLE,
   programLufs: Object.fromEntries(FORMS.map((f) => [f, Number(enc[f].prog.lufs.toFixed(2))])),
   files: items.map((it) => ({
-    form: it.form, formOut: FORM_OUT[it.form], seat: SEG_OUT[it.seg], out: it.outName, src: it.src,
+    form: it.form, formOut: FORM_OUT[it.form], seat: it.seg, out: it.outName, src: it.src,
     srcLufs: it.lufs, srcTp: it.tp, gainDb: Number(it.gain.toFixed(2)),
     outLufs: Number(it.outLufs.toFixed(2)), outTp: Number(it.outTp.toFixed(2)),
     duration: it.duration, samples: it.samples, sampleRate: it.sr, bytes: it.bytes,
@@ -316,7 +353,8 @@ writeFileSync(reportPath, JSON.stringify(report, null, 2));
    成片文件名是固定的（wake-loop.mp3 等），换稿后 URL 不变——浏览器就会一直拿缓存里的
    旧曲子（fetch 带 force-cache 更不会回源），用户听到的仍是上一版。故按六个成片的
    内容算一个短版本号，运行时装进 URL 查询串，内容一变 URL 就变。
-   写进 src/data/bgm-assets.ts（要一起提交，构建时被 sound.ts 引用）。 */
+   写进 src/data/bgm-assets.ts（要一起提交，构建时被 sound.ts 引用），并随带
+   OPEN_SEAM（开场母带里 intro→loop 的边界，秒）供换面接力用。 */
 const hashOf = (p) => createHash('sha1').update(readFileSync(p)).digest('hex');
 const version = createHash('sha1')
   .update(report.files.map((f) => `${f.out}:${hashOf(join(OUT, f.out))}`).join('|'))
@@ -324,9 +362,12 @@ const version = createHash('sha1')
   .slice(0, 8);
 const verPath = resolve('src/data/bgm-assets.ts');
 const verBody = `/* 本文件由 design/audio/normalize-bgm.mjs 生成，勿手改。
-   成片在 public/audio/，文件名固定；靠这个版本号把 URL 区分开，换稿后浏览器
-   才会取新曲子而不是缓存里的旧曲子。换音频重跑流水线即可，记得一起提交。 */
+   成片在 public/audio/，文件名固定；靠版本号把 URL 区分开，换稿后浏览器才会取
+   新曲子而不是缓存里的旧曲子。OPEN_SEAM 是开场母带里 intro→loop 的边界（秒），
+   开场中段被换面拦下时，运行时用它从 bed 接上 loop 的当前相位。换音频重跑流水线
+   即可（边界若变，改流水线里的 OPEN_SEAM_SAMPLE），记得一起提交。 */
 export const BGM_VERSION = '${version}';
+export const OPEN_SEAM = ${OPEN_SEAM_SAMPLE / SR};
 `;
 const verOld = existsSync(verPath) ? readFileSync(verPath, 'utf8') : '';
 if (verOld !== verBody) writeFileSync(verPath, verBody);

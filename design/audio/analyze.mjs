@@ -1,9 +1,12 @@
-// 音频体检：读 16-bit PCM WAV，看循环边界是否连续、intro 与 loop 的关系。
+// 音频体检：读 16-bit PCM WAV，看循环边界是否连续、开场母带的接缝与 loop 的关系。
 // 用法：node design/audio/analyze.mjs <目录>
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const DIR = process.argv[2] ?? 'D:/myDownloads';
+const SR = 48000;
+/* 开场母带里 intro→loop 的边界（样本数）。与 normalize-bgm.mjs 的 OPEN_SEAM_SAMPLE 保持一致 */
+const OPEN_SEAM_SAMPLE = 1221819;
 
 function readWav(path) {
   const buf = readFileSync(path);
@@ -49,35 +52,31 @@ const rms = (ch, from, to) => {
 const db = (x) => (x > 0 ? 20 * Math.log10(x) : -Infinity);
 const f = (x, n = 2) => (Number.isFinite(x) ? x.toFixed(n) : '-inf');
 
-/** 边界连续性：把尾部 lastN 帧与头部 firstN 帧逐样本比较（同相续接的理想值） */
-function boundary(ch, n) {
-  const N = ch.length;
+/** 接缝跳变：把 a 的尾 n 帧与 b 的头 n 帧逐样本比较（同相续接的理想值） */
+function seam(a, b, n) {
+  const M = a.length;
   let jump = 0;
   let tailRms = 0;
   for (let i = 0; i < n; i++) {
-    const d = ch[i] - ch[N - n + i];
+    const d = b[i] - a[M - n + i];
     jump += d * d;
-    tailRms += ch[N - n + i] * ch[N - n + i];
+    tailRms += a[M - n + i] * a[M - n + i];
   }
   return { jumpRms: Math.sqrt(jump / n), tailRms: Math.sqrt(tailRms / n) };
 }
+const reportSeam = (label, a, b, n) => {
+  const { jumpRms, tailRms } = seam(a, b, n);
+  console.log(
+    `${label}  头RMS ${f(db(rms(b, 0, n)))} dB / 尾RMS ${f(db(tailRms))} dB / ` +
+      `接缝跳变 ${f(db(jumpRms))} dB（相对尾部 ${f(db(jumpRms) - db(tailRms))} dB）`,
+  );
+};
 
-/** 归一化互相关：a 从偏移 off 起 vs b 从头起 */
-function xcorr(a, b, off, n) {
-  let sab = 0, sa = 0, sb = 0;
-  for (let i = 0; i < n; i++) {
-    const x = a[off + i] ?? 0;
-    const y = b[i] ?? 0;
-    sab += x * y; sa += x * x; sb += y * y;
-  }
-  return sab / (Math.sqrt(sa * sb) || 1);
-}
-
-const SR = 48000;
+const SR_ = SR;
 const files = {};
 for (const name of [
-  'awake-intro', 'awake-loopAB', 'awake-outro',
-  'dream-intro', 'dream-loopAB', 'dream-outro',
+  'awake-intro+loopAB', 'awake-loopAB', 'awake-outro',
+  'dream-intro+loopAB', 'dream-loopAB', 'dream-outro',
 ]) {
   files[name] = readWav(join(DIR, `personalwebsite-${name}.wav`));
 }
@@ -88,52 +87,44 @@ for (const [k, w] of Object.entries(files)) {
   let peak = 0;
   for (let i = 0; i < L.length; i++) peak = Math.max(peak, Math.abs(L[i]), Math.abs(w.ch[1][i]));
   console.log(
-    `${k.padEnd(12)} ${w.duration.toFixed(4)}s  ${w.sampleRate}Hz ${w.channels}ch  ` +
+    `${k.padEnd(20)} ${w.duration.toFixed(4)}s  ${w.sampleRate}Hz ${w.channels}ch  ` +
       `整体RMS ${f(db(rms(L, 0, L.length)))} dBFS  峰值 ${f(db(peak))} dBFS`,
   );
 }
 
-console.log('\n=== 循环边界连续性（尾 50ms vs 头 50ms）===');
-for (const k of ['awake-loopAB', 'dream-loopAB']) {
-  const L = files[k].ch[0];
-  const n = Math.round(SR * 0.05);
-  const { jumpRms, tailRms } = boundary(L, n);
-  const head = rms(L, 0, n);
-  console.log(
-    `${k.padEnd(14)} 头RMS ${f(db(head))} dB / 尾RMS ${f(db(tailRms))} dB / ` +
-      `接缝跳变 ${f(db(jumpRms))} dB（相对尾部 ${f(db(jumpRms) - db(tailRms))} dB）`,
-  );
-  // 尾部是否为静止（静音收尾 → 循环会有空档）
-  const last10 = rms(L, L.length - Math.round(SR * 0.01), L.length);
-  const first10 = rms(L, 0, Math.round(SR * 0.01));
-  console.log(`${''.padEnd(14)} 末 10ms RMS ${f(db(last10))} / 首 10ms RMS ${f(db(first10))}`);
+const N = Math.round(SR_ * 0.05);
+console.log(`\n=== 开场母带内部接缝（intro→loop @${(OPEN_SEAM_SAMPLE / SR_).toFixed(3)}s，尾 50ms vs 头 50ms）===`);
+for (const form of ['awake', 'dream']) {
+  const L = files[`${form}-intro+loopAB`].ch[0];
+  const before = L.subarray(0, OPEN_SEAM_SAMPLE);
+  const after = L.subarray(OPEN_SEAM_SAMPLE);
+  reportSeam(`${form.padEnd(14)}`, before, after, N);
 }
 
-console.log('\n=== intro 与 loop 的关系（归一化互相关，取 loop 开头 4s 为参考）===');
+console.log('\n=== 开场尽头 → loop 文件开头（bed 接力的虚拟接缝，尾 50ms vs 头 50ms）===');
 for (const form of ['awake', 'dream']) {
-  const intro = files[`${form}-intro`].ch[0];
+  const open = files[`${form}-intro+loopAB`].ch[0];
   const loop = files[`${form}-loopAB`].ch[0];
-  const n = SR * 4;
-  const base = xcorr(loop, loop, 0, n);
-  console.log(`\n[${form}] loop 自相关(0) = ${f(base, 3)}`);
-  const offs = [0, SR * 0.5, SR * 5, SR * 10, SR * 20, loop.length / 2 - n, loop.length - n * 2];
-  for (const off of offs) {
-    const o = Math.round(off);
-    console.log(`  intro@${(o / SR).toFixed(2)}s vs loop@0s : r = ${f(xcorr(intro, loop, o, n), 3)}`);
-  }
-  // intro 尾部 vs loop 头部：判断 intro 结束后能否直接切入 loop
-  const tail = Math.round(SR * 0.5);
-  const a = intro.subarray(intro.length - tail);
-  console.log(`  intro 尾 0.5s vs loop 头 0.5s : r = ${f(xcorr(a, loop, 0, tail), 3)}`);
+  reportSeam(`${form.padEnd(14)}`, open, loop, N);
+}
+
+console.log('\n=== loop 自身循环边界（尾 50ms vs 头 50ms）===');
+for (const k of ['awake-loopAB', 'dream-loopAB']) {
+  const L = files[k].ch[0];
+  reportSeam(`${k.padEnd(14)}`, L, L, N);
+  // 尾部是否为静止（静音收尾 → 循环会有空档）
+  const last10 = rms(L, L.length - Math.round(SR_ * 0.01), L.length);
+  const first10 = rms(L, 0, Math.round(SR_ * 0.01));
+  console.log(`${''.padEnd(14)} 末 10ms RMS ${f(db(last10))} / 首 10ms RMS ${f(db(first10))}`);
 }
 
 console.log('\n=== 分段 RMS 包络（每 5s 一段，dBFS）===');
 for (const [k, w] of Object.entries(files)) {
   const L = w.ch[0];
-  const seg = SR * 5;
+  const seg = SR_ * 5;
   const out = [];
   for (let t = 0; t < L.length; t += seg) {
     out.push(f(db(rms(L, t, Math.min(L.length, t + seg))), 1));
   }
-  console.log(`${k.padEnd(14)} ${out.join(' ')}`);
+  console.log(`${k.padEnd(20)} ${out.join(' ')}`);
 }
