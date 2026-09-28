@@ -38,8 +38,8 @@
 ## 三、性能 P1/P2（独立可排期）
 
 1. **three.js 527KB（gzip 130KB）为一块装饰玻璃签**：`src/scripts/slip.ts:8` `import *` 拖进大半个核心，实际只用 7 个类。改 `three/webgl` 副入口 + `three.core`，或裸 WebGL 仿写（~200 行）。注意：若重设计弃用 slip 则本条作废。
-2. **Eeg 全站常驻 30fps rAF 重绘全视口 SVG**：波形是两层定频正弦——预生成 path + CSS `translateX` 循环平移可完全去掉 rAF；或降 12fps。
-3. `chrome.ts` anchorLoop 每帧写 `left`（布局属性）→ 改 `transform: translateX()`；rAF 循环加 `document.hidden` 门控（Eeg 已有，chrome 没有）。
+2. ~~**Eeg 全站常驻 30fps rAF 重绘全视口 SVG**~~ 已改（2026-09-28，见附五）：绘制搬进 Worker 里的 OffscreenCanvas，主线程零帧；「预生成 path + translateX」不可行——两层正弦相速度不同（≈497 / 578 px/s），合起来不是刚体平移。
+3. ~~`chrome.ts` anchorLoop 每帧写 `left`~~ 已改（2026-09-28，见附五）：游走交给 CSS（三层嵌套正弦），JS 只剩换站滑行、落定即停，且写 `translate` 不写 `left`。
 4. `three-common.ts:70` 的 900ms 轮询 `setInterval` 永不清理（makeLoop 无停止路径）。
 5. **字重策略收敛**：文章正文请求 400 只载 500（隐性匹配、多下一套 CJK 子集）；`projects/[slug]` 请求 700 匹配到 900；SiteHeader/StitchHeader 的 mono 用 500/600 但只载 IBM Plex Mono 400（伪粗体）。终态建议全站 2 个字重 + 补 `@fontsource/ibm-plex-mono/500.css`。
 6. 回退字体 `size-adjust/ascent-override` 调参（低优先）。
@@ -201,4 +201,36 @@
 - 另修：重测（`resize`/`load`/`fonts.ready`/1.2s/3s 五个入口）改走 `measureSoon()`——**滚动中挂起，滚停 200ms 后再测**。触发点按滚动像素存，若在滚动途中重测而段界恰有挪动，读者会看到一次「无故换面」（触控板连续滚动里尤其明显）。
 - `src/styles/tokens.css`：`@property` 注册与 `html.night-fade` 全部退役（不再需要可动画 token）。
 - 实测：每次换面 root 底色**只变化 1 帧、无中间色**（此前 ~21 帧）；全页遍历写入 3 次（含测试序列里的回撤换面）、空闲 6s 0 次；滞回与静稳态对比度不回退；`astro check` 0 error、`npm run build` 15 页通过；`design/.sweep-night.cjs` A 段自此**零低值带**（过渡态消失，顺带消除了「半途谁也读不清」）。
-- 未动（另案）：`chrome.ts` 的 `--echo` 仍每滚动帧写一次（值随滚动连续变，去重只在空闲时有效），以及它写 `hairline.style.width` 后再读 `getBoundingClientRect` 的强制同步布局——旧会话已记为次因，量级远小于换色那一项。
+- 未动（另案）：`chrome.ts` 的 `--echo` 仍每滚动帧写一次（值随滚动连续变，去重只在空闲时有效），以及它写 `hairline.style.width` 后再读 `getBoundingClientRect` 的强制同步布局——旧会话已记为次因，量级远小于换色那一项。（2026-09-28：发丝线已改写 `transform: scaleX()`，不再进布局，见附五。）
+
+## 附五：2026-09-28 低端机「进页卡顿」——稳态主线程被环境动效占满
+
+**现象**：低端设备进页后持续卡顿。CPU 4× 节流（`Emulation.setCPUThrottlingRate`）下，改前**所有页面**进页 9–13s 的稳态主线程占用都是 99–100%，首页稳态长任务 49 个 / 4s。
+
+**根因（一条链）**：Blink 每跑一个**主线程帧**，都要为页面上**每一个正在运行的 CSS 动画元素**重算一次样式——哪怕这些动画本身已交给合成器。构块场有 160 块浮动方块，加上漂移、字标等，每帧 ~375 个元素、桌面 ~2.4ms，再加 ~200 个合成层的分层提交。而改前每一帧都有主线程帧，驱动源有三类：
+1. **主线程 CSS 动画**（只要有一条在跑，就每 vsync 出一帧）：字标 `brand-char` 的 `color`、缝线锚点与引导点的 `box-shadow` 呼吸、Eeg 三道残影的 SVG `transform`、光标 `star-twinkle`（SVG；**触屏上光标根本不显示也在跑**）、正文逐字浮起 `float-ch` 的 `color`（默认 tint 0%，颜色其实不变）。
+2. **常驻 rAF**：`chrome.ts` anchorLoop（60fps 写 `left`，文章页锚点 `display:none` 也照跑）、Eeg（「每帧请求 rAF + 33ms 早退」——请求 rAF 本身就逼出主线程帧，早退省不掉）。
+3. **静置空跑的兜底轮询**：`onScrollRaf` 每 ~0.7s 无条件执行一次回调，回调里的 `getBoundingClientRect` 强制同步刷新（每次都连带重算全部动画元素）。
+
+隔离验证：160 块可合成方块单独跑 = 0 次重算；旁边加一个字的 `color` 动画 = 2s 内 481 次重算。
+
+**改法**（视觉不变）：
+- 主线程动画全部改成只动 `opacity` / `translate` 的写法：`box-shadow` 呼吸 → 谷值/峰值两层光晕交叉淡变（`Seam.astro`、`RealityGuide.astro`）；字标与 `float-ch` 的琥珀灼点 → 叠一层琥珀色同字副本（`::after`，`content: attr(data-ch)`）只动 opacity，srgb 里与原 `color-mix` 同式；`float-ch` 只在写了 `tint` 的段落才挂副本（`twilight.mjs` 输出 `.float-run--tint` / `data-ch` / `--float-tint-a`）；光标自转与微烁只在 `html.fx-cursor-on` 下声明。
+- Eeg：算法抽到 `src/scripts/eeg-wave.ts`（只产出路径字符串），首选 `src/scripts/eeg-worker.ts` 在 OffscreenCanvas 上用 `Path2D` 描同一串，主线程零帧；不支持时回退主线程 SVG（由 `lib.ts` 的 `onFrame30` 共享帧钟驱动，24ms + rAF ≈ 30fps）。残影的两种游走由 CSS 动画挪进路径的 `dy`。⚠ 线宽/不透明度/虚线在 Worker 里有一份照抄（`MAIN_STYLE` / `ECHO_STYLE`），改 CSS 要两处一起改。
+- 缝线锚点：游走 = 三层嵌套 `.seam-wander`，各一条 easeInOutSine 往返（＝一条余弦），时长/负延迟按原式 ω、φ 换算，振幅乘 `--still`；JS 只剩换站滑行、落定退订帧钟。
+- 构块场方块：8 个 `--sq-*` 变量驱动的一条 keyframes → 生成器烘焙的 16 条字面值 keyframes（`SQ_TIERS`），每块内联 `animation`，醒面/长按由 `!important` 摘掉动画名。单次重算实测约快一倍。
+- `onScrollRaf` 兜底轮询只在「有事件排着、400ms 未被 rAF 消化」时执行；发丝线写 `scaleX` 不写 `width`。
+
+**实测**（CPU 4×，3 次中位，稳态 = 进页 9–13s；`entry` = 0–7s）：
+
+| 页面 | 稳态主线程占用 | 稳态长任务 | 进页长任务 |
+| --- | --- | --- | --- |
+| 首页 | 99% → 15% | 49 → 1 | 48 → 31 |
+| 关于 | 99% → 14% | 3 → 0 | 19 → 11 |
+| 文章 hello-xingmeng | 99% → 9% | 0 → 0 | 6 → 4 |
+| 闪念（含 `{{流光}}`） | 99% → 98%（流光改后 → 3%） | 2 → 0 | 5 → 4 |
+
+**剩余（另案）**：
+1. ~~**`{{流光}}`（`.sheen-run`）仍是主线程动画**~~ 已改（同日）：构建期拆字、逐字琥珀副本只动 opacity（曲线见 `src/markdown/sheen-timing.mjs`），闪念页稳态 99% → 3%、样张页 99% → 14%、`building-with-agents` 99% → 7%。原记录：（`background-position`），用到它的页面（闪念、样张、`building-with-agents` 的那一段）稳态仍满载。难点是它支持跨行折行、每行各取一截渐变，改成可合成写法（遮罩窗 + 反向平移）会丢掉这一点。可选：进出视口才挂动画（IntersectionObserver），或接受。
+2. **进页首个 Layout 很贵**（4× 下 ~800ms）：主体是 Windows 上中文系统回退字体按字重逐一初始化（最小页面实验：同一段中文，1 个字重 47ms、4 个字重 170–210ms；字体栈长短只占两成）。与二.8、三.5 的字重收敛是同一件事。
+3. 测法：别往页面里注 rAF 循环测帧率——注入本身就逼出主线程帧，会把「减少主线程帧」的收益整个盖住；读 trace 即可。

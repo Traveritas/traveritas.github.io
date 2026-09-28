@@ -28,34 +28,69 @@ export function hexLerp(a: string, b: string, t: number): string {
 
 /** rAF 节流的滚动 + 尺寸监听；另挂低频轮询兜底，
     覆盖 rAF 被节流/停转的环境（后台窗口、遮挡中的 webview）。
-    轮询直接执行 cb，不经 queued 门——否则 rAF 卡死时门永远关着。 */
+    轮询直接执行 cb（并把 queued 复位），不等 rAF——否则 rAF 卡死时门永远关着。
+    但只在「有事件排着、400ms 还没被 rAF 消化」时才执行：原先静置时也每 ~0.7s 空跑一次 cb，
+    而 cb 里的 getBoundingClientRect 会强制同步刷新样式 —— 每一次都把全站正在跑的动画
+    （构块场 160 块等）拉到主线程重算一遍。被卡住的滚动事件恢复出帧后浏览器会补发，
+    不会丢。 */
 export function onScrollRaf(cb: () => void): () => void {
   let queued = false;
-  let lastRun = 0;
+  let queuedAt = 0;
   const fire = () => {
     queued = false;
-    lastRun = performance.now();
     cb();
   };
   const queue = () => {
     if (queued) return;
     queued = true;
+    queuedAt = performance.now();
     requestAnimationFrame(fire);
   };
   addEventListener('scroll', queue, { passive: true });
   addEventListener('resize', queue, { passive: true });
   const poll = setInterval(() => {
     // rAF 超过 400ms 没消化掉排队事件，就直接执行
-    if (performance.now() - lastRun > 400) {
-      queued = false;
-      fire();
-    }
+    if (queued && performance.now() - queuedAt > 400) fire();
   }, 350);
   queue();
   return () => {
     removeEventListener('scroll', queue);
     removeEventListener('resize', queue);
     clearInterval(poll);
+  };
+}
+
+/** 共享的 ~30fps 帧钟（常驻的环境动效用：脑电、缝线锚点游走）。
+    不用「每帧 rAF + 时间差早退」：只要请求了 rAF，浏览器每个 vsync 都要跑一整遍
+    主线程帧（动画更新 + 样式重算），早退省不掉这一遍，而且会把全站本可只在合成器上跑的
+    动画（构块场 160 块、漂移）逐帧拉回主线程重算。这里先等 24ms 再请求 rAF ——
+    60Hz 下恰好落在第二个 vsync（≈33ms），主线程帧数减半；所有订阅者在同一帧里执行，
+    不会各自错相、再多出帧。后台标签页里 setTimeout 被节流，自然停摆。 */
+type FrameFn = (ts: number) => void;
+const frameSubs = new Set<FrameFn>();
+let frameTimer = 0;
+let frameRaf = 0;
+
+function runFrame(ts: number) {
+  frameRaf = 0;
+  for (const fn of frameSubs) fn(ts);
+  scheduleFrame();
+}
+
+function scheduleFrame() {
+  if (!frameSubs.size || frameTimer || frameRaf) return;
+  frameTimer = window.setTimeout(() => {
+    frameTimer = 0;
+    frameRaf = requestAnimationFrame(runFrame);
+  }, 24);
+}
+
+/** 订阅帧钟；返回退订函数（最后一个退订后帧钟停转，不留空转的定时器） */
+export function onFrame30(fn: FrameFn): () => void {
+  frameSubs.add(fn);
+  scheduleFrame();
+  return () => {
+    frameSubs.delete(fn);
   };
 }
 

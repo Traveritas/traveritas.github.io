@@ -86,10 +86,25 @@ const isCurrent = (href: string) =>
   }
 
   :global(.brand-char) {
+    position: relative;
     display: inline-block;
-    will-change: transform, color;
+    will-change: transform;
     text-decoration: none !important;
     transition: none !important;
+  }
+
+  /* 琥珀灼点：同一个字的琥珀色副本叠在正上方，只动 opacity。
+     原写法直接动画 color（color-mix 琥珀 16% / 32%）⇒ 主线程动画，且只要它在跑，
+     全站可合成的动画（构块场 160 块）也被逐帧拉回主线程重算样式。
+     琥珀副本以 p 的不透明度盖在正文色上 ＝ srgb 里 p·琥珀 + (1−p)·正文，与 color-mix 同式。
+     字由 brand.ts 写进 data-ch；链接有 aria-label，伪元素文字不进可访问名。 */
+  :global(.brand-char)::after {
+    content: attr(data-ch);
+    position: absolute;
+    inset: 0;
+    color: var(--amber);
+    opacity: 0;
+    pointer-events: none;
   }
 
   :global(.brand-char:nth-child(even)) {
@@ -106,40 +121,56 @@ const isCurrent = (href: string) =>
      醒面不声明这条动画：醒面的 brand 根本没有 .brand-char（是整块文本），
      而且这台字不会空转 —— 上一条纪律「醒静梦动」在别处是「振幅归零」，在这里是
      「连动画都不在」，两者读数一致。 */
-  :global(.brand.is-dream .brand-char) {
+  :global(.brand.is-dream .brand-char),
+  :global(.brand.is-dream .brand-char)::after {
     animation: brand-pixel-float 2.8s step-end infinite;
     animation-delay: calc(var(--i) * -0.4s);
+  }
+
+  :global(.brand.is-dream .brand-char)::after {
+    animation-name: brand-pixel-glint;
   }
 
   @keyframes brand-pixel-float {
     0% {
       transform: translateY(0px);
-      color: var(--fg);
     }
     13% {
       transform: translateY(calc(-1px * var(--still, 0)));
-      color: var(--fg);
     }
     25% {
       transform: translateY(calc(-2px * var(--still, 0)));
-      color: color-mix(in srgb, var(--amber) calc(16% * var(--still, 0)), var(--fg));
     }
     37% {
       transform: translateY(calc(-3px * var(--still, 0)));
-      color: color-mix(in srgb, var(--amber) calc(32% * var(--still, 0)), var(--fg));
     }
     63% {
       transform: translateY(calc(-2px * var(--still, 0)));
-      color: color-mix(in srgb, var(--amber) calc(16% * var(--still, 0)), var(--fg));
     }
     75% {
       transform: translateY(calc(-1px * var(--still, 0)));
-      color: var(--fg);
     }
     87%,
     100% {
       transform: translateY(0px);
-      color: var(--fg);
+    }
+  }
+
+  /* 与上面同拍同相（同一组 duration / delay / step-end）：25% 与 63% 灼 16%，37% 灼 32% */
+  @keyframes brand-pixel-glint {
+    0%,
+    13%,
+    75%,
+    87%,
+    100% {
+      opacity: 0;
+    }
+    25%,
+    63% {
+      opacity: calc(0.16 * var(--still, 0));
+    }
+    37% {
+      opacity: calc(0.32 * var(--still, 0));
     }
   }
 
@@ -156,6 +187,9 @@ const isCurrent = (href: string) =>
       animation: none !important;
       transform: none !important;
       color: var(--fg) !important;
+    }
+    :global(.brand-char)::after {
+      display: none;
     }
   }
 

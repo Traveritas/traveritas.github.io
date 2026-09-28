@@ -50,12 +50,15 @@
 **行内光景**（`((浮起))` / `{{流过}}`，写作手册见 `docs/writing.md`）样式在 `global.css`
 「行内光景」一节，随笔与项目同款：浮起的动画**常驻**，位移与顶点色都乘 `--still`
 （梦 1 → 醒 0）—— 醒面位移为零、字色就是正文原色，无 JS 与 RM 下同理；流光仍按
-`body[data-reality='dream']` 开关（它换的是整幅 `background-image`，没有「振幅」可收）。
+`body[data-reality='dream']` 开关（没有「振幅」可收）。
 
 - **逐字浮起**拆字成 `inline-block`（每个字一盒）：字串内部不再换行，两端对齐在此留缺口，2–8 字为宜。
-- **流光**不拆字，不影响换行与两端对齐；只动 `background-position`，不碰字号字距，所以没有布局抖动。
-- 参数都是自定义属性（`--float-amp/dur/stagger/tint/sway`、`--sheen-angle/hue/span/dur/ease`），
-  默认值写在 keyframes 与 `background-image` 里；正文侧由 `((…|k=v,…))` 覆盖，预览页「醒梦双态」一节有滑杆。
+- **流光**构建期按字拆成 `inline-block` 单元（西文按词），每个单元叠一层琥珀副本、只动 `opacity`，
+  曲线是按单元在整段里的位置算好的 `linear()` 缓动（`src/markdown/sheen-timing.mjs`，与原「整段渐变 +
+  background-position」同式）⇒ 整条交给合成器。代价：单元整体变色、`angle` 不再生效、段内两端对齐留缺口。
+  （原写法动 `background-position` 走主线程，会把全站可合成的动画逐帧拉回主线程重算，见 backlog 附五。）
+- 参数都是自定义属性（`--float-amp/dur/stagger/tint/sway`、`--sheen-hue/dur`；`span`/`steps` 在构建期烘焙），
+  默认值写在 keyframes 与 `sheen-timing.mjs` 里；正文侧由 `((…|k=v,…))` 覆盖，预览页「醒梦双态」一节有滑杆。
 
 **代码配色**由 `astro.config.mjs` 的 `shikiConfig.theme` 指向 `src/markdown/shiki-theme.mjs`：
 主题里的颜色写成 `var(--umber)` / `var(--ghost-ink)` / `var(--fg-soft)` 这类字符串，会被原样写进
@@ -154,7 +157,7 @@ h2 的序号由 `src/markdown/ordinal.mjs` 这个 **mdast 插件在构建期注�
 6. **行内光景与序号自 2026-09-25 起也吃 `--still` 了**：两族的动画**常驻**，振幅乘 `--still`
    ⇒ 把 `--still` 置 0 就能让它们停下（旧写法是「按面开关」，置 0 没用，得显式切面）。
    要断言醒面，断的是「动画名仍在、位移恒为 0」，而不是「没有 animation」。
-   流光仍是按面开关：醒面那一段的 `background-image` 恒为 `none`。
+   流光仍是按面开关：醒面那一段的琥珀副本（`.sheen-u::after`）不存在。
 7. **改了 markdown 插件必须清内容缓存**：插件（`mdastPlugins`）变了而**内容没变**时，
    `npm run build` 会直接用 `.astro/` 与 `node_modules/.astro/` 里缓存的渲染结果，
    `dist/` 里还是旧标记 —— 现象是「改了插件、构建成功、产物没变」。改完插件先

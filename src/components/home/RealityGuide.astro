@@ -217,23 +217,52 @@
     height: 6px;
     border-radius: 50%;
     background: var(--amber);
-    box-shadow: 0 0 8px 1px color-mix(in srgb, var(--amber) 65%, transparent);
+    position: relative;
+    box-shadow: 0 0 0 0 transparent;
     animation: rg-dot-breathe 3.6s ease-in-out infinite;
     transition:
       transform 0.25s ease,
       box-shadow 0.25s ease;
   }
 
+  /* 呼吸：点本身只动 opacity / scale（可合成）；光晕的谷值、峰值各占一个伪元素，
+     交叉淡变 opacity，≈ 原先在两组 box-shadow 之间插值。直接动画 box-shadow
+     会走主线程，并把全站可合成的动画一起拖回逐帧重算（见 Seam.astro 同款注释） */
+  .rg-dot::before,
+  .rg-dot::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    animation: rg-glow-breathe 3.6s ease-in-out infinite;
+  }
+
+  .rg-dot::before {
+    box-shadow: 0 0 6px 1px color-mix(in srgb, var(--amber) 45%, transparent);
+    animation-direction: reverse;
+  }
+
+  .rg-dot::after {
+    box-shadow: 0 0 10px 2px color-mix(in srgb, var(--amber) 80%, transparent);
+  }
+
   @keyframes rg-dot-breathe {
     0%, 100% {
       opacity: 0.75;
       transform: scale(0.95);
-      box-shadow: 0 0 6px 1px color-mix(in srgb, var(--amber) 45%, transparent);
     }
     50% {
       opacity: 1;
       transform: scale(1.15);
-      box-shadow: 0 0 10px 2px color-mix(in srgb, var(--amber) 80%, transparent);
+    }
+  }
+
+  @keyframes rg-glow-breathe {
+    0%, 100% {
+      opacity: 0;
+    }
+    50% {
+      opacity: 1;
     }
   }
 
@@ -241,6 +270,12 @@
     animation: none;
     transform: scale(1.4);
     box-shadow: 0 0 12px 2px var(--amber);
+  }
+
+  :global(body.reality-holding) .rg-dot::before,
+  :global(body.reality-holding) .rg-dot::after {
+    animation: none;
+    opacity: 0;
   }
 
   /* 演示微抽发丝线（-4°倾角） */

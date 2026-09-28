@@ -66,6 +66,7 @@ export function initBrand() {
     for (let i = 0; i < word.length; i++) {
       if (spans[i].textContent !== word[i]) {
         spans[i].textContent = word[i];
+        spans[i].dataset.ch = word[i]; // 琥珀灼点副本（SiteHeader.astro 的 ::after）
       }
     }
   }

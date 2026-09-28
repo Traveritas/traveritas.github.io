@@ -10,7 +10,7 @@
    行内（自解析，纯文本、不嵌 markdown，三套语法一次扫描）：
      [[醒来|梦见]] → <span data-morph data-true="醒来" data-dream="梦见">醒来</span>
      ((浮起))      → 逐字 span，梦面各自量化浮起（.float-run，见 global.css）
-     {{流过}}      → 单层 span，梦面有一道暖光流过字面（.sheen-run）
+     {{流过}}      → 按字（西文按词）拆单元，梦面有一道暖光依次流过（.sheen-run）
    后两套可追一段参数：((字|amp=4px,dur=3s)) / {{字|span=260%,hue=55%}}。
    参数走白名单 + 取值形状校验，认不出的键与值一律丢弃 —— 正文里的一个笔误
    不该能写进 style 属性。清单见 FLOAT_PARAMS / SHEEN_PARAMS。
@@ -18,6 +18,8 @@
    产出与站内手写双文案同一约定，morph/reality 引擎自动接管：
    长按线到达换面、梦态走神、无 JS 与读屏恒醒面。
    ───────────────────────────────────────────────────────────── */
+
+import { sheenEase, sheenWeight } from './sheen-timing.mjs';
 
 const SIDE_NAMES = new Set(['dream', 'wake']);
 /** 行内 code 的正文不在 text 节点里，但以防万一：这些父级下的 text 不拆 */
@@ -41,7 +43,7 @@ const SHEEN_PARAMS = {
   hue: ['--sheen-hue', /^\d+(\.\d+)?%$/],
   span: ['--sheen-span', /^\d+(\.\d+)?%$/],
   dur: ['--sheen-dur', /^\d+(\.\d+)?(s|ms)$/],
-  // 抽帧档数：转成缓动函数（styles/global.css 里 --sheen-ease 默认 linear）
+  // 抽帧档数：构建期烘焙进每个单元的曲线（见 inlineSheenHtml）；这里照旧写出只为留档
   steps: ['--sheen-ease', /^\d+$/, (n) => `steps(${n}, end)`],
 };
 
@@ -76,19 +78,78 @@ function paramStyle(table, raw) {
   return decls.length ? ` style="${decls.join(';')}"` : '';
 }
 
-/** ((浮起)) → 包装层 + 一字一盒（--i 供逐字相位错开；参数落在包装层上被继承） */
+/** ((浮起)) → 包装层 + 一字一盒（--i 供逐字相位错开；参数落在包装层上被继承）。
+    带 tint 的一段额外挂 .float-run--tint，并把每个字抄进 data-ch：顶点色由叠在字上的
+    琥珀副本（::after）只动 opacity 给出，--float-tint-a 是 tint 的小数形（opacity 要数）。
+    不带 tint 的段落因此只有 translate 动画、可以整条交给合成器（见 global.css）。 */
 function inlineFloatHtml(body) {
   const [text, params] = splitParams(body);
+  let style = paramStyle(FLOAT_PARAMS, params);
+  const tint = /--float-tint:(\d+(?:\.\d+)?)%/.exec(style);
+  const tinted = tint && parseFloat(tint[1]) > 0;
+  if (tinted) style = style.replace(/"$/, `;--float-tint-a:${parseFloat(tint[1]) / 100}"`);
   const chars = Array.from(text)
-    .map((ch, i) => `<span class="float-ch" style="--i:${i}">${escapeHtml(ch)}</span>`)
+    .map((ch, i) => {
+      const e = escapeHtml(ch);
+      return `<span class="float-ch" style="--i:${i}"${tinted ? ` data-ch="${e}"` : ''}>${e}</span>`;
+    })
     .join('');
-  return `<span class="float-run"${paramStyle(FLOAT_PARAMS, params)}>${chars}</span>`;
+  return `<span class="float-run${tinted ? ' float-run--tint' : ''}"${style}>${chars}</span>`;
 }
 
-/** {{流过}} → 单层 span，字不拆（不影响换行与两端对齐） */
+/** 读出已校验的原始参数值（paramStyle 只产出 style 串，这里要数值） */
+function paramValue(table, raw, key) {
+  for (const pair of (raw || '').split(',')) {
+    const eq = pair.indexOf('=');
+    if (eq < 1 || pair.slice(0, eq).trim() !== key) continue;
+    const value = pair.slice(eq + 1).trim();
+    return table[key][1].test(value) ? value : null;
+  }
+  return null;
+}
+
+/** {{流过}} → 包装层 + 单元（汉字一字一个、西文一词一个；空白原样留作断行点）。
+    每个单元带一层琥珀副本（CSS ::after，content 取 data-ch），不透明度曲线在构建期按单元在
+    整段里的位置算好（--sh-e，一条 linear() 缓动，见 sheen-timing.mjs）⇒ 只动 opacity，
+    动画整条交给合成器。原先动 background-position，走主线程，并会把全站可合成的动画
+    逐帧拉回主线程重算。data-c ＝ 单元中心（样式预览页的 span 滑杆拿它重算曲线）。 */
 function inlineSheenHtml(body) {
   const [text, params] = splitParams(body);
-  return `<span class="sheen-run"${paramStyle(SHEEN_PARAMS, params)}>${escapeHtml(text)}</span>`;
+  const span = parseFloat(paramValue(SHEEN_PARAMS, params, 'span') ?? '300') / 100;
+  const steps = parseInt(paramValue(SHEEN_PARAMS, params, 'steps') ?? '0', 10);
+
+  // 切单元：[文字, 权重, 是否单元]；空白不成单元
+  const parts = [];
+  let word = '';
+  const flush = () => {
+    if (word) parts.push([word, Array.from(word).reduce((a, ch) => a + sheenWeight(ch), 0), true]);
+    word = '';
+  };
+  for (const ch of Array.from(text)) {
+    if (/\s/.test(ch)) {
+      flush();
+      parts.push([ch, 0.3, false]);
+    } else if (sheenWeight(ch) === 1) {
+      flush();
+      parts.push([ch, 1, true]);
+    } else word += ch;
+  }
+  flush();
+
+  const total = parts.reduce((a, p) => a + p[1], 0) || 1;
+  let at = 0;
+  const html = parts
+    .map(([s, w, unit]) => {
+      const c = (at + w / 2) / total;
+      at += w;
+      const e = escapeHtml(s);
+      if (!unit) return e;
+      const cc = Math.round(c * 1e4) / 1e4;
+      return `<span class="sheen-u" style="--sh-e:${sheenEase(cc, span, steps)}" data-c="${cc}" data-ch="${e}">${e}</span>`;
+    })
+    .join('');
+  const stepsAttr = steps > 0 ? ` data-steps="${steps}"` : '';
+  return `<span class="sheen-run"${stepsAttr}${paramStyle(SHEEN_PARAMS, params)}>${html}</span>`;
 }
 
 /** 行内语法的正文与参数以第一个 `|` 分界；正文里要用竖线请写全角 ｜ */

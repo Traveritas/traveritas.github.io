@@ -831,6 +831,7 @@ const LOCAL_BLOCKS = [
 
 <script>
   import { forceReality, getReality, onRealityChange } from '../scripts/reality';
+  import { sheenEase } from '../markdown/sheen-timing.mjs';
 
   const root = document.documentElement;
 
@@ -911,6 +912,19 @@ const LOCAL_BLOCKS = [
       fxZone?.style.setProperty(prop, input.value + unit);
       const read = document.querySelector<HTMLElement>(`[data-sg-fx-val="${prop}"]`);
       if (read) read.textContent = input.value + unit;
+    }
+    /* 流光的光带宽度（span）在构建期烘焙进每个单元的曲线 --sh-e，改变量本身不生效：
+       没写 span 参数的那几段按滑杆值重算（与插件同一个函数） */
+    const spanIn = fxInputs.find((i) => i.dataset.sgFx === '--sheen-span');
+    if (fxZone && spanIn) {
+      const S = Number(spanIn.value) / 100;
+      for (const run of fxZone.querySelectorAll<HTMLElement>('.sheen-run')) {
+        if (run.style.getPropertyValue('--sheen-span')) continue;
+        const steps = Number(run.dataset.steps ?? 0);
+        for (const u of run.querySelectorAll<HTMLElement>('.sheen-u')) {
+          u.style.setProperty('--sh-e', sheenEase(Number(u.dataset.c), S, steps));
+        }
+      }
     }
   };
   for (const input of fxInputs) input.addEventListener('input', applyFx);
