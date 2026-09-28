@@ -1,11 +1,10 @@
 /* ─────────────────────────────────────────────────────────────
    全局 chrome：发丝进度线 / 叠影 --echo / past-hero /
-   缝线锚点（函数图巡行：随结停靠、逐站沿线越走越远、
-   停靠点附近沿线大幅无规律游走）/ 阅读深度轨。
+   缝线锚点（函数图巡行：随结停靠、逐站沿线越走越远；
+   停靠点附近沿线大幅无规律游走交给 Seam.astro 的 CSS）/ 阅读深度轨。
    ───────────────────────────────────────────────────────────── */
 
-import { clamp, onScrollRaf, reducedMotion } from './lib';
-import { wakeMix } from './reality';
+import { clamp, onFrame30, onScrollRaf, reducedMotion } from './lib';
 
 const DEG = (14 * Math.PI) / 180;
 const DX = Math.cos(DEG);
@@ -13,8 +12,6 @@ const DY = Math.sin(DEG);
 
 /** 每站沿线的增量：刻度锚点越走越远 */
 const SPREAD = 0.115;
-/** 停靠点附近沿线游走的幅度（线宽分数） */
-const WANDER = 0.05;
 
 let seamAnchor: HTMLElement | null = null;
 let seamW = 0;
@@ -24,8 +21,9 @@ let baseT: number | null = null; // 首屏锚位（醒/梦两字中点在缝线�
 let lastStop = 0.46; // 无结在带内时钉在上一站，不回退
 let anchorT = 46; // 当前锚点位置（线宽百分比）
 let anchorTarget = 46;
-let anchorRaf = 0;
+let anchorStop: (() => void) | null = null; // 帧钟订阅（null ＝ 锚点静止、不占帧）
 let anchorMovedAt = 0;
+let anchorShown = '';
 
 /** 视口坐标点 → 缝线上的位置（0–1 线宽分数） */
 function projectPoint(px: number, py: number): number {
@@ -74,28 +72,38 @@ function focusKnot(): HTMLElement | null {
   return best;
 }
 
-/** 沿线游走：三层不同频正弦叠出的无规律漂移（-1..1） */
-function wanderAt(t: number): number {
-  return (
-    (Math.sin(t * 0.31) + Math.sin(t * 0.53 + 1.7) + Math.sin(t * 0.11 + 4.2)) / 3
-  );
-}
-
+/* 锚点沿线的位置：轨道点在 CSS 里停在 left: 50%，这里只写 translate（线宽百分比 → px）。
+   原先逐帧写 left ⇒ 每帧一次重排；translate 不进布局，且值没变就不写（不产生样式失效） */
 function applyAnchor() {
-  if (seamAnchor) seamAnchor.style.left = `${anchorT}%`;
+  if (!seamAnchor) return;
+  const v = `${(((anchorT - 50) / 100) * seamW).toFixed(2)}px 0`;
+  if (v === anchorShown) return;
+  anchorShown = v;
+  seamAnchor.style.translate = v;
 }
 
+/* 趋近停靠点。游走（醒静梦动，三个正弦相加）已交给 Seam.astro 里三层嵌套的 CSS 动画、
+   由合成器跑；这里只剩「换站时滑过去」这一段，落定就退订帧钟 —— 原先是常驻的 60fps rAF，
+   逐帧写 left，锚点不动时也一直占着主线程帧。 */
 function anchorStep() {
-  // 醒静梦动：游走幅度随醒度衰减，醒面锚点钉定在停靠处
-  const w = reducedMotion() ? 0 : wanderAt(performance.now() / 1000) * (WANDER * 100) * (1 - wakeMix());
-  anchorT += (anchorTarget + w - anchorT) * 0.08;
+  /* 帧钟约 30fps：原先 60fps 下每帧趋近 8%，这里取 1−0.92² ≈ 15.4%，每秒收敛量不变 */
+  anchorT += (anchorTarget - anchorT) * 0.1536;
   anchorMovedAt = performance.now();
+  if (Math.abs(anchorTarget - anchorT) < 0.01) {
+    anchorT = anchorTarget;
+    stopAnchor();
+  }
   applyAnchor();
 }
 
-function anchorLoop() {
-  anchorStep();
-  anchorRaf = requestAnimationFrame(anchorLoop); // 游走常驻，不收敛
+function startAnchor() {
+  if (!seamAnchor || anchorStop || reducedMotion()) return;
+  anchorStop = onFrame30(anchorStep);
+}
+
+function stopAnchor() {
+  anchorStop?.();
+  anchorStop = null;
 }
 
 function markActive(focus: HTMLElement | null) {
@@ -123,17 +131,21 @@ function kickAnchor() {
     applyAnchor();
     return;
   }
-  if (!anchorRaf) anchorRaf = requestAnimationFrame(anchorLoop);
+  startAnchor();
 }
 
 export function initChrome() {
   const seam = document.querySelector<HTMLElement>('.seam');
-  seamAnchor = seam?.querySelector<HTMLElement>('.seam-anchor') ?? null;
+  seamAnchor = seam?.querySelector<HTMLElement>('.seam-anchor-track') ?? null;
+  // 阅读页把锚点 display:none 掉了：不画的东西不巡行（原先照样逐帧跑）
+  if (seamAnchor && !seamAnchor.getClientRects().length) seamAnchor = null;
   if (seam) {
     seamW = seam.offsetWidth || 1;
     addEventListener('resize', () => {
       seamW = seam.offsetWidth || 1;
       baseT = null;
+      anchorShown = '';
+      applyAnchor();
     });
   }
 
@@ -151,7 +163,7 @@ export function initChrome() {
 
   // rAF 被节流的环境里，用低频定时器拖着锚点继续游走
   setInterval(() => {
-    if (anchorRaf && performance.now() - anchorMovedAt > 600) anchorStep();
+    if (anchorStop && performance.now() - anchorMovedAt > 600) anchorStep();
   }, 700);
 
   const hairline = document.querySelector<HTMLElement>('.hairline-fill');
@@ -210,7 +222,8 @@ export function initChrome() {
       document.body.classList.remove('in-dawn');
     }
 
-    if (hairline) hairline.style.width = `${p * 100}%`;
+    // scaleX 而非 width：不进布局（渐变随盒子一起压缩，与按宽度裁出的一截逐像素相同）
+    if (hairline) hairline.style.transform = `scaleX(${p.toFixed(4)})`;
 
     if (depthTarget) {
       if (depthDot) depthDot.style.top = `${(6 + prog * 84).toFixed(1)}%`;

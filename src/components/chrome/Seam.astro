@@ -9,7 +9,12 @@ const { variant = 'default' } = Astro.props;
 
 <div class="seam-wrap" aria-hidden="true">
   <div class:list={['seam', { 'seam--faint': variant === 'faint', 'seam--broken': variant === 'broken' }]}>
-    <span class="seam-anchor"></span>
+    <!-- 轨道点（chrome.ts 写 translate：趋近停靠点）› 三层游走（CSS，三个正弦相加）› 锚点本体 -->
+    <span class="seam-anchor-track">
+      <span class="seam-wander"><span class="seam-wander"><span class="seam-wander">
+        <span class="seam-anchor"></span>
+      </span></span></span>
+    </span>
   </div>
 </div>
 
@@ -75,9 +80,50 @@ const { variant = 'default' } = Astro.props;
   }
 
   /* 长文/阅读页面隐藏正中央呼吸发光锚点，消除焦点争抢 */
-  :global(body[data-mask-lines='true']) .seam-anchor,
-  :global(body[data-page-type='article']) .seam-anchor {
+  :global(body[data-mask-lines='true']) .seam-anchor-track,
+  :global(body[data-page-type='article']) .seam-anchor-track {
     display: none;
+  }
+
+  /* 轨道点：线宽中点起算，chrome.ts 只写 translate（沿线趋近当前停靠点，落定即停） */
+  .seam-anchor-track {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+  }
+
+  /* 停靠点附近沿线大幅无规律游走（醒静梦动：振幅乘 --still，醒面钉定）。
+     原先是 chrome.ts 逐帧算 (sin .31t + sin(.53t+1.7) + sin(.11t+4.2)) / 3 × 5% 线宽，
+     一直占着主线程帧；现在三个正弦各给一层，嵌套 ⇒ 位移相加，全交给合成器。
+     每层 ＝ 正弦缓动的往返（alternate + easeInOutSine ⇒ 正好一条余弦），
+     单程时长 ＝ π/ω，负延迟 ＝ (φ + π/2)/ω 把相位对回原式；
+     振幅 ＝ 5% × 170vmax ÷ 3 ≈ 2.8333vmax（线宽是 170vmax）。 */
+  .seam-wander {
+    position: absolute;
+    left: 0;
+    top: 0;
+    animation: seam-wander 10.134s cubic-bezier(0.37, 0, 0.63, 1) -5.067s infinite alternate;
+  }
+
+  .seam-wander .seam-wander {
+    animation-duration: 5.928s;
+    animation-delay: -6.171s;
+  }
+
+  .seam-wander .seam-wander .seam-wander {
+    animation-duration: 28.56s;
+    animation-delay: -52.46s;
+  }
+
+  @keyframes seam-wander {
+    from {
+      translate: calc(-2.8333vmax * var(--still, 0)) 0;
+    }
+    to {
+      translate: calc(2.8333vmax * var(--still, 0)) 0;
+    }
   }
 
   .seam-anchor {
@@ -89,24 +135,43 @@ const { variant = 'default' } = Astro.props;
     margin: -4px 0 0 -4px;
     border-radius: 50%;
     background: var(--amber);
-    /* 光晕由 --amber 派生：随入梦检验的醒度插值一同换色 */
-    box-shadow:
-      0 0 10px 2px color-mix(in srgb, var(--amber) 55%, transparent),
-      0 0 26px 6px color-mix(in srgb, var(--amber) 20%, transparent);
+  }
+
+  /* 呼吸光晕：谷值、峰值两层光晕各占一个伪元素，只交叉淡变 opacity。
+     原写法直接动画 box-shadow ⇒ 走主线程、逐帧重绘，而且只要有一条主线程动画在跑，
+     全站可合成的动画（构块场 160 块）就会被逐帧拉回主线程重算样式。
+     两层按 1−s / s 交叉 ≈ 原 keyframes 在两组 box-shadow 之间的插值。
+     光晕由 --amber 派生：随入梦检验的醒度插值一同换色 */
+  .seam-anchor::before,
+  .seam-anchor::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
     animation: anchor-breathe 5.5s ease-in-out infinite;
   }
 
+  .seam-anchor::before {
+    box-shadow:
+      0 0 8px 1px color-mix(in srgb, var(--amber) 45%, transparent),
+      0 0 20px 4px color-mix(in srgb, var(--amber) 16%, transparent);
+    animation-direction: reverse;
+  }
+
+  .seam-anchor::after {
+    box-shadow:
+      0 0 13px 3px color-mix(in srgb, var(--amber) 72%, transparent),
+      0 0 34px 9px color-mix(in srgb, var(--amber) 30%, transparent);
+  }
+
+  /* 0 → 1 → 0；::before 反向播放 ⇒ 1 → 0 → 1（ease-in-out 对称，反向后两层逐帧互补） */
   @keyframes anchor-breathe {
     0%,
     100% {
-      box-shadow:
-        0 0 8px 1px color-mix(in srgb, var(--amber) 45%, transparent),
-        0 0 20px 4px color-mix(in srgb, var(--amber) 16%, transparent);
+      opacity: 0;
     }
     50% {
-      box-shadow:
-        0 0 13px 3px color-mix(in srgb, var(--amber) 72%, transparent),
-        0 0 34px 9px color-mix(in srgb, var(--amber) 30%, transparent);
+      opacity: 1;
     }
   }
 
@@ -116,7 +181,14 @@ const { variant = 'default' } = Astro.props;
       --draw: 1;
     }
 
-    .seam-anchor {
+    /* 停在原先的静态光晕（两层的中间态） */
+    .seam-anchor::before,
+    .seam-anchor::after {
+      animation: none;
+      opacity: 0.5;
+    }
+
+    .seam-wander {
       animation: none;
     }
   }</style>

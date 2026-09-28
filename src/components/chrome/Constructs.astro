@@ -55,7 +55,8 @@ const { layer = 'through' } = Astro.props;
        --sq-amp      梦态方块位置量化浮动：严格参考标题（AveritA）实现，采用 Celeste 风格
                      简谐位置量化（3px 最大幅值，1px 整像素阶跃，step-end 零 tween 瞬切，
                      波峰波谷 26% 滞空缓动）。
-                     ⚠ 只在梦面静置时成立（醒面与长按期间不声明这条动画）——
+                     档位表在生成器顶部的 SQ_TIERS（烘焙成 16 条字面值 keyframes）。
+                     ⚠ 只在梦面静置时成立（醒面与长按期间摘掉动画名）——
                      这是一条硬性能约束，不是可调项，详见 .fld-sq 上方注释。
                      ☆ 别拿序号 / 正文 ((浮起)) 的写法来对齐这里：那两族只有
                      一节两枚、一段数字的量级，2026-09-25 起改成「动画常驻、
@@ -181,7 +182,7 @@ const { layer = 'through' } = Astro.props;
      两值同比例，调浓淡就是同时改这两个数（见顶部调参总闸 --fld-ink）。
      梦态独立小块浮动：参考标题（AveritA）实现，采用 Celeste 风格简谐位置量化
      （3px 最大幅值，1px 整像素阶跃，step-end 零 tween 瞬切，波峰波谷 26% 滞空缓动）。
-     ★ 浮动动画的声明在下面那条梦面规则里，**不写在这里** —— 原因见该处注释。 */
+     ★ 浮动动画由生成器写进内联 style，成立与否由下面那条 !important 门控决定 —— 原因见该处注释。 */
   .fld-sq {
     position: absolute;
     background: color-mix(in srgb, var(--fld-ink) 5%, transparent);
@@ -192,9 +193,9 @@ const { layer = 'through' } = Astro.props;
     will-change: transform, translate, scale;
   }
 
-  /* ★ 浮动只在「梦面静置」时存在：醒面与长按（含回梦途中）都不声明 animation-name。
-     这 160 条浮动动画各自引用 var(--sq-*)，属于主线程动画 ⇒ 只要它在跑，Blink 每帧
-     都要 tick 一遍并为每个方块重新解算动画值。实测主页长按 2.4s（trace 累计）：
+  /* ★ 浮动只在「梦面静置」时存在：醒面与长按（含回梦途中）都摘掉 animation-name。
+     这 160 条浮动动画只要在跑，每个主线程帧 Blink 都要 tick 一遍并为每个方块重新解算
+     动画值（即便动画本身已交给合成器 —— 同页任何一条主线程动画 / rAF 都会带出主线程帧）。实测主页长按 2.4s（trace 累计）：
      全站样式重算 1026→766ms、动画 Tick 423→62ms（＝「整片场不存在」?fld=off 的水平）；
      墙钟同口径多轮中位：p50 39.4→15.3ms、掉帧（>33ms）42→3 帧、长任务 6→0。
      只摘掉这一条动画即可，别的都不用动。
@@ -205,42 +206,15 @@ const { layer = 'through' } = Astro.props;
      ☆ 序号 / 正文 ((浮起)) 那一族 2026-09-25 走了**相反**的路（动画常驻、振幅乘
      --still，见 global.css「定格漂浮」与 design/.probe-float-ramp.cjs）：那一族一页只有
      几枚到几十枚，常驻实测代价可忽略，换来的是换面时不再有一下骤停；本层 160 枚，
-     常驻代价就是上面那组数字 —— 同一把尺子量出两个答案，别照搬任何一边。 */
-  body[data-reality='dream']:not(.reality-holding) .fld-sq {
-    animation: fld-sq-float var(--sq-dur, 2.8s) step-end infinite;
-    animation-delay: var(--sq-del, 0s);
-  }
-
-  /* 浮动轨迹：振幅不再乘 --still（那一乘让 160 条 keyframes 逐帧依赖根变量，
-     也随动画在梦面常驻而失去意义）。醒面/长按不成立动画 ⇒ translate 回到 0。 */
-  @keyframes fld-sq-float {
-    0% {
-      translate: 0px 0px;
-    }
-    13% {
-      translate: calc(var(--sq-x-step, 0px) * var(--sq-dir, 1))
-                 calc(var(--sq-y-step, 1px) * -1 * var(--sq-ydir, 1));
-    }
-    25% {
-      translate: calc(var(--sq-x-mid, 1px) * var(--sq-dir, 1))
-                 calc(var(--sq-y-mid, 2px) * -1 * var(--sq-ydir, 1));
-    }
-    37% {
-      translate: calc(var(--sq-x-max, 1px) * var(--sq-dir, 1))
-                 calc(var(--sq-y-max, 3px) * -1 * var(--sq-ydir, 1));
-    }
-    63% {
-      translate: calc(var(--sq-x-mid, 1px) * var(--sq-dir, 1))
-                 calc(var(--sq-y-mid, 2px) * -1 * var(--sq-ydir, 1));
-    }
-    75% {
-      translate: calc(var(--sq-x-step, 0px) * var(--sq-dir, 1))
-                 calc(var(--sq-y-step, 1px) * -1 * var(--sq-ydir, 1));
-    }
-    87%,
-    100% {
-      translate: 0px 0px;
-    }
+     常驻代价就是上面那组数字 —— 同一把尺子量出两个答案，别照搬任何一边。
+     动画本体由生成器写在每块的内联 style 里（animation: fld-sq-<档><横><纵> …），
+     keyframes 是生成器按 SQ_TIERS 烘焙的 16 条字面值（振幅不乘 --still）。
+     这里反过来只管「不成立」：醒面、长按、以及脚本落定梦面之前，一律摘掉动画名。
+     作者样式的 !important 压得过内联的普通声明 ⇒ 门控仍在 CSS 这一处。
+     摘掉动画名 ⇒ translate 回到 0。 */
+  body:not([data-reality='dream']) .fld-sq,
+  body.reality-holding .fld-sq {
+    animation-name: none !important;
   }
 
   /* 减动效：整层停在醒面构图上（静止的拼接）。
@@ -321,6 +295,39 @@ const { layer = 'through' } = Astro.props;
       { n: 6, span: [295, 380], o: 1.0, dur: 66, amp: 3, gap: 8, gapU: 360, sdur: 9.5, sdel: -6.5 },
     ];
     if (GAPQ >= 0 && GAPQ <= 16) for (const b of BANDS) b.gap = GAPQ;
+
+    /* ★ 方块梦态浮动的 4 档（px，[一阶, 中, 峰]；x 乘横向 ±1，y 朝上乘纵向 ±1）：
+         档 0：纯纵向 3px（与 AveritA 字符完全同构）   档 1：微倾斜，X 最大 1px、Y 3px
+         档 2：折线倾角，X 最大 2px、Y 3px              档 3：微幅纵向，X 1px、Y 2px
+       轨迹：0 → 一阶 → 中 → 峰 → 中 → 一阶 → 0，停在 13 / 25 / 37 / 63 / 75 / 87%，
+       step-end 零 tween 瞬切、波峰波谷 26% 滞空（与品牌字标同一条曲线）。
+       这里把 档 × 横向 × 纵向 烘焙成 16 条**字面值** keyframes 注入一次：原先是一条
+       keyframes 读每块身上的 8 个 --sq-* 变量，每个主线程帧里 160 块都要逐一解析一遍。 */
+    const SQ_TIERS = [
+      { x: [0, 0, 0], y: [1, 2, 3] },
+      { x: [0, 1, 1], y: [1, 2, 3] },
+      { x: [1, 1, 2], y: [1, 2, 3] },
+      { x: [0, 1, 1], y: [1, 1, 2] },
+    ];
+    const sqKf = (tier: number, dx: number, dy: number) =>
+      'fld-sq-' + tier + (dx > 0 ? 'r' : 'l') + (dy > 0 ? 'u' : 'd');
+    {
+      let css = '';
+      SQ_TIERS.forEach((t, tier) => {
+        for (const dx of [1, -1])
+          for (const dy of [1, -1]) {
+            const at = (k: number) => t.x[k] * dx + 'px ' + -t.y[k] * dy + 'px';
+            css +=
+              '@keyframes ' + sqKf(tier, dx, dy) +
+              '{0%,87%,100%{translate:0 0}13%,75%{translate:' + at(0) +
+              '}25%,63%{translate:' + at(1) + '}37%{translate:' + at(2) + '}}';
+          }
+      });
+      const st = document.createElement('style');
+      st.id = 'fld-sq-keyframes';
+      st.textContent = css;
+      document.head.appendChild(st);
+    }
 
     /* 生成区（u,v 是 14° 的正交系 ⇒ 这里的距离就是屏幕距离）与「副本不相交」的 u 边界 */
     const UMAX = 830,
@@ -685,48 +692,14 @@ const { layer = 'through' } = Astro.props;
             const rndScale = ((h >> 12) & 0xffff) / 65535;
             const scaleDelta = (0.2 + Math.pow(rndScale, 1.4) * (MAX_SCALE - 1 - 0.2)).toFixed(2);
 
-            // 4 档离散随机浮动配置（严格对齐 AveritA 3px 峰值与 1px 阶跃量化，零 tween 瞬切）
-            const tier = h % 4;
-            let xStep = '0px',
-              xMid = '0px',
-              xMax = '0px';
-            let yStep = '1px',
-              yMid = '2px',
-              yMax = '3px';
-            if (tier === 0) {
-              // 档 0：纯纵向 3px 量化浮动（与 AveritA 字符完全同构）
-              xStep = '0px';
-              xMid = '0px';
-              xMax = '0px';
-              yStep = '1px';
-              yMid = '2px';
-              yMax = '3px';
-            } else if (tier === 1) {
-              // 档 1：微倾斜 3px 量化浮动（X 最大 1px，Y 3px）
-              xStep = '0px';
-              xMid = '1px';
-              xMax = '1px';
-              yStep = '1px';
-              yMid = '2px';
-              yMax = '3px';
-            } else if (tier === 2) {
-              // 档 2：折线倾角 3px 量化浮动（X 最大 2px，Y 3px）
-              xStep = '1px';
-              xMid = '1px';
-              xMax = '2px';
-              yStep = '1px';
-              yMid = '2px';
-              yMax = '3px';
-            } else {
-              // 档 3：微幅纵向 2px 量化浮动（X 1px，Y 2px）
-              xStep = '0px';
-              xMid = '1px';
-              xMax = '1px';
-              yStep = '1px';
-              yMid = '1px';
-              yMax = '2px';
-            }
+            // 4 档离散随机浮动（严格对齐 AveritA 3px 峰值与 1px 阶跃量化，零 tween 瞬切）：
+            // 档 × 横向 × 纵向 ⇒ 16 条烘焙好的 keyframes 之一（见下方 SQ_TIERS / sqKeyframes）
+            const kf = sqKf(h % 4, dirX, dirY);
 
+            /* 浮动直接写成内联 animation；醒面 / 长按期间由 CSS 的 !important 规则摘掉
+               animation-name（见 .fld-sq 上方注释）。每块只剩 3 个自定义属性（拼合位移、梦态放大），
+               浮动的 8 个参数全在 keyframes 字面值里 —— 主线程每次为动画元素重算样式时，
+               要解析的 var() 少了一大半（实测单次重算 ≈ 快一倍）。 */
             d.style.cssText =
               'left:' +
               lo.x +
@@ -742,28 +715,15 @@ const { layer = 'through' } = Astro.props;
               'px;--fld-ty:' +
               (ti.y - lo.y) +
               'px;' +
-              '--sq-dur:' +
+              '--sq-scale-delta:' +
+              scaleDelta +
+              ';animation:' +
+              kf +
+              ' ' +
               dur +
-              ';--sq-del:' +
+              ' step-end ' +
               del +
-              ';--sq-dir:' +
-              dirX +
-              ';--sq-ydir:' +
-              dirY +
-              ';--sq-x-step:' +
-              xStep +
-              ';--sq-x-mid:' +
-              xMid +
-              ';--sq-x-max:' +
-              xMax +
-              ';--sq-y-step:' +
-              yStep +
-              ';--sq-y-mid:' +
-              yMid +
-              ';--sq-y-max:' +
-              yMax +
-              ';--sq-scale-delta:' +
-              scaleDelta;
+              ' infinite';
             d.dataset.b = ti.x + ',' + ti.y + ',' + g.sz; // 醒态（tiled）局部位置 + 边长
             d.dataset.l = lo.x + ',' + lo.y; // 梦态（loose）局部位置
             cl.appendChild(d);

@@ -234,17 +234,32 @@ hr {
    相位是插件写在每个字上的 --i，横向方向由奇偶交替。
    ⚠ 拆字后字串内部不再换行（2–8 字为宜），两端对齐在这里留缺口；
      流光不拆字，没有这条限制。 */
-.float-run {
-  /* 顶点色：琥珀按 --float-tint 混进正文色，默认 0%（纯位移、不动色）。
-     占比乘 --still ⇒ 醒面就是 0% ＝ 纯 currentColor，不闪一下暖色。 */
-  --float-tint-now: calc(var(--float-tint, 0%) * var(--still, 0));
-  --float-peak: color-mix(in srgb, var(--amber) var(--float-tint-now), currentColor);
-}
-
 .float-ch {
   display: inline-block;
   white-space: pre;
   animation: float-char var(--float-dur, 2.8s) step-end infinite;
+  animation-delay: calc(var(--i, 0) * var(--float-stagger, -0.4s));
+}
+
+/* 顶点色（只在写了 tint 的段落）：琥珀副本叠在字上，按 --float-tint-a（tint 的小数形，
+   插件写入）× --still 显出 ⇒ srgb 里 a·琥珀 + (1−a)·正文色，与原先 color-mix 同式；
+   醒面 --still 0 ＝ 纯正文色，不闪一下暖色。
+   为什么不直接动画 color：color 走主线程，只要有一条主线程动画在跑，全站可合成的
+   动画（构块场 160 块、漂移）都会被逐帧拉回主线程重算样式。
+   副本文字用 content 的替代文本语法（/ ""）挡在可访问名之外，读屏不会念两遍；
+   不认这个语法的浏览器会整条丢弃 content ⇒ 只是没有灼点，位移照常。 */
+.float-run--tint .float-ch {
+  position: relative;
+}
+
+.float-run--tint .float-ch::after {
+  content: attr(data-ch) / '';
+  position: absolute;
+  inset: 0;
+  color: var(--amber);
+  opacity: 0;
+  pointer-events: none;
+  animation: float-char-glint var(--float-dur, 2.8s) step-end infinite;
   animation-delay: calc(var(--i, 0) * var(--float-stagger, -0.4s));
 }
 
@@ -270,7 +285,6 @@ body[data-reality='dream'] .float-ch {
   87%,
   100% {
     translate: 0 0;
-    color: currentColor;
   }
   13% {
     translate: calc(var(--float-amp, 3px) * var(--float-sway, 0) * var(--float-dir, 1) * 0.33 * var(--still, 0))
@@ -279,17 +293,14 @@ body[data-reality='dream'] .float-ch {
   25% {
     translate: calc(var(--float-amp, 3px) * var(--float-sway, 0) * var(--float-dir, 1) * 0.66 * var(--still, 0))
       calc(var(--float-amp, 3px) * -0.66 * var(--still, 0));
-    color: var(--float-peak);
   }
   37% {
     translate: calc(var(--float-amp, 3px) * var(--float-sway, 0) * var(--float-dir, 1) * var(--still, 0))
       calc(var(--float-amp, 3px) * -1 * var(--still, 0));
-    color: var(--float-peak);
   }
   63% {
     translate: calc(var(--float-amp, 3px) * var(--float-sway, 0) * var(--float-dir, 1) * 0.66 * var(--still, 0))
       calc(var(--float-amp, 3px) * -0.66 * var(--still, 0));
-    color: var(--float-peak);
   }
   75% {
     translate: calc(var(--float-amp, 3px) * var(--float-sway, 0) * var(--float-dir, 1) * 0.33 * var(--still, 0))
@@ -297,47 +308,61 @@ body[data-reality='dream'] .float-ch {
   }
 }
 
-/* —— 流光：一道暖光自左向右流过字面 ——
-   醒面不设背景，字就是正文原色，没有一丝渐变。位移只动 background-position，
-   不碰字号与字距 ⇒ 不产生布局抖动。整段折行时每行各取一截渐变（见手册）。 */
-body[data-reality='dream'] .sheen-run {
-  background-image: linear-gradient(
-    var(--sheen-angle, 100deg),
-    var(--fg) 0%,
-    var(--fg) 33%,
-    color-mix(in srgb, var(--amber) var(--sheen-hue, 45%), var(--fg)) 50%,
-    var(--fg) 67%,
-    var(--fg) 100%
-  );
-  background-size: var(--sheen-span, 300%) 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  animation: sheen-slide var(--sheen-dur, 7s) var(--sheen-ease, linear) infinite;
+/* 顶点色的时序与原 color 轨一致：step-end 下 25% 起显、一直持续到 87% 才落回 */
+@keyframes float-char-glint {
+  0%,
+  87%,
+  100% {
+    opacity: 0;
+  }
+  25% {
+    opacity: calc(var(--float-tint-a, 0) * var(--still, 0));
+  }
 }
 
-/* 100% → 0%：亮带自左向右走过（与阅读方向一致） */
-@keyframes sheen-slide {
+/* —— 流光：一道暖光自左向右依次流过字面 ——
+   插件把一段拆成单元（汉字一字一个、西文一词一个，空白留作断行点），每个单元叠一层
+   琥珀副本（::after），只动 opacity：曲线 --sh-e 是构建期按单元在整段里的位置算好的
+   linear() 缓动（src/markdown/sheen-timing.mjs），光带经过它时由 0 升到 1 再落回。
+   ⇒ 与原先「整段一张渐变、动 background-position」同式（峰色 = color-mix(琥珀 hue, 墨)），
+   区别只在一个单元整体变色；折行时序号按整段排成一行来算，光带照样从行尾接到下一行开头。
+   为什么不再动 background-position：它走主线程，只要在跑，全站可合成的动画（构块场
+   160 块、漂移）就被逐帧拉回主线程重算 —— 用到流光的页面因此一直满载。
+   醒面没有副本动画，字就是正文原色；angle 参数在拆单元后不再生效（单元整体变色，没有斜角）。
+   单元是 inline-block（副本才能逐像素叠准），所以段内两端对齐会留一点缺口（同 ((浮起))）。 */
+.sheen-u {
+  display: inline-block;
+  position: relative;
+  white-space: pre;
+}
+
+body[data-reality='dream'] .sheen-run {
+  color: var(--fg);
+}
+
+body[data-reality='dream'] .sheen-u::after {
+  content: attr(data-ch) / '';
+  position: absolute;
+  inset: 0;
+  color: color-mix(in srgb, var(--amber) var(--sheen-hue, 45%), var(--fg));
+  opacity: 0;
+  pointer-events: none;
+  animation: sheen-unit var(--sheen-dur, 7s) var(--sh-e, linear) infinite;
+}
+
+@keyframes sheen-unit {
   from {
-    background-position: 100% 0;
+    opacity: 0;
   }
   to {
-    background-position: 0% 0;
+    opacity: 1;
   }
 }
 
-/* 裁字之后字身是透明的，选中高亮会把整段盖成一块色 —— 给选中的那截还回正文色 */
-.sheen-run::selection {
-  color: var(--fg);
-  -webkit-text-fill-color: var(--fg);
-}
-
-/* Windows 高对比度：背景被强制抹掉，透明字身会读不出来 */
+/* Windows 高对比度：副本的颜色会被强制改写，干脆不画 */
 @media (forced-colors: active) {
-  body[data-reality='dream'] .sheen-run {
-    background-image: none;
-    color: var(--fg);
-    -webkit-text-fill-color: var(--fg);
+  body[data-reality='dream'] .sheen-u::after {
+    display: none;
   }
 }
 
@@ -1266,9 +1291,15 @@ body[data-reality='dream'] [data-side='wake'] {
     translate: none !important;
   }
 
+  .float-ch::after {
+    display: none;
+  }
+
   .sheen-run {
-    background-image: none !important;
     color: inherit !important;
-    -webkit-text-fill-color: inherit !important;
+  }
+
+  .sheen-u::after {
+    display: none !important;
   }
 }

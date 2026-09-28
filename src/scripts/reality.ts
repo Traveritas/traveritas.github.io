@@ -247,6 +247,13 @@ function drawThread(W: number, ang: number, coreOp: number, bandOp: number) {
   tBand.style.opacity = `${bandOp}`;
 }
 
+/* 醒度变化的订阅口：给读不到 CSS 变量的消费方（Worker 里的脑电，见 Eeg.astro）。
+   只在 setTint 真的改写了变量时通知，频率 ＝ 长按期间的帧率，静置时为零 */
+const mixListeners: (() => void)[] = [];
+export function onMixChange(fn: () => void) {
+  mixListeners.push(fn);
+}
+
 let lastMix = -1;
 function setTint(cc: number) {
   const rounded = Math.round(cc * 1000) / 1000;
@@ -257,6 +264,7 @@ function setTint(cc: number) {
     docEl.style.setProperty(k, mixRgb(d, w, rounded));
   }
   docEl.style.setProperty('--reality-mix', rounded.toFixed(3));
+  for (const fn of mixListeners) fn();
 }
 
 /** 当前醒度 0..1（chrome.ts 锚点游走等「醒静梦动」消费方使用） */
