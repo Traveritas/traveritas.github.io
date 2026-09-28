@@ -29,15 +29,32 @@ const repoOf = (p: (typeof projects)[number]) =>
 const manifesto = '在即将醒来的那一瞬，世界究竟是在成形，还是正在融化？';
 const frags = ['世界在此停留片刻。', '它并非梦境，', '亦非确凿之物。', '只是人在睁眼之前，最后一眼看见的明亮倒影。'];
 
-const seeds = [
-  { name: '水面', desc: '微光与水汽漫开的边缘，没有确凿的轮廓。', lift: 0 },
-  { name: '细线', desc: '微光与轮廓的边界，圆环正在聚拢。', lift: 16 },
-  { name: '帷幕', desc: '遮蔽与展露之间的一层薄纱。', lift: 6 },
-  { name: '巨型空洞', desc: '尺度本身作为母题，悬于视界边缘。', lift: 22 },
-  { name: '花', desc: '抽象形态探索中，待重塑。', lift: 10 },
-];
+function makeSnippetHtml(md: string, maxLen = 65): string {
+  const clean = md
+    .replace(/:::(dream|wake)[\s\S]*?:::/g, '')
+    .replace(/^#{1,6}\s+.+$/gm, '')
+    .replace(/\[\[([^|[\]]+)\|([^|[\]]+)\]\]/g, '<span data-morph data-true="$1" data-dream="$2">$1</span>')
+    .replace(/\(\(([^()|]+)(\|[^()]*)?\)\)/g, '$1')
+    .replace(/\{\{([^{}|]+)(\|[^{}]*)?\}\}/g, '$1')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/[*_`#>-]/g, '')
+    .trim();
+  if (clean.length <= maxLen) return clean;
+  return clean.slice(0, maxLen).trim() + '…';
+}
 
-const deadSeeds = [{ name: '碎块', desc: '过于规整与生硬，已搁置。' }];
+const fmtMomentTime = (d: Date) =>
+  `${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+
+const rawMoments = (await getCollection('moments', (m) => !m.data.draft))
+  .sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf() || b.id.localeCompare(a.id))
+  .slice(0, 7);
+
+const moments = rawMoments.map((m) => ({
+  id: m.id,
+  data: m.data,
+  snippetHtml: makeSnippetHtml(m.body ?? ''),
+}));
 
 const wakeAnchors = [
   {
@@ -209,35 +226,40 @@ const wakeAnchors = [
     </div>
   </section>
 
-  <!-- ═══ REM · 试验场：种子药丸浮在玻璃签四周 ═══ -->
+  <!-- ═══ REM · 瞬间：错落悬浮便签场围绕玻璃签 ═══ -->
   <section class="band band-rem" id="ns-rem">
     <div class="container-wide">
-      <StitchHeader title="试验场" stage="异相 · REM · 眼动" time={`${fmtNightTime(181)} → ${fmtNightTime(352)}`} />
+      <StitchHeader title="瞬间" stage="异相 · REM · 眼动" time={`${fmtNightTime(181)} → ${fmtNightTime(352)}`} />
       <p class="verdict">
-        <span class="vtag warm">未命名的 · UNNAMED</span>
+        <span class="vtag warm">即逝的 · EPHEMERAL</span>
       </p>
       <div class="rem-field">
-        <div class="pill-field">
+        <div class="moment-slip-field">
           {
-            seeds.map((s, i) => (
-              <span
-                class="pill drift"
-                style={`--d-amp: 6px; --d-dur: ${(6.4 + i * 0.7).toFixed(1)}s; --d-phase: ${(-i * 1.7).toFixed(1)}s; --d-rot: 0.5deg; --lift: ${s.lift}px`}
-              >
-                <span class="pill-skin" style={`--tilt: ${(i % 2 === 0 ? 1.2 : -0.9).toString()}deg`}>
-                  <b>{s.name}</b>
-                  <small>{s.desc}</small>
-                </span>
-              </span>
-            ))
-          }
-          {
-            deadSeeds.map((d) => (
-              <span class="pill-skin dead" style="--lift: 14px">
-                <b>{d.name}</b>
-                <small>{d.desc}</small>
-              </span>
-            ))
+            moments.map((m, i) => {
+              const tilt = ([-1.2, 0.9, -0.7, 1.3, -1.0, 0.6, -0.8][i % 7]).toFixed(1);
+              const lift = [0, 10, -4, 14, 6, 18, 4][i % 7];
+              const dur = (6.2 + (i % 5) * 0.7).toFixed(1);
+              const phase = (-i * 1.6).toFixed(1);
+              return (
+                <a
+                  href={`/moments/#${m.id}`}
+                  class="moment-slip drift"
+                  style={`--d-amp: 5px; --d-dur: ${dur}s; --d-phase: ${phase}s; --d-rot: 0.4deg; --lift: ${lift}px`}
+                >
+                  <span class="moment-slip-card" style={`--tilt: ${tilt}deg`}>
+                    <span class="m-slip-head mono">
+                      <span class="m-slip-time">{fmtMomentTime(m.data.date)}</span>
+                      {m.data.tags?.[0] && <span class="m-slip-tag">#{m.data.tags[0]}</span>}
+                    </span>
+                    {m.data.title && <b class="m-slip-title">{m.data.title}</b>}
+                    <span class="m-slip-snip">
+                      <Fragment set:html={m.snippetHtml} />
+                    </span>
+                  </span>
+                </a>
+              );
+            })
           }
         </div>
         <div class="slip-stage">
@@ -249,7 +271,7 @@ const wakeAnchors = [
           </div>
         </div>
       </div>
-      <p class="band-more"><a href="/articles/motif-exploration-log/">母题探索记录 →</a></p>
+      <p class="band-more"><a href="/moments/">全部瞬间 →</a></p>
     </div>
   </section>
 
@@ -1061,7 +1083,7 @@ const wakeAnchors = [
     }
   }
 
-  /* ── REM · 药丸星座：种子绕玻璃签漂，否决的一枚划线留在场内 ── */
+  /* ── REM · 瞬间便签场：7 枚磨砂晶体便签错落漂浮在玻璃签左侧 ── */
   .rem-field {
     display: grid;
     gap: 3.4rem;
@@ -1070,82 +1092,114 @@ const wakeAnchors = [
 
   @media (min-width: 900px) {
     .rem-field {
-      grid-template-columns: minmax(0, 32rem) minmax(16rem, auto);
+      grid-template-columns: minmax(0, 36rem) minmax(16rem, auto);
       align-items: center;
       justify-content: center;
-      gap: clamp(3rem, 6vw, 5rem);
+      gap: clamp(2.5rem, 5vw, 4.5rem);
     }
   }
 
-  .pill-field {
+  .moment-slip-field {
     display: flex;
     flex-wrap: wrap;
     align-items: flex-start;
-    gap: 1.1rem 1rem;
+    gap: 1.15rem 1rem;
   }
 
-  .pill {
+  .moment-slip {
+    display: block;
+    text-decoration: none !important;
     margin-top: var(--lift, 0px);
+    flex: 1 1 calc(50% - 0.55rem);
+    min-width: 210px;
+    max-width: 100%;
   }
 
-  .pill-skin {
+  .moment-slip-card {
     display: grid;
-    gap: 0.3rem;
-    padding: 0.8rem 1.3rem 0.7rem;
-    border-radius: 999px;
-    border: 1px solid rgba(138, 110, 150, 0.3);
-    background: rgba(255, 255, 255, 0.58);
-    -webkit-backdrop-filter: blur(10px);
-    backdrop-filter: blur(10px);
-    box-shadow: 0 8px 20px -6px rgba(138, 110, 150, 0.08);
+    gap: 0.45rem;
+    padding: 1.1rem 1.3rem;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.75);
+    background: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.72) 0%,
+      rgba(255, 255, 255, 0.42) 100%
+    );
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+    box-shadow:
+      inset 0 1px 1px rgba(255, 255, 255, 0.7),
+      0 10px 24px -8px rgba(38, 44, 51, 0.07);
     transform: rotate(var(--tilt, 0deg));
-    transition: border-color 0.3s ease, background 0.3s ease;
+    transition:
+      border-color 0.26s ease,
+      background 0.26s ease,
+      box-shadow 0.26s ease,
+      transform 0.26s ease;
   }
 
-  .pill-skin:hover {
-    border-color: rgba(138, 110, 150, 0.65);
-    background: rgba(255, 255, 255, 0.85);
+  .moment-slip:hover .moment-slip-card {
+    border-color: color-mix(in srgb, var(--amber) 45%, rgba(255, 255, 255, 0.9));
+    background: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.92) 0%,
+      rgba(255, 255, 255, 0.62) 100%
+    );
+    box-shadow:
+      inset 0 1px 1px rgba(255, 255, 255, 0.95),
+      0 14px 28px -6px rgba(38, 44, 51, 0.12);
+    transform: rotate(var(--tilt, 0deg)) translateY(-2px);
   }
 
-  .pill-skin b {
+  .m-slip-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+    font-size: 0.65rem;
+    letter-spacing: 0.12em;
+    color: var(--fg-soft);
+  }
+
+  .m-slip-time {
+    color: var(--fg-faint);
+  }
+
+  .m-slip-tag {
+    color: var(--umber);
+    opacity: 0.85;
+  }
+
+  .m-slip-title {
     font-family: var(--font-display);
     font-weight: 600;
-    font-size: 1rem;
-    letter-spacing: 0.06em;
+    font-size: 0.95rem;
+    letter-spacing: 0.04em;
     color: var(--fg);
+    margin: 0;
   }
 
-  .pill-skin small {
-    font-size: 0.72rem;
-    line-height: 1.65;
+  .m-slip-snip {
+    font-family: var(--font-serif);
+    font-size: 0.82rem;
+    line-height: 1.7;
     letter-spacing: 0.02em;
     color: var(--fg-soft);
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
   }
 
-  .pill-skin.dead {
-    margin-top: var(--lift, 0px);
-    border-style: dashed;
-    border-color: color-mix(in srgb, var(--fg-faint) 45%, transparent);
+  :global(body[data-reality='dream']) .m-slip-snip {
+    color: color-mix(in srgb, var(--fg) 85%, transparent);
   }
 
-  .pill-skin.dead b {
-    color: var(--fg-faint);
-    text-decoration: line-through;
-    text-decoration-thickness: 1px;
-  }
-
-  /* 否决种子的描述仍是正文信息：只让标题靠划线＋淡色退场 */
-  .pill-skin.dead small {
-    color: var(--fg-soft);
-  }
-
-  .rem-cap {
-    margin: 0;
-    max-width: 34em;
-    font-size: 0.88rem;
-    line-height: 1.95;
-    color: var(--fg-soft);
-    letter-spacing: 0.04em;
+  @media (max-width: 580px) {
+    .moment-slip {
+      flex: 1 1 100%;
+    }
   }
 
   .slip-stage {

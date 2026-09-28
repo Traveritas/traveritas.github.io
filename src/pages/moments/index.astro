@@ -1,0 +1,253 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getCollection, render } from 'astro:content';
+
+const entries = (await getCollection('moments', (m) => !m.data.draft))
+  .sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf() || b.id.localeCompare(a.id));
+
+const momentsWithContent = await Promise.all(
+  entries.map(async (m) => {
+    const { Content } = await render(m);
+    return {
+      ...m,
+      Content,
+    };
+  })
+);
+
+const fmtDate = (d: Date) =>
+  `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
+
+const fmtTime = (d: Date) =>
+  `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+
+// 按年份分组（保持倒序）
+const byYear = new Map<number, typeof momentsWithContent>();
+for (const m of momentsWithContent) {
+  const y = m.data.date.getFullYear();
+  if (!byYear.has(y)) byYear.set(y, []);
+  byYear.get(y)!.push(m);
+}
+const years = [...byYear.keys()].sort((a, b) => b - a);
+---
+
+<BaseLayout
+  title="瞬间 — Traveritas"
+  dreamTitle="闪念 — AveritA"
+  description="即逝的直觉、断简与思绪微光。"
+  ambient
+  rail={{ mode: 'station', station: '瞬间 · 异相', en: 'MOMENTS · REM' }}
+>
+  <div class="container page-body">
+    <header class="page-head">
+      <h1 data-morph data-true="瞬间" data-dream="闪念">瞬间</h1>
+      <p class="lede" data-morph data-true="即逝的直觉、断简与思绪微光。" data-dream="“在即将醒来的那一瞬，尚未串联成篇的散落光斑。”">
+        即逝的直觉、断简与思绪微光。
+      </p>
+    </header>
+
+    {
+      years.map((y) => (
+        <section class="year-group">
+          <div class="axis" aria-hidden="true">
+            <span class="axis-tag mono">
+              {y} · {byYear.get(y)!.length} 则
+            </span>
+          </div>
+
+          <div class="moments-stream">
+            {byYear.get(y)!.map((m) => (
+              <article class="moment-card" id={m.id}>
+                <header class="moment-head">
+                  <div class="moment-meta mono">
+                    <span class="moment-date">{fmtDate(m.data.date)}</span>
+                    <span class="moment-time">{fmtTime(m.data.date)}</span>
+                    {m.data.tags.length > 0 && (
+                      <span class="moment-tags">
+                        {m.data.tags.map((t) => (
+                          <span class="tag-pill">#{t}</span>
+                        ))}
+                      </span>
+                    )}
+                  </div>
+                  <a href={`#${m.id}`} class="moment-anchor mono" title="锚点链接" aria-label="永久链接">#</a>
+                </header>
+
+                {m.data.title && <h2 class="moment-title">{m.data.title}</h2>}
+
+                <div class="md moment-content">
+                  <m.Content />
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      ))
+    }
+  </div>
+</BaseLayout>
+
+<style>
+  .page-body {
+    padding-block: 4rem 8rem;
+    max-width: 44rem;
+  }
+
+  .page-head {
+    margin-bottom: 4rem;
+  }
+
+  .page-head h1 {
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 4vw, 2.6rem);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin: 0 0 1rem;
+    color: var(--fg);
+  }
+
+  .lede {
+    font-size: 0.96rem;
+    line-height: 1.8;
+    color: var(--fg-soft);
+    margin: 0;
+  }
+
+  .year-group {
+    margin-bottom: 4rem;
+  }
+
+  .axis {
+    margin: 0 0 2rem;
+    padding-left: 0.2rem;
+    display: flex;
+    align-items: baseline;
+  }
+
+  .axis-tag {
+    font-size: 0.72rem;
+    letter-spacing: 0.2em;
+    color: var(--umber);
+  }
+
+  /* 瞬间时间流卡片列表 */
+  .moments-stream {
+    display: flex;
+    flex-direction: column;
+    gap: 2.2rem;
+  }
+
+  .moment-card {
+    position: relative;
+    scroll-margin-top: 5.5rem;
+    padding: 1.8rem 2.2rem;
+    border-radius: 6px;
+    background: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.75) 0%,
+      rgba(255, 255, 255, 0.45) 100%
+    );
+    border: 1px solid rgba(255, 255, 255, 0.82);
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+    box-shadow:
+      inset 0 1px 1px rgba(255, 255, 255, 0.7),
+      0 12px 32px -10px rgba(38, 44, 51, 0.06);
+    transition:
+      border-color 0.24s ease,
+      box-shadow 0.24s ease,
+      transform 0.24s ease;
+  }
+
+  .moment-card:hover {
+    border-color: color-mix(in srgb, var(--amber) 40%, rgba(255, 255, 255, 0.85));
+    box-shadow:
+      inset 0 1px 1px rgba(255, 255, 255, 0.9),
+      0 16px 36px -8px rgba(38, 44, 51, 0.09);
+    transform: translateY(-1px);
+  }
+
+  .moment-card:target {
+    border-color: var(--amber);
+    box-shadow:
+      0 0 0 1px var(--amber),
+      0 16px 36px -8px rgba(200, 140, 50, 0.16);
+  }
+
+  .moment-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .moment-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.65rem 0.9rem;
+    font-size: 0.72rem;
+    color: var(--fg-soft);
+  }
+
+  .moment-time {
+    color: var(--fg-faint);
+  }
+
+  .moment-tags {
+    display: flex;
+    gap: 0.45rem;
+  }
+
+  .tag-pill {
+    color: var(--umber);
+    opacity: 0.85;
+    font-size: 0.68rem;
+  }
+
+  .moment-anchor {
+    color: var(--fg-faint);
+    text-decoration: none;
+    font-size: 0.85rem;
+    opacity: 0.4;
+    transition: opacity 0.18s ease, color 0.18s ease;
+  }
+
+  .moment-anchor:hover {
+    opacity: 1;
+    color: var(--amber);
+  }
+
+  .moment-title {
+    font-family: var(--font-display);
+    font-size: 1.15rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--fg);
+    margin: 0 0 0.85rem;
+  }
+
+  .moment-content {
+    font-family: var(--font-serif);
+    font-size: 0.95rem;
+    line-height: 1.95;
+    color: var(--fg);
+  }
+
+  .moment-content :global(p) {
+    margin: 0 0 0.9rem;
+  }
+
+  .moment-content :global(p:last-child) {
+    margin-bottom: 0;
+  }
+
+  @media (max-width: 480px) {
+    .moment-card {
+      padding: 1.4rem 1.4rem;
+    }
+  }
+</style>
