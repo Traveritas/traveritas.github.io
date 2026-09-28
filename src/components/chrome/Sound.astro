@@ -1,27 +1,41 @@
 ---
 /* ─────────────────────────────────────────────────────────────
-   环境声 · 开关微章
-   · 固定在左下角：左侧中段留给 Rail 的仪表，首屏右下留给 RealityGuide，
-     移动端 RealityGuide 居中下，左下角始终是空着的。
-   · 与 RealityGuide 同一族材质：⌜ ⌟ 光学微刻角标 + 呼吸光核 + 磨砂树脂微章。
-   · 文案双态（[data-morph] + data-dream，随长按换面）；开关态只由
-     html[data-sound="on"] 决定呈现哪一组——脚本不重写文案，避免与
-     morph 引擎抢注册表。
-   · 无 JS 时整块隐藏（BaseLayout 的 noscript 里），不留一个按不动的键。
+   环境声 · 开关微章（音律微弦 · 悬停舒展版）
+   · 固定在左下角（常驻全站）：左侧中段留给 Rail 仪表轨，首屏右下留给 RealityGuide。
+   · 构型设计：
+     - 常态：32×30px 的半透明磨砂树脂微体，内置 3 根极细（1.25px）光学声学微弦；
+     - 动效：静音时微弦平卧为 2.5px 浅灰基线，发声时化为琥珀色流光并按质数周期上下起伏；
+     - 悬停/聚焦：向右优雅舒展至 106px，浮现双态文案（醒「环境声/开启」↔ 梦「回响/让声浮起」）；
+     - 梦态：微弦带有轻微泛音混响柔焦（filter: blur(0.35px)）。
+   · 开关态由 html[data-sound="on"] 统一驱动，与 [data-morph] 引擎无缝协同。
+   · 无 JS 时在 BaseLayout 的 noscript 下自动隐藏。
    ───────────────────────────────────────────────────────────── */
 ---
 
-<button class="snd" type="button" data-sound-toggle data-nofx>
-  <span class="snd-reticle snd-rt-tl mono" aria-hidden="true">⌜</span>
-  <span class="snd-reticle snd-rt-br mono" aria-hidden="true">⌟</span>
+<button
+  class="snd"
+  type="button"
+  data-sound-toggle
+  data-nofx
+  aria-label="环境声开关"
+  title="环境声"
+>
+  <!-- 声学微弦发声核（3 根光学微线） -->
+  <span class="snd-filaments" aria-hidden="true">
+    <i class="snd-str snd-s1"></i>
+    <i class="snd-str snd-s2"></i>
+    <i class="snd-str snd-s3"></i>
+  </span>
 
-  <span class="snd-core" aria-hidden="true"><i></i></span>
+  <!-- 悬停展开区域（平滑舒展） -->
+  <span class="snd-expand" aria-hidden="true">
+    <!-- 文字恒定保持：醒面「环境声」↔ 梦面「回响」 -->
+    <span class="snd-label" data-morph data-true="环境声" data-dream="回响">环境声</span>
 
-  <span class="snd-label snd-on" data-morph data-true="关闭环境声" data-dream="让声音沉落">关闭环境声</span>
-  <span class="snd-label snd-off" data-morph data-true="开启环境声" data-dream="让声音浮起">开启环境声</span>
-
-  <span class="snd-tag snd-tag-on mono" aria-hidden="true">AUDIBLE</span>
-  <span class="snd-tag snd-tag-off mono" aria-hidden="true">SILENT</span>
+    <!-- 仅徽标跟随开/关状态切换 -->
+    <span class="snd-tag snd-tag-on mono">ON</span>
+    <span class="snd-tag snd-tag-off mono">OFF</span>
+  </span>
 </button>
 
 <style>
@@ -32,17 +46,18 @@
     z-index: 60;
     display: inline-flex;
     align-items: center;
-    gap: 0.55rem;
-    padding: 0.4rem 0.78rem 0.38rem 0.7rem;
-    border-radius: 4px;
-    border: 1px solid rgba(255, 255, 255, 0.22);
+    width: 32px;
+    height: 30px;
+    padding: 0 8px;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
     background: color-mix(in srgb, var(--bg) 75%, rgba(255, 255, 255, 0.08));
     backdrop-filter: blur(16px) saturate(125%);
     -webkit-backdrop-filter: blur(16px) saturate(125%);
     box-shadow:
-      0 10px 30px -8px rgba(10, 14, 20, 0.35),
-      0 0 1px 1px rgba(255, 255, 255, 0.1),
-      inset 0 1px 0 rgba(255, 255, 255, 0.28);
+      0 6px 18px -4px rgba(10, 14, 20, 0.3),
+      0 0 1px 1px rgba(255, 255, 255, 0.08),
+      inset 0 1px 0 rgba(255, 255, 255, 0.32);
     color: var(--fg-soft);
     font: inherit;
     font-size: 0.72rem;
@@ -50,146 +65,194 @@
     cursor: pointer;
     -webkit-user-select: none;
     user-select: none;
-    /* 常驻构件，比一次性引导标尺更退后一步；但高调画册底色上再低就看不清了 */
+    overflow: hidden;
+    /* 常驻构件：余光中静默退后，触碰与悬停时唤起 */
     opacity: 0.8;
     transition:
-      opacity 0.5s cubic-bezier(0.2, 0.8, 0.3, 1),
+      width 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+      opacity 0.4s cubic-bezier(0.2, 0.8, 0.3, 1),
       border-color 0.25s ease,
       box-shadow 0.25s ease,
-      color 0.25s ease;
+      color 0.25s ease,
+      transform 0.2s cubic-bezier(0.2, 0.8, 0.3, 1);
   }
 
   .snd:hover,
   .snd:focus-visible {
+    width: 98px;
     opacity: 1;
     color: var(--fg);
-    border-color: color-mix(in srgb, var(--amber) 50%, rgba(255, 255, 255, 0.35));
+    border-color: color-mix(in srgb, var(--amber) 45%, rgba(255, 255, 255, 0.35));
     box-shadow:
-      0 12px 32px -6px rgba(10, 14, 20, 0.42),
-      0 0 16px 1px color-mix(in srgb, var(--amber) 22%, transparent),
-      inset 0 1px 0 rgba(255, 255, 255, 0.4);
+      0 8px 24px -4px rgba(10, 14, 20, 0.38),
+      0 0 14px 1px color-mix(in srgb, var(--amber) 22%, transparent),
+      inset 0 1px 0 rgba(255, 255, 255, 0.45);
     outline: none;
   }
 
-  /* 光学微刻角标 ⌜ ⌟ */
-  .snd-reticle {
-    position: absolute;
-    font-size: 8px;
-    line-height: 1;
-    color: var(--fg-soft);
-    opacity: 0.6;
-    pointer-events: none;
-  }
-  .snd-rt-tl {
-    top: -4px;
-    left: -3px;
-  }
-  .snd-rt-br {
-    bottom: -4px;
-    right: -3px;
+  .snd:active {
+    transform: scale(0.94);
   }
 
-  /* 光核：静＝中空细环，响＝琥珀微核呼吸（与 RealityGuide 同族） */
-  .snd-core {
-    position: relative;
+  /* ── 3 根声学微弦（核心构型） ───────────────────────── */
+  .snd-filaments {
+    position: absolute;
+    left: 8px;
+    top: 50%;
+    transform: translateY(-50%);
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 12px;
-    height: 12px;
+    gap: 3px;
+    width: 14px;
+    height: 14px;
     flex: none;
   }
-  .snd-core i {
+
+  .snd-str {
     display: block;
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    border: 1px solid currentColor;
-    opacity: 0.75;
+    width: 1.25px;
+    border-radius: 1px;
+    background: var(--fg-faint);
+    opacity: 0.65;
     transition:
+      height 0.35s ease,
       background 0.3s ease,
-      border-color 0.3s ease,
-      box-shadow 0.3s ease,
-      transform 0.3s ease;
-  }
-  :global(html[data-sound='on']) .snd-core i {
-    background: var(--amber);
-    border-color: var(--amber);
-    box-shadow: 0 0 8px 1px color-mix(in srgb, var(--amber) 65%, transparent);
-    animation: snd-breathe 3.6s ease-in-out infinite;
-  }
-  @keyframes snd-breathe {
-    0%,
-    100% {
-      opacity: 0.78;
-      transform: scale(0.94);
-      box-shadow: 0 0 6px 1px color-mix(in srgb, var(--amber) 45%, transparent);
-    }
-    50% {
-      opacity: 1;
-      transform: scale(1.12);
-      box-shadow: 0 0 10px 2px color-mix(in srgb, var(--amber) 80%, transparent);
-    }
+      opacity 0.3s ease,
+      filter 0.3s ease;
   }
 
-  /* 开关态：文案与英文签成对切换（默认呈现「静」的一组） */
-  .snd-on,
+  /* 静音常态（Off）：3 根细线平卧为 2.5px 微短点 */
+  .snd-s1 { height: 2.5px; }
+  .snd-s2 { height: 2.5px; }
+  .snd-s3 { height: 2.5px; }
+
+  /* 发声活跃态（On）：琥珀流光，按质数周期呼吸起伏 */
+  :global(html[data-sound='on']) .snd-str {
+    background: var(--amber);
+    opacity: 1;
+  }
+  :global(html[data-sound='on']) .snd-s1 {
+    animation: snd-wave-1 2.4s ease-in-out infinite alternate;
+  }
+  :global(html[data-sound='on']) .snd-s2 {
+    animation: snd-wave-2 3.1s ease-in-out infinite alternate;
+  }
+  :global(html[data-sound='on']) .snd-s3 {
+    animation: snd-wave-3 1.9s ease-in-out infinite alternate;
+  }
+
+  /* 梦态微弦的泛音混响与柔焦（仅在梦面生效） */
+  :global(html[data-reality='dream'][data-sound='on']) .snd-filaments,
+  :global(html[data-face='dream'][data-sound='on']) .snd-filaments {
+    filter: blur(0.35px) drop-shadow(0 0 3px color-mix(in srgb, var(--amber) 60%, transparent));
+  }
+
+  @keyframes snd-wave-1 {
+    0% { height: 3.5px; }
+    50% { height: 11.5px; }
+    100% { height: 5px; }
+  }
+  @keyframes snd-wave-2 {
+    0% { height: 13.5px; }
+    50% { height: 6px; }
+    100% { height: 14px; }
+  }
+  @keyframes snd-wave-3 {
+    0% { height: 4.5px; }
+    50% { height: 9.5px; }
+    100% { height: 3px; }
+  }
+
+  /* ── 悬停展开区域（文字与状态标签） ───────────────── */
+  .snd-expand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin-left: 20px;
+    white-space: nowrap;
+    opacity: 0;
+    transform: translateX(-4px);
+    transition:
+      opacity 0.22s 0.04s ease,
+      transform 0.28s 0.04s cubic-bezier(0.16, 1, 0.3, 1);
+    pointer-events: none;
+  }
+
+  .snd:hover .snd-expand,
+  .snd:focus-visible .snd-expand {
+    opacity: 1;
+    transform: translateX(0);
+    pointer-events: auto;
+  }
+
+  .snd-label {
+    white-space: nowrap;
+    font-size: 0.72rem;
+    letter-spacing: 0.03em;
+  }
+
+  .snd-tag {
+    font-size: 0.58rem;
+    letter-spacing: 0.12em;
+    color: var(--fg-faint);
+  }
+
+  /* 徽标状态切换：默认 OFF，开声时点亮 ON */
   .snd-tag-on {
     display: none;
   }
-  :global(html[data-sound='on']) .snd-on {
+  .snd-tag-off {
     display: inline;
   }
-  :global(html[data-sound='on']) .snd-off,
+
+  :global(html[data-sound='on']) .snd-tag-on {
+    display: inline;
+    color: var(--amber);
+  }
   :global(html[data-sound='on']) .snd-tag-off {
     display: none;
   }
-  :global(html[data-sound='on']) .snd-tag-on {
-    display: inline;
-  }
-
-  /* 标签是 [data-morph]：梦态会走神乱码，而乱码池里的拉丁/数字比中文字窄，
-     不设下限的话微章宽度会跟着字符抖（四个文案都是 5 个中文字，故按 5em 定住） */
-  .snd-label {
-    white-space: nowrap;
-    min-width: 5.1em;
-  }
-  /* 英文签：静时退成雾灰，响时才点着（琥珀在醒面会被 reality 的强调色插值
-     褪成冷灰，故亮/不亮由状态决定，而不是靠色相本身区分） */
-  .snd-tag {
-    font-size: 0.6rem;
-    letter-spacing: 0.18em;
-    color: var(--fg-faint);
-    opacity: 0.9;
-    transition: color 0.3s ease;
-  }
-  :global(html[data-sound='on']) .snd-tag {
-    color: var(--amber);
-    opacity: 1;
-  }
   :global(html[data-sound='on']) .snd {
+    opacity: 0.95;
     color: var(--fg);
   }
 
+  /* ── 阅读页整页电平退避联动 ───────────────────────── */
+  :global(body[data-bgm='reading']) .snd {
+    opacity: 0.48;
+  }
+  :global(body[data-bgm='reading']) .snd:hover,
+  :global(body[data-bgm='reading']) .snd:focus-visible {
+    opacity: 1;
+  }
+
+  /* ── 移动端与无障碍 ─────────────────────────────────── */
   @media (max-width: 760px) {
     .snd {
       left: 14px;
-      bottom: 12px;
-      padding: 0.34rem 0.66rem 0.32rem 0.6rem;
-      font-size: 0.68rem;
+      bottom: 14px;
+      /* 触屏无 hover：保持小巧微体，点击即切换 */
+      width: 32px !important;
+      height: 30px;
+      padding: 0 8px;
     }
-    .snd-tag {
+    .snd-expand {
       display: none !important;
     }
   }
 
   @media (prefers-reduced-motion: reduce) {
     .snd,
-    .snd-core i {
+    .snd-expand,
+    .snd-str {
       transition: none;
     }
-    :global(html[data-sound='on']) .snd-core i {
+    :global(html[data-sound='on']) .snd-s1,
+    :global(html[data-sound='on']) .snd-s2,
+    :global(html[data-sound='on']) .snd-s3 {
       animation: none;
+      height: 9px;
     }
   }
 </style>
