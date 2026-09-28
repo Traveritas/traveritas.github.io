@@ -351,11 +351,11 @@ async function turnOn() {
   offAt = null;
   persist();
   if (!ctx) {
-    try {
-      ctx = new AudioContext({ sampleRate: 48000 });
-    } catch {
-      ctx = new AudioContext();
-    }
+    // 不锁采样率：iOS 的实际输出率随路由漂移（蓝牙 44.1k、语音会话残留等），
+    // 锁 48k 就得走 WebKit 的实时重采样——那是出名的失真路径（WebKit Bug 154538，
+    // 症状即「声音变成很小的杂音」）。默认创建让 ctx 跟着设备走，decodeAudioData
+    // 会把 48k 素材对齐到 ctx 率（Core Audio 离线重采样，质量可靠），全程零实时重采样。
+    ctx = new AudioContext();
     buildGraph();
   }
   if (ctx.state !== 'running') {
