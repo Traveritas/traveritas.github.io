@@ -129,11 +129,22 @@ export function initStoryboard() {
     ghost: el.querySelector<HTMLElement>('.ghost'),
   }));
   const slips = [...document.querySelectorAll<HTMLElement>('[data-c]')].map((el) => ({ el, c: Number(el.dataset.c) }));
-  document.querySelectorAll<HTMLElement>('[data-w0]').forEach((st) => {
-    st.style.setProperty('--w0', st.dataset.w0 ?? '.09');
-    st.style.setProperty('--w1', st.dataset.w1 ?? '.16');
-  });
   slips.forEach(({ el, c }) => el.style.setProperty('--c', String(c)));
+
+  /* 便签的窗口半宽（--w0 全显 / --w1 散尽）：桌面的写在 data-w0 / data-w1，
+     窄屏一组在 data-w0m / data-w1m（见 index.astro 的 W0 / W1 / W0M / W1M），
+     这里按屏宽挑一组写进幕上。全显半宽同时是涟漪与指针的点亮界（updateScroll 用）。 */
+  let winFull = 0.075;
+  const applyWindows = () => {
+    document.querySelectorAll<HTMLElement>('[data-w0]').forEach((st) => {
+      const [w0, w1] = mq.matches
+        ? [st.dataset.w0m ?? '.028', st.dataset.w1m ?? '.085']
+        : [st.dataset.w0 ?? '.075', st.dataset.w1 ?? '.23'];
+      winFull = Number(w0);
+      st.style.setProperty('--w0', w0);
+      st.style.setProperty('--w1', w1);
+    });
+  };
 
   /* 问句逐字（入场时一字一字从线下垂落） */
   const heroLine = document.getElementById('hero-line');
@@ -224,6 +235,7 @@ export function initStoryboard() {
     vw = innerWidth;
     vh = innerHeight;
     geo = scenes.map((el) => ({ el, top: el.offsetTop, h: el.offsetHeight }));
+    applyWindows();
     buildPoses();
     setTiles();
     kick();
@@ -241,7 +253,12 @@ export function initStoryboard() {
     const g4 = geo[4];
     lift = g4 ? Math.max(0, y - (g4.top + g4.h - vh)) : 0;
     palette(Math.min(5, pos));
-    for (const s of slips) s.el.classList.toggle('on', Math.abs(ps[3] - s.c) < 0.125);
+    /* 便签：只有「全部显影」的那一段才点亮（涟漪与指针）。松开时留一点回滞 ——
+       在边界上来回滚一点，涟漪不会被打成连发 */
+    for (const s of slips) {
+      const ad = Math.abs(ps[3] - s.c);
+      s.el.classList.toggle('on', s.el.classList.contains('on') ? ad < winFull + 0.04 : ad < winFull);
+    }
     dawnDot = cl((pos - 4.2) / 0.3);
   }
 

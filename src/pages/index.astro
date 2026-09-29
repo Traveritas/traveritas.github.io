@@ -47,25 +47,44 @@ function snippet(md: string, maxLen = 64): string {
   return clean.length <= maxLen ? clean : clean.slice(0, maxLen).trim() + '…';
 }
 
-/* 闪念：最多 7 张，沿幕内进度等距闪现，左右交错挂在线两侧 */
+/* 闪念：最多 7 张，左右交错挂在线两侧。
+   窗口半宽（幕内进度）：全显 W0 / 散尽 W1。七张的中心在 [散尽, 1 − 散尽] 里等距铺开、
+   两头各留 EDGE 的余量 —— 第一张的浮起与最后一张的散场因此都完整落在幕内（--p ∈ 0..1），
+   最后一张不会再「没散完就被舞台带走」。窄屏另备一组（W0M / W1M）：手机上七张只有两行
+   站位，窗口不收窄的话，同一行会同时停着两张。 */
+const W0 = 0.075;
+const W1 = 0.23;
+const W0M = 0.028;
+const W1M = 0.085;
+const EDGE = 0.02;
+
+/* 一行 ＝ 一张便签的全部手艺：站位 / 静姿倾角 · 入场（横移 + 附加倾角）· 散场（同）。
+   入场都从自己这一侧斜着来、散场往另一侧走 —— 左右两张因此总是相向而行，交错着看过去
+   就是「互相穿过」；行程的长短与倾角各不相同，七张不会像一套机械装置。附加倾角只在飘的
+   过程里带上，落位时回到静姿 --tilt。 */
 const SLIP_POS = [
-  ['16vw', '34svh', '-1deg'],
-  ['60vw', '26svh', '.9deg'],
-  ['18vw', '58svh', '.7deg'],
-  ['62vw', '52svh', '-.8deg'],
-  ['14vw', '40svh', '1.2deg'],
-  ['60vw', '40svh', '-1deg'],
-  ['18vw', '30svh', '.6deg'],
+  { x: '15vw', y: '33svh', tilt: '-1deg', in: ['-22vw', '-7deg'], out: ['15vw', '4.5deg'] },
+  { x: '61vw', y: '25svh', tilt: '.9deg', in: ['20vw', '6deg'], out: ['-14vw', '-4deg'] },
+  { x: '17vw', y: '58svh', tilt: '.7deg', in: ['-16vw', '-5deg'], out: ['18vw', '5.5deg'] },
+  { x: '62vw', y: '53svh', tilt: '-.8deg', in: ['18vw', '5.5deg'], out: ['-20vw', '-6deg'] },
+  { x: '12.5vw', y: '46svh', tilt: '1.2deg', in: ['-24vw', '-7.5deg'], out: ['13vw', '4deg'] },
+  { x: '59vw', y: '39svh', tilt: '-1deg', in: ['16vw', '4.5deg'], out: ['-18vw', '-5.5deg'] },
+  { x: '19vw', y: '26svh', tilt: '.6deg', in: ['-14vw', '-4.5deg'], out: ['21vw', '6.5deg'] },
 ];
-const moments = allMoments.slice(0, 7).map((m, i, arr) => ({
-  id: m.id,
-  title: m.data.title,
-  tag: m.data.tags[0],
-  time: fmtMomentTime(m.data.date),
-  text: snippet(m.body ?? ''),
-  c: (0.16 + (i * 0.72) / Math.max(1, arr.length - 1)).toFixed(3),
-  pos: SLIP_POS[i],
-}));
+const nSlip = Math.min(allMoments.length, 7);
+const moments = allMoments.slice(0, nSlip).map((m, i) => {
+  const s = SLIP_POS[i];
+  const c = nSlip > 1 ? W1 + EDGE + (i * (1 - 2 * (W1 + EDGE))) / (nSlip - 1) : 0.5;
+  return {
+    id: m.id,
+    title: m.data.title,
+    tag: m.data.tags[0],
+    time: fmtMomentTime(m.data.date),
+    text: snippet(m.body ?? ''),
+    c: c.toFixed(3),
+    vars: `--x:${s.x};--y:${s.y};--tilt:${s.tilt};--dxin:${s.in[0]};--drin:${s.in[1]};--dxout:${s.out[0]};--drout:${s.out[1]}`,
+  };
+});
 
 const exits = [
   { name: 'GitHub', href: 'https://github.com/Traveritas', addr: 'github.com/Traveritas', external: true },
@@ -201,7 +220,7 @@ const manifesto = '在即将醒来的那一瞬，世界究竟是在成形，还�
 
     <!-- ═══ 场 3 · 异相 · 闪念：线居中，便签左右交错闪现 ═══ -->
     <section class="scene s-rem" id="ns-rem" data-scene="3" style="--len:380svh">
-      <div class="stage" data-w0=".09" data-w1=".16">
+      <div class="stage" data-w0={String(W0)} data-w1={String(W1)} data-w0m={String(W0M)} data-w1m={String(W1M)}>
         <div class="chap in-out">
           <h2>闪念</h2>
           <span class="cap">异相 · 02:08 — 04:59</span>
@@ -212,7 +231,7 @@ const manifesto = '在即将醒来的那一瞬，世界究竟是在成形，还�
               class="slip"
               href={`/moments/#${m.id}`}
               data-c={m.c}
-              style={`--x:${m.pos[0]};--y:${m.pos[1]};--tilt:${m.pos[2]}`}
+              style={m.vars}
             >
               <span class="h">
                 <span>{m.time}</span>
@@ -446,13 +465,13 @@ const manifesto = '在即将醒来的那一瞬，世界究竟是在成形，还�
     text-decoration: none;
   }
 
-  /* 窗口函数：--c 为本镜中心，--w0 全显半宽，--w1 消失半宽 */
+  /* 窗口函数：--c 为本镜中心，--w0 全显半宽，--w1 散尽半宽（皆由幕上的 data-w*
+     按屏宽写进来，见前台 W0 / W1 / W0M / W1M）。消费它的只有便签：
+     显影走 --a（线性），位移与倾角走 .slip 里的 --f / --s（带缓动）。 */
   .home [data-c] {
     --d: calc(var(--p) - var(--c));
     --ad: max(var(--d), calc(var(--d) * -1));
     --a: clamp(0, calc((var(--w1) - var(--ad)) / (var(--w1) - var(--w0))), 1);
-    /* 浮走方向：还没到本镜中心（--d < 0）＝ +1（从下方浮上）；过了中心 ＝ −1（继续向上浮走） */
-    --dir: clamp(-1, calc(var(--d) * -400), 1);
     opacity: var(--a);
     pointer-events: none;
   }
@@ -859,9 +878,24 @@ const manifesto = '在即将醒来的那一瞬，世界究竟是在成形，还�
   .s-rem .chap h2 {
     font-size: clamp(36px, 4vw, 56px);
   }
+  /* 一张便签的行程（窗口半宽 --w0 全显 / --w1 散尽，由脚本按屏宽写进来）：
+     · --t 是行程比例（0 ＝ 正落位，1 ＝ 满程），--f 取它的四次方（只用乘法，不依赖 pow()）——
+       贴住中心的一大段（含整个全显段）几乎不动：停稳时它是真的停住了；越往外越快，
+       散场于是「先飘起来、再化掉」。
+     · --s 是方向掩码（0 ＝ 还在入场侧，1 ＝ 已过中心）：横移与倾角照它选入场 / 散场那一份。
+     · 横移之外还有一点公共分量：从下方浮起（--dyin）、继续往上飘走（--dyout）。
+     · --mx / --rg 是窄屏的收幅档：横移与涟漪环各收一档，免得整张飘出画外。 */
   .slip {
     --sfg: #ece6f1;
     --sfg-soft: #a99fba;
+    --dyin: 3.5svh;
+    --dyout: -4.5svh;
+    --mx: 1;
+    --rg: 1;
+    --t: clamp(0, calc(var(--ad) / var(--w1)), 1);
+    --t2: calc(var(--t) * var(--t));
+    --f: calc(var(--t2) * var(--t2));
+    --s: clamp(0, calc(var(--d) * 400), 1);
     position: absolute;
     left: var(--x);
     top: var(--y);
@@ -872,11 +906,67 @@ const manifesto = '在即将醒来的那一瞬，世界究竟是在成形，还�
     background: linear-gradient(135deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.05));
     border: 1px solid rgba(255, 255, 255, 0.16);
     box-shadow: 0 20px 40px -20px rgba(0, 0, 0, 0.5);
-    transform: translate3d(0, calc((1 - var(--a)) * 5svh * var(--dir, 1)), 0) rotate(var(--tilt, 0deg));
+    transform: translate3d(
+      calc(var(--f) * var(--mx) * (var(--dxin) * (1 - var(--s)) + var(--dxout) * var(--s))),
+      calc(var(--f) * (var(--dyin) * (1 - var(--s)) + var(--dyout) * var(--s))),
+      0
+    ) rotate(calc(var(--tilt, 0deg) + var(--f) * (var(--drin) * (1 - var(--s)) + var(--drout) * var(--s))));
     filter: blur(calc((1 - var(--a)) * 5px));
   }
   .slip:hover {
     border-color: color-mix(in srgb, var(--amber) 55%, transparent);
+  }
+  /* 落定：全显（.on）的那一瞬，卡身轻轻收一下，一圈白细光从卡框里侧起、扩到画外就散。
+     不加色：那一下光自己就够，不必借全站唯一的那枚异质色。环是卡自己的形状（同一个圆角框）。
+     scale 与 opacity 分成两条动画 —— 一条缓动会替两者一起做加减，扩得快就淡得快、
+     环还没看清就没了；这里扩用快出（前快后慢）、淡用行进渐深（先亮着，收尾才散）。
+     只动 transform / opacity，走合成器，不占主线程。.on 由脚本按「全部显影」的那一段
+     点亮（带一点回滞），每进入一次荡一轮。 */
+  .slip.on {
+    animation: home-slip-land 1100ms cubic-bezier(0.22, 0.9, 0.28, 1) both;
+  }
+  .slip.on::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: 9px;
+    pointer-events: none;
+    /* 一圈光自己的三个数：起点 / 扩幅 / 亮度（--rg 是窄屏收幅档） */
+    --r0: 0.95;
+    --rs: 0.24;
+    --ro: 0.38;
+    border: 1px solid rgba(255, 255, 255, 0.94);
+    animation:
+      home-slip-ring-out 1150ms cubic-bezier(0.16, 0.9, 0.3, 1) both,
+      home-slip-ring-fade 1150ms cubic-bezier(0.5, 0, 0.85, 0.7) both;
+  }
+  @keyframes home-slip-land {
+    from {
+      scale: 1.018;
+    }
+    to {
+      scale: 1;
+    }
+  }
+  /* 环的起点 / 幅度 / 亮度取自上面那一圈光的 --r0 / --rs / --ro（--rg 是窄屏收幅档） */
+  @keyframes home-slip-ring-out {
+    from {
+      transform: scale(var(--r0, 0.95));
+    }
+    to {
+      transform: scale(calc(1 + var(--rs, 0.24) * var(--rg, 1)));
+    }
+  }
+  @keyframes home-slip-ring-fade {
+    from {
+      opacity: 0;
+    }
+    8% {
+      opacity: var(--ro, 0.38);
+    }
+    to {
+      opacity: 0;
+    }
   }
   .slip .h {
     display: flex;
@@ -1096,6 +1186,9 @@ const manifesto = '在即将醒来的那一瞬，世界究竟是在成形，还�
     }
     .slip {
       --x: 14vw !important;
+      /* 窄屏收幅：卡几乎满宽，横移与涟漪环照桌面的幅度会整张飘出画外 */
+      --mx: 0.52;
+      --rg: 0.45;
       width: 78vw;
     }
     .slip:nth-of-type(odd) {
@@ -1141,6 +1234,16 @@ const manifesto = '在即将醒来的那一瞬，世界究竟是在成形，还�
     html.booted .hero-line .c {
       transform: none;
       filter: none;
+    }
+    /* 便签：只留显影 —— 不飘、不转、不荡（行程位移、失焦、卡身收势与那一圈涟漪一并去掉） */
+    .home .slip,
+    .home .slip.on {
+      animation: none;
+      transform: rotate(var(--tilt, 0deg));
+      filter: none;
+    }
+    .home .slip::before {
+      animation: none;
     }
   }
 </style>
