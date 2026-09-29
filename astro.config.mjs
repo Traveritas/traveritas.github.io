@@ -14,7 +14,8 @@ export default defineConfig({
   server: { host: '127.0.0.1' },
   integrations: [
     // 样式预览（/styleguide/）是工作台不是内容页：不进 sitemap（robots.txt 同档禁收）
-    sitemap({ filter: (page) => !page.includes('/styleguide') }),
+    // /legacy/ 是旧主页（千层纸版）的存档：保留可访问，但同样不进 sitemap、robots 禁收
+    sitemap({ filter: (page) => !page.includes('/styleguide') && !page.includes('/legacy') }),
   ],
   markdown: {
     // 醒梦两态正文语法（:::dream/:::wake 块、[[醒|梦]] 行内），见 docs/writing.md

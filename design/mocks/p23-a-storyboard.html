@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>p23-A · 分镜夜行</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Serif+SC:wght@300;500;600&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════════
+   p23-A · 分镜夜行（storyboard）
+   每一夜段 = 一个钉住的舞台（sticky 100svh），滚动在舞台内推进「分镜」。
+   原生滚动，不劫持滚轮、不整页吸附。
+   驱动：一个 rAF 节流的 scroll 监听，每帧只写 --p（各场局部进度 0..1）
+   与全局色板变量；所有编排都是 CSS 里对 --p 的 calc。
+   对照稿：p23-b-depth.html（景深推进）。?debug 显示帧率。
+   ═══════════════════════════════════════════════════════════ */
+:root{
+  --bg:#edf0f4; --ink:#232830; --ink-soft:#56606d; --glow:rgba(255,255,255,.75);
+  --dark:0; --dawn:0;
+  --line:color-mix(in srgb, var(--ink) 14%, transparent);
+  --amber:#d9a05b; --umber:#765640;
+  --serif:'Noto Serif SC','Songti SC','Source Han Serif SC',SimSun,serif;
+  --mono:'IBM Plex Mono',ui-monospace,Consolas,monospace;
+  --sans:system-ui,-apple-system,'PingFang SC','Microsoft YaHei UI',sans-serif;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased;overflow-x:clip}
+a{color:inherit;text-decoration:none}
+.mono{font-family:var(--mono)}
+
+/* ── 环境层：雾 / 微尘 / 晨光（取代灰方块场） ── */
+.atmo{position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden}
+.fog{position:absolute;border-radius:50%;background:radial-gradient(closest-side,var(--glow),transparent);will-change:transform}
+.fog.f1{width:70vmax;height:50vmax;left:-20vmax;top:-12vmax;animation:fog1 38s ease-in-out infinite alternate}
+.fog.f2{width:60vmax;height:44vmax;right:-22vmax;bottom:-14vmax;animation:fog2 46s ease-in-out infinite alternate}
+@keyframes fog1{to{transform:translate3d(8vmax,6vmax,0)}}
+@keyframes fog2{to{transform:translate3d(-10vmax,-4vmax,0)}}
+.motes{position:absolute;inset:0;opacity:calc(var(--dark) * .9)}
+.motes i{position:absolute;width:2px;height:2px;border-radius:50%;background:#dfe6f5;box-shadow:0 0 6px 1px rgba(200,215,245,.5);animation:mote var(--t) ease-in-out infinite alternate}
+@keyframes mote{from{transform:translate3d(0,0,0);opacity:.2}to{transform:translate3d(var(--dx),var(--dy),0);opacity:.9}}
+.dawnlight{position:absolute;inset:-10% -10% auto;height:90%;opacity:var(--dawn);
+  background:radial-gradient(60% 70% at 50% 0%,rgba(255,214,160,.55),rgba(255,232,205,.2) 45%,transparent 75%)}
+
+/* ── 页头 / 夜轨 / 切换 ── */
+.top{position:fixed;inset:0 0 auto;z-index:20;display:flex;align-items:center;justify-content:space-between;padding:22px clamp(18px,4vw,56px);pointer-events:none}
+.top>*{pointer-events:auto}
+.logo{font-family:var(--serif);font-size:19px;letter-spacing:.04em}
+.logo b{font-weight:500;color:var(--amber)}
+.nav{display:flex;gap:26px;font-size:14px;letter-spacing:.12em;color:var(--ink-soft)}
+.nav a:hover{color:var(--ink)}
+
+.rail{position:fixed;left:clamp(14px,2.4vw,34px);top:50%;transform:translateY(-50%);z-index:20;height:min(52vh,420px);width:120px}
+.rail::before{content:"";position:absolute;left:3px;top:0;bottom:0;width:1px;background:var(--line)}
+.rail a{position:absolute;left:0;display:flex;align-items:center;gap:10px;font-size:10.5px;letter-spacing:.14em;color:var(--ink-soft);opacity:.55;transform:translateY(-50%);transition:opacity .3s}
+.rail a::before{content:"";width:7px;height:1px;background:currentColor}
+.rail a.on{opacity:1;color:var(--ink)}
+.rail a span{font-family:var(--mono);font-size:10px;opacity:.7}
+.rail .dot{position:absolute;left:0;width:7px;height:7px;border-radius:50%;background:var(--amber);box-shadow:0 0 10px var(--amber);transform:translate(0,-50%);top:0}
+.clock{position:fixed;right:clamp(18px,4vw,56px);bottom:22px;z-index:20;font-family:var(--mono);font-size:12px;letter-spacing:.2em;color:var(--ink-soft)}
+
+.switch{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:30;display:flex;gap:2px;padding:3px;border-radius:99px;background:color-mix(in srgb,var(--bg) 70%,transparent);backdrop-filter:blur(10px);border:1px solid var(--line);font-size:11px;letter-spacing:.1em}
+.switch a{padding:5px 12px;border-radius:99px;color:var(--ink-soft)}
+.switch a.cur{background:var(--ink);color:var(--bg)}
+.fps{position:fixed;right:10px;top:70px;z-index:30;font:11px var(--mono);color:var(--ink-soft);display:none}
+
+/* ── 场与舞台 ── */
+.scene{position:relative;height:var(--len)}
+/* 相邻两场首尾叠一屏：上一场舞台离开的同时下一场舞台已钉住，消除「舞台滑入」的空白屏 */
+.scene + .scene{margin-top:-100svh}
+.stage{position:sticky;top:0;height:100svh;overflow:hidden}
+.cap{font-family:var(--mono);font-size:10.5px;letter-spacing:.24em;color:var(--ink-soft)}
+
+/* 窗口函数：--c 为本镜中心，--w0 全显半宽，--w1 消失半宽 */
+[data-c]{
+  --d:calc(var(--p) - var(--c));
+  --ad:max(var(--d), calc(var(--d) * -1));
+  --a:clamp(0, calc((var(--w1) - var(--ad)) / (var(--w1) - var(--w0))), 1);
+  opacity:var(--a);
+  pointer-events:none;
+}
+[data-c].on{pointer-events:auto}
+
+/* ═══ 场 0 · 23:07 入夜 · 开屏三稿（?hero=lily | focus | curtain，底部可切） ═══ */
+.hero{position:absolute;inset:0;display:none}
+body[data-hero='lily'] .hero-lily,
+body[data-hero='focus'] .hero-focus,
+body[data-hero='curtain'] .hero-curtain{display:block}
+
+/* 共用文案：一句主张问句 + 一行醒态自述 */
+.hero-copy{position:absolute;left:max(12vw,170px);top:50%;width:min(34rem,40vw);
+  transform:translate3d(0,calc(-50% + var(--p) * -10svh),0);
+  --fo:clamp(0, calc((var(--p) - .12) / .3), 1);
+  opacity:calc(1 - var(--fo));filter:blur(calc(var(--fo) * 6px))}
+.hero-copy .stamp{display:block;font-family:var(--mono);font-size:11px;letter-spacing:.34em;color:var(--ink-soft);margin-bottom:2.2rem}
+.hero-copy .stamp::before{content:"";display:inline-block;width:28px;height:1px;background:var(--amber);vertical-align:middle;margin-right:14px}
+.hero-copy h1{margin:0;font-family:var(--serif);font-weight:300;font-size:clamp(1.6rem,2.5vw,2.35rem);line-height:1.8;letter-spacing:.08em;text-wrap:balance}
+.hero-copy h1 em{font-style:normal;color:color-mix(in srgb,var(--ink) 55%,var(--umber))}
+.hero-copy .who{margin:2.4rem 0 0;font-family:var(--serif);font-size:14px;letter-spacing:.14em;line-height:1.9;color:var(--ink-soft)}
+.hero-copy .who b{font-weight:500;color:var(--ink);letter-spacing:.08em;margin-right:.4em}
+.hint{position:absolute;left:50%;bottom:7svh;transform:translateX(-50%);margin:0;font-size:12px;letter-spacing:.3em;color:var(--ink-soft);white-space:nowrap;
+  opacity:calc(1 - var(--p) * 10)}
+.hint i{display:block;width:1px;height:34px;margin:0 auto 12px;background:linear-gradient(transparent,var(--amber));animation:hintdrop 2.6s ease-in-out infinite}
+@keyframes hintdrop{0%{transform:scaleY(0);transform-origin:top}45%{transform:scaleY(1);transform-origin:top}55%{transform:scaleY(1);transform-origin:bottom}100%{transform:scaleY(0);transform-origin:bottom}}
+
+/* ── 稿一 · 水面百合：雾中湖面上一朵磨砂玻璃百合（真 3D），滚动时先舒展、再散开化去 ── */
+.hero-lily{--u:calc(min(66svh, 44vw) / 100);--cx:66vw;--cy:56svh;perspective:1100px;perspective-origin:var(--cx) 20svh}
+.hero-lily .fogband{position:absolute;left:-5vw;right:-5vw;top:30svh;height:34svh;
+  background:linear-gradient(180deg,transparent,color-mix(in srgb,var(--glow) 90%,transparent) 45%,transparent);
+  opacity:calc(1 - clamp(0, calc((var(--p) - .5) / .4), 1))}
+.hero-lily .horizon{position:absolute;left:0;right:0;top:44svh;height:1px;
+  background:linear-gradient(90deg,transparent 42%,color-mix(in srgb,var(--ink) 16%,transparent) 54%,color-mix(in srgb,var(--amber) 40%,transparent) 70%,transparent 96%);
+  opacity:calc(.9 - var(--p) * 1.6)}
+.hero-lily .halo{position:absolute;left:var(--cx);top:calc(var(--cy) - 14svh);width:calc(var(--u) * 150);aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%;
+  background:radial-gradient(closest-side,rgba(255,236,214,.75),rgba(255,244,232,.25) 55%,transparent);
+  animation:halo 9s ease-in-out infinite alternate;opacity:calc(1 - clamp(0, calc((var(--p) - .35) / .4), 1))}
+@keyframes halo{from{transform:translate(-50%,-50%) scale(.94)}to{transform:translate(-50%,-50%) scale(1.06)}}
+/* 水面平面：躺倒 62°，涟漪是面上的圆 → 透视成椭圆 */
+.hero-lily .pad{position:absolute;left:var(--cx);top:var(--cy);width:0;height:0;transform-style:preserve-3d;
+  transform:translate3d(0,calc(var(--p) * -6svh),0) rotateX(64deg)}
+.hero-lily .pool{position:absolute;left:calc(var(--u) * -95);top:calc(var(--u) * -95);width:calc(var(--u) * 190);height:calc(var(--u) * 190);border-radius:50%;
+  background:radial-gradient(closest-side,rgba(255,255,255,.7),rgba(255,255,255,.18) 60%,transparent)}
+.hero-lily .ripple{position:absolute;left:calc(var(--u) * -40);top:calc(var(--u) * -40);width:calc(var(--u) * 80);height:calc(var(--u) * 80);border-radius:50%;
+  border:1px solid color-mix(in srgb,var(--ink) 16%,transparent);animation:ripple 9s linear infinite;opacity:0}
+.hero-lily .ripple:nth-child(3){animation-delay:-3s}
+.hero-lily .ripple:nth-child(4){animation-delay:-6s}
+@keyframes ripple{0%{transform:scale(.55);opacity:0}15%{opacity:.9}100%{transform:scale(1.9);opacity:0}}
+.hero-lily .spin{position:absolute;transform-style:preserve-3d;animation:spin 120s linear infinite}
+@keyframes spin{to{transform:rotateZ(360deg)}}
+.hero-lily .bloom{position:absolute;transform-style:preserve-3d;transform:rotateZ(calc(var(--p) * 70deg))}
+/* 花瓣：底端中心钉在花心，绕底边抬起（--l0 越大越合拢）；--open 舒展，--out 散开 */
+.petal{--open:clamp(0, calc(var(--p) / .32), 1);
+  --out:clamp(0, calc((var(--p) - var(--t0)) / .34), 1);
+  position:absolute;left:calc(var(--w) * var(--u) / -2);top:calc(var(--pl) * var(--u) * -1);
+  width:calc(var(--w) * var(--u));height:calc(var(--pl) * var(--u));transform-origin:50% 100%;
+  transform:rotateZ(var(--a)) translateY(calc(var(--out) * var(--u) * -34)) rotateX(calc((var(--l0) * (1 - var(--open) * .8) + var(--out) * 25) * -1deg));
+  opacity:calc(1 - var(--out));
+  -webkit-mask:var(--petal) center / 100% 100% no-repeat;mask:var(--petal) center / 100% 100% no-repeat;
+  background:linear-gradient(0deg,rgba(236,205,196,.92) 0%,rgba(255,250,246,.82) 38%,rgba(236,242,250,.72) 72%,rgba(206,220,240,.62) 100%)}
+.petal::before{content:"";position:absolute;left:50%;top:10%;bottom:6%;width:1px;background:linear-gradient(0deg,rgba(118,86,64,.35),rgba(255,255,255,.7))}
+.petal::after{content:"";position:absolute;left:18%;right:44%;top:14%;bottom:18%;border-radius:50%;background:linear-gradient(90deg,rgba(255,255,255,.75),transparent);filter:blur(2px)}
+.petal.inner{background:linear-gradient(0deg,rgba(226,184,172,.95) 0%,rgba(255,247,240,.9) 42%,rgba(242,246,252,.8) 100%)}
+.stamen{position:absolute;left:0;top:calc(var(--u) * -20);width:1px;height:calc(var(--u) * 20);transform-origin:50% 100%;
+  transform:rotateZ(var(--a)) rotateX(calc((-58 - var(--p) * 30) * 1deg)) translateY(calc(var(--p) * var(--u) * -30));
+  background:linear-gradient(0deg,rgba(118,86,64,.15),rgba(118,86,64,.55));opacity:calc(1 - clamp(0, calc((var(--p) - .3) / .25), 1))}
+.stamen::after{content:"";position:absolute;left:-2.5px;top:-3px;width:6px;height:6px;border-radius:50%;background:var(--amber);box-shadow:0 0 8px var(--amber)}
+
+/* ── 稿二 · 对焦：醒梦两个巨字做一次变焦，醒 → 失焦，梦 → 清晰 ── */
+.hero-focus{--fz:clamp(0, calc(var(--p) / .42), 1);--gone:clamp(0, calc((var(--p) - .5) / .3), 1)}
+.gl{position:absolute;font-family:var(--serif);font-weight:600;line-height:1;font-size:min(64svh,34vw);
+  color:transparent;-webkit-background-clip:text;background-clip:text;-webkit-text-stroke:1px rgba(255,255,255,.85)}
+.gl-wake{left:40vw;top:10svh;
+  background-image:linear-gradient(165deg,#f4f7fa 4%,#b9c6d4 40%,#6f8093 100%);
+  filter:blur(calc(var(--fz) * 16px)) drop-shadow(0 30px 40px rgba(38,44,51,.12));
+  opacity:calc((1 - var(--fz) * .55) * (1 - var(--gone)));
+  transform:translate3d(calc(var(--p) * -4vw),calc(var(--p) * -8svh),0)}
+.gl-dream{left:64vw;top:34svh;font-size:min(46svh,25vw);
+  background-image:linear-gradient(165deg,#fff8f1 6%,#e7d4c1 50%,#bf9f82 100%);
+  filter:blur(calc((1 - var(--fz)) * 14px));
+  opacity:calc((.55 + var(--fz) * .45) * (1 - var(--gone)));
+  transform:translate3d(calc(var(--p) * 3vw),calc(var(--p) * -4svh),0) scale(calc(.94 + var(--fz) * .06))}
+.hero-focus .hair{position:absolute;left:-10vw;right:-10vw;top:52svh;height:1px;transform:rotate(14deg) scaleX(calc(.35 + var(--fz) * .65));
+  background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--umber) 55%,transparent) 30%,color-mix(in srgb,var(--amber) 80%,transparent) 60%,transparent);
+  opacity:calc(1 - var(--gone))}
+
+/* ── 稿三 · 帷幕：一排磨砂玻璃竖百叶挡在字前，滚动时百叶转开，字从雾里清楚起来 ── */
+.hero-curtain{perspective:1400px;
+  --open:clamp(0, calc((var(--p) - .02) / .36), 1);--gone:clamp(0, calc((var(--p) - .55) / .3), 1)}
+.hero-curtain .glow{position:absolute;border-radius:50%;filter:blur(10px)}
+.hero-curtain .g1{left:50%;top:50%;translate:-50% -50%;width:64vmax;aspect-ratio:1;background:radial-gradient(closest-side,rgba(247,213,168,.8),rgba(250,232,210,.3) 55%,transparent);animation:halo 11s ease-in-out infinite alternate}
+.hero-curtain .g2{left:-8vw;top:40svh;width:50vmax;aspect-ratio:1;background:radial-gradient(closest-side,rgba(190,208,232,.75),transparent)}
+.hero-curtain .g3{left:30vw;top:-20svh;width:36vmax;aspect-ratio:1;background:radial-gradient(closest-side,rgba(226,206,230,.55),transparent)}
+.slats{position:absolute;inset:0;display:flex;transform-style:preserve-3d;pointer-events:none;opacity:calc(1 - var(--gone))}
+.slats i{flex:1 1 0;height:100%;
+  --o:clamp(0, calc((var(--open) * 1.3) - var(--k) * .3), 1);
+  transform:rotateY(calc(var(--o) * 82deg));
+  background:linear-gradient(90deg,rgba(255,255,255,.62),rgba(236,241,247,.5) 30%,rgba(222,230,240,.42) 70%,rgba(255,255,255,.58));
+  -webkit-backdrop-filter:blur(calc((1 - var(--o)) * 7px));backdrop-filter:blur(calc((1 - var(--o)) * 7px));
+  border-left:1px solid rgba(255,255,255,.75);box-shadow:inset -1px 0 0 rgba(38,44,51,.05)}
+body[data-hero='curtain'] .hero-copy{left:50%;width:min(40rem,84vw);text-align:center;
+  transform:translate3d(-50%,calc(-50% + var(--p) * -8svh),0);
+  --fo:clamp(0, calc((var(--p) - .5) / .28), 1)}
+body[data-hero='curtain'] .hero-copy .stamp::before{display:none}
+
+/* 开屏切换（mock 专用） */
+.heropick{position:fixed;left:50%;top:18px;transform:translateX(-50%);z-index:30;display:flex;gap:2px;padding:3px;border-radius:99px;
+  background:color-mix(in srgb,var(--bg) 70%,transparent);backdrop-filter:blur(10px);border:1px solid var(--line);font-size:11px;letter-spacing:.1em;
+  opacity:calc(1 - var(--p0, 0) * 3);transition:opacity .3s}
+.heropick a{white-space:nowrap;padding:5px 12px;border-radius:99px;color:var(--ink-soft)}
+.heropick a.cur{background:var(--ink);color:var(--bg)}
+
+/* ═══ 场 1 · 浅梦 · 断章：三篇同屏，一张磨砂纸上的名录；逐行浮现、错速微移 ═══ */
+.chapter{position:absolute;left:clamp(90px,12vw,190px);top:0;bottom:0;display:flex;flex-direction:column;justify-content:center;gap:28px;
+  opacity:calc(clamp(0, calc(var(--p) / .08), 1) * clamp(0, calc((1 - var(--p)) / .1), 1))}
+.chapter h2{margin:0;writing-mode:vertical-rl;font-family:var(--serif);font-weight:300;font-size:clamp(56px,7vw,104px);letter-spacing:.3em;color:color-mix(in srgb,var(--ink) 30%,transparent)}
+.chapter .cap{writing-mode:vertical-rl}
+.essays{position:absolute;left:clamp(230px,28vw,450px);right:8vw;top:50%;
+  transform:translate3d(0,calc(-50% + (var(--p) - .5) * -10svh),0)}
+.essays::before{content:"";position:absolute;inset:-3.2rem -3rem;border-radius:6px;z-index:-1;
+  background:linear-gradient(135deg,rgba(255,255,255,.55),rgba(255,255,255,.18) 60%,rgba(255,255,255,.35));
+  border:1px solid rgba(255,255,255,.6);box-shadow:0 40px 80px -50px rgba(38,44,51,.25);
+  opacity:calc(clamp(0, calc((var(--p) - .02) / .14), 1) * clamp(0, calc((1 - var(--p)) / .12), 1))}
+.essay{--r:clamp(0, calc((var(--p) - .06 - var(--j) * .07) / .16), 1);
+  --out:clamp(0, calc((.96 - var(--p) + var(--j) * .02) / .1), 1);
+  position:relative;display:grid;grid-template-columns:4.2rem minmax(0,1fr) auto;align-items:baseline;gap:0 1.4rem;
+  padding:1.9rem 0 1.8rem;border-top:1px solid var(--line);
+  opacity:calc(var(--r) * var(--out));filter:blur(calc((1 - var(--r)) * 6px));
+  transform:translate3d(0,calc((1 - var(--r)) * 5svh + (var(--p) - .5) * var(--j) * -3svh),0)}
+.essay:last-of-type{border-bottom:1px solid var(--line)}
+.essay::before{content:"";position:absolute;left:0;top:-1px;height:1px;width:0;background:var(--amber);transition:width .5s cubic-bezier(.2,.7,.2,1)}
+.essay:hover::before{width:100%}
+.essay .no{font-family:var(--serif);font-weight:300;font-size:2.4rem;line-height:1;color:color-mix(in srgb,var(--ink) 22%,transparent);transition:color .3s}
+.essay:hover .no{color:var(--amber)}
+.essay .meta{display:block;font-family:var(--mono);font-size:10.5px;letter-spacing:.2em;color:var(--ink-soft);margin-bottom:.7rem}
+.essay h3{margin:0 0 .6rem;font-family:var(--serif);font-weight:500;font-size:clamp(1.45rem,2.5vw,2.3rem);line-height:1.3;letter-spacing:.04em;transition:color .3s}
+.essay:hover h3{color:var(--umber)}
+.essay p{margin:0;max-width:34em;font-family:var(--serif);font-size:clamp(.9rem,1.1vw,1rem);line-height:1.85;color:var(--ink-soft)}
+.essay .go{font-size:1.1rem;color:var(--ink-soft);transform:translateX(-6px);opacity:0;transition:opacity .3s,transform .3s}
+.essay:hover .go{opacity:1;transform:none;color:var(--amber)}
+.essays .all{display:inline-block;margin-top:1.8rem;font-size:13px;letter-spacing:.18em;border-bottom:1px solid var(--amber);padding-bottom:3px;
+  opacity:calc(clamp(0, calc((var(--p) - .3) / .12), 1) * clamp(0, calc((1 - var(--p)) / .1), 1))}
+
+/* ═══ 场 2 · 深眠 · 造物：晶板升起，窗口按浮现度显影 ═══ */
+.chap-h{position:absolute;left:clamp(90px,12vw,190px);top:15svh;display:flex;align-items:baseline;gap:22px;
+  opacity:calc(clamp(0, calc(var(--p) / .06), 1) * clamp(0, calc((1 - var(--p)) / .06), 1))}
+.chap-h h2{margin:0;font-family:var(--serif);font-weight:300;font-size:clamp(36px,4vw,56px);letter-spacing:.3em}
+.slabs-wrap{position:absolute;left:clamp(90px,12vw,190px);right:6vw;top:28svh;bottom:10svh}
+.slabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:clamp(16px,2.2vw,32px);height:100%}
+.slab{--r:clamp(0, calc((var(--p) - .04 - var(--j) * .07) / .2), 1);
+  --out:clamp(0, calc((1 - var(--p)) / .08), 1);
+  --dev:clamp(0, calc((var(--p) - .32) / .38), 1);
+  display:flex;flex-direction:column;min-width:0;border-radius:10px;overflow:hidden;
+  background:linear-gradient(160deg,rgba(255,255,255,.09),rgba(255,255,255,.03));
+  border:1px solid rgba(255,255,255,.13);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 30px 60px -30px rgba(0,0,0,.6);
+  opacity:calc(var(--r) * var(--out));
+  transform:translate3d(0,calc((1 - var(--r)) * 34svh),0);
+  transition:border-color .3s}
+.slab:hover{border-color:color-mix(in srgb,var(--amber) 60%,transparent)}
+.win{position:relative;flex:1 1 auto;min-height:0;background:radial-gradient(120% 90% at 30% 20%,#34405a,#1a2030 70%);overflow:hidden}
+.win svg{position:absolute;inset:0;width:100%;height:100%;
+  filter:blur(calc((1 - var(--dev) * var(--depth) / 8) * 14px));
+  opacity:calc(.3 + var(--dev) * var(--depth) / 8 * .7)}
+.win .fogv{position:absolute;inset:0;background:linear-gradient(180deg,rgba(170,185,210,.25),rgba(120,135,160,.1));
+  opacity:calc(1 - var(--dev) * var(--depth) / 8)}
+.slab-body{padding:18px 20px 16px;display:grid;gap:8px}
+.slab-head{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;color:var(--ink-soft)}
+.slab h3{margin:0;font-family:var(--serif);font-weight:500;font-size:clamp(1.05rem,1.35vw,1.3rem);letter-spacing:.04em}
+.slab p{margin:0;font-family:var(--serif);font-size:.84rem;line-height:1.75;color:var(--ink-soft)}
+.slab .depth{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;color:var(--ink-soft);padding-top:8px;border-top:1px solid var(--line)}
+.slab .depth b{font-weight:500;color:var(--amber)}
+
+/* ═══ 场 3 · REM · 闪念：散落闪现，玻璃签居中 ═══ */
+.slipzone{position:absolute;inset:0;perspective:900px}
+.glass{position:absolute;left:50%;top:50%;width:min(260px,52vw);aspect-ratio:3/4.2;
+  transform:translate(-50%,-50%) rotateY(calc(var(--p) * 80deg - 40deg)) rotateX(8deg);
+  border-radius:6px;border:1px solid rgba(255,255,255,.35);
+  background:linear-gradient(135deg,rgba(255,255,255,.2),rgba(200,185,230,.07));
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+  box-shadow:inset 0 1px 1px rgba(255,255,255,.35),0 40px 80px -30px rgba(0,0,0,.6);
+  display:grid;place-content:center;gap:22px;text-align:center;
+  opacity:calc(clamp(0, calc(var(--p) / .08), 1) * clamp(0, calc((1 - var(--p)) / .08), 1))}
+.glass b{font-family:var(--serif);font-weight:300;font-size:clamp(1.3rem,2vw,1.7rem);letter-spacing:.14em;line-height:2}
+.glass-glow{position:absolute;left:50%;top:50%;width:min(620px,110vw);aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%;
+  background:radial-gradient(closest-side,rgba(217,160,91,.16),transparent);opacity:calc(clamp(0, calc(var(--p) / .1), 1) * clamp(0, calc((1 - var(--p)) / .1), 1))}
+.slip{position:absolute;left:var(--x);top:var(--y);width:min(270px,70vw);padding:16px 18px;border-radius:8px;
+  background:linear-gradient(135deg,rgba(255,255,255,.14),rgba(255,255,255,.05));
+  border:1px solid rgba(255,255,255,.16);
+  box-shadow:0 20px 40px -20px rgba(0,0,0,.5);
+  transform:translate3d(0,calc(var(--d) * -30svh),0) rotate(var(--tilt,0deg)) scale(calc(.94 + var(--a) * .06));
+  filter:blur(calc((1 - var(--a)) * 5px))}
+.slip .h{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;letter-spacing:.16em;color:var(--ink-soft)}
+.slip .h em{font-style:normal;color:var(--amber)}
+.slip b{display:block;margin:8px 0 6px;font-family:var(--serif);font-weight:500;font-size:1rem;letter-spacing:.05em}
+.slip span.t{font-family:var(--serif);font-size:.82rem;line-height:1.75;color:var(--ink-soft)}
+.slip:hover{border-color:color-mix(in srgb,var(--amber) 55%,transparent)}
+
+/* ═══ 场 4 · 06:31 晨醒：常规文档流，光铺满，所有层压平成一张纸 ═══ */
+.dawn{position:relative;min-height:100svh;padding:22svh clamp(20px,8vw,120px) 12svh}
+.dawn-in{max-width:980px;margin:0 auto}
+.dawn .time{font-family:var(--mono);font-size:12px;letter-spacing:.4em;color:var(--ink-soft)}
+.dawn h2{margin:.8em 0 .9em;font-family:var(--serif);font-weight:300;font-size:clamp(1.6rem,3.4vw,2.8rem);letter-spacing:.1em;line-height:1.6}
+.dawn .about{font-family:var(--serif);font-size:1.02rem;line-height:2;color:var(--ink-soft);max-width:36em;padding:14px 18px;border:1px dashed color-mix(in srgb,var(--amber) 60%,transparent)}
+.exits{display:flex;flex-wrap:wrap;gap:12px;margin:40px 0 72px}
+.exits a{padding:12px 20px;border:1px solid var(--line);border-radius:4px;background:rgba(255,255,255,.4);font-size:14px;letter-spacing:.1em;transition:border-color .25s,transform .25s}
+.exits a:hover{border-color:var(--amber);transform:translateY(-2px)}
+.exits a small{display:block;font-family:var(--mono);font-size:10.5px;color:var(--ink-soft);margin-top:4px;letter-spacing:.08em}
+.index{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:40px;border-top:1px solid var(--line);padding-top:36px}
+.index h4{margin:0 0 14px;font-family:var(--serif);font-weight:500;font-size:15px;letter-spacing:.3em}
+.index ul{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.index li a{display:flex;justify-content:space-between;gap:12px;font-family:var(--serif);font-size:14px;line-height:1.5}
+.index li a span{font-family:var(--mono);font-size:10.5px;color:var(--ink-soft);white-space:nowrap}
+.index li a:hover{color:var(--umber)}
+.foot{margin-top:80px;display:flex;justify-content:space-between;font-size:12px;letter-spacing:.14em;color:var(--ink-soft)}
+
+/* ── 窄屏 ── */
+@media (max-width:760px){
+  .nav{display:none}
+  .rail{display:none}
+  .clock{top:24px;bottom:auto;right:auto;left:50%;transform:translateX(-50%)}
+  .hero-copy{left:7vw;right:7vw;width:auto;top:auto;bottom:15svh;transform:translate3d(0,calc(var(--p) * -8svh),0)}
+  .hero-copy .stamp{margin-bottom:1.2rem}
+  .hero-copy h1{font-size:1.32rem;line-height:1.75}
+  .hero-copy .who{margin-top:1.2rem;font-size:12.5px}
+  .hint{bottom:9svh}
+  .hero-lily{--u:calc(84vw / 100);--cx:50vw;--cy:38svh}
+  .hero-lily .horizon{top:27svh}
+  .hero-lily .fogband{top:14svh}
+  .gl-wake{left:6vw;top:11svh;font-size:62vw}
+  .gl-dream{left:48vw;top:30svh;font-size:42vw}
+  .hero-focus .hair{top:40svh}
+  body[data-hero='curtain'] .hero-copy{top:50%;bottom:auto;left:50%;right:auto;width:86vw;transform:translate3d(-50%,calc(-50% + var(--p) * -8svh),0)}
+  .slats i:nth-child(n+9){display:none}
+  .heropick{top:64px}
+  .chapter{left:6vw;top:10svh;bottom:auto;flex-direction:row;align-items:baseline;gap:14px}
+  .chapter h2,.chapter .cap{writing-mode:horizontal-tb}
+  .chapter h2{font-size:34px}
+  .essays{left:7vw;right:7vw;top:54%}
+  .essays::before{inset:-1.4rem -1rem}
+  .essay{grid-template-columns:2.4rem minmax(0,1fr);padding:1.2rem 0}
+  .essay .no{font-size:1.5rem}
+  .essay .go{display:none}
+  .essay p{font-size:.85rem;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .chap-h{left:6vw;top:10svh}
+  .slabs-wrap{left:0;right:0;top:22svh;bottom:12svh;overflow:visible}
+  .slabs{display:flex;width:max-content;gap:6vw;padding-inline:6vw;
+    transform:translate3d(calc(clamp(0, calc((var(--p) - .12) / .72), 1) * -168vw),0,0)}
+  .slab{width:78vw}
+  .slip{width:72vw}
+  /* 窄屏：相邻两张一上一下，玻璃签居中收窄 */
+  .slip:nth-of-type(odd){left:6vw;top:17svh}
+  .slip:nth-of-type(even){left:22vw;top:68svh}
+  .glass{width:42vw}
+  .index{grid-template-columns:1fr;gap:32px}
+  .dawn{padding-top:16svh}
+}
+</style>
+</head>
+<body>
+
+<div class="atmo" aria-hidden="true">
+  <div class="fog f1"></div><div class="fog f2"></div>
+  <div class="motes" id="motes"></div>
+  <div class="dawnlight"></div>
+</div>
+
+<header class="top">
+  <a class="logo" href="#" data-jump="0">Aver<b>i</b>tA</a>
+  <nav class="nav"><a href="#" data-jump="1">断章</a><a href="#" data-jump="2">造物</a><a href="#" data-jump="3">闪念</a><a href="#" data-jump="4">此身</a></nav>
+</header>
+
+<nav class="rail" id="rail" aria-label="一夜">
+  <span class="dot" id="railDot"></span>
+  <a href="#" data-jump="0" style="top:0%">入夜 <span>23:07</span></a>
+  <a href="#" data-jump="1" style="top:25%">断章 <span>23:19</span></a>
+  <a href="#" data-jump="2" style="top:50%">造物 <span>01:11</span></a>
+  <a href="#" data-jump="3" style="top:75%">闪念 <span>02:08</span></a>
+  <a href="#" data-jump="4" style="top:100%">晨醒 <span>06:31</span></a>
+</nav>
+<div class="clock" id="clock">23:07</div>
+<div class="switch"><a class="cur" href="p23-a-storyboard.html">A · 分镜</a><a href="p23-b-depth.html">B · 景深</a></div>
+<div class="heropick" id="heropick"></div>
+<div class="fps" id="fps"></div>
+
+<main>
+  <!-- ═══ 场 0 · 入夜（三稿开屏：水面百合 / 对焦 / 帷幕） ═══ -->
+  <section class="scene s-hero" data-scene="0" style="--len:230svh">
+    <div class="stage">
+      <div class="hero hero-lily" aria-hidden="true">
+        <div class="fogband"></div><div class="horizon"></div><div class="halo"></div>
+        <div class="pad"><div class="pool"></div><div class="ripple"></div><div class="ripple"></div><div class="ripple"></div>
+          <div class="spin"><div class="bloom" id="bloom"></div></div></div>
+      </div>
+      <div class="hero hero-focus" aria-hidden="true"><i class="hair"></i><span class="gl gl-dream">梦</span><span class="gl gl-wake">醒</span></div>
+      <div class="hero hero-curtain" aria-hidden="true"><div class="glow g2"></div><div class="glow g3"></div><div class="glow g1"></div></div>
+      <div class="hero-copy">
+        <span class="stamp">23:07 · 入夜</span>
+        <h1>在即将醒来的那一瞬，<br>世界究竟是在<em>成形</em>，<br>还是正在<em>融化</em>？</h1>
+        <p class="who"><b>Traveritas</b>随笔、项目，与正在成形的东西。</p>
+      </div>
+      <div class="hero hero-curtain" aria-hidden="true"><div class="slats" id="slats"></div></div>
+      <p class="hint"><i></i>向下，穿行于这一夜</p>
+    </div>
+  </section>
+
+  <!-- ═══ 场 1 · 浅梦 · 断章（三篇同屏） ═══ -->
+  <section class="scene s-essays" data-scene="1" style="--len:290svh">
+    <div class="stage">
+      <div class="chapter"><span class="cap">浅梦 · 23:19 — 01:11</span><h2>断章</h2></div>
+      <div class="essays">
+        <a class="essay" href="#" style="--j:0"><span class="no">01</span><div><span class="meta">2026.09.28 · 样张 · 排版 · 醒梦</span><h3>字面与光景 · 全样式样张</h3><p>随笔正文排版正典、小节序号、两态文字与行内光景的完整表现存目。</p></div><span class="go">→</span></a>
+        <a class="essay" href="#" style="--j:1"><span class="no">02</span><div><span class="meta">2026.09.19 · 建站 · 设计 · 醒梦</span><h3>母题探索记录：从碎块到花</h3><p>主页视觉母题的三轮探索与两次否决——一份仍在进行中的设计日志。</p></div><span class="go">→</span></a>
+        <a class="essay" href="#" style="--j:2"><span class="no">03</span><div><span class="meta">2026.09.19 · 建站 · 醒梦</span><h3>开站：在醒与梦之间</h3><p>这个网站为什么存在，以及它想长成什么样子。</p></div><span class="go">→</span></a>
+        <div><a class="all" href="#">全部断章 →</a></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 场 2 · 深眠 · 造物 ═══ -->
+  <section class="scene s-projects" data-scene="2" style="--len:330svh">
+    <div class="stage">
+      <header class="chap-h"><h2>造物</h2><span class="cap">深眠 · 01:11 — 02:08</span></header>
+      <div class="slabs-wrap">
+        <div class="slabs">
+          <a class="slab" href="#" style="--j:0;--depth:5">
+            <div class="win"><svg data-lily="3" viewBox="-100 -100 200 200" preserveAspectRatio="xMidYMid slice"></svg><div class="fogv"></div></div>
+            <div class="slab-body">
+              <div class="slab-head"><span>2026.09.28</span><span>进行中</span></div>
+              <h3>样式系统与构造规范</h3>
+              <p>项目变体下的方框语言、施工清单、深眠注记与板块排版全览。</p>
+              <div class="depth"><span>浮现度 <b>5</b>/8</span><span>✓ 公开仓库</span></div>
+            </div>
+          </a>
+          <a class="slab" href="#" style="--j:1;--depth:2">
+            <div class="win"><svg data-lily="7" viewBox="-100 -100 200 200" preserveAspectRatio="xMidYMid slice"></svg><div class="fogv"></div></div>
+            <div class="slab-body">
+              <div class="slab-head"><span>2026.09.19</span><span>构想中</span></div>
+              <h3>醒梦 · 视觉母题探索</h3>
+              <p>为「醒梦」寻找 2—4 个可以反复出现的核心视觉意象。</p>
+              <div class="depth"><span>浮现度 <b>2</b>/8</span><span>○ 暂无公开</span></div>
+            </div>
+          </a>
+          <a class="slab" href="#" style="--j:2;--depth:5">
+            <div class="win"><svg data-lily="11" viewBox="-100 -100 200 200" preserveAspectRatio="xMidYMid slice"></svg><div class="fogv"></div></div>
+            <div class="slab-body">
+              <div class="slab-head"><span>2026.09.19</span><span>进行中</span></div>
+              <h3>这个网站本身</h3>
+              <p>探索「醒梦」落地的个人网站与持续迭代记录。</p>
+              <div class="depth"><span>浮现度 <b>5</b>/8</span><span>✓ 公开仓库</span></div>
+            </div>
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 场 3 · REM · 闪念 ═══ -->
+  <section class="scene s-rem" data-scene="3" style="--len:400svh">
+    <div class="stage" data-w0=".09" data-w1=".16">
+      <header class="chap-h"><h2>闪念</h2><span class="cap">异相 · 02:08 — 04:59</span></header>
+      <div class="slipzone">
+        <div class="glass-glow" aria-hidden="true"></div>
+        <div class="glass" aria-hidden="true"><b>它可能<br>马上消失。</b><span class="cap">GLASS SLIP</span></div>
+        <a class="slip" href="#" data-c=".16"  style="--x:12vw;--y:22svh;--tilt:-1.2deg"><span class="h"><span>09.28 14:40</span><em>#知觉</em></span><b>水面的边缘</b><span class="t">微光与水汽漫开的边缘，没有确凿的轮廓。</span></a>
+        <a class="slip" href="#" data-c=".28" style="--x:64vw;--y:18svh;--tilt:.9deg"><span class="h"><span>09.27 23:45</span><em>#器物</em></span><b>十四度发丝线</b><span class="t">纸面上画下一道倾斜十四度的极细线。它不是裁切，只是……</span></a>
+        <a class="slip" href="#" data-c=".4" style="--x:16vw;--y:58svh;--tilt:.7deg"><span class="h"><span>09.25 01:20</span><em>#随感</em></span><b>深夜读断章</b><span class="t">凡能够说的事情，都能够说清楚；凡不能说的事情，就应当保持沉默。</span></a>
+        <a class="slip" href="#" data-c=".52" style="--x:66vw;--y:56svh;--tilt:-.8deg"><span class="h"><span>09.24 18:15</span><em>#界面</em></span><b>遮蔽与展露</b><span class="t">磨砂玻璃并不掩藏内部，它只是让里面的几何形体退后两步，变成一层温和的浅影。</span></a>
+        <a class="slip" href="#" data-c=".64" style="--x:8vw;--y:30svh;--tilt:1.3deg"><span class="h"><span>09.22 02:08</span><em>#尺度</em></span><b>未命名的空洞</b><span class="t">巨大的尺度若悬于极远处，便不会给人以压迫，反而像一轮褪了色的静止月面。</span></a>
+        <a class="slip" href="#" data-c=".76" style="--x:62vw;--y:28svh;--tilt:-1deg"><span class="h"><span>09.20 22:30</span><em>#色彩</em></span><b>琥珀的微温</b><span class="t">屏幕不应当太冷。字色底下一丝极淡的琥珀偏暖，才让人觉得光是有温度的。</span></a>
+        <a class="slip" href="#" data-c=".88" style="--x:36vw;--y:66svh;--tilt:.6deg"><span class="h"><span>09.18 03:52</span><em>#醒梦</em></span><b>即将醒来的一瞬</b><span class="t">在它消失之前，我们确曾在这张半透明的纸上写下了几个字。</span></a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 场 4 · 06:31 晨醒 ═══ -->
+  <section class="dawn" data-scene="4" id="dawn">
+    <div class="dawn-in">
+      <div class="time">06:31 · 晨光</div>
+      <h2>注视持续得太久。<br>被注视之物微微退开。</h2>
+      <p class="about">〔mock 占位〕这里放一两句醒态的自我介绍：你是谁、在做什么、这里会写些什么。</p>
+      <div class="exits">
+        <a href="#">GitHub<small>github.com/Traveritas</small></a>
+        <a href="#">本站源码<small>traveritas.github.io</small></a>
+        <a href="#">RSS<small>/rss.xml</small></a>
+        <a href="#">关于此处 →<small>/about/</small></a>
+      </div>
+      <div class="index">
+        <div><h4>断章</h4><ul>
+          <li><a href="#">字面与光景 · 全样式样张<span>09.28</span></a></li>
+          <li><a href="#">母题探索记录：从碎块到花<span>09.19</span></a></li>
+          <li><a href="#">开站：在醒与梦之间<span>09.19</span></a></li>
+        </ul></div>
+        <div><h4>造物</h4><ul>
+          <li><a href="#">样式系统与构造规范<span>5/8</span></a></li>
+          <li><a href="#">醒梦 · 视觉母题探索<span>2/8</span></a></li>
+          <li><a href="#">这个网站本身<span>5/8</span></a></li>
+        </ul></div>
+        <div><h4>闪念</h4><ul>
+          <li><a href="#">水面的边缘<span>09.28</span></a></li>
+          <li><a href="#">十四度发丝线<span>09.27</span></a></li>
+          <li><a href="#">深夜读断章<span>09.25</span></a></li>
+          <li><a href="#">全部闪念 →<span></span></a></li>
+        </ul></div>
+      </div>
+      <div class="foot"><span>Traveritas 2026</span><span>在醒与梦之间</span></div>
+    </div>
+  </section>
+</main>
+
+<script>
+(() => {
+  const root = document.documentElement;
+  const scenes = [...document.querySelectorAll('[data-scene]')];
+  const railLinks = [...document.querySelectorAll('.rail a')];
+  const railDot = document.getElementById('railDot');
+  const clock = document.getElementById('clock');
+
+  /* 开屏稿：?hero=lily | focus | curtain */
+  const HEROES = [['lily', '水面百合'], ['focus', '对焦'], ['curtain', '帷幕']];
+  const qs = new URLSearchParams(location.search);
+  const hero = HEROES.some(([k]) => k === qs.get('hero')) ? qs.get('hero') : 'lily';
+  document.body.dataset.hero = hero;
+  document.getElementById('heropick').innerHTML = '<a style="pointer-events:none">开屏</a>' + HEROES.map(([k, n]) => {
+    const q = new URLSearchParams(qs); q.set('hero', k);
+    return `<a href="?${q}"${k === hero ? ' class="cur"' : ''}>${n}</a>`;
+  }).join('');
+
+  /* 百合：六枚花被片（外三内三），开角与长度微抖，避免机械放射对称 */
+  root.style.setProperty('--petal', "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 150'%3E%3Cpath d='M30 150 C8 120 0 70 22 12 Q30 0 38 12 C60 70 52 120 30 150Z'/%3E%3C/svg%3E\")");
+  const bloom = document.getElementById('bloom');
+  const JA = [0, 5, -6, 3, -4, 6], JT = [0, .08, .03, .11, .05, .09];
+  [0, 2, 4, 1, 3, 5].forEach((i) => {
+    const inner = i % 2 === 1, el = document.createElement('i');
+    el.className = 'petal' + (inner ? ' inner' : '');
+    el.style.cssText = `--a:${i * 60 + JA[i]}deg;--w:${inner ? 26 : 31};--pl:${inner ? 42 : 48};--l0:${inner ? 64 : 46};--t0:${.3 + JT[i]}`;
+    bloom.append(el);
+  });
+  for (let i = 0; i < 6; i++) { const st = document.createElement('i'); st.className = 'stamen'; st.style.setProperty('--a', (i * 60 + 30 + JA[i]) + 'deg'); bloom.append(st); }
+
+  /* 百叶 */
+  const slats = document.getElementById('slats');
+  for (let i = 0; i < 16; i++) { const s = document.createElement('i'); s.style.setProperty('--k', (i / 15).toFixed(3)); slats.append(s); }
+
+  /* 微尘 */
+  const motes = document.getElementById('motes');
+  for (let i = 0; i < 40; i++) {
+    const m = document.createElement('i');
+    m.style.cssText = `left:${Math.random()*100}%;top:${Math.random()*100}%;--t:${6+Math.random()*10}s;--dx:${(Math.random()-.5)*60}px;--dy:${(Math.random()-.5)*60}px;animation-delay:${-Math.random()*10}s`;
+    motes.append(m);
+  }
+
+  /* 抽象百合：花瓣长度/开角抖动，避免机械放射对称 */
+  let seed = 1; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  document.querySelectorAll('svg[data-lily]').forEach((svg) => {
+    seed = +svg.dataset.lily * 997; let out = '<defs><radialGradient id="pg' + svg.dataset.lily + '"><stop offset="0" stop-color="#f3e6d6" stop-opacity=".55"/><stop offset="1" stop-color="#a9b8d6" stop-opacity=".08"/></radialGradient></defs>';
+    const k = 5 + Math.floor(rnd() * 2); const rot0 = rnd() * 60;
+    for (let i = 0; i < k; i++) {
+      const a = rot0 + i * 360 / k + (rnd() - .5) * 22, L = 62 + rnd() * 26, w = 16 + rnd() * 10, bend = (rnd() - .5) * 18;
+      out += `<path transform="rotate(${a.toFixed(1)})" d="M0 0 C ${w} ${-L*.3}, ${w*.6+bend} ${-L*.85}, ${bend} ${-L} C ${-w*.6+bend} ${-L*.85}, ${-w} ${-L*.3}, 0 0Z" fill="url(#pg${svg.dataset.lily})" stroke="#e6ecf7" stroke-opacity=".45" stroke-width=".8"/>`;
+    }
+    out += '<circle r="5" fill="#d9a05b" fill-opacity=".7"/>';
+    svg.innerHTML = out;
+  });
+
+  /* 窗口参数：写进 CSS 变量，JS 与 CSS 同一套 */
+  const windowed = [];
+  document.querySelectorAll('[data-w0]').forEach((st) => {
+    st.style.setProperty('--w0', st.dataset.w0); st.style.setProperty('--w1', st.dataset.w1);
+    st.querySelectorAll('[data-c]').forEach((el) => { el.style.setProperty('--c', el.dataset.c); windowed.push({ el, c: +el.dataset.c, w0: +st.dataset.w0, w1: +st.dataset.w1, scene: st.closest('[data-scene]') }); });
+  });
+
+  /* 色板：按「场序 + 场内进度」插值 */
+  const S = [
+    [0.00, [237,240,244], [35,40,48],   [86,96,109],   [255,255,255,.75], 0, 0],
+    [1.00, [230,235,242], [35,40,48],   [86,96,109],   [255,255,255,.7],  0, 0],
+    [1.96, [221,227,236], [35,40,48],   [86,96,109],   [255,255,255,.6],  0, 0],
+    [2.12, [24,32,48],    [230,233,239],[154,166,184], [120,150,200,.18], 1, 0],
+    [2.95, [20,26,39],    [230,233,239],[154,166,184], [120,150,200,.14], 1, 0],
+    [3.08, [34,29,49],    [236,230,241],[169,159,186], [170,140,210,.16], 1, 0],
+    [3.97, [42,36,56],    [236,230,241],[169,159,186], [170,140,210,.14], 1, 0],
+    [4.35, [239,230,216], [43,38,32],   [111,100,87],  [255,236,205,.8],  0, 1],
+    [5.00, [245,239,230], [43,38,32],   [111,100,87],  [255,240,215,.7],  0, .8],
+  ];
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const mix = (A, B, t) => A.map((v, i) => lerp(v, B[i], t));
+  const rgb = (c) => c.length === 4 ? `rgba(${c[0]|0},${c[1]|0},${c[2]|0},${c[3].toFixed(3)})` : `rgb(${c[0]|0},${c[1]|0},${c[2]|0})`;
+  function palette(pos) {
+    let i = 0; while (i < S.length - 2 && pos > S[i + 1][0]) i++;
+    const a = S[i], b = S[i + 1], t = Math.min(1, Math.max(0, (pos - a[0]) / (b[0] - a[0])));
+    root.style.setProperty('--bg', rgb(mix(a[1], b[1], t)));
+    root.style.setProperty('--ink', rgb(mix(a[2], b[2], t)));
+    root.style.setProperty('--ink-soft', rgb(mix(a[3], b[3], t)));
+    root.style.setProperty('--glow', rgb(mix(a[4], b[4], t)));
+    root.style.setProperty('--dark', lerp(a[5], b[5], t).toFixed(3));
+    root.style.setProperty('--dawn', lerp(a[6], b[6], t).toFixed(3));
+  }
+  const MIN = [0, 12, 124, 181, 352, 444];
+  const fmt = (m) => { const t = (23 * 60 + 7 + Math.round(m)) % 1440; return String(Math.floor(t / 60)).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0'); };
+
+  let geo = [], vh = innerHeight, docH = 0;
+  const measure = () => {
+    vh = innerHeight; docH = root.scrollHeight;
+    geo = scenes.map((el) => ({ el, top: el.offsetTop, h: el.offsetHeight }));
+  };
+  const sceneP = (g, y) => {
+    if (g.el.id === 'dawn') return Math.min(1, Math.max(0, (y - (g.top - vh)) / Math.max(1, docH - g.top)));
+    return Math.min(1, Math.max(0, (y - g.top) / Math.max(1, g.h - vh)));
+  };
+
+  let ticking = false;
+  function frame() {
+    ticking = false;
+    const y = scrollY;
+    let pos = 0;
+    geo.forEach((g, k) => {
+      const p = sceneP(g, y);
+      g.el.style.setProperty('--p', p.toFixed(4));
+      if (k === 0) root.style.setProperty('--p0', p.toFixed(3));
+      if (g.el.id === 'dawn') { if (y + vh > g.top) pos = 4 + p; }
+      else if (y >= g.top) pos = k + p;
+    });
+    palette(pos);
+    windowed.forEach((w) => {
+      const p = parseFloat(w.scene.style.getPropertyValue('--p')) || 0;
+      w.el.classList.toggle('on', Math.abs(p - w.c) < (w.w0 + w.w1) / 2);
+    });
+    const k = Math.min(4, Math.floor(pos)), f = pos - k;
+    clock.textContent = fmt(k >= 4 ? lerp(MIN[4], MIN[5], f) : lerp(MIN[k], MIN[k + 1], f));
+    railDot.style.top = (Math.min(4, pos) / 4 * 100) + '%';
+    railLinks.forEach((a, i) => a.classList.toggle('on', i === Math.min(4, Math.round(pos - .3))));
+  }
+  const req = () => { if (!ticking) { ticking = true; requestAnimationFrame(frame); } };
+  addEventListener('scroll', req, { passive: true });
+  addEventListener('resize', () => { measure(); req(); });
+
+  /* 跳转：落在该场内容已浮现的位置，而不是场顶（场顶处内容还没出现） */
+  const OFFSET = [0, .4, .45, .1, 0];
+  document.querySelectorAll('[data-jump]').forEach((a) => a.addEventListener('click', (e) => {
+    e.preventDefault(); const k = +a.dataset.jump, g = geo[k];
+    const y = k === 4 ? g.top - vh * .05 : g.top + (g.h - vh) * OFFSET[k];
+    scrollTo({ top: y, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  }));
+
+  if (location.search.includes('debug')) {
+    const el = document.getElementById('fps'); el.style.display = 'block';
+    let fr = 0, t0 = performance.now();
+    (function loop(t) { fr++; if (t - t0 > 1000) { el.textContent = fr + ' fps'; fr = 0; t0 = t; } requestAnimationFrame(loop); })(t0);
+  }
+  measure(); frame();
+  document.fonts && document.fonts.ready.then(() => { measure(); req(); });
+})();
+</script>
+</body>
+</html>

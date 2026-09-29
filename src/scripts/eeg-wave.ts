@@ -66,6 +66,22 @@ export interface EegFrame {
   echoesOn: boolean;
 }
 
+/* ── 曲线骨架（仅主页用）：线不再是「过视口中心的 14° 直线」，而是视口坐标里的一条折线，
+   声部沿它的弧长采样、向法线偏移。法线 ＝ 前进方向左转 90°，与直线版转 14° 之后的 +y 同向，
+   所以骨架恰为那条 14° 直线时，曲线版与直线版画出的是同一条线。 */
+export interface Spine {
+  xy: Float32Array; // x0,y0,x1,y1,…（视口 px）
+  L: Float32Array; // 累计弧长
+  len: number;
+}
+
+export function makeSpine(xy: Float32Array): Spine {
+  const n = xy.length / 2;
+  const L = new Float32Array(n);
+  for (let i = 1; i < n; i++) L[i] = L[i - 1] + Math.hypot(xy[2 * i] - xy[2 * i - 2], xy[2 * i + 1] - xy[2 * i - 1]);
+  return { xy, L, len: L[n - 1] };
+}
+
 /** beat：拍长（秒），与 CSS 同源（.eeg-group 上的 --fld-beat） */
 export function createEegWave(beat: number) {
   const BEAT = beat;
@@ -137,6 +153,67 @@ export function createEegWave(beat: number) {
     return d === 0 ? ph : g + (1 - d) * (ph - g);
   };
 
+  /* ── 曲线版声部：与 voicePath 同一套采样 / 量化 / 保持 / 延迟 / 游走，只是坐标换成
+     「弧长 s 沿骨架 + 法线偏移」。u 以骨架中点为 0（直线骨架时 ＝ 直线版的 x / 600）。
+     返回视口坐标的扁平点列 [x0,y0,x1,y1,…]；阶梯的横段 / 竖阶在弧长—法线坐标里生成，
+     因而沿曲线弯折。 */
+  function voiceCurve(ph: number, d: number, v: Voice, sp: Spine, walk = 0): number[] {
+    const step = STEP * v.step;
+    const lvl = STEP_LV[Math.min(2, Math.floor(((ph % 3) / 3) * 3))];
+    const q = v.smooth ? 0 : v.q * lvl * Math.max(0, Math.min(1, (d - 0.1) / 0.9));
+    const hold = v.smooth ? 0 : step * d;
+    const A = AMP * (1 + (GAIN_D * v.gain - 1) * d);
+    const phv = ph - v.beats * BEAT * d;
+    const dy = v.dy * d + walk;
+    const full = hold >= step - 0.6;
+    const { xy, L, len } = sp;
+    const last = L.length - 1;
+    let j = 1; // 弧长单调递增 ⇒ 段索引只往前走
+    const out: number[] = [];
+    const put = (s: number, y: number) => {
+      while (j < last && L[j] < s) j++;
+      const i0 = j - 1;
+      const seg = L[j] - L[i0] || 1;
+      const t = Math.max(0, Math.min(1, (s - L[i0]) / seg));
+      const dx = xy[2 * j] - xy[2 * i0];
+      const dyS = xy[2 * j + 1] - xy[2 * i0 + 1];
+      const l = Math.hypot(dx, dyS) || 1;
+      out.push(xy[2 * i0] + dx * t - (dyS / l) * y, xy[2 * i0 + 1] + dyS * t + (dx / l) * y);
+    };
+    const c = len / 2;
+    let first = true;
+    let ps = 0;
+    let py = 0;
+    let lastY = 0;
+    for (let s = 0; s <= len; s += step) {
+      let y = waveAt((s - c) / 600, phv, A);
+      if (q > 0.05) y = Math.round(y / q) * q;
+      const Y = y + dy;
+      if (first) {
+        put(s, Y);
+        lastY = Y;
+        first = false;
+      } else if (full && Math.abs(Y - lastY) < 0.05) put(s, Y);
+      else if (full) {
+        put(s, lastY);
+        put(s, Y);
+        lastY = Y;
+      } else {
+        if (hold > 0.5) put(ps + hold, py);
+        put(s, Y);
+        lastY = Y;
+      }
+      ps = s;
+      py = Y;
+    }
+    return out;
+  }
+  const toPath = (p: number[]) => {
+    let s = '';
+    for (let i = 0; i < p.length; i += 2) s += (i ? 'L' : 'M') + p[i].toFixed(1) + ' ' + p[i + 1].toFixed(1);
+    return s;
+  };
+
   let lastMainGrid = NaN;
   const lastGrid = VOICES.map(() => NaN);
   const lastWalk = VOICES.map(() => NaN);
@@ -144,6 +221,7 @@ export function createEegWave(beat: number) {
   let lastD = NaN;
   let lastW = NaN;
   let lastH = NaN;
+  let lastVer = NaN;
 
   return {
     /** 推进一帧（ph ＝ 秒针，d ＝ 梦度 0..1）。同一时刻、同一梦度、同一视口的重复调用返回 null。 */
@@ -154,6 +232,7 @@ export function createEegWave(beat: number) {
       lastD = d;
       lastW = W;
       lastH = H;
+      lastVer = NaN; // 从直线版切回曲线版时强制重算
       /* 两个时钟：
          · 拍钟 gridAt() ＝ 每 0.25s 采一次样并零阶保持 —— 两个阶梯波（主波与灰道）跟它走，
            各自的格位分开记，谁走格谁重写（灰道带半格偏移 ⇒ 与主波交错）；
@@ -185,6 +264,45 @@ export function createEegWave(beat: number) {
         }
       }
       return out;
+    },
+
+    /** 曲线骨架版的一帧（主页）。骨架每次变化都带一个新的 ver；读法与 step() 相同：
+        主波与灰道跟拍钟、有色两道跟秒针。 */
+    stepCurve(ph: number, d: number, sp: Spine, ver: number): EegFrame | null {
+      const changed = d !== lastD || ver !== lastVer;
+      if (!changed && ph === lastPh) return null;
+      lastPh = ph;
+      lastD = d;
+      lastVer = ver;
+      lastW = NaN; // 回到直线版时强制重算
+      const out: EegFrame = { main: null, echoes: VOICES.map(() => null), echoesOn: d > 0.02 };
+      const mainGrid = gridAt(MAIN_V, d, ph);
+      if (changed || mainGrid !== lastMainGrid) {
+        lastMainGrid = mainGrid;
+        out.main = toPath(voiceCurve(mainGrid, d, MAIN_V, sp));
+      }
+      if (out.echoesOn) {
+        for (let i = 0; i < VOICES.length; i++) {
+          const v = VOICES[i];
+          if (v.smooth) {
+            out.echoes[i] = toPath(voiceCurve(ph, d, v, sp, driftAt(ph) * d));
+            continue;
+          }
+          const gv = gridAt(v, d, ph);
+          const wk = walkAt(ph);
+          if (changed || gv !== lastGrid[i] || wk !== lastWalk[i]) {
+            lastGrid[i] = gv;
+            lastWalk[i] = wk;
+            out.echoes[i] = toPath(voiceCurve(gv, d, v, sp, wk * d));
+          }
+        }
+      }
+      return out;
+    },
+
+    /** 主波在骨架上的实际点列（视口坐标）：主页开屏用它裁切醒 / 梦两字，保证切口与画出的线一致 */
+    mainCurve(ph: number, d: number, sp: Spine): number[] {
+      return voiceCurve(gridAt(MAIN_V, d, ph), d, MAIN_V, sp);
     },
   };
 }
