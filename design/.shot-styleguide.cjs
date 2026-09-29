@@ -139,6 +139,14 @@ const SHOTS = [
           const el = q('.prose--project .md li:has(input:not(:checked))');
           return el ? getComputedStyle(el, '::before').content : null;
         })(),
+        essayTaskChecked: (() => {
+          const el = q('.prose--essay .md li:has(input:checked)');
+          return el ? getComputedStyle(el, '::before').content : null;
+        })(),
+        essayTaskOpen: (() => {
+          const el = q('.prose--essay .md li:has(input:not(:checked))');
+          return el ? getComputedStyle(el, '::before').content : null;
+        })(),
         h2Essay: (() => {
           const el = q('.prose--essay .md h2');
           return el
