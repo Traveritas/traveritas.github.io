@@ -34,6 +34,7 @@
 6. ~~**BaseLayout `rail` Props 缺 `readout` 字段**~~ 已随 347331b 补上；`astro check` 现 **0 错误**，deploy.yml 可挂 `npm run check`（见五.1）。
 7. **Boot 揭幕期焦点被面纱遮蔽**（WCAG 2.4.11）：进门给 `.page` 设 `inert`，`booted` 后移除（BootVeil + BaseLayout 配合）。
 8. **字体 P0 主体——全站共享 CSS 501KB / gzip 211KB，97% 是 @font-face**（409 个声明，Noto Serif SC 4 字重 ×101 子集）：/about 字体实载 ≈805KB、文章页 ≈1MB。治本 = `cn-font-split` 按全站实际用字自切（CSS 可 <50KB gzip）；顺带只输出 woff2 单格式（现 dist 带 397 个冗余 .woff，31MB）。
+   - 2026-10-03 复测（主页转正前的性能评估）：新旧主页首帧排版都要 ~250–270ms（核显本机，1440×900@1.5），DOM 只有 470–670 个元素，大头疑为这批阻塞渲染的 CSS（现约 540KB：`400.*.css` 261KB + `BaseLayout.*.css` 278KB）与 CJK 回退排字。是新主页 TBT 仍有 ~350ms 的主要来源；治本后应复测。
 
 ## 三、性能 P1/P2（独立可排期）
 
@@ -43,6 +44,10 @@
 4. `three-common.ts:70` 的 900ms 轮询 `setInterval` 永不清理（makeLoop 无停止路径）。
 5. **字重策略收敛**：文章正文请求 400 只载 500（隐性匹配、多下一套 CJK 子集）；`projects/[slug]` 请求 700 匹配到 900；SiteHeader/StitchHeader 的 mono 用 500/600 但只载 IBM Plex Mono 400（伪粗体）。终态建议全站 2 个字重 + 补 `@fontsource/ibm-plex-mono/500.css`。
 6. 回退字体 `size-adjust/ascent-override` 调参（低优先）。
+7. **BaseLayout 初始化里一次 ~78ms 的强制排版**（2026-10-03，/new/ 加载期 trace：`Layout` 栈顶在 BaseLayout 脚本、经 `lib.ts` 的一个函数；旧主页对应一次 ~45ms 的样式重算）。全站每页都付。查法：`npm run build` 时关掉压缩（或 dev 下）重抓带栈的 trace，定位是哪个 init 在首帧前读布局，改成放进 rAF / 读缓存值。
+8. **新主页中段偶发的首次显影卡顿**（2026-10-03）：滚到第 2 幕（造物，scrollY≈2900）时偶尔出一帧 ~180ms，trace 里是 GPU 主线程上一次 116ms 的 `RendererRasterWorker` 光栅化 —— 该幕玻璃板（`filter: blur` 随 `--p` 变化、晶板窗里的 SVG 百合带 14px 模糊）首次进入视口时的一次性成本，两次实测只出现一次。可试：给 `.slab .win svg` 预先 `will-change: filter` 或在接近该幕时提前显影；滚动时 `--p` 驱动的 `filter: blur()` 改为只动 opacity（模糊做成静态两层交叉淡化）。
+9. **线景地形 Worker 的几何仍在 JS 里逐帧算**（每帧 ~4–5ms、7–8k 点；2560 宽 ~7.7ms）：已不占主线程也不占 GPU 主线程（2026-10-03 起由 WebGL2 画，见 `home-linescape-gl.ts`），属低优先。要再省可把波形 / 地势 / 透视搬进顶点着色器（骨架折线放进一张小纹理），每帧只传 uniform。
+10. **测量口径备忘**：同一套脚本里旧主页的 longtask 观察器没记到它自己那次 ~250ms 首帧排版（TBT 读数 0），而新主页记到了 —— 两页 TBT 数字不可直接比，比首帧排版的 trace 时长更可靠。复测脚本：`design/.perf-home.cjs`。
 
 ## 四、SEO / 内容（独立可排期）
 
