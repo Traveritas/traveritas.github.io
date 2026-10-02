@@ -15,7 +15,9 @@
        圆在地形上有倒影 —— 错开一截，且圆轻轻浮动时倒影纹丝不动。
      · b「回声飘起」：最远的几排越过地平线，继续向天空极淡地延伸、渐隐（蜃景）。
    锚点（等高线标注 / 测量点）：附近的波形压平；标注处线断开一小段，留给 DOM 上的小字。
-   预算：30fps；行数 ≤ 34、步长按透视给、视口裁剪，一帧约 5–6k 点。
+   预算：30fps；行数 ≤ 34、步长按透视给、视口裁剪，一帧约 5–8k 点。
+   绘制：这里只把每帧整理成绘制列表，真正落笔在 home-linescape-gl.ts（首选 WebGL2，退路 Canvas 2D）；
+   GPU 跟不上时先降帧、再停在静帧（见下方「帧率与降级」）。
    ───────────────────────────────────────────────────────────── */
 
 import {
@@ -37,6 +39,7 @@ import {
   type Geo,
   type Orb,
 } from './home-linescape-terrain';
+import { Scene, make2d, makeGl, type Backend, type Grad } from './home-linescape-gl';
 
 interface Colors {
   umber: string;
@@ -82,7 +85,8 @@ type Msg =
 
 let canvas: OffscreenCanvas;
 let pal: Pal | null = null;
-let ctx: OffscreenCanvasRenderingContext2D;
+let gfx: Backend | null = null;
+const scene = new Scene();
 let W = 0;
 let H = 0;
 let dpr = 1;
@@ -100,7 +104,6 @@ let fold = 0;
 let boot = NaN;
 let running = false;
 let timer = 0;
-const rowPts: number[] = [];
 let perfSum = 0;
 let perfN = 0;
 let perfMax = 0;
@@ -135,7 +138,7 @@ function parse(c: string): number[] {
   return [0, 2, 4].map((i) => parseInt(x.slice(i, i + 2), 16));
 }
 const mix = (a: number[], b: number[], t: number) => a.map((v, i) => v + (b[i] - v) * t);
-const rgba = (c: number[], a: number) => `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${cl(a).toFixed(3)})`;
+const rgba = (c: number[], a: number) => [c[0], c[1], c[2], cl(a)];
 
 /* 光的颜色：醒面一线冷蓝（不是白 —— 浅底上白线会直接消失），梦面琥珀 */
 const LIGHT_W = [104, 128, 164];
@@ -163,13 +166,15 @@ function anchorAt(list: Anchor[], s: number): [number, boolean] {
   return [calm, gap];
 }
 
-function paint(now: number) {
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+/* 把这一帧整理成绘制列表（画家顺序：远排先画，近排的擦除带盖掉它下面的远排） */
+function build(now: number) {
+  const S = scene;
+  S.reset();
   NPT = 0;
   if (!geo || fold >= 0.999) return;
   const g = geo;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  S.nx = g.nx;
+  S.ny = g.ny;
 
   const ph = now / 1000;
   const since = Number.isNaN(boot) ? -1 : (now - boot) / 1000;
@@ -210,8 +215,7 @@ function paint(now: number) {
   const SQ = 2.6; // 透视压扁：法向距离放大 ⇒ 环在地面上是扁的
 
   /* ── a：圆环与它的倒影 ── */
-  let reflBand: Path2D | null = null;
-  const orbPaths: Path2D[] = [];
+  const orbPolys: number[] = [];
   let lightGrad: [number, number, number] | null = null;
   if (orb) {
     // 浮动只留极轻的呼吸（原 ±4px 显得晃）
@@ -229,21 +233,17 @@ function paint(now: number) {
     // 几圈回声：与地形一样是同一根线的回声 —— 向内依次收一点、读波更晚、更淡
     for (let j = 0; j < ORB_ECHO.length; j++) {
       const [dr, lag, ka] = ORB_ECHO[j];
-      const p = new Path2D();
       const pj = ph - lag;
       const rj = R - dr * (1 + d * 0.6);
+      orbPolys.push(S.begin());
       for (let i = 0; i <= n; i++) {
         const th = (i / n) * TAU;
         const u = (th / TAU) * U;
         const b = i / n;
         const w = ((1 - b) * waveAt(u, pj, amp) + b * waveAt(u - U, pj, amp)) * ka;
         const r = rj + w;
-        const x = cx + Math.cos(th) * r;
-        const y = cy + Math.sin(th) * r;
-        if (i) p.lineTo(x, y);
-        else p.moveTo(x, y);
+        S.add(cx + Math.cos(th) * r, cy + Math.sin(th) * r, i ? 2 : 1);
       }
-      orbPaths.push(p);
       NPT += n;
     }
     lightGrad = [orb.cx, orb.cy, R * 1.45];
@@ -251,29 +251,25 @@ function paint(now: number) {
     // 倒影：圆心按地平线镜像（落到地面上按透视压扁），再沿地平线错开 —— 用的是不浮动的圆心
     const dist = (orb.cx - g.xy[0]) * nx + (orb.cy - g.xy[1]) * ny; // 负 ＝ 在地平线上方
     const slip = (mobile ? REFL_SLIP_M : REFL_SLIP_D) * W;
-    const rx = orb.cx - 2.2 * dist * nx + tx * slip;
-    const ry = orb.cy - 2.2 * dist * ny + ty * slip;
     const ex = R * 0.92;
     const ey = R * 0.24;
-    reflBand = new Path2D();
-    reflBand.ellipse(rx, ry, ex + 4.5, ey + 2.6, (14 * Math.PI) / 180, 0, TAU);
-    reflBand.ellipse(rx, ry, Math.max(0.5, ex - 4.5), Math.max(0.5, ey - 2.6), (14 * Math.PI) / 180, 0, TAU);
+    S.ring = {
+      x: orb.cx - 2.2 * dist * nx + tx * slip,
+      y: orb.cy - 2.2 * dist * ny + ty * slip,
+      rot: (14 * Math.PI) / 180,
+      ox: ex + 4.5,
+      oy: ey + 2.6,
+      ix: Math.max(0.5, ex - 4.5),
+      iy: Math.max(0.5, ey - 2.6),
+    };
   }
   const drawOrb = () => {
-    if (!orbPaths.length) return;
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.lineJoin = 'round';
     const base = (0.34 + 0.08 * d) * skyIn * open;
-    orbPaths.forEach((p, j) => {
+    orbPolys.forEach((p, j) => {
       const [, , , al, lw, lit] = ORB_ECHO[j];
-      ctx.strokeStyle = rgba(mix(ink, light, 0.25 + lit * (0.3 + 0.4 * d)), base * al);
-      ctx.lineWidth = lw;
-      ctx.stroke(p);
+      S.ops.push({ t: 'line', p, w: lw, c: rgba(mix(ink, light, 0.25 + lit * (0.3 + 0.4 * d)), base * al) });
     });
   };
-
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
 
   // 锚点按排分组
   const byRow = new Map<number, Anchor[]>();
@@ -301,12 +297,11 @@ function paint(now: number) {
     const col = mix(far, ink, sstep(p * 1.6));
     const al = byRow.get(k) ?? [];
 
-    const path = new Path2D();
-    rowPts.length = 0;
+    const pi = S.begin();
+    const p0 = S.np;
     let lastY = NaN;
     let minX = 1e9;
     let maxX = -1e9;
-    let minY = 1e9;
     let maxY = -1e9;
     /* 视口裁剪：每排近乎一条斜直线，只进出视口一次 —— 进之前的点只记住最后一个当起笔，
        出去之后再画一个点就收笔 */
@@ -318,13 +313,10 @@ function paint(now: number) {
     let has = false;
     let pen = false; // 标注断口：抬笔
     const add = (X: number, Yv: number, draw: boolean) => {
-      if (draw && pen) path.lineTo(X, Yv);
-      else if (draw) path.moveTo(X, Yv);
+      S.add(X, Yv, draw ? (pen ? 2 : 1) : 0);
       pen = draw;
-      rowPts.push(X, Yv);
       if (X < minX) minX = X;
       if (X > maxX) maxX = X;
-      if (Yv < minY) minY = Yv;
       if (Yv > maxY) maxY = Yv;
     };
     let cur = 1;
@@ -373,87 +365,100 @@ function paint(now: number) {
       for (const a of al) if (Math.abs(ss - a.s) < CALM * 2.2) near = true;
       s += near ? 3 : r.step;
     }
-    if (rowPts.length < 4) continue;
-    NPT += rowPts.length / 2;
+    if (S.np - p0 < 2) continue;
+    NPT += S.np - p0;
 
     /* 遮挡：只擦本排以下一条带（厚度 ＝ 这一排可能的最大起伏 + 余量）—— 能被它挡住的
        也只有这条带里的远排（以及 a 里圆环沉下去的那半截） */
-    const band = hill * 1.1 + A * 2.2 + 14;
-    const under = new Path2D();
-    const np = rowPts.length;
-    under.moveTo(rowPts[0], rowPts[1]);
-    for (let i = 2; i < np; i += 2) under.lineTo(rowPts[i], rowPts[i + 1]);
-    for (let i = np - 2; i >= 0; i -= 2) under.lineTo(rowPts[i] + nx * band, rowPts[i + 1] + ny * band);
-    under.closePath();
-    ctx.globalCompositeOperation = 'destination-out';
-    ctx.globalAlpha = 0.9 * ek;
-    ctx.fillStyle = '#000';
-    ctx.fill(under);
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.globalAlpha = 1;
+    S.ops.push({ t: 'band', p: pi, band: hill * 1.1 + A * 2.2 + 14, a: 0.9 * ek });
 
     // 描线：a 里经过圆后那团光的线略被照亮（以光心为圆心的径向渐变，越近越偏光色、略提亮）
+    let grad: Grad | null = null;
     if (lightGrad && maxX > lightGrad[0] - lightGrad[2] && minX < lightGrad[0] + lightGrad[2]) {
       const [lx, ly, lr] = lightGrad;
-      const gr = ctx.createRadialGradient(lx, ly, 0, lx, ly, lr);
-      const lit = mix(col, light, 0.62);
-      gr.addColorStop(0, rgba(lit, alpha * 1.25 + 0.06 * skyIn));
-      gr.addColorStop(0.55, rgba(mix(col, light, 0.3 * skyIn), alpha * 1.1));
-      gr.addColorStop(1, rgba(col, alpha));
-      ctx.strokeStyle = gr;
-    } else ctx.strokeStyle = rgba(col, alpha);
-    ctx.lineWidth = width;
-    ctx.stroke(path);
-    // 激活的那一排：整条换成光色、略粗（标注断口照旧留白）
-    if (k === hiK && hf > 0.001) {
-      ctx.strokeStyle = rgba(mix(ink, light, 0.55), (0.3 + 0.5 * hf) * hf * ek * open);
-      ctx.lineWidth = width + 0.7;
-      ctx.stroke(path);
+      grad = {
+        x: lx,
+        y: ly,
+        r: lr,
+        s: [
+          rgba(mix(col, light, 0.62), alpha * 1.25 + 0.06 * skyIn),
+          rgba(mix(col, light, 0.3 * skyIn), alpha * 1.1),
+          rgba(col, alpha),
+        ],
+      };
     }
+    S.ops.push({ t: 'line', p: pi, w: width, c: rgba(col, alpha), g: grad });
+    // 激活的那一排：整条换成光色、略粗（标注断口照旧留白）
+    if (k === hiK && hf > 0.001)
+      S.ops.push({ t: 'line', p: pi, w: width + 0.7, c: rgba(mix(ink, light, 0.55), (0.3 + 0.5 * hf) * hf * ek * open) });
 
     /* 倒影（a）：地形线穿过倒影环带的那几小段 —— 梦面被照亮（琥珀），醒面反而断开
        （只剩一圈空缺）。醒面没有异色（reality.ts 把 --amber 混成冷灰），倒影便以「缺席」出现 */
-    if (
-      reflBand &&
-      orb &&
-      skyIn > 0.01 &&
-      maxY > orb.cy &&
-      minX < orb.cx + orb.R * 3 &&
-      maxX > orb.cx - orb.R * 2
-    ) {
-      ctx.save();
-      ctx.clip(reflBand, 'evenodd');
-      ctx.globalCompositeOperation = 'destination-out';
-      ctx.strokeStyle = rgba([0, 0, 0], 0.92 * skyIn);
-      ctx.lineWidth = width + 1.2;
-      ctx.stroke(path);
-      ctx.globalCompositeOperation = 'source-over';
-      if (d > 0.02) {
-        ctx.strokeStyle = rgba(amber, Math.min(0.95, alpha * 1.3 + 0.2) * skyIn * d);
-        ctx.lineWidth = width + 0.4;
-        ctx.stroke(path);
-      }
-      ctx.restore();
+    if (S.ring && orb && skyIn > 0.01 && maxY > orb.cy && minX < orb.cx + orb.R * 3 && maxX > orb.cx - orb.R * 2) {
+      S.ops.push({ t: 'line', p: pi, w: width + 1.2, c: [0, 0, 0, 0.92 * skyIn], ring: true, out: true });
+      if (d > 0.02)
+        S.ops.push({
+          t: 'line',
+          p: pi,
+          w: width + 0.4,
+          c: rgba(amber, Math.min(0.95, alpha * 1.3 + 0.2) * skyIn * d),
+          ring: true,
+        });
     }
   }
   if (orb && orb.kFront >= K) drawOrb();
   // 涟漪的环本身：极淡的一道光色细线，与地形的起伏同步扩散
   if (rip) {
     const u = pt / PULSE;
-    ctx.strokeStyle = rgba(light, 0.32 * (1 - u) ** 1.5 * open);
-    ctx.lineWidth = 0.8;
-    ctx.beginPath();
-    ctx.ellipse(rpx, rpy, rR, rR / SQ, Math.atan2(ty, tx), 0, TAU);
-    ctx.stroke();
+    const rot = Math.atan2(ty, tx);
+    const cr = Math.cos(rot);
+    const sr = Math.sin(rot);
+    const p = S.begin();
+    const n = 96;
+    for (let i = 0; i <= n; i++) {
+      const th = (i / n) * TAU;
+      const ex = Math.cos(th) * rR;
+      const ey = (Math.sin(th) * rR) / SQ;
+      S.add(rpx + ex * cr - ey * sr, rpy + ex * sr + ey * cr, i ? 2 : 1);
+    }
+    S.ops.push({ t: 'line', p, w: 0.8, c: rgba(light, 0.32 * (1 - u) ** 1.5 * open) });
   }
-  ctx.globalAlpha = 1;
+}
+
+function paint(now: number) {
+  if (!gfx) return;
+  build(now);
+  gfx.draw(scene);
+}
+
+/* ── 帧率与降级 ──
+   常态约 30fps（24ms 间隔再等下一帧）。若 GPU 跟不上（帧间隔长期 > 50ms ⇒ 不到 20fps），
+   先降到约 15fps，仍跟不上就停在静帧：地形不再流动，只在滚动 / 醒梦 / 点按时重画一帧。
+   揭幕后 4s 内（页面本身还在忙）与切回前台的那一帧不计 */
+const GAP = [24, 56];
+let level = 0;
+let lastT = 0;
+let slowMs = 0;
+let frozen = false;
+function pace(t: number) {
+  const dt = lastT ? t - lastT : 0;
+  lastT = t;
+  if (!dt || dt > 1000) return;
+  const since = Number.isNaN(boot) ? -1 : (mainNow() - boot) / 1000;
+  if (since < 4) return;
+  slowMs = dt > 50 + GAP[Math.min(level, 1)] - 24 ? slowMs + dt : Math.max(0, slowMs - dt);
+  if (slowMs < 2000) return;
+  slowMs = 0;
+  level++;
+  if (level >= 2) frozen = true;
 }
 
 function loop() {
   timer = 0;
-  if (!running) return;
+  if (!running || frozen) return;
   if (!hidden) {
     const a = performance.now();
+    pace(a);
     paint(mainNow());
     const ms = performance.now() - a;
     perfSum += ms;
@@ -463,10 +468,11 @@ function loop() {
   timer = setTimeout(() => {
     if (typeof self.requestAnimationFrame === 'function') self.requestAnimationFrame(loop);
     else loop();
-  }, 24) as unknown as number;
+  }, GAP[Math.min(level, 1)]) as unknown as number;
 }
 function setRunning(on: boolean) {
-  if (still) {
+  if (still || frozen) {
+    running = on;
     paint(mainNow());
     return;
   }
@@ -476,21 +482,23 @@ function setRunning(on: boolean) {
   else paint(mainNow()); // 收拢到底：画一帧空白就停
 }
 
-function resize(w: number, h: number, r: number) {
-  W = w;
-  H = h;
-  dpr = r;
-  canvas.width = Math.round(W * dpr);
-  canvas.height = Math.round(H * dpr);
-}
-
 self.onmessage = (e: MessageEvent<Msg>) => {
   const m = e.data;
   if (m.type === 'init') {
     canvas = m.canvas;
-    const c = canvas.getContext('2d');
-    if (!c || typeof Path2D !== 'function') return;
-    ctx = c;
+    // 首选 WebGL2；拿不到（或建着色器出错）就退到 Canvas 2D
+    try {
+      gfx = makeGl(canvas);
+    } catch {
+      gfx = null;
+    }
+    if (!gfx)
+      try {
+        gfx = make2d(canvas);
+      } catch {
+        gfx = null;
+      }
+    if (!gfx) return;
     d = m.d;
     colors = m.colors;
     still = m.still;
@@ -498,15 +506,21 @@ self.onmessage = (e: MessageEvent<Msg>) => {
     mobile = m.mobile;
     variant = m.variant;
     pal = m.pal ?? null;
-    resize(m.W, m.H, m.dpr);
+    W = m.W;
+    H = m.H;
+    dpr = m.dpr;
+    gfx.resize(W, H, dpr);
     return;
   }
-  if (!ctx) return;
+  if (!gfx) return;
   if (m.type === 'size') {
     mobile = m.mobile;
-    resize(m.W, m.H, m.dpr);
+    W = m.W;
+    H = m.H;
+    dpr = m.dpr;
+    gfx.resize(W, H, dpr);
     geoReady();
-    if (!running) paint(mainNow());
+    if (!running || frozen) paint(mainNow());
   } else if (m.type === 'focus') {
     const now = mainNow();
     if (m.k >= 0) {
@@ -522,11 +536,11 @@ self.onmessage = (e: MessageEvent<Msg>) => {
       hiOn = false;
       hiT = now;
     }
-    if (!running) paint(now);
+    if (!running || frozen) paint(now);
   } else if (m.type === 'mix') {
     d = m.d;
     colors = m.colors;
-    if (!running) paint(mainNow());
+    if (!running || frozen) paint(mainNow());
   } else if (m.type === 'state') {
     xyLast = m.xy;
     anchors = m.anchors ?? [];
@@ -534,14 +548,23 @@ self.onmessage = (e: MessageEvent<Msg>) => {
     fold = m.fold;
     boot = m.boot;
     setRunning(fold < 0.999);
-    if (!running) paint(mainNow());
+    if (!running || frozen) paint(mainNow());
   } else if (m.type === 'perf') {
-    // 截图脚本用：报告并清零每帧绘制耗时
-    self.postMessage({ type: 'perf', pts: NPT, avg: perfN ? perfSum / perfN : 0, max: perfMax, n: perfN });
+    // 截图脚本用：报告并清零每帧绘制耗时（gl ＝ 是否走 WebGL2；level ＝ 降级档）
+    self.postMessage({
+      type: 'perf',
+      pts: NPT,
+      avg: perfN ? perfSum / perfN : 0,
+      max: perfMax,
+      n: perfN,
+      gl: gfx?.kind === 'gl',
+      level,
+    });
     perfSum = 0;
     perfN = 0;
     perfMax = 0;
   } else if (m.type === 'hidden') {
     hidden = m.hidden;
+    lastT = 0;
   }
 };
