@@ -1,18 +1,20 @@
 ---
 /* ─────────────────────────────────────────────────────────────
-   主页 · 一根线的一夜（故事板）—— 五幕骨架定稿自 design/mocks/p25-thread-storyboard.html。
+   原型 · 线景首屏（/mock/scene-linescape/）
+   复制自 src/pages/new.astro（排版网格沿用 hero-quiet），只重做场 0：不要大字，
+   全站那根线当地平线，地平线下展开成一整片「同一根线的回声」，天上三枚细线圆环。
+   说明见 design/mocks/scene-linescape-notes.md。
+   以下为主稿原注：
+   主页 · 一根线的一夜（故事板）—— 定稿自 design/mocks/p25-thread-storyboard.html
+   （五幕骨架）+ p27-membrane-glyphs.html（开屏「膜」与渐变字形）。
    · 五幕 = 五个 sticky 舞台（入夜 / 断章 / 造物 / 闪念 / 晨醒），相邻两幕首尾叠一屏；
      滚动写各幕的 --p，编排全在 CSS 里对 --p 的 calc。
    · 背景的脑电线就是全站那条线（同一套 eeg-wave 算法、同一个 Worker），只是在主页
      沿一条随幕变化的骨架走：开屏是过中心的 14° 直线，往下弯成竖线，晨醒拐成底线。
-   · 开屏是「线景」：那条线当地平线，地平线下展开成一整片「同一根线的回声」（地形 Worker），
-     线绕成的一枚圆半沉在地形里，几道静态的穹肋从画外汇向它；问句是唯一的字。
-     原型与取舍见 design/mocks/scene-linescape-notes.md / -vault-notes.md / -palette-notes.md（配色方案②）。
-     旧开屏（醒 / 梦大字与膜）见 git 历史。
-   · 驱动脚本：src/scripts/home-linescape.ts（地形 home-linescape-worker.ts，穹肋 home-linescape-ribs.ts）。
+   · 驱动脚本：src/scripts/home-storyboard.ts。
    ───────────────────────────────────────────────────────────── */
-import BaseLayout from '../layouts/BaseLayout.astro';
-import RealityGuide from '../components/home/RealityGuide.astro';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import RealityGuide from '../../components/home/RealityGuide.astro';
 import { getCollection } from 'astro:content';
 
 const byDate = <T extends { id: string; data: { date: Date } }>(a: T, b: T) =>
@@ -98,7 +100,7 @@ const exits = [
 
 const manifesto = '在即将醒来的那一瞬，世界究竟是在成形，还是正在融化？';
 
-/* ── 测量点：版块入口钉在地形的几条等高线上，平时只有一粒点与一行小字；
+/* ── 测量点（&pins=1）：版块入口钉在地形的几条等高线上，平时只有一粒点与一行小字；
    hover / focus / 点按时，floatwin 式的半透明小窗从点上浮起。窗内容与取数同 scene-floatwin。
    tx / ty ＝ 目标位置（视口比例；桌面 / 窄屏各一组），脚本找离它最近的那条线把点钉上去 ── */
 const pins = [
@@ -162,11 +164,18 @@ const pins = [
     <div class="fog f2"></div>
     <div class="dawnlight"></div>
   </div>
-  <!-- 线景：天空、地平线后的微光、圆光、穹肋（固定层，压在地形画布之下）；地形与线圈在画布里（home-linescape-worker.ts） -->
-  <div class="ls-sky" aria-hidden="true"><i class="sky-w"></i><i class="sky-d"></i></div>
+  <!-- 变体（?v=a 线圈 + 光 / ?v=b 回声飘起）与测量点（&pins=1）在首帧前定好，免得跳版 -->
+  <script is:inline>
+    (function () {
+      var q = new URLSearchParams(location.search);
+      var r = document.documentElement;
+      r.dataset.lv = q.get('v') === 'b' ? 'b' : 'a';
+      if (q.get('pins') === '1') r.dataset.pins = '1';
+    })();
+  </script>
+  <!-- 线景：地平线后的微光、a 的那团圆光（固定层，压在地形画布之下）；地形与线圈在画布里（scene-linescape-worker.ts） -->
   <div class="ls-glow" aria-hidden="true"></div>
   <div class="ls-sun" aria-hidden="true"><i class="sun-w"></i><i class="sun-d"></i></div>
-  <div class="ls-ribs" aria-hidden="true"><canvas id="ls-rib-w"></canvas><canvas id="ls-rib-d"></canvas></div>
   <canvas class="ls-canvas" id="ls-canvas" aria-hidden="true"></canvas>
 
   <div class="home">
@@ -402,7 +411,7 @@ const pins = [
 </BaseLayout>
 
 <script>
-  import { initLinescape } from '../scripts/home-linescape';
+  import { initLinescape } from '../../scripts/proto/scene-linescape-stem';
 
   /* 晶板窗口里的抽象百合（花瓣长度 / 开角抖动，避免机械放射对称） */
   let seed = 1;
@@ -552,9 +561,9 @@ const pins = [
   }
 
   /* ═══ 场 0 · 入夜 · 线景 ═══
-     全站那条线（Eeg 的 Worker）＝ 地平线；它下方那一整片线织地形与线圈
-     由 #ls-canvas（另一个 Worker，home-linescape-worker.ts）画。
-     这一层只剩三样：问句（一种颜色、一个字号）、两枚等高线标注、测量点。
+     全站那条线（Eeg 的 Worker）＝ 地平线；它下方那一整片线织地形、a 的线圈、b 的蜃景
+     由 #ls-canvas（另一个 Worker，scene-linescape-worker.ts）画。
+     这一层只剩三样：问句（一种颜色、一个字号）、两枚等高线标注、可选的测量点（&pins=1）。
      标注与测量点的位置由脚本按「静止地形」算一次（尺寸变化时才重算），Worker 在它们附近把波压平，
      所以它们始终落在线上，却不必逐帧挪。滚动只动 opacity。 */
   .s-hero {
@@ -576,87 +585,6 @@ const pins = [
   }
   /* 地平线上的一道微光：旋转 14° 的宽带过视口中心（＝ 开屏姿态的线），峰值略低于线。
      收拢到底后（html.ls-folded，脚本只在滚动时切换）淡出 */
-  /* ═══ 配色（灰粉梦温）═══
-     天空 ＝ 一张静止的渐变层（z −4：在洗染之上、雾 / 光 / 地形之下），醒梦两张按 --reality-mix 交叉淡化，
-     整层按 --sky（脚本只在滚动时写）往第 1 幕淡出到 --bg。
-     主渐变方向 194° ＝ 地平线的法向：色带与地平线平行，地平线（视口中心）处是最亮的一道雾带；
-     径向光在圆的那一侧（右）：空气透视 —— 离光近的一侧更白、更暖 / 更带方案的异质色。 */
-  .ls-sky {
-    position: fixed;
-    inset: 0;
-    z-index: -4;
-    pointer-events: none;
-    opacity: var(--sky, 1);
-  }
-    /* 穹肋（home-linescape-ribs.ts）：两张静态画布，醒 / 梦按 --reality-mix 交叉淡化，整层按 --rib 随收拢淡出；
-     入场在地形铺开之后淡入。z 与天空同层、DOM 在其后 ⇒ 压在天空之上、地形画布之下（近处的线从前面经过） */
-  .ls-ribs {
-    position: fixed;
-    inset: 0;
-    z-index: -4;
-    pointer-events: none;
-    opacity: var(--rib, 1);
-    visibility: hidden;
-  }
-  html.booted .ls-ribs {
-    visibility: visible;
-    animation: q-rise 2.2s ease 2s backwards;
-  }
-  .ls-ribs canvas {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-  }
-  #ls-rib-w {
-    opacity: var(--reality-mix, 1);
-  }
-  #ls-rib-d {
-    opacity: calc(1 - var(--reality-mix, 1));
-  }
-  .ls-sky i {
-    position: absolute;
-    inset: 0;
-  }
-  .sky-w {
-    opacity: var(--reality-mix, 1);
-    background:
-      radial-gradient(60% 55% at 76% 46%, var(--sw-lit), transparent 70%),
-      linear-gradient(194deg, var(--sw-0) 0%, var(--sw-1) 36%, var(--sw-h) 49.5%, var(--sw-2) 53%, var(--sw-3) 100%);
-  }
-  .sky-d {
-    opacity: calc(1 - var(--reality-mix, 1));
-    background:
-      radial-gradient(60% 55% at 76% 46%, var(--sd-lit), transparent 70%),
-      linear-gradient(194deg, var(--sd-0) 0%, var(--sd-1) 36%, var(--sd-h) 49.5%, var(--sd-2) 53%, var(--sd-3) 100%);
-  }
-  html {
-    /* 灰粉梦温（方案②） */
-    --sw-0: #e1ddd9; --sw-1: #eae6e2; --sw-h: #f6f3f0; --sw-2: #f0ece8; --sw-3: #e2ddd8;
-    --sw-lit: rgba(240, 232, 252, 0.55);
-    --sd-0: #e7d8da; --sd-1: #efe3e3; --sd-h: #f8f0ee; --sd-2: #f2e8e6; --sd-3: #e6d9da;
-    --sd-lit: rgba(236, 224, 252, 0.6);
-    --q-w: #2e2825; --q-d: #3b2a30;
-    --mk-w: #74665e; --mk-d: #80637a;
-    /* 圆光：比原型淡约四成，只是一层透过来的亮，不是一团发光体 */
-    --sun-w: rgba(255, 255, 255, 0.55), rgba(234, 226, 248, 0.32) 34%, rgba(226, 216, 244, 0.12) 64%, rgba(226, 216, 244, 0) 100%;
-    --sun-d: rgba(255, 246, 248, 0.55), rgba(236, 220, 246, 0.32) 34%, rgba(232, 214, 236, 0.13) 64%, rgba(232, 214, 236, 0) 100%;
-  }
-  html {
-    --ls-mark: color-mix(in srgb, var(--mk-w) calc(var(--reality-mix, 1) * 100%), var(--mk-d));
-    /* 地平线上那枚标注底下的托底 ＝ 天空在地平线处的雾带色（不是 --bg，否则在天空层上露出一块异色） */
-    --ls-hz: color-mix(in srgb, var(--sw-h) calc(var(--reality-mix, 1) * 100%), var(--sd-h));
-  }
-  html .q {
-    color: color-mix(in srgb, var(--q-w) calc(var(--reality-mix, 1) * 100%), var(--q-d));
-  }
-  html .sun-w {
-    background: radial-gradient(closest-side, var(--sun-w));
-  }
-  html .sun-d {
-    background: radial-gradient(closest-side, var(--sun-d));
-  }
-
   .ls-glow {
     position: fixed;
     left: -30vw;
@@ -698,6 +626,9 @@ const pins = [
     transition: opacity 0.8s ease;
     visibility: hidden;
   }
+  html[data-lv='b'] .ls-sun {
+    display: none;
+  }
   html.booted .ls-sun {
     visibility: visible;
     animation: q-rise 3s cubic-bezier(0.2, 0.7, 0.2, 1) 1.8s backwards;
@@ -729,7 +660,8 @@ const pins = [
   }
 
   /* ── 问句：唯一的字。一种颜色、一个字号 ──
-     横排两行，放左侧天空，对齐页头 42rem 中栏左沿 */
+     a：横排两行，放左侧天空，对齐页头 42rem 中栏左沿；
+     b：竖排三列，放右侧天空，右沿对齐页头导航右端，列脚沿地平线逐列抬高 */
   .qset {
     position: absolute;
     inset: 0;
@@ -748,55 +680,54 @@ const pins = [
     color: var(--fg);
     white-space: nowrap;
   }
-  .q {
+  html[data-lv='a'] .q {
     left: var(--g);
     top: 17svh;
   }
-  .q .ql:first-child {
+  html[data-lv='a'] .q .ql:first-child {
     display: block;
+  }
+  html[data-lv='b'] .q {
+    --x: calc(100vw - var(--g) - var(--f));
+    --ly: calc(50svh + (var(--x) - 50vw) * var(--t14));
+    right: var(--g);
+    bottom: calc(100svh - var(--ly) + 28px);
+    height: 62svh;
+    writing-mode: vertical-rl;
+    text-align: end;
+    line-height: 2;
+    letter-spacing: 0.2em;
+  }
+  html[data-lv='b'] .q .ql {
+    display: block;
+  }
+  html[data-lv='b'] .q .ql:nth-child(2) {
+    padding-inline-end: calc(2 * var(--f) * var(--t14));
+  }
+  html[data-lv='b'] .q .ql:nth-child(3) {
+    padding-inline-end: calc(4 * var(--f) * var(--t14));
   }
   .q .c {
     display: inline-block;
     opacity: 0;
   }
-  /* 逐字微错位与零星失焦：每字随序号带一点高低与倾角，零星几个失焦、压淡 ——
-     像刚醒时还没对准焦的字。都是静态值（落定后不再变），不增加逐帧开销 */
-  .q .c:nth-child(5n + 2) {
-    --cy: 0.06em;
-  }
-  .q .c:nth-child(7n + 3) {
-    --cy: -0.05em;
-    --cr: 0.6deg;
-  }
-  .q .c:nth-child(9n + 6) {
-    --cr: -0.8deg;
-  }
-  .q .c:nth-child(7n + 5) {
-    --cb: 0.7px;
-    --co: 0.8;
-  }
-  .q .c:nth-child(13n + 9) {
-    --cx: 0.06em;
-    --cb: 0.4px;
-  }
   html.booted .q .c {
     animation: q-drip 1.1s cubic-bezier(0.2, 0.7, 0.2, 1) both;
     animation-delay: calc(0.9s + var(--i) * 40ms);
   }
-  /* 关键帧写进各字自己的错位 / 失焦量：both 的停留态才不会把静态偏移抹平 */
   @keyframes q-drip {
     from {
       opacity: 0;
-      transform: translate(var(--cx, 0px), calc(-0.45em + var(--cy, 0px))) rotate(var(--cr, 0deg));
-      filter: blur(calc(3px + var(--cb, 0px)));
+      transform: translateY(-0.45em);
     }
     to {
-      opacity: var(--co, 1);
-      transform: translate(var(--cx, 0px), var(--cy, 0px)) rotate(var(--cr, 0deg));
-      filter: blur(var(--cb, 0px));
+      opacity: 1;
+      transform: none;
     }
   }
-
+  html.booted[data-lv='b'] .q .c {
+    animation-name: q-rise;
+  }
   @keyframes q-rise {
     from {
       opacity: 0;
@@ -819,7 +750,7 @@ const pins = [
   html.ls-placed .ls-marks {
     visibility: visible;
   }
-  html.ls-placed .ls-pins {
+  html.ls-placed[data-pins='1'] .ls-pins {
     visibility: visible;
   }
   html.ls-folded .ls-marks,
@@ -835,7 +766,7 @@ const pins = [
     font-size: 9.5px;
     line-height: 1;
     letter-spacing: 0.14em;
-    color: var(--ls-mark, var(--umber));
+    color: var(--umber);
     white-space: nowrap;
     opacity: 0;
   }
@@ -843,8 +774,8 @@ const pins = [
     padding: 13px 14px;
     background: radial-gradient(
       closest-side,
-      var(--ls-hz, var(--bg)) 58%,
-      color-mix(in srgb, var(--ls-hz, var(--bg)) 70%, transparent) 78%,
+      var(--bg) 58%,
+      color-mix(in srgb, var(--bg) 70%, transparent) 78%,
       transparent
     );
   }
@@ -863,7 +794,7 @@ const pins = [
     }
   }
 
-  /* ── 测量点：一粒点 + 一行很小的标签，钉在某条等高线上（--x / --y / --rot 由脚本写入）。
+  /* ── 测量点（&pins=1）：一粒点 + 一行很小的标签，钉在某条等高线上（--x / --y / --rot 由脚本写入）。
      hover / 键盘焦点 / 点按（.open）时，floatwin 式的半透明小窗从点上浮起（只动 opacity / transform）。
      窗以点为轴站位，左右夹在视口内 ── */
   .pin {
@@ -903,11 +834,11 @@ const pins = [
     height: 20px;
     border-radius: 50%;
     background:
-      radial-gradient(closest-side, var(--ls-mark, var(--umber)) 0 2.2px, transparent 2.7px),
+      radial-gradient(closest-side, var(--umber) 0 2.2px, transparent 2.7px),
       radial-gradient(
         closest-side,
         transparent 0 5.4px,
-        color-mix(in srgb, var(--ls-mark, var(--umber)) 40%, transparent) 5.7px 6.3px,
+        color-mix(in srgb, var(--umber) 40%, transparent) 5.7px 6.3px,
         transparent 6.7px
       );
     transition: transform 0.4s cubic-bezier(0.2, 0.7, 0.2, 1);
@@ -1535,8 +1466,13 @@ const pins = [
       --f: 1.16rem;
       letter-spacing: 0.05em;
     }
-    .q {
+    html[data-lv='a'] .q {
       top: 118px;
+    }
+    html[data-lv='b'] .q {
+      --f: 1.1rem;
+      height: 46svh;
+      letter-spacing: 0.16em;
     }
     .pin {
       --w: min(270px, calc(100vw - 24px));
@@ -1629,20 +1565,12 @@ const pins = [
     .atmo .fog {
       animation: none;
     }
+    html.booted .s-hero .q .c,
     html.booted .s-hero .rise {
       animation: none;
       opacity: 1;
       transform: none;
       filter: none;
-    }
-    html.booted .s-hero .q .c {
-      animation: none;
-      opacity: var(--co, 1);
-      transform: translate(var(--cx, 0px), var(--cy, 0px)) rotate(var(--cr, 0deg));
-      filter: blur(var(--cb, 0px));
-    }
-    html.booted .ls-ribs {
-      animation: none;
     }
     html.booted .s-hero .cmark {
       animation: none;
