@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>p23-B · 景深夜行</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Serif+SC:wght@300;500;600&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════════
+   p23-B · 景深夜行（depth dolly）
+   首屏千层纸往下长成整页：一个钉住的 3D 视口（perspective），
+   滚动只推进一个量 —— 镜头深度 --cam（0 → 12600）。
+   每一层（纸 / 玻璃 / 晶板 / 便签）有自己的 z，相对深度 rel = z + cam：
+     rel ≈ −2300 远处浮现 → −1000 起完全清晰 → 0 贴脸 → +520 穿过消散。
+   最后一层是 06:31 的整张纸，镜头停下时恰好 rel = 0 铺满屏幕。
+   移动层一律不用实时 backdrop-filter（磨砂靠渐变假造），保帧率。
+   对照稿：p23-a-storyboard.html（分镜滚动）。?debug 显示帧率。
+   ═══════════════════════════════════════════════════════════ */
+:root{
+  --bg:#edf0f4; --ink:#232830; --ink-soft:#56606d; --glow:rgba(255,255,255,.75);
+  --dark:0; --dawn:0; --cam:0;
+  --line:color-mix(in srgb, var(--ink) 14%, transparent);
+  --amber:#d9a05b; --umber:#765640;
+  --serif:'Noto Serif SC','Songti SC','Source Han Serif SC',SimSun,serif;
+  --mono:'IBM Plex Mono',ui-monospace,Consolas,monospace;
+  --sans:system-ui,-apple-system,'PingFang SC','Microsoft YaHei UI',sans-serif;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased;overflow-x:clip}
+a{color:inherit;text-decoration:none}
+.cap{font-family:var(--mono);font-size:10.5px;letter-spacing:.24em;color:var(--ink-soft)}
+
+/* ── 环境层 ── */
+.atmo{position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden}
+.fog{position:absolute;border-radius:50%;background:radial-gradient(closest-side,var(--glow),transparent);will-change:transform}
+.fog.f1{width:70vmax;height:50vmax;left:-20vmax;top:-12vmax;animation:fog1 38s ease-in-out infinite alternate}
+.fog.f2{width:60vmax;height:44vmax;right:-22vmax;bottom:-14vmax;animation:fog2 46s ease-in-out infinite alternate}
+@keyframes fog1{to{transform:translate3d(8vmax,6vmax,0)}}
+@keyframes fog2{to{transform:translate3d(-10vmax,-4vmax,0)}}
+.motes{position:absolute;inset:0;opacity:calc(var(--dark) * .9)}
+.motes i{position:absolute;width:2px;height:2px;border-radius:50%;background:#dfe6f5;box-shadow:0 0 6px 1px rgba(200,215,245,.5);animation:mote var(--t) ease-in-out infinite alternate}
+@keyframes mote{from{transform:translate3d(0,0,0);opacity:.2}to{transform:translate3d(var(--dx),var(--dy),0);opacity:.9}}
+.dawnlight{position:absolute;inset:-10% -10% auto;height:90%;opacity:var(--dawn);
+  background:radial-gradient(60% 70% at 50% 0%,rgba(255,214,160,.55),rgba(255,232,205,.2) 45%,transparent 75%)}
+
+/* ── 页头 / 夜轨 / 切换（与 A 同） ── */
+.top{position:fixed;inset:0 0 auto;z-index:20;display:flex;align-items:center;justify-content:space-between;padding:22px clamp(18px,4vw,56px);pointer-events:none}
+.top>*{pointer-events:auto}
+.logo{font-family:var(--serif);font-size:19px;letter-spacing:.04em}
+.logo b{font-weight:500;color:var(--amber)}
+.nav{display:flex;gap:26px;font-size:14px;letter-spacing:.12em;color:var(--ink-soft)}
+.nav a:hover{color:var(--ink)}
+.skip{font-size:12px;letter-spacing:.14em;color:var(--ink-soft);border-bottom:1px solid var(--line);padding-bottom:2px}
+.rail{position:fixed;left:clamp(14px,2.4vw,34px);top:50%;transform:translateY(-50%);z-index:20;height:min(52vh,420px);width:120px}
+.rail::before{content:"";position:absolute;left:3px;top:0;bottom:0;width:1px;background:var(--line)}
+.rail a{position:absolute;left:0;display:flex;align-items:center;gap:10px;font-size:10.5px;letter-spacing:.14em;color:var(--ink-soft);opacity:.55;transform:translateY(-50%);transition:opacity .3s}
+.rail a::before{content:"";width:7px;height:1px;background:currentColor}
+.rail a.on{opacity:1;color:var(--ink)}
+.rail a span{font-family:var(--mono);font-size:10px;opacity:.7}
+.rail .dot{position:absolute;left:0;width:7px;height:7px;border-radius:50%;background:var(--amber);box-shadow:0 0 10px var(--amber);transform:translate(0,-50%);top:0}
+.clock{position:fixed;right:clamp(18px,4vw,56px);bottom:22px;z-index:20;font-family:var(--mono);font-size:12px;letter-spacing:.2em;color:var(--ink-soft)}
+.switch{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:30;display:flex;gap:2px;padding:3px;border-radius:99px;background:color-mix(in srgb,var(--bg) 70%,transparent);backdrop-filter:blur(10px);border:1px solid var(--line);font-size:11px;letter-spacing:.1em}
+.switch a{padding:5px 12px;border-radius:99px;color:var(--ink-soft)}
+.switch a.cur{background:var(--ink);color:var(--bg)}
+.fps{position:fixed;right:10px;top:70px;z-index:30;font:11px var(--mono);color:var(--ink-soft);display:none}
+
+/* ── 3D 视口 ── */
+.voyage{position:relative;height:1300svh}
+.view{position:sticky;top:0;height:100svh;overflow:hidden;perspective:900px;perspective-origin:50% 46%}
+.world{position:absolute;inset:0;transform-style:preserve-3d;
+  transform:translate3d(calc(sin(var(--cam) / 1500) * 2.6vw),calc(cos(var(--cam) / 2100) * 1.4svh - 1.4svh),0)}
+.pl{--far:2300;--fade:1300;--near:520;--nfade:320;
+  --rel:calc(var(--z) + var(--cam));
+  position:absolute;left:50%;top:50%;pointer-events:none;will-change:transform,opacity;
+  transform:translate3d(-50%,-50%,0) translate3d(var(--x,0px),var(--y,0px),calc(var(--rel) * 1px)) rotate(var(--tilt,0deg));
+  opacity:min(clamp(0, calc((var(--rel) + var(--far)) / var(--fade)), 1), clamp(0, calc((var(--near) - var(--rel)) / var(--nfade)), 1))}
+.pl.on .hit{pointer-events:auto}
+.pl:has(> .slab),.pl:has(> .slip){--far:1300;--fade:700}
+
+/* ═══ 入夜 ═══ */
+.plate{aspect-ratio:1;width:clamp(210px,23vw,330px);display:grid;place-items:center;
+  border:1px solid rgba(255,255,255,.55);
+  box-shadow:inset 0 1.5px 2px rgba(255,255,255,.7),0 24px 50px -18px rgba(38,44,51,.18)}
+.plate .ch{font-family:var(--serif);font-weight:600;line-height:1;font-size:clamp(110px,14vw,200px)}
+.plate.wake{background:linear-gradient(135deg,rgba(255,255,255,.7),#dde6f0 55%,rgba(206,220,236,.8));clip-path:polygon(0 0,94% 0,100% 6%,100% 100%,6% 100%,0 94%)}
+.plate.dream{background:linear-gradient(135deg,rgba(255,255,255,.6),#e8ddd1 50%,rgba(215,198,180,.7));clip-path:polygon(0 5.5%,5% 0,100% 0,100% 87%,94% 100%,0 100%)}
+.plate.dream .ch{color:#4a4038}
+.hair{width:170vw;height:1px;background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--umber) 60%,transparent) 20%,color-mix(in srgb,var(--amber) 70%,transparent) 55%,transparent)}
+.manifesto{width:min(46vw,640px);padding:1.4rem 2rem 1rem;background:color-mix(in srgb,var(--bg) 50%,#fbfbfb);box-shadow:0 22px 46px -20px rgba(38,44,51,.2)}
+.manifesto p{margin:0 0 .8rem;font-family:var(--serif);font-weight:500}
+.manifesto p:nth-of-type(1){font-size:clamp(1.3rem,2vw,1.7rem)}
+.manifesto p:nth-of-type(2),.manifesto p:nth-of-type(3){font-size:clamp(.9rem,1.25vw,1rem);color:#56606d;margin-left:6%;letter-spacing:.12em}
+.manifesto p:nth-of-type(4){font-size:clamp(1rem,1.5vw,1.3rem)}
+.manifesto .c{display:inline-block;white-space:pre;
+  --k:clamp(0, calc((var(--cam) - 60 - var(--i) / var(--n) * 600) / 200), 1);
+  opacity:calc(1 - var(--k));filter:blur(calc(var(--k) * 6px));transform:translate3d(0,calc(var(--k) * -14px),0)}
+.intro{margin:0;font-family:var(--serif);font-size:15px;letter-spacing:.14em;line-height:2;color:var(--ink-soft);white-space:nowrap}
+.intro b{font-weight:500;color:var(--ink);font-size:17px}
+.hint{margin:0;font-size:13px;letter-spacing:.26em;color:var(--ink-soft);white-space:nowrap}
+.hint i{display:inline-block;width:24px;height:1.5px;background:var(--amber);vertical-align:middle;margin-right:12px;transform:rotate(-14deg)}
+
+/* ═══ 章名：远处悬着的大字 ═══ */
+.pl:has(> .chap){--far:1300;--fade:500;--near:-250;--nfade:350}
+.pl:has(> .sheet){--far:1500;--fade:700}
+.chap{display:flex;flex-direction:column;align-items:center;gap:18px;white-space:nowrap}
+.chap h2{margin:0;font-family:var(--serif);font-weight:300;font-size:clamp(90px,12vw,180px);letter-spacing:.3em;margin-right:-.3em;color:color-mix(in srgb,var(--ink) 22%,transparent)}
+
+/* ═══ 断章：迎面的玻璃 ═══ */
+.sheet{--ink:#232830;--ink-soft:#56606d;color:var(--ink);width:min(640px,84vw);padding:40px 44px 36px;border-radius:4px;
+  background:linear-gradient(135deg,rgba(255,255,255,.78),rgba(240,244,250,.5) 60%,rgba(226,234,244,.62));
+  border:1px solid rgba(255,255,255,.8);
+  box-shadow:inset 0 1.5px 2px rgba(255,255,255,.8),0 40px 80px -40px rgba(38,44,51,.3)}
+.sheet .meta{font-family:var(--mono);font-size:11px;letter-spacing:.2em;color:var(--ink-soft)}
+.sheet h3{margin:.5em 0 .5em;font-family:var(--serif);font-weight:500;font-size:clamp(1.8rem,3.4vw,3rem);line-height:1.25;letter-spacing:.04em;text-wrap:balance}
+.sheet p{margin:0;font-family:var(--serif);font-size:1rem;line-height:1.9;color:var(--ink-soft)}
+.sheet .go{display:inline-block;margin-top:1.4em;font-size:13px;letter-spacing:.18em;border-bottom:1px solid var(--amber);padding-bottom:3px}
+.sheet .no{position:absolute;right:30px;top:18px;font-family:var(--serif);font-weight:300;font-size:64px;line-height:1;color:color-mix(in srgb,var(--ink) 10%,transparent)}
+
+/* ═══ 造物：深处的晶板，越近越显影 ═══ */
+.slab{--ink:#e6e9ef;--ink-soft:#9aa6b8;--line:rgba(230,233,239,.14);color:var(--ink);--dev:clamp(0, calc((var(--rel) + 1500) / 1100), 1);
+  display:flex;flex-direction:column;width:min(340px,80vw);height:min(460px,64svh);border-radius:10px;overflow:hidden;
+  background:linear-gradient(160deg,rgba(255,255,255,.1),rgba(255,255,255,.03));
+  border:1px solid rgba(255,255,255,.14);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 30px 60px -30px rgba(0,0,0,.6);transition:border-color .3s}
+.slab:hover{border-color:color-mix(in srgb,var(--amber) 60%,transparent)}
+.win{position:relative;flex:1 1 auto;min-height:0;background:radial-gradient(120% 90% at 30% 20%,#34405a,#1a2030 70%);overflow:hidden}
+.win svg{position:absolute;inset:0;width:100%;height:100%;
+  filter:blur(calc((1 - var(--dev) * var(--depth) / 8) * 14px));opacity:calc(.3 + var(--dev) * var(--depth) / 8 * .7)}
+.win .fogv{position:absolute;inset:0;background:linear-gradient(180deg,rgba(170,185,210,.25),rgba(120,135,160,.1));opacity:calc(1 - var(--dev) * var(--depth) / 8)}
+.slab-body{padding:18px 20px 16px;display:grid;gap:8px}
+.slab-head{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;color:var(--ink-soft)}
+.slab h3{margin:0;font-family:var(--serif);font-weight:500;font-size:1.2rem;letter-spacing:.04em}
+.slab p{margin:0;font-family:var(--serif);font-size:.84rem;line-height:1.75;color:var(--ink-soft)}
+.slab .depth{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;color:var(--ink-soft);padding-top:8px;border-top:1px solid var(--line)}
+.slab .depth b{font-weight:500;color:var(--amber)}
+
+/* ═══ 闪念：散在空间里的便签 + 转动的玻璃签 ═══ */
+.slip{--ink:#ece6f1;--ink-soft:#a99fba;color:var(--ink);display:block;width:min(270px,68vw);padding:16px 18px;border-radius:8px;
+  background:linear-gradient(135deg,rgba(255,255,255,.15),rgba(255,255,255,.05));border:1px solid rgba(255,255,255,.17);
+  box-shadow:0 20px 40px -20px rgba(0,0,0,.5)}
+.slip .h{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;letter-spacing:.16em;color:var(--ink-soft)}
+.slip .h em{font-style:normal;color:var(--amber)}
+.slip b{display:block;margin:8px 0 6px;font-family:var(--serif);font-weight:500;font-size:1rem;letter-spacing:.05em}
+.slip .t{font-family:var(--serif);font-size:.82rem;line-height:1.75;color:var(--ink-soft)}
+.slip:hover{border-color:color-mix(in srgb,var(--amber) 55%,transparent)}
+.glass{width:min(280px,56vw);aspect-ratio:3/4.2;border-radius:6px;border:1px solid rgba(255,255,255,.35);
+  background:linear-gradient(135deg,rgba(255,255,255,.22),rgba(200,185,230,.08));
+  box-shadow:inset 0 1px 1px rgba(255,255,255,.35),0 40px 80px -30px rgba(0,0,0,.6),0 0 90px 0 rgba(217,160,91,.1);
+  display:grid;place-content:center;gap:22px;text-align:center;
+  transform:rotateY(calc((var(--rel) + 300) * .045deg)) rotateX(6deg)}
+.glass b{font-family:var(--serif);font-weight:300;font-size:1.6rem;letter-spacing:.14em;line-height:2}
+
+/* ═══ 06:31：最后一层，镜头停下时铺满整屏 ═══ */
+.pl.dawnpl{--far:4200;--fade:3000;--near:100000}
+.dawnsheet{width:100vw;height:100svh;display:grid;place-content:center;padding:0 clamp(20px,8vw,120px);
+  background:radial-gradient(80% 60% at 50% 0%,rgba(255,226,186,.9),rgba(247,240,229,1) 60%);
+  box-shadow:0 0 160px 40px rgba(255,220,170,.35)}
+.dawnsheet .in{max-width:900px}
+.dawnsheet .time{font-family:var(--mono);font-size:12px;letter-spacing:.4em;color:#6f6457}
+.dawnsheet h2{margin:.8em 0 .9em;font-family:var(--serif);font-weight:300;font-size:clamp(1.6rem,3.4vw,2.8rem);letter-spacing:.1em;line-height:1.6;color:#2b2620}
+.dawnsheet .about{font-family:var(--serif);font-size:1.02rem;line-height:2;color:#6f6457;max-width:36em;padding:14px 18px;border:1px dashed color-mix(in srgb,var(--amber) 60%,transparent)}
+.exits{display:flex;flex-wrap:wrap;gap:12px;margin-top:36px}
+.exits a{padding:12px 20px;border:1px solid rgba(43,38,32,.14);border-radius:4px;background:rgba(255,255,255,.45);font-size:14px;letter-spacing:.1em;color:#2b2620;transition:border-color .25s,transform .25s}
+.exits a:hover{border-color:var(--amber);transform:translateY(-2px)}
+.exits a small{display:block;font-family:var(--mono);font-size:10.5px;color:#6f6457;margin-top:4px;letter-spacing:.08em}
+
+/* ── 旅程之后：常规文档流的目录 ── */
+.after{position:relative;background:#f5efe6;color:#2b2620;padding:10svh clamp(20px,8vw,120px) 12svh}
+.after .in{max-width:980px;margin:0 auto}
+.index{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:40px;border-top:1px solid rgba(43,38,32,.14);padding-top:36px}
+.index h4{margin:0 0 14px;font-family:var(--serif);font-weight:500;font-size:15px;letter-spacing:.3em}
+.index ul{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.index li a{display:flex;justify-content:space-between;gap:12px;font-family:var(--serif);font-size:14px;line-height:1.5}
+.index li a span{font-family:var(--mono);font-size:10.5px;color:#6f6457;white-space:nowrap}
+.index li a:hover{color:var(--umber)}
+.foot{margin-top:80px;display:flex;justify-content:space-between;font-size:12px;letter-spacing:.14em;color:#6f6457}
+
+@media (max-width:760px){
+  .nav,.rail{display:none}
+  .clock{top:24px;bottom:auto;right:auto;left:50%;transform:translateX(-50%)}
+  .plate{width:46vw}.plate .ch{font-size:26vw}
+  .manifesto{width:90vw;padding:1rem 1.2rem .6rem}
+  .manifesto p{margin-left:0 !important}
+  .intro{font-size:12px;white-space:normal;width:80vw}.intro b{font-size:14px}
+  .hint{font-size:12px}
+  .sheet{padding:28px 24px 24px}
+  .index{grid-template-columns:1fr;gap:32px}
+}
+</style>
+</head>
+<body>
+
+<div class="atmo" aria-hidden="true">
+  <div class="fog f1"></div><div class="fog f2"></div>
+  <div class="motes" id="motes"></div>
+  <div class="dawnlight"></div>
+</div>
+
+<header class="top">
+  <a class="logo" href="#" data-jump="0">Aver<b>i</b>tA</a>
+  <nav class="nav"><a href="#" data-jump="1">断章</a><a href="#" data-jump="2">造物</a><a href="#" data-jump="3">闪念</a><a href="#" data-jump="4">此身</a></nav>
+  <a class="skip" href="#" data-jump="4">直接到晨醒 ↓</a>
+</header>
+<nav class="rail" aria-label="一夜">
+  <span class="dot" id="railDot"></span>
+  <a href="#" data-jump="0" style="top:0%">入夜 <span>23:07</span></a>
+  <a href="#" data-jump="1" style="top:25%">断章 <span>23:19</span></a>
+  <a href="#" data-jump="2" style="top:50%">造物 <span>01:11</span></a>
+  <a href="#" data-jump="3" style="top:75%">闪念 <span>02:08</span></a>
+  <a href="#" data-jump="4" style="top:100%">晨醒 <span>06:31</span></a>
+</nav>
+<div class="clock" id="clock">23:07</div>
+<div class="switch"><a href="p23-a-storyboard.html">A · 分镜</a><a class="cur" href="p23-b-depth.html">B · 景深</a></div>
+<div class="fps" id="fps"></div>
+
+<main>
+<section class="voyage" id="voyage">
+  <div class="view">
+    <div class="world" id="world">
+      <!-- data-z 深度；data-x / data-y 桌面偏移；data-xm / data-ym / data-zm 窄屏覆盖 -->
+
+      <!-- ═══ 入夜 ═══ -->
+      <div class="pl dawnpl" data-z="-12600"><div class="dawnsheet hit">
+        <div class="in">
+          <div class="time">06:31 · 晨光</div>
+          <h2>注视持续得太久。<br>被注视之物微微退开。</h2>
+          <p class="about">〔mock 占位〕这里放一两句醒态的自我介绍：你是谁、在做什么、这里会写些什么。</p>
+          <div class="exits">
+            <a href="#">GitHub<small>github.com/Traveritas</small></a>
+            <a href="#">本站源码<small>traveritas.github.io</small></a>
+            <a href="#">RSS<small>/rss.xml</small></a>
+            <a href="#" data-jump="5">全部目录 ↓<small>断章 · 造物 · 闪念</small></a>
+          </div>
+        </div>
+      </div></div>
+
+      <div class="pl" data-z="-650" data-x="-20vw" data-y="10svh" data-xm="-18vw" data-ym="-6svh" style="--tilt:-2deg"><div class="plate dream"><span class="ch">梦</span></div></div>
+      <div class="pl" data-z="-460" data-x="0vw" data-y="0svh" style="--tilt:14deg"><div class="hair"></div></div>
+      <div class="pl" data-z="-300" data-x="15vw" data-y="-16svh" data-xm="16vw" data-ym="-24svh" style="--tilt:1.5deg"><div class="plate wake"><span class="ch">醒</span></div></div>
+      <div class="pl" data-z="-60" data-x="16vw" data-y="20svh" data-xm="0vw" data-ym="20svh" style="--near:420"><div class="manifesto" id="manifesto">
+        <p>世界在此停留片刻。</p><p>它并非梦境，</p><p>亦非确凿之物。</p><p>只是人在睁眼之前，最后一眼看见的明亮倒影。</p>
+      </div></div>
+      <div class="pl" data-z="0" data-x="-28vw" data-y="34svh" data-xm="0vw" data-ym="-38svh" style="--near:320;--nfade:260"><p class="intro"><b>Traveritas</b><br>随笔、项目，与正在成形的东西。</p></div>
+      <div class="pl" data-z="0" data-x="32vw" data-y="42svh" data-xm="0vw" data-ym="44svh" style="--near:90;--nfade:90"><p class="hint"><i></i>向下 · 穿行于这一夜</p></div>
+
+      <!-- ═══ 浅梦 · 断章 ═══ -->
+      <div class="pl" data-z="-2200" data-x="0vw" data-y="-4svh"><div class="chap"><span class="cap">浅梦 · 23:19 — 01:11</span><h2>断章</h2></div></div>
+      <div class="pl" data-z="-2900" data-x="14vw" data-y="0svh" data-xm="0vw" style="--tilt:-1deg"><article class="sheet hit" style="position:relative">
+        <span class="no">01</span><div class="meta">2026.09.28 · 样张 · 排版</div>
+        <h3>字面与光景 · 全样式样张</h3><p>随笔正文排版正典、小节序号、两态文字与行内光景的完整表现存目。</p><a class="go" href="#">阅读 →</a>
+      </article></div>
+      <div class="pl" data-z="-3700" data-x="-14vw" data-y="3svh" data-xm="0vw" style="--tilt:.8deg"><article class="sheet hit" style="position:relative">
+        <span class="no">02</span><div class="meta">2026.09.19 · 建站 · 设计</div>
+        <h3>母题探索记录：从碎块到花</h3><p>主页视觉母题的三轮探索与两次否决——一份仍在进行中的设计日志。</p><a class="go" href="#">阅读 →</a>
+      </article></div>
+      <div class="pl" data-z="-4500" data-x="12vw" data-y="-2svh" data-xm="0vw" style="--tilt:-.6deg"><article class="sheet hit" style="position:relative">
+        <span class="no">03</span><div class="meta">2026.09.19 · 建站</div>
+        <h3>开站：在醒与梦之间</h3><p>这个网站为什么存在，以及它想长成什么样子。</p><a class="go" href="#">阅读 →</a>
+      </article></div>
+
+      <!-- ═══ 深眠 · 造物 ═══ -->
+      <div class="pl" data-z="-6100" data-x="0vw" data-y="-4svh"><div class="chap"><span class="cap">深眠 · 01:11 — 02:08</span><h2>造物</h2></div></div>
+      <div class="pl" data-z="-7000" data-x="-30vw" data-y="3svh" data-xm="0vw" data-zm="-6900" style="--tilt:-.9deg"><a class="slab hit" href="#" style="--depth:5">
+        <div class="win"><svg data-lily="3" viewBox="-100 -100 200 200" preserveAspectRatio="xMidYMid slice"></svg><div class="fogv"></div></div>
+        <div class="slab-body"><div class="slab-head"><span>2026.09.28</span><span>进行中</span></div><h3>样式系统与构造规范</h3><p>项目变体下的方框语言、施工清单、深眠注记与板块排版全览。</p><div class="depth"><span>浮现度 <b>5</b>/8</span><span>✓ 公开仓库</span></div></div>
+      </a></div>
+      <div class="pl" data-z="-7000" data-x="0vw" data-y="6svh" data-xm="0vw" data-zm="-7300" style="--tilt:.7deg"><a class="slab hit" href="#" style="--depth:2">
+        <div class="win"><svg data-lily="7" viewBox="-100 -100 200 200" preserveAspectRatio="xMidYMid slice"></svg><div class="fogv"></div></div>
+        <div class="slab-body"><div class="slab-head"><span>2026.09.19</span><span>构想中</span></div><h3>醒梦 · 视觉母题探索</h3><p>为「醒梦」寻找 2—4 个可以反复出现的核心视觉意象。</p><div class="depth"><span>浮现度 <b>2</b>/8</span><span>○ 暂无公开</span></div></div>
+      </a></div>
+      <div class="pl" data-z="-7000" data-x="30vw" data-y="2svh" data-xm="0vw" data-zm="-7700" style="--tilt:-.5deg"><a class="slab hit" href="#" style="--depth:5">
+        <div class="win"><svg data-lily="11" viewBox="-100 -100 200 200" preserveAspectRatio="xMidYMid slice"></svg><div class="fogv"></div></div>
+        <div class="slab-body"><div class="slab-head"><span>2026.09.19</span><span>进行中</span></div><h3>这个网站本身</h3><p>探索「醒梦」落地的个人网站与持续迭代记录。</p><div class="depth"><span>浮现度 <b>5</b>/8</span><span>✓ 公开仓库</span></div></div>
+      </a></div>
+
+      <!-- ═══ 异相 · 闪念 ═══ -->
+      <div class="pl" data-z="-8900" data-x="0vw" data-y="-4svh"><div class="chap"><span class="cap">异相 · 02:08 — 04:59</span><h2>闪念</h2></div></div>
+      <div class="pl" data-z="-9750" data-x="-24vw" data-y="-18svh" data-xm="-8vw" data-ym="-30svh" style="--tilt:-1.2deg"><a class="slip hit" href="#"><span class="h"><span>09.28 14:40</span><em>#知觉</em></span><b>水面的边缘</b><span class="t">微光与水汽漫开的边缘，没有确凿的轮廓。</span></a></div>
+      <div class="pl" data-z="-10050" data-x="24vw" data-y="16svh" data-xm="8vw" data-ym="30svh" style="--tilt:.9deg"><a class="slip hit" href="#"><span class="h"><span>09.27 23:45</span><em>#器物</em></span><b>十四度发丝线</b><span class="t">纸面上画下一道倾斜十四度的极细线。它不是裁切，只是……</span></a></div>
+      <div class="pl" data-z="-10350" data-x="-22vw" data-y="20svh" data-xm="-8vw" data-ym="32svh" style="--tilt:.7deg"><a class="slip hit" href="#"><span class="h"><span>09.25 01:20</span><em>#随感</em></span><b>深夜读断章</b><span class="t">凡能够说的事情，都能够说清楚；凡不能说的事情，就应当保持沉默。</span></a></div>
+      <div class="pl" data-z="-10600" data-x="0vw" data-y="0svh" style="--near:260;--nfade:200"><div class="glass"><b>它可能<br>马上消失。</b><span class="cap">GLASS SLIP</span></div></div>
+      <div class="pl" data-z="-10750" data-x="26vw" data-y="-16svh" data-xm="8vw" data-ym="-32svh" style="--tilt:-.8deg"><a class="slip hit" href="#"><span class="h"><span>09.24 18:15</span><em>#界面</em></span><b>遮蔽与展露</b><span class="t">磨砂玻璃并不掩藏内部，它只是让里面的几何形体退后两步，变成一层温和的浅影。</span></a></div>
+      <div class="pl" data-z="-11050" data-x="-26vw" data-y="2svh" data-xm="-6vw" data-ym="-24svh" style="--tilt:1.3deg"><a class="slip hit" href="#"><span class="h"><span>09.22 02:08</span><em>#尺度</em></span><b>未命名的空洞</b><span class="t">巨大的尺度若悬于极远处，便不会给人以压迫，反而像一轮褪了色的静止月面。</span></a></div>
+      <div class="pl" data-z="-11350" data-x="22vw" data-y="20svh" data-xm="6vw" data-ym="27svh" style="--tilt:-1deg"><a class="slip hit" href="#"><span class="h"><span>09.20 22:30</span><em>#色彩</em></span><b>琥珀的微温</b><span class="t">屏幕不应当太冷。字色底下一丝极淡的琥珀偏暖，才让人觉得光是有温度的。</span></a></div>
+      <div class="pl" data-z="-11650" data-x="-4vw" data-y="-22svh" data-xm="0vw" data-ym="-5svh" style="--tilt:.6deg"><a class="slip hit" href="#"><span class="h"><span>09.18 03:52</span><em>#醒梦</em></span><b>即将醒来的一瞬</b><span class="t">在它消失之前，我们确曾在这张半透明的纸上写下了几个字。</span></a></div>
+    </div>
+  </div>
+</section>
+
+<section class="after" id="after">
+  <div class="in">
+    <div class="index">
+      <div><h4>断章</h4><ul>
+        <li><a href="#">字面与光景 · 全样式样张<span>09.28</span></a></li>
+        <li><a href="#">母题探索记录：从碎块到花<span>09.19</span></a></li>
+        <li><a href="#">开站：在醒与梦之间<span>09.19</span></a></li>
+      </ul></div>
+      <div><h4>造物</h4><ul>
+        <li><a href="#">样式系统与构造规范<span>5/8</span></a></li>
+        <li><a href="#">醒梦 · 视觉母题探索<span>2/8</span></a></li>
+        <li><a href="#">这个网站本身<span>5/8</span></a></li>
+      </ul></div>
+      <div><h4>闪念</h4><ul>
+        <li><a href="#">水面的边缘<span>09.28</span></a></li>
+        <li><a href="#">十四度发丝线<span>09.27</span></a></li>
+        <li><a href="#">深夜读断章<span>09.25</span></a></li>
+        <li><a href="#">全部闪念 →<span></span></a></li>
+      </ul></div>
+    </div>
+    <div class="foot"><span>Traveritas 2026</span><span>在醒与梦之间</span></div>
+  </div>
+</section>
+</main>
+
+<script>
+(() => {
+  const root = document.documentElement;
+  const CAM_MAX = 12600;
+  const voyage = document.getElementById('voyage');
+  const planes = [...document.querySelectorAll('.pl')];
+  const railLinks = [...document.querySelectorAll('.rail a')];
+  const railDot = document.getElementById('railDot');
+  const clock = document.getElementById('clock');
+
+  const man = document.getElementById('manifesto');
+  let n = 0;
+  man.querySelectorAll('p').forEach((p) => {
+    const txt = p.textContent; p.textContent = '';
+    for (const ch of txt) { const s = document.createElement('span'); s.className = 'c'; s.style.setProperty('--i', n++); s.textContent = ch; p.append(s); }
+  });
+  man.style.setProperty('--n', n);
+
+  const motes = document.getElementById('motes');
+  for (let i = 0; i < 40; i++) {
+    const m = document.createElement('i');
+    m.style.cssText = `left:${Math.random()*100}%;top:${Math.random()*100}%;--t:${6+Math.random()*10}s;--dx:${(Math.random()-.5)*60}px;--dy:${(Math.random()-.5)*60}px;animation-delay:${-Math.random()*10}s`;
+    motes.append(m);
+  }
+
+  let seed = 1; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  document.querySelectorAll('svg[data-lily]').forEach((svg) => {
+    const id = svg.dataset.lily; seed = +id * 997;
+    let out = `<defs><radialGradient id="pg${id}"><stop offset="0" stop-color="#f3e6d6" stop-opacity=".55"/><stop offset="1" stop-color="#a9b8d6" stop-opacity=".08"/></radialGradient></defs>`;
+    const k = 5 + Math.floor(rnd() * 2), rot0 = rnd() * 60;
+    for (let i = 0; i < k; i++) {
+      const a = rot0 + i * 360 / k + (rnd() - .5) * 22, L = 62 + rnd() * 26, w = 16 + rnd() * 10, bend = (rnd() - .5) * 18;
+      out += `<path transform="rotate(${a.toFixed(1)})" d="M0 0 C ${w} ${-L*.3}, ${w*.6+bend} ${-L*.85}, ${bend} ${-L} C ${-w*.6+bend} ${-L*.85}, ${-w} ${-L*.3}, 0 0Z" fill="url(#pg${id})" stroke="#e6ecf7" stroke-opacity=".45" stroke-width=".8"/>`;
+    }
+    svg.innerHTML = out + '<circle r="5" fill="#d9a05b" fill-opacity=".7"/>';
+  });
+
+  /* 每层几何：按断点把 data-* 写成 CSS 变量，同时留一份 z 给剔除/命中判断 */
+  const mq = matchMedia('(max-width:760px)');
+  const layout = () => {
+    const m = mq.matches;
+    planes.forEach((el) => {
+      const d = el.dataset;
+      const z = +((m && d.zm) || d.z), x = (m && d.xm) || d.x || '0px', y = (m && d.ym) || d.y || '0px';
+      el._z = z; el.style.setProperty('--z', z); el.style.setProperty('--x', x); el.style.setProperty('--y', y);
+    });
+  };
+
+  const S = [
+    [0.00, [237,240,244], [35,40,48],   [86,96,109],   [255,255,255,.75], 0, 0],
+    [1.00, [230,235,242], [35,40,48],   [86,96,109],   [255,255,255,.7],  0, 0],
+    [1.75, [221,227,236], [35,40,48],   [86,96,109],   [255,255,255,.6],  0, 0],
+    [1.98, [24,32,48],    [230,233,239],[154,166,184], [120,150,200,.18], 1, 0],
+    [2.95, [20,26,39],    [230,233,239],[154,166,184], [120,150,200,.14], 1, 0],
+    [3.08, [34,29,49],    [236,230,241],[169,159,186], [170,140,210,.16], 1, 0],
+    [3.97, [42,36,56],    [236,230,241],[169,159,186], [170,140,210,.14], 1, 0],
+    [4.60, [239,230,216], [43,38,32],   [111,100,87],  [255,236,205,.8],  0, 1],
+    [5.00, [245,239,230], [43,38,32],   [111,100,87],  [255,240,215,.7],  0, .8],
+  ];
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const mix = (A, B, t) => A.map((v, i) => lerp(v, B[i], t));
+  const rgb = (c) => c.length === 4 ? `rgba(${c[0]|0},${c[1]|0},${c[2]|0},${c[3].toFixed(3)})` : `rgb(${c[0]|0},${c[1]|0},${c[2]|0})`;
+  function palette(pos) {
+    let i = 0; while (i < S.length - 2 && pos > S[i + 1][0]) i++;
+    const a = S[i], b = S[i + 1], t = Math.min(1, Math.max(0, (pos - a[0]) / (b[0] - a[0])));
+    root.style.setProperty('--bg', rgb(mix(a[1], b[1], t)));
+    root.style.setProperty('--ink', rgb(mix(a[2], b[2], t)));
+    root.style.setProperty('--ink-soft', rgb(mix(a[3], b[3], t)));
+    root.style.setProperty('--glow', rgb(mix(a[4], b[4], t)));
+    root.style.setProperty('--dark', lerp(a[5], b[5], t).toFixed(3));
+    root.style.setProperty('--dawn', lerp(a[6], b[6], t).toFixed(3));
+  }
+  /* 镜头深度 ↔ 场序：各场在深度轴上的边界 */
+  const CAMB = [0, 1400, 5300, 8100, 11800, CAM_MAX];
+  const MIN = [0, 12, 124, 181, 352, 444];
+  const camToPos = (c) => { let k = 0; while (k < 4 && c > CAMB[k + 1]) k++; return k + Math.min(1, (c - CAMB[k]) / (CAMB[k + 1] - CAMB[k])); };
+  const fmt = (m) => { const t = (23 * 60 + 7 + Math.round(m)) % 1440; return String(Math.floor(t / 60)).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0'); };
+
+  let vTop = 0, vLen = 1, vh = innerHeight;
+  const measure = () => { vh = innerHeight; vTop = voyage.offsetTop; vLen = Math.max(1, voyage.offsetHeight - vh); layout(); };
+
+  let ticking = false;
+  function frame() {
+    ticking = false;
+    const g = Math.min(1, Math.max(0, (scrollY - vTop) / vLen));
+    const cam = g * CAM_MAX;
+    root.style.setProperty('--cam', cam.toFixed(1));
+    /* 剔除：穿过镜头或太远的层直接隐藏（不参与绘制与命中） */
+    planes.forEach((el) => {
+      const rel = el._z + cam;
+      const far = el.classList.contains('dawnpl') ? 4300 : 2400;
+      el.style.visibility = rel > 560 || rel < -far ? 'hidden' : '';
+      el.classList.toggle('on', rel > -900 && rel < 300);
+    });
+    const pos = camToPos(cam);
+    palette(pos);
+    const k = Math.min(4, Math.floor(pos)), f = pos - k;
+    clock.textContent = fmt(k >= 4 ? lerp(MIN[4], MIN[5], f) : lerp(MIN[k], MIN[k + 1], f));
+    railDot.style.top = (Math.min(4, pos) / 4 * 100) + '%';
+    railLinks.forEach((a, i) => a.classList.toggle('on', i === Math.min(4, Math.round(pos - .3))));
+  }
+  const req = () => { if (!ticking) { ticking = true; requestAnimationFrame(frame); } };
+  addEventListener('scroll', req, { passive: true });
+  addEventListener('resize', () => { measure(); req(); });
+
+  /* 跳转到各场「第一件内容刚好清晰」的深度 */
+  const CAM_JUMP = [0, 2350, 6500, 9300, CAM_MAX];
+  document.querySelectorAll('[data-jump]').forEach((a) => a.addEventListener('click', (e) => {
+    e.preventDefault(); const k = +a.dataset.jump;
+    const y = k === 5 ? document.getElementById('after').offsetTop : vTop + CAM_JUMP[k] / CAM_MAX * vLen;
+    scrollTo({ top: y, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  }));
+
+  if (location.search.includes('debug')) {
+    const el = document.getElementById('fps'); el.style.display = 'block';
+    let fr = 0, t0 = performance.now();
+    (function loop(t) { fr++; if (t - t0 > 1000) { el.textContent = fr + ' fps'; fr = 0; t0 = t; } requestAnimationFrame(loop); })(t0);
+  }
+  measure(); frame();
+  document.fonts && document.fonts.ready.then(() => { measure(); req(); });
+})();
+</script>
+</body>
+</html>

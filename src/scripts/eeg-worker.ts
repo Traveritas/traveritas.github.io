@@ -7,7 +7,7 @@
    路径与 SVG 回退端同源（eeg-wave.ts，Path2D 直接描同一串），样式照抄 Eeg.astro 的 CSS。
    ───────────────────────────────────────────────────────────── */
 
-import { createEegWave, EEG_ECHO_COUNT } from './eeg-wave';
+import { createEegWave, EEG_ECHO_COUNT, makeSpine, type Spine } from './eeg-wave';
 
 interface Colors {
   umber: string;
@@ -27,6 +27,18 @@ type Msg =
       d: number;
       colors: Colors;
       still: boolean;
+      /** 主线程的 performance.timeOrigin：秒针对齐主线程时钟（主页开屏在主线程按同一秒针裁切字形） */
+      origin?: number;
+    }
+  | {
+      /* 主页：线沿一条视口坐标里的骨架走（xy ＝ null 回到过中心的 14° 直线）。
+         dark ＝ 背景明暗（0 亮 1 暗，暗场里主波往浅处混）；reveal ＝ 开屏「从中心往两端画出」
+         的进度（1 ＝ 画满）；dot ＝ 骨架上一粒琥珀点 [弧长比例, 不透明度]（晨醒底线末端） */
+      type: 'spine';
+      xy: Float32Array | null;
+      dark: number;
+      reveal: number;
+      dot: [number, number] | null;
     }
   | { type: 'size'; W: number; H: number; dpr: number }
   | { type: 'mix'; d: number; colors: Colors }
@@ -52,9 +64,51 @@ let still = false; // 减动效：只画静帧，不起循环
 let hidden = false;
 let echoesOn = false;
 let lastDraw = 0;
+let origin = NaN; // 主线程 timeOrigin；NaN ＝ 用 Worker 自己的时钟
+let spine: Spine | null = null;
+let spineVer = 0;
+let dark = 0;
+let reveal = 1;
+let dot: [number, number] | null = null;
+/* Worker 的 performance 时钟 → 主线程时钟（秒） */
+const clock = (ts: number) => (Number.isNaN(origin) ? ts : performance.timeOrigin + ts - origin) / 1000;
 let ph = 0;
 let mainPath: Path2D | null = null;
 const echoPaths: (Path2D | null)[] = Array.from({ length: EEG_ECHO_COUNT }, () => null);
+
+const LIGHT_MAIN = '#d8ccbe';
+const smooth = (t: number) => {
+  const u = Math.max(0, Math.min(1, t));
+  return u * u * (3 - 2 * u);
+};
+function mixHex(a: string, b: string, t: number) {
+  const p = (h: string) => {
+    const m = h.match(/\d+(\.\d+)?/g);
+    if (h.startsWith('rgb') && m) return m.slice(0, 3).map(Number);
+    const x = h.replace('#', '');
+    return [0, 2, 4].map((i) => parseInt(x.slice(i, i + 2), 16));
+  };
+  const A = p(a);
+  const B = p(b);
+  return `rgb(${A.map((v, i) => Math.round(v + (B[i] - v) * t)).join(',')})`;
+}
+function pointAt(s: number): [number, number] {
+  const { xy, L } = spine as Spine;
+  let j = 1;
+  while (j < L.length - 1 && L[j] < s) j++;
+  const t = Math.max(0, Math.min(1, (s - L[j - 1]) / (L[j] - L[j - 1] || 1)));
+  return [xy[2 * j - 2] + (xy[2 * j] - xy[2 * j - 2]) * t, xy[2 * j - 1] + (xy[2 * j + 1] - xy[2 * j - 1]) * t];
+}
+function glow(s: number, R: number, a: number) {
+  const [x, y] = pointAt(s);
+  const g = ctx.createRadialGradient(x, y, 0, x, y, R);
+  g.addColorStop(0, `rgba(217,160,91,${a})`);
+  g.addColorStop(1, 'rgba(217,160,91,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(x, y, R, 0, Math.PI * 2);
+  ctx.fill();
+}
 
 function paint() {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -63,9 +117,11 @@ function paint() {
   const cx = W / 2;
   const cy = H * 0.5;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.translate(cx, cy);
-  ctx.rotate((14 * Math.PI) / 180);
-  ctx.translate(-cx, -cy);
+  if (!spine) {
+    ctx.translate(cx, cy);
+    ctx.rotate((14 * Math.PI) / 180);
+    ctx.translate(-cx, -cy);
+  }
   ctx.miterLimit = 4; // SVG 的默认值（canvas 默认 10）
   // 残影在前、主波压在最上（＝ SVG 里的文档顺序）
   if (echoesOn) {
@@ -83,13 +139,33 @@ function paint() {
     }
   }
   if (mainPath) {
-    ctx.globalAlpha = MAIN_STYLE.op;
-    ctx.strokeStyle = colors[MAIN_STYLE.color];
+    ctx.globalAlpha = MAIN_STYLE.op * (1 + dark * 0.15);
+    ctx.strokeStyle = dark > 0.001 ? mixHex(colors[MAIN_STYLE.color], LIGHT_MAIN, dark) : colors[MAIN_STYLE.color];
     ctx.lineWidth = MAIN_STYLE.width;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    ctx.setLineDash([]);
+    if (spine && reveal < 1) {
+      // 从中心往两端画出：一段居中的实线（路径比骨架略长，按 1.04 估）
+      const len = spine.len * 1.04;
+      const r = smooth(reveal) * (len / 2 + 40);
+      ctx.setLineDash([0, Math.max(0, len / 2 - r), 2 * r, len * 4]);
+    } else ctx.setLineDash([]);
     ctx.stroke(mainPath);
+    ctx.setLineDash([]);
+  }
+  if (spine && reveal < 1) {
+    // 笔尖：两端各一粒琥珀，画满前淡去
+    const r = smooth(reveal) * (spine.len / 2 + 40);
+    ctx.globalAlpha = 1 - smooth(Math.max(0, (reveal - 0.85) / 0.15));
+    for (const sg of [-1, 1]) glow(spine.len / 2 + sg * r, 10, 0.95);
+  }
+  if (spine && dot && dot[1] > 0.01) {
+    ctx.globalAlpha = dot[1];
+    const p = pointAt(spine.len * dot[0]);
+    ctx.fillStyle = colors.amber;
+    ctx.beginPath();
+    ctx.arc(p[0], p[1], 3.2, 0, Math.PI * 2);
+    ctx.fill();
   }
 }
 
@@ -97,7 +173,7 @@ function paint() {
 function render(t: number, force = false) {
   ph = t;
   lastDraw = performance.now();
-  const f = wave.step(ph, d, W, H);
+  const f = spine ? wave.stepCurve(ph, d, spine, spineVer) : wave.step(ph, d, W, H);
   if (f) {
     if (f.main) mainPath = new Path2D(f.main);
     f.echoes.forEach((s, i) => {
@@ -126,7 +202,7 @@ function schedule() {
   }, 24);
 }
 function tick(ts: number) {
-  if (!hidden) render(ts / 1000);
+  if (!hidden) render(clock(ts));
   schedule();
 }
 
@@ -144,14 +220,15 @@ self.onmessage = (e: MessageEvent<Msg>) => {
     d = m.d;
     colors = m.colors;
     still = m.still;
+    if (typeof m.origin === 'number') origin = m.origin;
     resize(m.W, m.H, m.dpr);
-    render(0, true);
+    render(clock(performance.now()), true);
     self.postMessage({ type: 'ready' });
     if (still) return;
     schedule();
     // rAF 被节流/停转的环境里由低频定时器兜底补帧（同原先主线程版）
     setInterval(() => {
-      if (!hidden && performance.now() - lastDraw > 500) render(performance.now() / 1000);
+      if (!hidden && performance.now() - lastDraw > 500) render(clock(performance.now()));
     }, 400);
     return;
   }
@@ -162,6 +239,13 @@ self.onmessage = (e: MessageEvent<Msg>) => {
   } else if (m.type === 'mix') {
     d = m.d;
     colors = m.colors;
+    render(ph, true);
+  } else if (m.type === 'spine') {
+    spine = m.xy ? makeSpine(m.xy) : null;
+    spineVer++;
+    dark = m.dark;
+    reveal = m.reveal;
+    dot = m.dot;
     render(ph, true);
   } else if (m.type === 'hidden') {
     hidden = m.hidden;

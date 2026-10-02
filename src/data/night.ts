@@ -6,11 +6,12 @@
    ⚠ 本文件里有**两处已失效**的东西，改之前先读这一段（2026-09-28 标注）：
 
      · 底色的三段平台（ZONES，文件下半）：**没有消费方**。initNight()
-       只写 `body.dataset.stage`（给夜轨与脑电波用），从不写颜色；
-       --bg 全站也无人运行时改写，恒为 tokens.css 的值。
-       首页地面现由 components/home/StageBackdrop.astro 的五层平色承担，
+       只写 `body.dataset.stage`（给夜轨与脑电波用），从不写颜色。
+       ⇒ 改底色别改 ZONES：主页是千层纸版，地面仍是
+       components/home/StageBackdrop.astro 的五层平色；「一根线的一夜」
+       故事板稿在 /new/，底色由 scripts/home-storyboard.ts 的 PALETTE
+       按幕写到根变量（--bg / --fg / --fg-soft / --line / --glow / --dark / --dawn）；
        其余页面地面就是 `body { background: var(--bg) }`。
-       ⇒ 改底色请改那两处，改 ZONES 不会有任何效果。
      · 下面注释里提到的 components/chrome/NightVeil.astro：**该组件已不存在**
        （换面幕布已废除）。这段历史注记留着备查，不要再去找那个组件。
    ───────────────────────────────────────────────────────────── */

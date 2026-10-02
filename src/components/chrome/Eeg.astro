@@ -146,7 +146,8 @@
 <script>
   import { onMixChange, wakeMix } from '../../scripts/reality';
   import { onFrame30, reducedMotion } from '../../scripts/lib';
-  import { createEegWave, EEG_ECHO_COUNT } from '../../scripts/eeg-wave';
+  import { createEegWave, EEG_ECHO_COUNT, makeSpine, type Spine } from '../../scripts/eeg-wave';
+  import { onEegSpine } from '../../scripts/eeg-spine';
 
   const svg = document.getElementById('site-eeg');
   const canvas = document.getElementById('site-eeg-canvas') as HTMLCanvasElement | null;
@@ -171,21 +172,33 @@
       const wave = createEegWave(BEAT);
       let lastRot = '';
       let lastDraw = 0;
+      let lastPh = 0;
+      /* 主页骨架（见 eeg-spine.ts）：有骨架时线沿它走、不再绕中心转 14° */
+      let spine: Spine | null = null;
+      let spineVer = 0;
       const tickDraw = (ph: number) => {
         lastDraw = performance.now();
-        const rot = `rotate(14 ${innerWidth / 2} ${innerHeight * 0.5})`;
+        lastPh = ph;
+        const rot = spine ? '' : `rotate(14 ${innerWidth / 2} ${innerHeight * 0.5})`;
         if (rot !== lastRot) {
-          g?.setAttribute('transform', rot);
+          if (rot) g?.setAttribute('transform', rot);
+          else g?.removeAttribute('transform');
           lastRot = rot;
         }
-        const f = wave.step(ph, 1 - wakeMix(), innerWidth, innerHeight);
+        const d = 1 - wakeMix();
+        const f = spine ? wave.stepCurve(ph, d, spine, spineVer) : wave.step(ph, d, innerWidth, innerHeight);
         if (!f) return;
         if (f.main) main?.setAttribute('d', f.main);
         f.echoes.forEach((s, i) => {
           if (s) echoPaths[i]?.setAttribute('d', s);
         });
       };
-      tickDraw(0);
+      onEegSpine((st) => {
+        spine = st.xy ? makeSpine(st.xy) : null;
+        spineVer++;
+        tickDraw(lastPh);
+      });
+      tickDraw(performance.now() / 1000);
       // 减动效：只留上面那一帧静态
       if (!RM) {
         onFrame30((ts) => {
@@ -251,7 +264,16 @@
       try {
         const off = canvas.transferControlToOffscreen();
         worker.postMessage(
-          { type: 'init', canvas: off, ...size(), beat: BEAT, d: 1 - wakeMix(), colors: colors(), still: RM },
+          {
+            type: 'init',
+            canvas: off,
+            ...size(),
+            beat: BEAT,
+            d: 1 - wakeMix(),
+            colors: colors(),
+            still: RM,
+            origin: performance.timeOrigin,
+          },
           [off],
         );
       } catch {
@@ -261,6 +283,9 @@
       onMixChange(() => worker.postMessage({ type: 'mix', d: 1 - wakeMix(), colors: colors() }));
       document.addEventListener('visibilitychange', () =>
         worker.postMessage({ type: 'hidden', hidden: document.hidden }),
+      );
+      onEegSpine((st) =>
+        worker.postMessage({ type: 'spine', xy: st.xy, dark: st.dark, reveal: st.reveal, dot: st.dot }),
       );
     }
   }

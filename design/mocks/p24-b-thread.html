@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>p24-B · 一根线的一夜</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Serif+SC:wght@300;500;600&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════════
+   p24-B · 一根线的一夜（thread）
+   脑电线不再横躺固定：它是一根竖向贯穿整页的线，像一卷慢慢展开的
+   记录纸从开屏蜿蜒到页底，所有内容「挂」在线上（细引线 + 线上一个结）。
+   · 线的骨架（spine）= 一条过各内容锚点的 Catmull-Rom 曲线，装载/尺寸变化时
+     在文档坐标里烘焙一次（每 3px 弧长一个采样，带法向、所处夜段、累积相位）；
+   · 每帧只画落在视口里的那一段：波形沿骨架法向摆动，参数按采样点所处
+     「场序 + 场内进度」连续插值 —— 入夜 β → 浅梦 θ + 纺锤波 → 深眠 δ →
+     REM 锯齿碎线 → 晨醒平复，最后拐成晨醒页的底线；
+   · 滚动速度 = 清醒程度：滚得快线变快变细，停下约 1.5s 沉回本段。
+   mock 里主线程 rAF 画一张 fixed canvas；正式版沿用现有 Eeg 的
+   Worker + OffscreenCanvas（主线程每帧只 postMessage 滚动位置与速度）。
+   原生滚动，不劫持滚轮。?debug 显示帧率。对照稿：p24-a-surface.html。
+   ═══════════════════════════════════════════════════════════ */
+:root{
+  --bg:#edf0f4; --ink:#232830; --ink-soft:#56606d; --glow:rgba(255,255,255,.75);
+  --dark:0; --dawn:0;
+  --line:color-mix(in srgb, var(--ink) 14%, transparent);
+  --amber:#d9a05b; --umber:#765640;
+  --serif:'Noto Serif SC','Songti SC','Source Han Serif SC',SimSun,serif;
+  --mono:'IBM Plex Mono',ui-monospace,Consolas,monospace;
+  --sans:system-ui,-apple-system,'PingFang SC','Microsoft YaHei UI',sans-serif;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased;overflow-x:clip}
+a{color:inherit;text-decoration:none}
+.cap{font-family:var(--mono);font-size:10.5px;letter-spacing:.24em;color:var(--ink-soft)}
+
+/* ── 环境层：雾 / 微尘 / 晨光 ── */
+.atmo{position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden}
+.fog{position:absolute;border-radius:50%;background:radial-gradient(closest-side,var(--glow),transparent);will-change:transform}
+.fog.f1{width:70vmax;height:50vmax;left:-20vmax;top:-12vmax;animation:fog1 38s ease-in-out infinite alternate}
+.fog.f2{width:60vmax;height:44vmax;right:-22vmax;bottom:-14vmax;animation:fog2 46s ease-in-out infinite alternate}
+@keyframes fog1{to{transform:translate3d(8vmax,6vmax,0)}}
+@keyframes fog2{to{transform:translate3d(-10vmax,-4vmax,0)}}
+.motes{position:absolute;inset:0;opacity:calc(var(--dark) * .9)}
+.motes i{position:absolute;width:2px;height:2px;border-radius:50%;background:#dfe6f5;box-shadow:0 0 6px 1px rgba(200,215,245,.5);animation:mote var(--t) ease-in-out infinite alternate}
+@keyframes mote{from{transform:translate3d(0,0,0);opacity:.2}to{transform:translate3d(var(--dx),var(--dy),0);opacity:.9}}
+.dawnlight{position:absolute;inset:-10% -10% auto;height:90%;opacity:var(--dawn);
+  background:radial-gradient(60% 70% at 50% 0%,rgba(255,214,160,.55),rgba(255,232,205,.2) 45%,transparent 75%)}
+
+/* ── 线：fixed 画布，压在环境层之上、内容之下 ── */
+#thread{position:fixed;inset:0;width:100vw;height:100vh;z-index:0;pointer-events:none}
+main{position:relative;z-index:1}
+
+/* ── 页头 / 夜轨 / 切换 ── */
+.top{position:fixed;inset:0 0 auto;z-index:20;display:flex;align-items:center;justify-content:space-between;padding:22px clamp(18px,4vw,56px);pointer-events:none}
+.top>*{pointer-events:auto}
+.logo{font-family:var(--serif);font-size:19px;letter-spacing:.04em}
+.logo b{font-weight:500;color:var(--amber)}
+.nav{display:flex;gap:26px;font-size:14px;letter-spacing:.12em;color:var(--ink-soft)}
+.nav a{position:relative;padding-bottom:3px}
+.nav a::after{content:"";position:absolute;left:0;right:100%;bottom:0;height:1px;background:var(--amber);transition:right .35s ease}
+.nav a:hover{color:var(--ink)}
+.nav a:hover::after{right:0}
+.rail{position:fixed;left:clamp(14px,2.4vw,34px);top:50%;transform:translateY(-50%);z-index:20;height:min(52vh,420px);width:110px}
+.rail::before{content:"";position:absolute;left:3px;top:0;bottom:0;width:1px;background:var(--line)}
+.rail a{position:absolute;left:0;display:flex;align-items:center;gap:10px;font-size:10.5px;letter-spacing:.14em;color:var(--ink-soft);opacity:.55;transform:translateY(-50%);transition:opacity .3s}
+.rail a::before{content:"";width:7px;height:1px;background:currentColor}
+.rail a.on{opacity:1;color:var(--ink)}
+.rail a span{font-family:var(--mono);font-size:10px;opacity:.7}
+.rail .dot{position:absolute;left:0;width:7px;height:7px;border-radius:50%;background:var(--amber);box-shadow:0 0 10px var(--amber);transform:translate(0,-50%);top:0}
+.clock{position:fixed;right:clamp(18px,4vw,56px);bottom:22px;z-index:20;font-family:var(--mono);font-size:12px;letter-spacing:.2em;color:var(--ink-soft)}
+.switch{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:30;display:flex;gap:2px;padding:3px;border-radius:99px;background:color-mix(in srgb,var(--bg) 70%,transparent);backdrop-filter:blur(10px);border:1px solid var(--line);font-size:11px;letter-spacing:.1em}
+.switch a{padding:5px 12px;border-radius:99px;color:var(--ink-soft);white-space:nowrap}
+.switch a.cur{background:var(--ink);color:var(--bg)}
+.fps{position:fixed;right:10px;top:70px;z-index:30;font:11px var(--mono);color:var(--ink-soft);display:none}
+
+/* ── 浮现：进入视口时从雾里清楚起来 ── */
+[data-rv]{opacity:0;filter:blur(6px);transform:translate3d(0,22px,0);
+  transition:opacity 1s ease var(--d,0s),filter 1.1s ease var(--d,0s),transform 1.3s cubic-bezier(.2,.7,.2,1) var(--d,0s)}
+[data-rv].in{opacity:1;filter:none;transform:none}
+
+.sec{position:relative}
+.chap{position:absolute;display:flex;flex-direction:column;align-items:center;gap:22px}
+.chap h2{margin:0;writing-mode:vertical-rl;font-family:var(--serif);font-weight:300;font-size:clamp(46px,5.4vw,84px);letter-spacing:.3em;color:color-mix(in srgb,var(--ink) 32%,transparent)}
+.chap .cap{writing-mode:vertical-rl}
+
+/* ═══ 入夜：线从天上垂下，醒（冷、清楚）与梦（暖、失焦）分居两侧 ═══ */
+.hero{height:100svh;min-height:640px}
+.gl{position:absolute;font-family:var(--serif);font-weight:600;line-height:1;font-size:min(40svh,23vw);
+  color:transparent;-webkit-background-clip:text;background-clip:text}
+.gl-wake{left:13vw;top:13svh;background-image:linear-gradient(165deg,#3a4452 0%,#5d6b7c 45%,#95a4b6 100%)}
+.gl-dream{left:61vw;top:31svh;font-size:min(36svh,21vw);
+  background-image:linear-gradient(165deg,#e6c9a6 0%,#c69a72 50%,#9c7658 100%);
+  filter:blur(2.4px);animation:dreamdrift 11s ease-in-out infinite alternate}
+@keyframes dreamdrift{from{translate:-4px -6px;rotate:-.5deg}to{translate:6px 8px;rotate:.6deg}}
+.hero-copy{position:absolute;left:13vw;top:64svh;width:min(30rem,36vw)}
+.hero-copy .stamp{display:block;font-family:var(--mono);font-size:11px;letter-spacing:.34em;color:var(--ink-soft);margin-bottom:1.4rem}
+.hero-copy h1{margin:0;font-family:var(--serif);font-weight:300;font-size:clamp(1.25rem,1.9vw,1.75rem);line-height:1.85;letter-spacing:.08em}
+.hero-copy h1 em{font-style:normal;color:color-mix(in srgb,var(--ink) 55%,var(--umber))}
+.hero-copy .who{margin:1.4rem 0 0;font-family:var(--serif);font-size:14px;letter-spacing:.14em;line-height:1.9;color:var(--ink-soft)}
+.hero-copy .who b{font-weight:500;color:var(--ink);letter-spacing:.08em;margin-right:.5em}
+.hint{position:absolute;left:calc(50% + 22px);bottom:9svh;margin:0;font-size:12px;letter-spacing:.3em;color:var(--ink-soft);white-space:nowrap}
+
+/* ═══ 断章：线靠左，三篇同屏挂在线右侧，每篇一个纺锤波 ═══ */
+.essays{padding:24svh 8vw 26svh 0}
+.essays .chap{left:15vw;top:24svh}
+.list{margin-left:31vw;max-width:62rem}
+.essay{position:relative;display:grid;grid-template-columns:4rem minmax(0,1fr) auto;align-items:baseline;gap:0 1.3rem;padding:2rem 0 1.9rem;border-top:1px solid var(--line)}
+.essay:last-of-type{border-bottom:1px solid var(--line)}
+.essay .no{font-family:var(--serif);font-weight:300;font-size:2.2rem;line-height:1;color:color-mix(in srgb,var(--ink) 24%,transparent);transition:color .3s}
+.essay .meta{display:block;font-family:var(--mono);font-size:10.5px;letter-spacing:.2em;color:var(--ink-soft);margin-bottom:.7rem}
+.essay h3{margin:0 0 .6rem;font-family:var(--serif);font-weight:500;font-size:clamp(1.4rem,2.3vw,2.15rem);line-height:1.3;letter-spacing:.04em;transition:color .3s}
+.essay p{margin:0;max-width:34em;font-family:var(--serif);font-size:clamp(.9rem,1.1vw,1rem);line-height:1.85;color:var(--ink-soft)}
+.essay .go{font-size:1.1rem;opacity:0;transform:translateX(-6px);transition:opacity .3s,transform .3s}
+.essay:hover .no,.essay:hover .go{color:var(--amber)}
+.essay:hover h3{color:var(--umber)}
+.essay:hover .go{opacity:1;transform:none}
+.more{display:inline-block;margin-top:1.8rem;font-size:13px;letter-spacing:.18em;border-bottom:1px solid var(--amber);padding-bottom:3px}
+
+/* ═══ 造物：线回到正中、变粗变慢，三块晶板左右交错挂在深波旁 ═══ */
+.projects{padding:22svh 0 24svh}
+/* 造物 / 闪念：章名在线左侧、横排、占位于文档流里，不与交错的卡片叠 */
+.projects .chap,.rem .chap{position:relative;flex-direction:row-reverse;align-items:baseline;gap:18px;width:calc(50% - 3.4rem);justify-content:flex-start;margin-bottom:5rem}
+.projects .chap h2,.rem .chap h2,.projects .chap .cap,.rem .chap .cap{writing-mode:horizontal-tb}
+.projects .chap h2,.rem .chap h2{font-size:clamp(40px,4.4vw,64px)}
+.slabs{display:flex;flex-direction:column;gap:0}
+.slab{--ink:#e6e9ef;--ink-soft:#9aa6b8;--line:rgba(230,233,239,.14);color:var(--ink);
+  display:flex;flex-direction:column;width:min(29vw,390px);border-radius:10px;overflow:hidden;
+  background:linear-gradient(160deg,rgba(255,255,255,.09),rgba(255,255,255,.03));
+  border:1px solid rgba(255,255,255,.13);box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 30px 60px -30px rgba(0,0,0,.6);
+  transition:border-color .3s,opacity 1s ease var(--d,0s),filter 1.1s ease var(--d,0s),transform 1.3s cubic-bezier(.2,.7,.2,1) var(--d,0s)}
+.slab.r{margin-left:calc(50% + 4.5rem)}
+.slab.l{margin-left:calc(50% - 4.5rem - min(29vw,390px));margin-top:-9rem}
+.slab.r + .slab.r,.slab.l + .slab.r{margin-top:-9rem}
+.slab:hover{border-color:color-mix(in srgb,var(--amber) 60%,transparent)}
+.win{position:relative;height:210px;background:radial-gradient(120% 90% at 30% 20%,#34405a,#1a2030 70%);overflow:hidden}
+.win svg{position:absolute;inset:0;width:100%;height:100%;filter:blur(14px);opacity:.3;transition:filter 2.8s ease .5s,opacity 2.8s ease .5s}
+.slab.in .win svg{filter:blur(calc((1 - var(--depth) / 8) * 14px));opacity:calc(.3 + var(--depth) / 8 * .7)}
+.win .fogv{position:absolute;inset:0;background:linear-gradient(180deg,rgba(170,185,210,.25),rgba(120,135,160,.1));transition:opacity 2.8s ease .5s}
+.slab.in .win .fogv{opacity:calc(1 - var(--depth) / 8)}
+.slab-body{padding:18px 20px 16px;display:grid;gap:8px}
+.slab-head{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;color:var(--ink-soft)}
+.slab h3{margin:0;font-family:var(--serif);font-weight:500;font-size:1.22rem;letter-spacing:.04em}
+.slab p{margin:0;font-family:var(--serif);font-size:.86rem;line-height:1.75;color:var(--ink-soft)}
+.slab .depth{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;color:var(--ink-soft);padding-top:8px;border-top:1px solid var(--line)}
+.slab .depth b{font-weight:500;color:var(--amber)}
+.projects .more{margin-left:calc(50% + 4.5rem);margin-top:2.6rem;color:var(--ink)}
+
+/* ═══ 闪念：线变碎、带锯齿；七张便签左右交错，出现时线上弹一个尖峰 ═══ */
+.rem{padding:20svh 0 26svh}
+.slips{display:flex;flex-direction:column}
+.slip{--ink:#ece6f1;--ink-soft:#a99fba;color:var(--ink);display:block;width:min(28vw,330px);padding:16px 18px;border-radius:8px;
+  background:linear-gradient(135deg,rgba(255,255,255,.14),rgba(255,255,255,.05));border:1px solid rgba(255,255,255,.16);
+  box-shadow:0 20px 40px -20px rgba(0,0,0,.5);transition:border-color .3s,opacity 1s ease var(--d,0s),filter 1.1s ease var(--d,0s),transform 1.3s cubic-bezier(.2,.7,.2,1) var(--d,0s)}
+.slip.r{margin-left:calc(50% + 4rem)}
+.slip.l{margin-left:calc(50% - 4rem - min(28vw,330px))}
+.slip + .slip{margin-top:-2.2rem}
+.slip.r{rotate:.6deg}.slip.l{rotate:-.7deg}
+.slip .h{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;letter-spacing:.16em;color:var(--ink-soft)}
+.slip .h em{font-style:normal;color:var(--amber)}
+.slip b{display:block;margin:8px 0 6px;font-family:var(--serif);font-weight:500;font-size:1rem;letter-spacing:.05em}
+.slip .t{font-family:var(--serif);font-size:.84rem;line-height:1.75;color:var(--ink-soft)}
+.slip:hover{border-color:color-mix(in srgb,var(--amber) 55%,transparent)}
+/* 玻璃签：线从它背后穿过，被磨成一段模糊的光 */
+.glass{position:relative;z-index:2;width:min(240px,50vw);aspect-ratio:3/4.2;margin:1.4rem auto;border-radius:6px;border:1px solid rgba(255,255,255,.32);
+  background:linear-gradient(135deg,rgba(255,255,255,.16),rgba(200,185,230,.06));
+  -webkit-backdrop-filter:blur(9px);backdrop-filter:blur(9px);
+  box-shadow:inset 0 1px 1px rgba(255,255,255,.35),0 40px 80px -30px rgba(0,0,0,.6),0 0 90px rgba(217,160,91,.1);
+  display:grid;place-content:center;gap:20px;text-align:center;color:#ece6f1;rotate:-2deg}
+.glass b{font-family:var(--serif);font-weight:300;font-size:1.45rem;letter-spacing:.14em;line-height:2}
+.glass .cap{color:#a99fba}
+.rem .more{margin-left:calc(50% + 4rem);margin-top:2.6rem;color:var(--ink)}
+
+/* ═══ 晨醒：线平复，拐成这一页的底线 ═══ */
+.dawn{padding:26svh 8vw 12svh 17vw}
+.dawn .time{font-family:var(--mono);font-size:12px;letter-spacing:.4em;color:var(--ink-soft)}
+.dawn h2{margin:.8em 0 0;font-family:var(--serif);font-weight:300;font-size:clamp(1.6rem,3.2vw,2.7rem);letter-spacing:.1em;line-height:1.6}
+.baseline{height:88px}
+.dawn .about{margin:0;font-family:var(--serif);font-size:1.02rem;line-height:2;color:var(--ink-soft);max-width:36em;padding:14px 18px;border:1px dashed color-mix(in srgb,var(--amber) 60%,transparent)}
+.exits{display:flex;flex-wrap:wrap;gap:12px;margin:40px 0 72px}
+.exits a{padding:12px 20px;border:1px solid var(--line);border-radius:4px;background:rgba(255,255,255,.4);font-size:14px;letter-spacing:.1em;transition:border-color .25s,transform .25s}
+.exits a:hover{border-color:var(--amber);transform:translateY(-2px)}
+.exits a small{display:block;font-family:var(--mono);font-size:10.5px;color:var(--ink-soft);margin-top:4px;letter-spacing:.08em}
+.index{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:40px;border-top:1px solid var(--line);padding-top:36px;max-width:980px}
+.index h4{margin:0 0 14px;font-family:var(--serif);font-weight:500;font-size:15px;letter-spacing:.3em}
+.index h4 a:hover{color:var(--umber)}
+.index ul{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.index li a{display:flex;justify-content:space-between;gap:12px;font-family:var(--serif);font-size:14px;line-height:1.5}
+.index li a span{font-family:var(--mono);font-size:10.5px;color:var(--ink-soft);white-space:nowrap}
+.index li a:hover{color:var(--umber)}
+.foot{margin-top:80px;display:flex;justify-content:space-between;font-size:12px;letter-spacing:.14em;color:var(--ink-soft);max-width:980px}
+
+/* ── 窄屏：线贴左缘，内容单列挂在线右侧 ── */
+@media (max-width:760px){
+  .nav{gap:16px;font-size:13px}
+  .rail{display:none}
+  .clock{top:62px;bottom:auto;right:18px}
+  .gl-wake{left:7vw;top:13svh;font-size:38vw}
+  .gl-dream{left:58vw;top:25svh;font-size:32vw}
+  .hero-copy{left:14vw;right:7vw;width:auto;top:52svh}
+  .hero-copy h1{font-size:1.18rem}
+  .hint{left:14vw;bottom:10svh}
+  .chap,.projects .chap,.rem .chap{position:static;width:auto;flex-direction:row;justify-content:flex-start;align-items:baseline;gap:14px;margin:0 0 1.4rem 14vw}
+  .chap h2,.chap .cap{writing-mode:horizontal-tb}
+  .chap h2,.projects .chap h2,.rem .chap h2{font-size:32px}
+  .essays{padding:16svh 6vw 18svh 0}
+  .list{margin-left:14vw}
+  .essay{grid-template-columns:2.2rem minmax(0,1fr);padding:1.3rem 0}
+  .essay .no{font-size:1.4rem}
+  .essay .go{display:none}
+  .essay p{font-size:.86rem}
+  .projects,.rem{padding:16svh 6vw 18svh 0}
+  .slab,.slab.r,.slab.l{width:auto;margin:0 0 1.6rem 14vw}
+  .slip,.slip.r,.slip.l{width:auto;margin:0 0 1rem 14vw}
+  .slip + .slip{margin-top:0}
+  .glass{margin:1.4rem 0 1.4rem 24vw}
+  .projects .more,.rem .more{margin-left:14vw}
+  .dawn{padding:20svh 6vw 12svh 14vw}
+  .index{grid-template-columns:1fr;gap:32px}
+  .switch{bottom:14px}
+}
+@media (prefers-reduced-motion:reduce){
+  [data-rv]{transition:none;opacity:1;filter:none;transform:none}
+  .gl-dream,.fog,.motes i{animation:none}
+}
+</style>
+</head>
+<body>
+
+<div class="atmo" aria-hidden="true">
+  <div class="fog f1"></div><div class="fog f2"></div>
+  <div class="motes" id="motes"></div>
+  <div class="dawnlight"></div>
+</div>
+<canvas id="thread" aria-hidden="true"></canvas>
+
+<header class="top">
+  <a class="logo" href="#" data-jump="0">Aver<b>i</b>tA</a>
+  <nav class="nav" aria-label="主导航"><a href="/articles/">断章</a><a href="/projects/">造物</a><a href="/moments/">闪念</a><a href="/about/">此身</a></nav>
+</header>
+
+<nav class="rail" aria-label="这一夜">
+  <span class="dot" id="railDot"></span>
+  <a href="#" data-jump="0" style="top:0%">入夜 <span>23:07</span></a>
+  <a href="#" data-jump="1" style="top:25%">断章 <span>23:19</span></a>
+  <a href="#" data-jump="2" style="top:50%">造物 <span>01:11</span></a>
+  <a href="#" data-jump="3" style="top:75%">闪念 <span>02:08</span></a>
+  <a href="#" data-jump="4" style="top:100%">晨醒 <span>06:31</span></a>
+</nav>
+<div class="clock" id="clock">23:07</div>
+<div class="switch"><a href="p24-a-surface.html">A · 水面之下</a><a class="cur" href="p24-b-thread.html">B · 一根线</a></div>
+<div class="fps" id="fps"></div>
+
+<main>
+  <!-- ═══ 入夜 ═══ -->
+  <section class="sec hero" data-sec="0">
+    <span class="gl gl-wake" data-rv style="--d:.2s" aria-hidden="true">醒</span>
+    <span class="gl gl-dream" data-rv style="--d:.7s" aria-hidden="true">梦</span>
+    <div class="hero-copy" data-rv style="--d:1.1s">
+      <span class="stamp">23:07 · 入夜</span>
+      <h1>在即将醒来的那一瞬，<br>世界究竟是在<em>成形</em>，<br>还是正在<em>融化</em>？</h1>
+      <p class="who"><b>Traveritas</b>随笔、项目，与正在成形的东西。</p>
+    </div>
+    <p class="hint" data-rv style="--d:1.6s">沿着这根线，向下</p>
+  </section>
+
+  <!-- ═══ 浅梦 · 断章 ═══ -->
+  <section class="sec essays" data-sec="1">
+    <div class="chap" data-rv><span class="cap">浅梦 · 23:19 — 01:11</span><h2>断章</h2></div>
+    <div class="list">
+      <a class="essay" href="#" data-rv data-hang data-spindle><span class="no">01</span><div><span class="meta">2026.09.28 · 样张 · 排版 · 醒梦</span><h3>字面与光景 · 全样式样张</h3><p>随笔正文排版正典、小节序号、两态文字与行内光景的完整表现存目。</p></div><span class="go">→</span></a>
+      <a class="essay" href="#" data-rv style="--d:.15s" data-hang data-spindle><span class="no">02</span><div><span class="meta">2026.09.19 · 建站 · 设计 · 醒梦</span><h3>母题探索记录：从碎块到花</h3><p>主页视觉母题的三轮探索与两次否决——一份仍在进行中的设计日志。</p></div><span class="go">→</span></a>
+      <a class="essay" href="#" data-rv style="--d:.3s" data-hang data-spindle><span class="no">03</span><div><span class="meta">2026.09.19 · 建站 · 醒梦</span><h3>开站：在醒与梦之间</h3><p>这个网站为什么存在，以及它想长成什么样子。</p></div><span class="go">→</span></a>
+      <div><a class="more" href="/articles/" data-rv style="--d:.45s">全部断章 →</a></div>
+    </div>
+  </section>
+
+  <!-- ═══ 深眠 · 造物 ═══ -->
+  <section class="sec projects" data-sec="2">
+    <div class="chap" data-rv><span class="cap">深眠 · 01:11 — 02:08</span><h2>造物</h2></div>
+    <div class="slabs">
+      <a class="slab r" href="#" data-rv data-hang style="--depth:5">
+        <div class="win"><svg data-lily="3" viewBox="-100 -100 200 200" preserveAspectRatio="xMidYMid slice"></svg><div class="fogv"></div></div>
+        <div class="slab-body"><div class="slab-head"><span>2026.09.28</span><span>进行中</span></div><h3>样式系统与构造规范</h3><p>项目变体下的方框语言、施工清单、深眠注记与板块排版全览。</p><div class="depth"><span>浮现度 <b>5</b>/8</span><span>✓ 公开仓库</span></div></div>
+      </a>
+      <a class="slab l" href="#" data-rv data-hang style="--depth:2">
+        <div class="win"><svg data-lily="7" viewBox="-100 -100 200 200" preserveAspectRatio="xMidYMid slice"></svg><div class="fogv"></div></div>
+        <div class="slab-body"><div class="slab-head"><span>2026.09.19</span><span>构想中</span></div><h3>醒梦 · 视觉母题探索</h3><p>为「醒梦」寻找 2—4 个可以反复出现的核心视觉意象。</p><div class="depth"><span>浮现度 <b>2</b>/8</span><span>○ 暂无公开</span></div></div>
+      </a>
+      <a class="slab r" href="#" data-rv data-hang style="--depth:5">
+        <div class="win"><svg data-lily="11" viewBox="-100 -100 200 200" preserveAspectRatio="xMidYMid slice"></svg><div class="fogv"></div></div>
+        <div class="slab-body"><div class="slab-head"><span>2026.09.19</span><span>进行中</span></div><h3>这个网站本身</h3><p>探索「醒梦」落地的个人网站与持续迭代记录。</p><div class="depth"><span>浮现度 <b>5</b>/8</span><span>✓ 公开仓库</span></div></div>
+      </a>
+    </div>
+    <a class="more" href="/projects/" data-rv>全部造物 →</a>
+  </section>
+
+  <!-- ═══ 异相 · 闪念 ═══ -->
+  <section class="sec rem" data-sec="3">
+    <div class="chap" data-rv><span class="cap">异相 · 02:08 — 04:59</span><h2>闪念</h2></div>
+    <div class="slips">
+      <a class="slip r" href="#" data-rv data-hang data-spike><span class="h"><span>09.28 14:40</span><em>#知觉</em></span><b>水面的边缘</b><span class="t">微光与水汽漫开的边缘，没有确凿的轮廓。</span></a>
+      <a class="slip l" href="#" data-rv data-hang data-spike><span class="h"><span>09.27 23:45</span><em>#器物</em></span><b>十四度发丝线</b><span class="t">纸面上画下一道倾斜十四度的极细线。它不是裁切，只是……</span></a>
+      <a class="slip r" href="#" data-rv data-hang data-spike><span class="h"><span>09.25 01:20</span><em>#随感</em></span><b>深夜读断章</b><span class="t">凡能够说的事情，都能够说清楚；凡不能说的事情，就应当保持沉默。</span></a>
+      <div class="glass" data-rv aria-hidden="true"><b>它可能<br>马上消失。</b><span class="cap">GLASS SLIP</span></div>
+      <a class="slip l" href="#" data-rv data-hang data-spike><span class="h"><span>09.24 18:15</span><em>#界面</em></span><b>遮蔽与展露</b><span class="t">磨砂玻璃并不掩藏内部，它只是让里面的几何形体退后两步，变成一层温和的浅影。</span></a>
+      <a class="slip r" href="#" data-rv data-hang data-spike><span class="h"><span>09.22 02:08</span><em>#尺度</em></span><b>未命名的空洞</b><span class="t">巨大的尺度若悬于极远处，便不会给人以压迫，反而像一轮褪了色的静止月面。</span></a>
+      <a class="slip l" href="#" data-rv data-hang data-spike><span class="h"><span>09.20 22:30</span><em>#色彩</em></span><b>琥珀的微温</b><span class="t">屏幕不应当太冷。字色底下一丝极淡的琥珀偏暖，才让人觉得光是有温度的。</span></a>
+      <a class="slip r" href="#" data-rv data-hang data-spike><span class="h"><span>09.18 03:52</span><em>#醒梦</em></span><b>即将醒来的一瞬</b><span class="t">在它消失之前，我们确曾在这张半透明的纸上写下了几个字。</span></a>
+    </div>
+    <a class="more" href="/moments/" data-rv>全部闪念 →</a>
+  </section>
+
+  <!-- ═══ 06:31 晨醒 ═══ -->
+  <section class="sec dawn" data-sec="4">
+    <div class="time" data-rv>06:31 · 晨光</div>
+    <h2 data-rv style="--d:.15s">注视持续得太久。<br>被注视之物微微退开。</h2>
+    <div class="baseline" id="baseline"></div>
+    <p class="about" data-rv>〔mock 占位〕这里放一两句醒态的自我介绍：你是谁、在做什么、这里会写些什么。</p>
+    <div class="exits" data-rv style="--d:.1s">
+      <a href="https://github.com/Traveritas">GitHub<small>github.com/Traveritas</small></a>
+      <a href="https://github.com/Traveritas/traveritas.github.io">本站源码<small>traveritas.github.io</small></a>
+      <a href="/rss.xml">RSS<small>/rss.xml</small></a>
+      <a href="/about/">关于此处 →<small>/about/</small></a>
+    </div>
+    <div class="index" data-rv style="--d:.2s">
+      <div><h4><a href="/articles/">断章</a></h4><ul>
+        <li><a href="#">字面与光景 · 全样式样张<span>09.28</span></a></li>
+        <li><a href="#">母题探索记录：从碎块到花<span>09.19</span></a></li>
+        <li><a href="#">开站：在醒与梦之间<span>09.19</span></a></li>
+      </ul></div>
+      <div><h4><a href="/projects/">造物</a></h4><ul>
+        <li><a href="#">样式系统与构造规范<span>5/8</span></a></li>
+        <li><a href="#">醒梦 · 视觉母题探索<span>2/8</span></a></li>
+        <li><a href="#">这个网站本身<span>5/8</span></a></li>
+      </ul></div>
+      <div><h4><a href="/moments/">闪念</a></h4><ul>
+        <li><a href="#">水面的边缘<span>09.28</span></a></li>
+        <li><a href="#">十四度发丝线<span>09.27</span></a></li>
+        <li><a href="#">深夜读断章<span>09.25</span></a></li>
+        <li><a href="/moments/">全部闪念 →<span></span></a></li>
+      </ul></div>
+    </div>
+    <div class="foot"><span>Traveritas 2026</span><span>在醒与梦之间</span></div>
+  </section>
+</main>
+
+<script>
+(() => {
+  const root = document.documentElement;
+  const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const mq = matchMedia('(max-width:760px)');
+  const secs = [...document.querySelectorAll('[data-sec]')];
+  const railLinks = [...document.querySelectorAll('.rail a')];
+  const railDot = document.getElementById('railDot');
+  const clock = document.getElementById('clock');
+  const cvs = document.getElementById('thread');
+  const ctx = cvs.getContext('2d');
+
+  /* 微尘 */
+  const motes = document.getElementById('motes');
+  for (let i = 0; i < 40; i++) {
+    const m = document.createElement('i');
+    m.style.cssText = `left:${Math.random()*100}%;top:${Math.random()*100}%;--t:${6+Math.random()*10}s;--dx:${(Math.random()-.5)*60}px;--dy:${(Math.random()-.5)*60}px;animation-delay:${-Math.random()*10}s`;
+    motes.append(m);
+  }
+  /* 晶板窗口里的抽象百合 */
+  let seed = 1; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  document.querySelectorAll('svg[data-lily]').forEach((svg) => {
+    const id = svg.dataset.lily; seed = +id * 997;
+    let out = `<defs><radialGradient id="pg${id}"><stop offset="0" stop-color="#f3e6d6" stop-opacity=".55"/><stop offset="1" stop-color="#a9b8d6" stop-opacity=".08"/></radialGradient></defs>`;
+    const k = 5 + Math.floor(rnd() * 2), rot0 = rnd() * 60;
+    for (let i = 0; i < k; i++) {
+      const a = rot0 + i * 360 / k + (rnd() - .5) * 22, L = 62 + rnd() * 26, w = 16 + rnd() * 10, bend = (rnd() - .5) * 18;
+      out += `<path transform="rotate(${a.toFixed(1)})" d="M0 0 C ${w} ${-L*.3}, ${w*.6+bend} ${-L*.85}, ${bend} ${-L} C ${-w*.6+bend} ${-L*.85}, ${-w} ${-L*.3}, 0 0Z" fill="url(#pg${id})" stroke="#e6ecf7" stroke-opacity=".45" stroke-width=".8"/>`;
+    }
+    svg.innerHTML = out + '<circle r="5" fill="#d9a05b" fill-opacity=".7"/>';
+  });
+
+  /* ── 浮现 ── */
+  const hung = [...document.querySelectorAll('[data-hang]')].map((el) => ({ el, t0: -1, hover: 0, hoverT: 0 }));
+  const io = new IntersectionObserver((es) => es.forEach((e) => {
+    if (!e.isIntersecting) return;
+    e.target.classList.add('in');
+    const h = hung.find((x) => x.el === e.target);
+    if (h && h.t0 < 0) h.t0 = performance.now() / 1000 + parseFloat(getComputedStyle(e.target).getPropertyValue('--d') || 0);
+    io.unobserve(e.target);
+  }), { rootMargin: '0px 0px -12% 0px' });
+  document.querySelectorAll('[data-rv]').forEach((el) => io.observe(el));
+  /* 首屏不等观察器：装载即依次浮现（底部提示落在观察器的下缘盲区里） */
+  requestAnimationFrame(() => document.querySelectorAll('.hero [data-rv]').forEach((el) => el.classList.add('in')));
+  hung.forEach((h) => {
+    h.el.addEventListener('pointerenter', () => { h.hoverT = 1; if (h.el.hasAttribute('data-spike')) h.t0 = performance.now() / 1000; });
+    h.el.addEventListener('pointerleave', () => { h.hoverT = 0; });
+  });
+
+  /* ── 色板（按视口中线所处的「场序 + 场内进度」插值），含线色 ── */
+  const S = [
+    [0.00, [237,240,244], [35,40,48],   [86,96,109],   [255,255,255,.75], 0, 0, [70,78,92]],
+    [1.00, [230,235,242], [35,40,48],   [86,96,109],   [255,255,255,.7],  0, 0, [84,90,104]],
+    [1.86, [221,227,236], [35,40,48],   [86,96,109],   [255,255,255,.6],  0, 0, [96,100,112]],
+    [2.10, [24,32,48],    [230,233,239],[154,166,184], [120,150,200,.18], 1, 0, [176,196,232]],
+    [2.92, [20,26,39],    [230,233,239],[154,166,184], [120,150,200,.14], 1, 0, [176,196,232]],
+    [3.10, [34,29,49],    [236,230,241],[169,159,186], [170,140,210,.16], 1, 0, [214,186,236]],
+    [3.90, [42,36,56],    [236,230,241],[169,159,186], [170,140,210,.14], 1, 0, [214,186,236]],
+    [4.22, [239,230,216], [43,38,32],   [111,100,87],  [255,236,205,.8],  0, 1, [150,108,70]],
+    [5.00, [245,239,230], [43,38,32],   [111,100,87],  [255,240,215,.7],  0, .8, [150,108,70]],
+  ];
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const clamp01 = (v) => Math.min(1, Math.max(0, v));
+  const mix = (A, B, t) => A.map((v, i) => lerp(v, B[i], t));
+  const rgb = (c) => c.length === 4 ? `rgba(${c[0]|0},${c[1]|0},${c[2]|0},${c[3].toFixed(3)})` : `rgb(${c[0]|0},${c[1]|0},${c[2]|0})`;
+  let lineRGB = [70, 78, 92];
+  function palette(pos) {
+    let i = 0; while (i < S.length - 2 && pos > S[i + 1][0]) i++;
+    const a = S[i], b = S[i + 1], t = clamp01((pos - a[0]) / (b[0] - a[0]));
+    root.style.setProperty('--bg', rgb(mix(a[1], b[1], t)));
+    root.style.setProperty('--ink', rgb(mix(a[2], b[2], t)));
+    root.style.setProperty('--ink-soft', rgb(mix(a[3], b[3], t)));
+    root.style.setProperty('--glow', rgb(mix(a[4], b[4], t)));
+    root.style.setProperty('--dark', lerp(a[5], b[5], t).toFixed(3));
+    root.style.setProperty('--dawn', lerp(a[6], b[6], t).toFixed(3));
+    lineRGB = mix(a[7], b[7], t);
+  }
+
+  /* ── 五幕波形参数表（按采样点的夜段 pos 插值）
+     A 振幅 px · f 空间频率（周/px）· v 时间速度 · n 噪声 · w 线宽 · saw 锯齿 · frag 断裂 · sp 纺锤 ── */
+  const P = [
+    [0.00, { A: 3.2, f: 1/13,  v: 9,   n: .55, w: 1.25, saw: 0, frag: 0, sp: 0 }],
+    [0.75, { A: 3.4, f: 1/15,  v: 8,   n: .5,  w: 1.25, saw: 0, frag: 0, sp: 0 }],
+    [1.10, { A: 6,   f: 1/40,  v: 3.2, n: .3,  w: 1.4,  saw: 0, frag: 0, sp: 1 }],
+    [1.85, { A: 6.5, f: 1/46,  v: 3,   n: .3,  w: 1.4,  saw: 0, frag: 0, sp: 1 }],
+    [2.18, { A: 40,  f: 1/250, v: .9,  n: .06, w: 2.5,  saw: 0, frag: 0, sp: 0 }],
+    [2.90, { A: 44,  f: 1/270, v: .8,  n: .06, w: 2.6,  saw: 0, frag: 0, sp: 0 }],
+    [3.14, { A: 11,  f: 1/27,  v: 6,   n: .45, w: 1.3,  saw: 1, frag: 1, sp: 0 }],
+    [3.92, { A: 11,  f: 1/27,  v: 6,   n: .45, w: 1.3,  saw: 1, frag: 1, sp: 0 }],
+    [4.18, { A: 1.4, f: 1/70,  v: 1.2, n: .05, w: 1.2,  saw: 0, frag: 0, sp: 0 }],
+    [4.55, { A: 0,   f: 1/80,  v: 1,   n: 0,   w: 1.2,  saw: 0, frag: 0, sp: 0 }],
+    [5.00, { A: 0,   f: 1/80,  v: 1,   n: 0,   w: 1.2,  saw: 0, frag: 0, sp: 0 }],
+  ];
+  const KEYS = Object.keys(P[0][1]);
+  function paramsAt(pos, mobile) {
+    let i = 0; while (i < P.length - 2 && pos > P[i + 1][0]) i++;
+    const a = P[i], b = P[i + 1], t = clamp01((pos - a[0]) / (b[0] - a[0]));
+    const s = t * t * (3 - 2 * t), o = {};
+    for (const k of KEYS) o[k] = lerp(a[1][k], b[1][k], s);
+    if (mobile) o.A *= o.A > 15 ? .36 : .8;
+    return o;
+  }
+
+  /* 一维值噪声 */
+  const hash = (i) => { const x = Math.sin(i * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+  const noise = (x) => { const i = Math.floor(x), f = x - i, u = f * f * (3 - 2 * f); return lerp(hash(i), hash(i + 1), u) * 2 - 1; };
+  const saw = (x) => 2 * (x - Math.floor(x + .5));
+
+  /* ── 骨架：过锚点的 Catmull-Rom 曲线，文档坐标里烘焙 ── */
+  let SP = [], vh = innerHeight, vw = innerWidth, T = [], docH = 0, spindles = [], spikes = [];
+  /* 未浮现的元素还带着 22px 的下沉位移，量的时候扣掉，引线才对得准 */
+  const docRect = (el) => {
+    const r = el.getBoundingClientRect(), k = el.matches('[data-rv]:not(.in)') && !RM ? 22 : 0;
+    return { x: r.left, y: r.top + scrollY - k, w: r.width, h: r.height, r: r.right, b: r.bottom + scrollY - k };
+  };
+  const posOfY = (y) => {
+    for (let k = 4; k >= 0; k--) if (y >= T[k]) return k === 4 ? 4 + clamp01((y - T[4]) / Math.max(1, docH - T[4])) : k + clamp01((y - T[k]) / (T[k + 1] - T[k]));
+    return 0;
+  };
+  function buildSpine() {
+    vh = innerHeight; vw = innerWidth; docH = root.scrollHeight;
+    T = secs.map((s) => docRect(s).y);
+    const m = mq.matches, W = vw, pts = [];
+    const H0 = secs[0].offsetHeight;
+    const lxE = m ? W * .07 : W * .255;             // 断章处线的横坐标
+    const lxC = m ? W * .07 : W * .5;               // 造物 / 闪念处
+    /* 入夜：从天上垂下，从醒与梦之间穿过 */
+    if (m) pts.push([W * .5, -80], [W * .5, 0], [W * .49, H0 * .22], [W * .52, H0 * .36], [W * .07, H0 * .52], [W * .07, H0 * .8]);
+    else pts.push([W * .5, -80], [W * .5, 0], [W * .49, H0 * .3], [W * .53, H0 * .6], [W * .47, H0 * .86]);
+    /* 断章：每篇一个锚点（线在列表左缘外，轻轻摆动） */
+    const ess = [...document.querySelectorAll('.essay')];
+    ess.forEach((el, i) => { const r = docRect(el); pts.push([lxE + (m ? 0 : (i % 2 ? 14 : -10)), r.y + 46]); });
+    const essM = docRect(document.querySelector('.essays .more'));
+    pts.push([lxE, essM.b + 40]);
+    /* 造物：回到正中 */
+    const slabs = [...document.querySelectorAll('.slab')];
+    pts.push([m ? lxC : W * .48, T[2] + (m ? 40 : 60)]);
+    slabs.forEach((el) => { const r = docRect(el); pts.push([lxC, r.y + 30]); pts.push([lxC, r.y + r.h * .7]); });
+    /* 闪念 */
+    pts.push([lxC, T[3] + 60]);
+    document.querySelectorAll('.slips > *').forEach((el) => { const r = docRect(el); pts.push([lxC + (m ? 0 : 0), r.y + r.h * .5]); });
+    /* 晨醒：线往左下收，贴着标题下方拐成横向的底线 */
+    const base = docRect(document.getElementById('baseline'));
+    const by = base.y + base.h * .5;
+    const lxD = m ? W * .07 : W * .12;
+    pts.push([lxC, T[4] + 40]);
+    if (!m) pts.push([W * .3, T[4] + (by - T[4]) * .45]);
+    pts.push([lxD, by - 90], [lxD + 40, by], [W * .5, by], [W * (m ? .96 : .9), by], [W * (m ? .97 : .92), by]);
+
+    /* 采样：每段按弦长定步数，约 3px 一点 */
+    const raw = [];
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = pts[Math.max(0, i - 1)], p1 = pts[i], p2 = pts[i + 1], p3 = pts[Math.min(pts.length - 1, i + 2)];
+      const n = Math.max(2, Math.ceil(Math.hypot(p2[0] - p1[0], p2[1] - p1[1]) / 3));
+      for (let j = 0; j < n; j++) {
+        const t = j / n, t2 = t * t, t3 = t2 * t;
+        const cr = (a, b, c, d) => .5 * ((2 * b) + (-a + c) * t + (2 * a - 5 * b + 4 * c - d) * t2 + (-a + 3 * b - 3 * c + d) * t3);
+        raw.push([cr(p0[0], p1[0], p2[0], p3[0]), cr(p0[1], p1[1], p2[1], p3[1])]);
+      }
+    }
+    raw.push(pts[pts.length - 1]);
+    SP = []; let s = 0, ph = 0;
+    for (let i = 0; i < raw.length; i++) {
+      const a = raw[Math.max(0, i - 1)], b = raw[Math.min(raw.length - 1, i + 1)];
+      let tx = b[0] - a[0], ty = b[1] - a[1]; const L = Math.hypot(tx, ty) || 1; tx /= L; ty /= L;
+      if (i > 0) { const d = Math.hypot(raw[i][0] - raw[i - 1][0], raw[i][1] - raw[i - 1][1]); s += d; }
+      const pos = posOfY(raw[i][1]);
+      const pr = paramsAt(pos, m);
+      if (i > 0) ph += pr.f * Math.hypot(raw[i][0] - raw[i - 1][0], raw[i][1] - raw[i - 1][1]);
+      SP.push({ x: raw[i][0], y: raw[i][1], nx: -ty, ny: tx, s, ph, pos, pr });
+    }
+    /* 挂件在线上的落点：按锚点 y 找最近的采样 */
+    const nearest = (y) => { let best = 0, bd = 1e9; for (let i = 0; i < SP.length; i++) { const d = Math.abs(SP[i].y - y); if (d < bd && SP[i].pos < 4.3) { bd = d; best = i; } } return best; };
+    hung.forEach((h) => {
+      const r = docRect(h.el);
+      h.ay = h.el.classList.contains('essay') ? r.y + 46 : r.y + Math.min(40, r.h * .3);
+      h.i = nearest(h.ay); h.s = SP[h.i].s; h.rect = r;
+    });
+    spindles = hung.filter((h) => h.el.hasAttribute('data-spindle'));
+    spikes = hung.filter((h) => h.el.hasAttribute('data-spike'));
+  }
+
+  /* ── 画 ── */
+  let arousal = 0, lastY = scrollY, lastT = performance.now(), vel = 0;
+  const dpr = Math.min(2, devicePixelRatio || 1);
+  function resize() { cvs.width = innerWidth * dpr; cvs.height = innerHeight * dpr; buildSpine(); }
+
+  function offsetAt(p, t, g, extra) {
+    const pr = p.pr, A = pr.A * (1 - .45 * g);
+    const ph = p.ph * (1 + 1.4 * g);
+    const vt = pr.v * (1 + 2.2 * g) * t;
+    const TAU = 6.283;
+    let w = (Math.sin(TAU * ph - vt) + .35 * Math.sin(TAU * 2.3 * ph + 1.7 - 1.3 * vt)) * A * (1 - pr.saw)
+          + saw(ph - vt / TAU) * A * pr.saw
+          + noise(p.s * .06 + t * 1.3) * A * pr.n;
+    return w + extra;
+  }
+  function spindleAt(p, t) {
+    let e = 0;
+    for (const h of spindles) {
+      const d = (p.s - h.s) / (46 + h.hover * 18);
+      if (Math.abs(d) > 3) continue;
+      const env = Math.exp(-d * d) * p.pr.sp;
+      e += env * (7 + h.hover * 16) * Math.sin(p.s / 1.7 - t * 13);
+    }
+    for (const h of spikes) {
+      if (h.t0 < 0) continue;
+      const age = t - h.t0; if (age < 0 || age > 3) continue;
+      const d = (p.s - h.s) / 13;
+      if (Math.abs(d) > 3) continue;
+      const k = Math.exp(-age / .55) * (1 - Math.exp(-age / .05));
+      e += Math.exp(-d * d) * 46 * k * (h.el.classList.contains('l') ? 1 : -1) * (mq.matches ? .6 : 1);
+    }
+    return e;
+  }
+
+  let tFrozen = 0;
+  function frame(now) {
+    requestAnimationFrame(frame);
+    const t = RM ? tFrozen : now / 1000;
+    /* 滚动速度 → 清醒程度（快速升起，约 1.5s 衰减） */
+    const dt = Math.max(1, now - lastT); const y = scrollY;
+    vel = lerp(vel, Math.abs(y - lastY) / dt, .25); lastY = y; lastT = now;
+    const target = clamp01(vel / 3.2);
+    arousal = target > arousal ? lerp(arousal, target, .35) : arousal * Math.exp(-dt / 1500 * 2.2);
+    hung.forEach((h) => { h.hover = lerp(h.hover, h.hoverT, .08); });
+
+    const cpos = posOfY(y + vh * .5);
+    palette(cpos);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, vw, vh);
+    const y0 = y - 80, y1 = y + vh + 80;
+    const g = RM ? 0 : arousal;
+
+    /* 回声：延迟半秒的一道淡琥珀，梦里那几道残影的影子 */
+    for (const pass of [1, 0]) {
+      const tt = pass ? t - .55 : t;
+      ctx.beginPath();
+      let pen = false, wSum = 0, wN = 0;
+      for (let i = 0; i < SP.length; i++) {
+        const p = SP[i];
+        if (p.y < y0 || p.y > y1) { pen = false; continue; }
+        if (p.pr.frag > .02 && noise(p.ph * .55 + tt * .5 + (pass ? 7 : 0)) < -1 + p.pr.frag * .72) { pen = false; continue; }
+        const off = offsetAt(p, tt, g, pass ? 0 : spindleAt(p, tt)) + (pass ? 3 : 0);
+        const X = p.x + p.nx * off, Y = p.y + p.ny * off - y;
+        if (pen) ctx.lineTo(X, Y); else { ctx.moveTo(X, Y); pen = true; }
+        wSum += p.pr.w; wN++;
+      }
+      const lw = (wN ? wSum / wN : 1.3) * (1 - .35 * g);
+      ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+      if (pass) { ctx.strokeStyle = 'rgba(217,160,91,.32)'; ctx.lineWidth = Math.max(.8, lw * .7); }
+      else { ctx.strokeStyle = `rgba(${lineRGB[0]|0},${lineRGB[1]|0},${lineRGB[2]|0},.85)`; ctx.lineWidth = lw; }
+      ctx.stroke();
+    }
+
+    /* 挂件：线上一个结 + 一根细引线接到卡片边缘 */
+    for (const h of hung) {
+      if (h.t0 < 0) continue;
+      const p = SP[h.i]; if (!p || p.y < y0 || p.y > y1) continue;
+      const a = clamp01((t - h.t0 - .2) / .8);
+      if (a <= 0) continue;
+      const off = offsetAt(p, t, g, spindleAt(p, t));
+      const X = p.x + p.nx * off, Y = p.y + p.ny * off - y;
+      const r = h.rect, ay = h.ay - y;
+      const ex = r.x > X ? r.x - 6 : r.r + 6;
+      ctx.strokeStyle = `rgba(${lineRGB[0]|0},${lineRGB[1]|0},${lineRGB[2]|0},${(.35 + h.hover * .4) * a})`;
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(X, Y); ctx.lineTo(lerp(X, ex, a), ay); ctx.stroke();
+      ctx.fillStyle = `rgba(217,160,91,${a})`;
+      ctx.beginPath(); ctx.arc(X, Y, 2.6 + h.hover * 1.4, 0, 6.283); ctx.fill();
+    }
+    /* 线尾：晨醒底线的终点 */
+    const e = SP[SP.length - 1];
+    if (e && e.y > y0 && e.y < y1) { ctx.fillStyle = 'rgba(217,160,91,.9)'; ctx.beginPath(); ctx.arc(e.x, e.y - y, 3.2, 0, 6.283); ctx.fill(); }
+
+    /* 夜轨 / 时钟 */
+    const MIN = [0, 12, 124, 181, 352, 444];
+    const k = Math.min(4, Math.floor(cpos)), f = cpos - k;
+    const m = k >= 4 ? lerp(MIN[4], MIN[5], f) : lerp(MIN[k], MIN[k + 1], f);
+    const tm = (23 * 60 + 7 + Math.round(m)) % 1440;
+    clock.textContent = String(Math.floor(tm / 60)).padStart(2, '0') + ':' + String(tm % 60).padStart(2, '0');
+    railDot.style.top = (Math.min(4, cpos) / 4 * 100) + '%';
+    railLinks.forEach((a, i) => a.classList.toggle('on', i === Math.min(4, Math.floor(cpos + .15))));
+    fpsTick(now);
+  }
+
+  /* 夜轨：页内跳转（右上四个入口是独立页面，不在这里） */
+  document.querySelectorAll('[data-jump]').forEach((a) => a.addEventListener('click', (e) => {
+    e.preventDefault(); const k = +a.dataset.jump;
+    scrollTo({ top: k === 0 ? 0 : T[k] + (mq.matches ? 0 : vh * .12), behavior: RM ? 'auto' : 'smooth' });
+  }));
+
+  let fpsTick = () => {};
+  if (location.search.includes('debug')) {
+    const el = document.getElementById('fps'); el.style.display = 'block';
+    let fr = 0, t0 = performance.now();
+    fpsTick = (t) => { fr++; if (t - t0 > 1000) { el.textContent = fr + ' fps'; fr = 0; t0 = t; } };
+  }
+
+  addEventListener('resize', resize);
+  resize();
+  document.fonts && document.fonts.ready.then(resize);
+  addEventListener('load', resize);
+  /* 布局会因浮现/字体变化轻微移动：再烘焙一次骨架 */
+  setTimeout(resize, 1600);
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
