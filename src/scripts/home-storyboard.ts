@@ -127,6 +127,7 @@ export function initStoryboard() {
     side: Number(el.dataset.side),
     crisp: el.querySelector<HTMLElement>('.crisp'),
     ghost: el.querySelector<HTMLElement>('.ghost'),
+    r: { left: 0, top: 0 },
   }));
   const slips = [...document.querySelectorAll<HTMLElement>('[data-c]')].map((el) => ({ el, c: Number(el.dataset.c) }));
   slips.forEach(({ el, c }) => el.style.setProperty('--c', String(c)));
@@ -187,6 +188,60 @@ export function initStoryboard() {
     root.style.setProperty('--wv-w-sz', `22px ${H}px`);
     root.style.setProperty('--wv-d', waveTile(72, H, 4.5, 2.5, '#b88560', (u) => 5 + 20 * u ** 1.6));
     root.style.setProperty('--wv-d-sz', `72px ${H}px`);
+    if (!RM) glyphMasks();
+  };
+
+  /* 字形遮罩：把 .pa 的字画进画布当静止遮罩（见 new.astro 的 .pa.mk），波纹贴图改走合成层平移。
+     竖向位置按行高 1 的行内框复算：基线 ＝ 半行距 ＋ 字体上沿 */
+  const glyphMasks = () => {
+    const dpr = Math.min(3, devicePixelRatio || 1);
+    for (const el of document.querySelectorAll<HTMLElement>('.gw .pa')) {
+      const w = el.clientWidth;
+      const h = el.clientHeight;
+      if (!w || !h) continue;
+      const cs = getComputedStyle(el);
+      // measure() 在初始化、字体就绪、load 时各跑一次：尺寸与字体没变就沿用已有遮罩
+      const key = `${w}x${h}@${dpr}|${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}|${document.fonts?.status}`;
+      if (el.dataset.maskKey === key) continue;
+      el.dataset.maskKey = key;
+      const cv = document.createElement('canvas');
+      cv.width = Math.round(w * dpr);
+      cv.height = Math.round(h * dpr);
+      const ctx = cv.getContext('2d');
+      if (!ctx) return;
+      ctx.scale(dpr, dpr);
+      ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'alphabetic';
+      const ch = el.firstChild?.textContent ?? '';
+      const tm = ctx.measureText(ch);
+      const asc = tm.fontBoundingBoxAscent;
+      const lh = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize);
+      ctx.fillText(ch, w / 2, (lh - asc - tm.fontBoundingBoxDescent) / 2 + asc);
+      cv.toBlob((blob) => {
+        if (!blob || el.dataset.maskKey !== key) return;
+        const url = URL.createObjectURL(blob);
+        // 先解码再挂上：遮罩图未就绪时合成层会把整层遮空，且之后不一定补画
+        const img = new Image();
+        img.src = url;
+        img
+          .decode()
+          .then(() => {
+            // 期间尺寸或字体又变了：这张已过期，等新的一张
+            if (el.dataset.maskKey !== key) return URL.revokeObjectURL(url);
+            const old = el.dataset.mask;
+            el.dataset.mask = url;
+            el.style.setProperty('--pa-mask', `url("${url}")`);
+            el.classList.add('mk');
+            // 旧图等新图上屏后再释放
+            if (old) setTimeout(() => URL.revokeObjectURL(old), 1000);
+          })
+          .catch(() => {
+            URL.revokeObjectURL(url);
+            delete el.dataset.maskKey; // 下次 measure 重试
+          });
+      });
+    }
   };
 
   function buildPoses() {
@@ -282,10 +337,27 @@ export function initStoryboard() {
   let scrollDirty = true;
   let lastSent = '';
   let raf = 0;
+  let nap = 0;
   let lastClip = 0;
   const kick = () => {
     scrollDirty = true;
+    if (nap) {
+      clearTimeout(nap);
+      nap = 0;
+    }
     if (!raf) raf = requestAnimationFrame(frame);
+  };
+  /* 静置时按切口的 30fps 节拍睡到下一拍前再要帧：每要一帧主线程就得把全页在跑的
+     CSS 动画（页头浮字、提示点、雾）重算一遍样式，空转的 60Hz rAF 会让这笔开销翻倍 */
+  const later = () => {
+    if (raf || nap) return;
+    const wait = 20 - (performance.now() - lastClip);
+    if (wait <= 0) raf = requestAnimationFrame(frame);
+    else
+      nap = window.setTimeout(() => {
+        nap = 0;
+        if (!raf) raf = requestAnimationFrame(frame);
+      }, wait);
   };
 
   function clipMembranes(sp: Spine, xy: number[]) {
@@ -302,7 +374,7 @@ export function initStoryboard() {
     const F = 4000;
     for (const m of membranes) {
       if (!m.crisp || !m.ghost) continue;
-      const r = m.el.getBoundingClientRect();
+      const r = m.r;
       const poly = (sg: number) => {
         let s = 'polygon(';
         for (let i = 0; i < xy.length; i += 2) s += `${(xy[i] - r.left).toFixed(1)}px ${(xy[i + 1] - r.top).toFixed(1)}px,`;
@@ -315,20 +387,36 @@ export function initStoryboard() {
     }
   }
 
+  /* 骨架只随滚动 / 尺寸变：缓存起来，静置时不必每帧重算 */
+  let xy = new Float32Array(0);
+  let sp: Spine | null = null;
+
   function frame(now: number) {
     raf = 0;
     const scrollDirtyThisFrame = scrollDirty;
+    const reveal = RM ? 1 : t0 < 0 ? 0 : cl((now - t0 - 150) / 1150);
+    // 静置帧：没滚动、入场已完成、离下一次切口还早 —— 什么都不做，睡到下一拍
+    if (!scrollDirty && sp && reveal >= 1 && now - lastClip < 28) {
+      if (pos < 1.05 && !RM) later();
+      return;
+    }
     if (scrollDirty) {
       scrollDirty = false;
       updateScroll();
+      // 字框位置只随滚动 / 尺寸变；在本帧写任何样式之前一次读完，免得逐字强制同步重排
+      for (const m of membranes) {
+        const r = m.el.getBoundingClientRect();
+        m.r = { left: r.left, top: r.top };
+      }
+      const pts = poseAt(pos);
+      xy = new Float32Array(pts.length * 2);
+      for (let i = 0; i < pts.length; i++) {
+        xy[2 * i] = pts[i][0];
+        xy[2 * i + 1] = pts[i][1] - lift;
+      }
+      sp = makeSpine(xy);
     }
-    const pts = poseAt(pos);
-    const xy = new Float32Array(pts.length * 2);
-    for (let i = 0; i < pts.length; i++) {
-      xy[2 * i] = pts[i][0];
-      xy[2 * i + 1] = pts[i][1] - lift;
-    }
-    const reveal = RM ? 1 : t0 < 0 ? 0 : cl((now - t0 - 150) / 1150);
+    if (!sp) return;
     const dotF = mq.matches ? 0.78 : 0.7;
     // 同一姿态、同一入场进度、同一明暗就不再发（Worker 端自己在流动）
     const key = `${pos.toFixed(4)}|${lift.toFixed(1)}|${reveal.toFixed(3)}|${dark.toFixed(3)}|${vw}x${vh}`;
@@ -338,9 +426,8 @@ export function initStoryboard() {
     }
 
     const heroOn = pos < 1.05;
-    const sp = makeSpine(xy);
-    // 切口与 Worker 同拍（约 30fps）：线本身也是这个帧率画的，更快只是白算
-    if (heroOn && (scrollDirtyThisFrame || now - lastClip > 32)) {
+    // 切口与 Worker 同拍（约 30fps）：线本身也是这个帧率画的，更快只是白算（阈值留 4ms 余量，免得 60Hz 下帧间抖动漏拍）
+    if (heroOn && (scrollDirtyThisFrame || now - lastClip >= 28)) {
       lastClip = now;
       clipMembranes(sp, wave.mainCurve(now / 1000, 1 - wakeMix(), sp));
     }
@@ -352,8 +439,9 @@ export function initStoryboard() {
       while (j < L.length - 1 && L[j] < s) j++;
       root.style.setProperty('--base', `${(sp.xy[2 * j + 1] + lift).toFixed(1)}px`);
     }
-    // 开屏可见（字的切口要跟着波走）或入场未完成时继续跑；否则等下一次滚动
-    if ((heroOn && !RM) || (reveal < 1 && t0 >= 0)) raf = requestAnimationFrame(frame);
+    // 入场画出时满帧跑；之后开屏可见（字的切口要跟着波走）就按 30fps 节拍醒来；否则等下一次滚动
+    if (reveal < 1 && t0 >= 0) raf = requestAnimationFrame(frame);
+    else if (heroOn && !RM) later();
   }
 
   addEventListener('scroll', kick, { passive: true });
