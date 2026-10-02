@@ -30,6 +30,12 @@ export function initBoot() {
     return;
   }
 
+  // 【原型】开屏候选接管（LoaderProto.astro），booted 由它按自己的节奏打
+  if (root.dataset.lp) {
+    veil.remove();
+    return;
+  }
+
   let seen = false;
   try {
     seen = sessionStorage.getItem(KEY) === '1';
