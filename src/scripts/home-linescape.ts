@@ -2,7 +2,7 @@
    主页 · 一根线的一夜（/new/）—— 开屏是「线景」（原型 design/mocks/scene-linescape*-notes.md）
    由 home-storyboard.ts 演化而来，去掉开屏大字那一套。开屏 ＝ 线景：
    全站那条线当地平线，地平线下方一整片「同一根线的回声」由另一个 Worker 画
-   （home-linescape-worker.ts，OffscreenCanvas，不占主线程）；天上的穹肋是静态层（home-linescape-ribs.ts）。
+   （home-linescape-worker.ts，OffscreenCanvas，不占主线程）；天上的穹肋是静态位图，也由那个 Worker 画、垫在地形底下（home-linescape-ribs.ts）。
    这里只负责：
      · 场序 pos → 色板（同主稿）
      · 线的姿态插值 → setEegSpine，并把同一条骨架与「收拢度」转给地形 Worker
@@ -16,7 +16,6 @@ import { setEegSpine } from './eeg-spine';
 import { reducedMotion } from './lib';
 import { onMixChange, wakeMix } from './reality';
 import type { Pal } from './home-linescape-worker';
-import { drawRibs } from './home-linescape-ribs';
 import { findAnchor, makeGeo, orbOf, restPoint, rowsFor, type Anchor, type Geo } from './home-linescape-terrain';
 
 type Pt = [number, number];
@@ -195,9 +194,6 @@ export function initLinescape() {
   let tKey = '';
 
   /* ── 锚点：等高线标注与测量点钉在静止地形上（只在尺寸变化时算一次，Worker 在附近把波压平） ── */
-  const ribW = document.getElementById('ls-rib-w') as HTMLCanvasElement | null;
-  const ribD = document.getElementById('ls-rib-d') as HTMLCanvasElement | null;
-  let ribKey = '';
   const pinsOn = true;
   const pinAt = new Map<HTMLElement, Anchor>(); // 每个测量点钉在哪一排、哪一处（激活时告诉地形 Worker）
   const isA = true;
@@ -252,13 +248,8 @@ export function initLinescape() {
       root.style.setProperty('--sx', `${o.cx.toFixed(1)}px`);
       root.style.setProperty('--sy', `${o.cy.toFixed(1)}px`);
       root.style.setProperty('--sr', `${o.R.toFixed(1)}px`);
-      // 穹肋：静态两张（醒 / 梦），只在尺寸变化时重画；醒梦交叉淡化与滚动淡出全交给 CSS
-      const rk = `${vw}x${vh}@${DPR()}|${m}`;
-      if (rk !== ribKey && ribW && ribD) {
-        ribKey = rk;
-        drawRibs(ribW, g, o, DPR(), 0, PAL.nearW, PAL.lightW);
-        drawRibs(ribD, g, o, DPR(), 1, PAL.nearD, PAL.lightD);
-      }
+      // 穹肋：地形 Worker 按这条静止的地平线画进地形画布（尺寸没变时它自己跳过）
+      terrain?.postMessage({ type: 'rest', xy: xy0 });
     }
     anchorVer++;
     root.classList.add('ls-placed');
@@ -425,7 +416,6 @@ export function initLinescape() {
 
   let scrollDirty = true;
   let lastSent = '';
-  let lastRib = '';
   let raf = 0;
   const kick = () => {
     scrollDirty = true;
@@ -459,9 +449,6 @@ export function initLinescape() {
     }
     /* 地形：只在开屏一带发；收拢到底（fold 1）发最后一次后 Worker 自己停下 */
     const fold = cl(pos / 0.3);
-    // 穹肋随收拢淡出（只在值变了时写：入场那几秒 frame 满帧跑，同值重写也会让样式失效）
-    const rib = ((1 - sstep(fold)) ** 2).toFixed(3);
-    if (rib !== lastRib) root.style.setProperty('--rib', (lastRib = rib));
     const tk = `${fold.toFixed(4)}|${vw}x${vh}|${t0}|${anchorVer}`;
     if (terrain && tk !== tKey && (fold < 1 || !tKey.startsWith('1.0000'))) {
       tKey = tk;

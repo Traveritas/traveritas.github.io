@@ -1,9 +1,13 @@
 /* ─────────────────────────────────────────────────────────────
-   主页开屏 · 线景地形的绘制后端（Worker 内）。
-   home-linescape-worker.ts 每帧把地形整理成一张「绘制列表」（Scene）：
+   离屏 Worker 的线条绘制后端：主页开屏的线景地形（home-linescape-worker.ts），
+   以及全站那条脑电线（eeg-worker.ts）。
+   Worker 每帧把画面整理成一张「绘制列表」（Scene）：
    点（视口 CSS px）按折线分组，再按画家顺序列出操作 ——
-     · line：描一条折线（实色或以光心为圆心的径向渐变；可只留倒影环带里的那几段；可是擦除）
+     · line：描一条折线（实色或以光心为圆心的径向渐变；可只留倒影环带里的那几段；可是擦除；
+       可按弧长描成虚线，或只留弧长落在某一段里的部分）
      · band：擦掉一排线以下的一条带（destination-out，近处的山脊遮住远处的线）
+     · dot：一粒圆点（实心，或由中心向外线性淡出的光晕）
+     · img：把一张整幅的静态位图按给定不透明度铺上去（穹肋：尺寸变化时画一次，之后每帧只贴图）
    两个后端照同一张列表画：
      · WebGL2（首选）：整帧几何一次上传，一条操作一次 drawArrays。原 Canvas 2D 每帧
        在 GPU 进程主线程上把几千个点的长路径逐条三角化，核显上一帧要 50ms 以上、
@@ -31,9 +35,25 @@ export interface Ring {
 }
 export type Op =
   /* c ＝ rgba（未预乘，a 已含整体透明度）；out ＝ 擦除；ring ＝ 只画在倒影环带里 */
-  | { t: 'line'; p: number; w: number; c: number[]; g?: Grad | null; ring?: boolean; out?: boolean }
+  | {
+      t: 'line';
+      p: number;
+      w: number;
+      c: number[];
+      g?: Grad | null;
+      ring?: boolean;
+      out?: boolean;
+      /* 虚线 [实, 空]（CSS px，沿弧长从折线起点量起） */
+      dash?: [number, number] | null;
+      /* 只留弧长在 [s0, s1] 之间的那一段 */
+      win?: [number, number] | null;
+    }
   /* 擦除带：折线 p 的每个点沿法向 (nx, ny) 伸出 band，擦到 a */
-  | { t: 'band'; p: number; band: number; a: number };
+  | { t: 'band'; p: number; band: number; a: number }
+  /* 圆点：soft ＝ 光晕（中心 c、到半径 r 线性淡到 0）；否则实心、边缘抗锯齿 */
+  | { t: 'dot'; x: number; y: number; r: number; c: number[]; soft?: boolean }
+  /* 整幅静态位图（与画布同像素尺寸，预乘 alpha）：ver 变了才重新上传 */
+  | { t: 'img'; src: OffscreenCanvas; ver: number; a: number };
 
 /* 点：x, y, f（f ＝ 0 抬笔跳过 / 1 起笔 / 2 连线）；折线 ＝ 点表里的一段 [o, o + n) */
 export class Scene {
@@ -84,24 +104,31 @@ const VS_LINE = `#version 300 es
 in vec2 aP;
 in vec2 aM;
 in float aS;
+in float aL;
 uniform vec2 uRes;
 uniform float uHw;
 uniform float uDpr;
 out vec2 vPos;
 out float vD;
+out float vL;
 void main() {
   vec2 p = aP + aM * (aS * uHw);
   vPos = p;
   vD = aS * uHw * uDpr;
+  vL = aL;
   vec2 c = p / uRes * 2.0 - 1.0;
   gl_Position = vec4(c.x, -c.y, 0.0, 1.0);
 }`;
 
-/* 覆盖率：中线两侧 uCore（设备 px）全覆盖、外沿 1px 线性收；不足 1 设备像素宽的线画成 1px、按宽度减淡 */
+/* 覆盖率：中线两侧 uCore（设备 px）全覆盖、外沿 1px 线性收；不足 1 设备像素宽的线画成 1px、按宽度减淡。
+   虚线 / 弧长窗口按弧长 vL（CSS px）裁，两端各留 1 设备像素的软边 */
 const FS_LINE = `#version 300 es
 precision highp float;
 in vec2 vPos;
 in float vD;
+in float vL;
+uniform vec2 uDash;
+uniform vec2 uWin;
 uniform float uCore;
 uniform float uCov;
 uniform float uDpr;
@@ -131,9 +158,57 @@ void main() {
     vec2 q = vec2(d.x * uE.z + d.y * uE.w, -d.x * uE.w + d.y * uE.z);
     cov *= clamp(0.5 - ell(q, uR.xy) * uDpr, 0.0, 1.0) * clamp(0.5 + ell(q, uR.zw) * uDpr, 0.0, 1.0);
   }
+  if (uDash.x > 0.0) {
+    float m = mod(vL, uDash.x + uDash.y);
+    cov *= clamp(min(m, uDash.x - m) * uDpr + 0.5, 0.0, 1.0);
+  }
+  if (uWin.y >= uWin.x) cov *= clamp((vL - uWin.x) * uDpr + 0.5, 0.0, 1.0) * clamp((uWin.y - vL) * uDpr + 0.5, 0.0, 1.0);
   float a = c.a * cov;
   o = vec4(c.rgb * a, a);
 }`;
+
+/* 圆点：以圆心为中心的一个方块（gl_VertexID 0..3 → 三角带），片元里按到圆心的距离出覆盖率 */
+const VS_DOT = `#version 300 es
+uniform vec2 uRes;
+uniform vec3 uC;
+out vec2 vPos;
+void main() {
+  vec2 k = vec2(float(gl_VertexID & 1), float(gl_VertexID >> 1)) * 2.0 - 1.0;
+  vec2 p = uC.xy + k * (uC.z + 1.0);
+  vPos = p;
+  vec2 c = p / uRes * 2.0 - 1.0;
+  gl_Position = vec4(c.x, -c.y, 0.0, 1.0);
+}`;
+const FS_DOT = `#version 300 es
+precision highp float;
+in vec2 vPos;
+uniform vec3 uC;
+uniform vec4 uCol;
+uniform int uSoft;
+uniform float uDpr;
+out vec4 o;
+void main() {
+  float d = length(vPos - uC.xy);
+  float cov = uSoft == 1 ? clamp(1.0 - d / uC.z, 0.0, 1.0) : clamp((uC.z - d) * uDpr + 0.5, 0.0, 1.0);
+  float a = uCol.a * cov;
+  o = vec4(uCol.rgb * a, a);
+}`;
+
+/* 整幅位图：铺满画布的一个方块，逐像素对位取样（位图与画布同像素尺寸） */
+const VS_IMG = `#version 300 es
+out vec2 vUv;
+void main() {
+  vec2 k = vec2(float(gl_VertexID & 1), float(gl_VertexID >> 1));
+  vUv = k;
+  gl_Position = vec4(k.x * 2.0 - 1.0, 1.0 - k.y * 2.0, 0.0, 1.0);
+}`;
+const FS_IMG = `#version 300 es
+precision mediump float;
+in vec2 vUv;
+uniform sampler2D uTex;
+uniform float uA;
+out vec4 o;
+void main() { o = texture(uTex, vUv) * uA; }`;
 
 const VS_BAND = `#version 300 es
 in vec2 aP;
@@ -162,11 +237,13 @@ class Buf {
   }
 }
 
-export function makeGl(canvas: OffscreenCanvas): Backend | null {
+/** msaa：地形要（擦除带与倒影环带的边缘靠它）；只描细线的脑电不要 —— 描线的抗锯齿在片元里算，
+    整屏多重采样每帧还得多解析一遍 */
+export function makeGl(canvas: OffscreenCanvas, msaa = true): Backend | null {
   const gl = canvas.getContext('webgl2', {
     alpha: true,
     premultipliedAlpha: true,
-    antialias: true,
+    antialias: msaa,
     depth: false,
     stencil: false,
     preserveDrawingBuffer: false,
@@ -191,18 +268,24 @@ export function makeGl(canvas: OffscreenCanvas): Backend | null {
   };
   let pl: WebGLProgram;
   let pb: WebGLProgram;
+  let pd: WebGLProgram;
+  let pi: WebGLProgram;
   try {
     pl = compile(VS_LINE, FS_LINE);
     pb = compile(VS_BAND, FS_BAND);
+    pd = compile(VS_DOT, FS_DOT);
+    pi = compile(VS_IMG, FS_IMG);
   } catch {
     return null;
   }
   const U = (p: WebGLProgram, names: string[]) =>
     Object.fromEntries(names.map((n) => [n, gl.getUniformLocation(p, n)])) as Record<string, WebGLUniformLocation | null>;
-  const ul = U(pl, ['uRes', 'uHw', 'uDpr', 'uCore', 'uCov', 'uC0', 'uC1', 'uC2', 'uG', 'uRing', 'uE', 'uR']);
+  const ul = U(pl, ['uRes', 'uHw', 'uDpr', 'uCore', 'uCov', 'uC0', 'uC1', 'uC2', 'uG', 'uRing', 'uE', 'uR', 'uDash', 'uWin']);
   const ub = U(pb, ['uRes', 'uA']);
+  const ud = U(pd, ['uRes', 'uC', 'uCol', 'uSoft', 'uDpr']);
+  const ui = U(pi, ['uTex', 'uA']);
 
-  // 描线：x, y, mx, my, side（每点两个顶点，三角带）
+  // 描线：x, y, mx, my, side, 弧长（每点两个顶点，三角带）
   const vaoL = gl.createVertexArray();
   const bufL = gl.createBuffer();
   gl.bindVertexArray(vaoL);
@@ -210,12 +293,19 @@ export function makeGl(canvas: OffscreenCanvas): Backend | null {
   const aP = gl.getAttribLocation(pl, 'aP');
   const aM = gl.getAttribLocation(pl, 'aM');
   const aS = gl.getAttribLocation(pl, 'aS');
+  const aL = gl.getAttribLocation(pl, 'aL');
   gl.enableVertexAttribArray(aP);
-  gl.vertexAttribPointer(aP, 2, gl.FLOAT, false, 20, 0);
+  gl.vertexAttribPointer(aP, 2, gl.FLOAT, false, 24, 0);
   gl.enableVertexAttribArray(aM);
-  gl.vertexAttribPointer(aM, 2, gl.FLOAT, false, 20, 8);
+  gl.vertexAttribPointer(aM, 2, gl.FLOAT, false, 24, 8);
   gl.enableVertexAttribArray(aS);
-  gl.vertexAttribPointer(aS, 1, gl.FLOAT, false, 20, 16);
+  gl.vertexAttribPointer(aS, 1, gl.FLOAT, false, 24, 16);
+  gl.enableVertexAttribArray(aL);
+  gl.vertexAttribPointer(aL, 1, gl.FLOAT, false, 24, 20);
+  // 圆点与位图：顶点全在着色器里由 gl_VertexID 生成，不挂任何属性
+  const vaoE = gl.createVertexArray();
+  // 位图的纹理：每张源画布一份，ver 变了才重传
+  const texOf = new Map<OffscreenCanvas, { tex: WebGLTexture; ver: number }>();
   // 擦除带：x, y
   const vaoB = gl.createVertexArray();
   const bufB = gl.createBuffer();
@@ -238,11 +328,13 @@ export function makeGl(canvas: OffscreenCanvas): Backend | null {
   const lineAt: number[] = []; // 每条折线在描线顶点里的 [首, 数]
   const bandAt = new Map<number, [number, number]>(); // 擦除带：折线编号 → [首, 数]
 
-  /* 一条折线 → 三角带。各段子路径之间用退化三角形接上；拐点处法线取两段的平均、按斜接放长（上限 2 倍） */
+  /* 一条折线 → 三角带。各段子路径之间用退化三角形接上；拐点处法线取两段的平均、按斜接放长（上限 2 倍）。
+     每个顶点带上从折线起点量起的弧长（只计落笔的段），给虚线与弧长窗口用 */
   function stripOf(s: Scene, o: number, n: number) {
     const P = s.pts;
-    const first = L.n / 5;
+    const first = L.n / 6;
     let started = false;
+    let len = 0;
     let i = 0;
     while (i < n) {
       // 找一段连续的子路径 [a, b)
@@ -253,7 +345,7 @@ export function makeGl(canvas: OffscreenCanvas): Backend | null {
       const b = i;
       const m = b - a;
       if (m < 2) continue;
-      L.need((m * 2 + 2) * 5);
+      L.need((m * 2 + 2) * 6);
       const A = L.a;
       // 首尾几乎重合 ⇒ 闭合（圆环）：两端法线按环绕取
       const x0 = P[(o + a) * 3];
@@ -288,31 +380,35 @@ export function makeGl(canvas: OffscreenCanvas): Backend | null {
         const p = (o + a + j) * 3;
         const x = P[p];
         const y = P[p + 1];
+        if (j) len += Math.hypot(x - P[p - 3], y - P[p - 2]);
         if (j === 0 && started) {
           // 退化：重复上一个顶点与这一个顶点
-          A.set(A.subarray(L.n - 5, L.n), L.n);
-          L.n += 5;
+          A.set(A.subarray(L.n - 6, L.n), L.n);
+          L.n += 6;
           A[L.n++] = x;
           A[L.n++] = y;
           A[L.n++] = mx;
           A[L.n++] = my;
           A[L.n++] = 1;
+          A[L.n++] = len;
         }
         A[L.n++] = x;
         A[L.n++] = y;
         A[L.n++] = mx;
         A[L.n++] = my;
         A[L.n++] = 1;
+        A[L.n++] = len;
         A[L.n++] = x;
         A[L.n++] = y;
         A[L.n++] = mx;
         A[L.n++] = my;
         A[L.n++] = -1;
+        A[L.n++] = len;
         if (!Number.isNaN(next[0])) prev = next;
       }
       started = true;
     }
-    lineAt.push(first, L.n / 5 - first);
+    lineAt.push(first, L.n / 6 - first);
   }
 
   function bandOf(s: Scene, pi: number, band: number) {
@@ -371,15 +467,55 @@ export function makeGl(canvas: OffscreenCanvas): Backend | null {
       }
       gl.useProgram(pb);
       gl.uniform2f(ub.uRes, W, H);
+      gl.useProgram(pd);
+      gl.uniform2f(ud.uRes, W, H);
+      gl.uniform1f(ud.uDpr, dpr);
 
       let cur: WebGLProgram | null = null;
       let out: boolean | null = null;
       for (const op of s.ops) {
-        const wantOut = op.t === 'band' || !!op.out;
+        const wantOut = op.t === 'band' || (op.t === 'line' && !!op.out);
         if (wantOut !== out) {
           out = wantOut;
           if (out) gl.blendFunc(gl.ZERO, gl.ONE_MINUS_SRC_ALPHA);
           else gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+        }
+        if (op.t === 'img') {
+          if (op.a <= 0.001) continue;
+          let t = texOf.get(op.src);
+          if (!t) texOf.set(op.src, (t = { tex: gl.createTexture() as WebGLTexture, ver: NaN }));
+          gl.activeTexture(gl.TEXTURE0);
+          gl.bindTexture(gl.TEXTURE_2D, t.tex);
+          if (t.ver !== op.ver) {
+            t.ver = op.ver;
+            gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, op.src);
+            gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+          }
+          if (cur !== pi) {
+            gl.useProgram((cur = pi));
+            gl.bindVertexArray(vaoE);
+            gl.uniform1i(ui.uTex, 0);
+          }
+          gl.uniform1f(ui.uA, cl(op.a));
+          gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+          continue;
+        }
+        if (op.t === 'dot') {
+          if (cur !== pd) {
+            gl.useProgram((cur = pd));
+            gl.bindVertexArray(vaoE);
+          }
+          const c = op.c;
+          gl.uniform3f(ud.uC, op.x, op.y, op.r);
+          gl.uniform4f(ud.uCol, c[0] / 255, c[1] / 255, c[2] / 255, cl(c[3]));
+          gl.uniform1i(ud.uSoft, op.soft ? 1 : 0);
+          gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+          continue;
         }
         if (op.t === 'band') {
           const at = bandAt.get(op.p);
@@ -415,6 +551,8 @@ export function makeGl(canvas: OffscreenCanvas): Backend | null {
           gl.uniform3f(ul.uG, g.x, g.y, g.r);
         } else gl.uniform3f(ul.uG, 0, 0, 0);
         gl.uniform1i(ul.uRing, op.ring && r ? 1 : 0);
+        gl.uniform2f(ul.uDash, op.dash ? op.dash[0] : 0, op.dash ? op.dash[1] : 0);
+        gl.uniform2f(ul.uWin, op.win ? op.win[0] : 1, op.win ? op.win[1] : 0);
         gl.drawArrays(gl.TRIANGLE_STRIP, first, count);
       }
       gl.bindVertexArray(null);
@@ -470,6 +608,27 @@ export function make2d(canvas: OffscreenCanvas): Backend | null {
         ringPath.ellipse(r.x, r.y, r.ix, r.iy, r.rot, 0, Math.PI * 2);
       }
       for (const op of s.ops) {
+        if (op.t === 'img') {
+          if (op.a <= 0.001) continue;
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          ctx.globalAlpha = cl(op.a);
+          ctx.drawImage(op.src, 0, 0);
+          ctx.globalAlpha = 1;
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          continue;
+        }
+        if (op.t === 'dot') {
+          ctx.beginPath();
+          ctx.arc(op.x, op.y, op.r, 0, Math.PI * 2);
+          if (op.soft) {
+            const gr = ctx.createRadialGradient(op.x, op.y, 0, op.x, op.y, op.r);
+            gr.addColorStop(0, rgba(op.c));
+            gr.addColorStop(1, rgba([op.c[0], op.c[1], op.c[2], 0]));
+            ctx.fillStyle = gr;
+          } else ctx.fillStyle = rgba(op.c);
+          ctx.fill();
+          continue;
+        }
         if (op.t === 'band') {
           const o = s.polys[2 * op.p];
           const n = s.polys[2 * op.p + 1];
@@ -504,7 +663,10 @@ export function make2d(canvas: OffscreenCanvas): Backend | null {
           ctx.strokeStyle = gr;
         } else ctx.strokeStyle = rgba(op.c);
         ctx.lineWidth = op.w;
+        if (op.dash) ctx.setLineDash(op.dash);
+        else if (op.win) ctx.setLineDash([0, Math.max(0, op.win[0]), Math.max(0, op.win[1] - op.win[0]), 1e6]);
         ctx.stroke(get(op.p));
+        if (op.dash || op.win) ctx.setLineDash([]);
         ctx.globalCompositeOperation = 'source-over';
         if (op.ring) ctx.restore();
       }

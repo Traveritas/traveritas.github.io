@@ -40,6 +40,8 @@ import {
   type Orb,
 } from './home-linescape-terrain';
 import { Scene, make2d, makeGl, type Backend, type Grad } from './home-linescape-gl';
+import { SLOT, slotWait } from './frame-slot';
+import { drawRibs } from './home-linescape-ribs';
 
 interface Colors {
   umber: string;
@@ -80,6 +82,8 @@ type Msg =
   | { type: 'state'; xy: Float32Array; fold: number; boot: number; anchors: Anchor[] }
   /* 测量点激活：k / s ＝ 该点所在的排与弧长（k < 0 ＝ 收起）；pulse ＝ 这一下要不要散一圈涟漪 */
   | { type: 'focus'; k: number; s: number; pulse: boolean }
+  /* 开屏姿态的地平线（静止形状）：穹肋按它画，只在尺寸变化时来一次 */
+  | { type: 'rest'; xy: Float32Array }
   | { type: 'perf' }
   | { type: 'hidden'; hidden: boolean };
 
@@ -154,6 +158,26 @@ function geoReady() {
 }
 let xyLast: Float32Array | null = null;
 
+/* 穹肋：两张静态离屏位图（醒 / 梦），尺寸变化时按开屏姿态的地平线重画一次（home-linescape-ribs.ts） */
+let ribW: OffscreenCanvas | null = null;
+let ribD: OffscreenCanvas | null = null;
+let ribVer = 0;
+let ribKey = '';
+let xyRest: Float32Array | null = null;
+function ribsReady() {
+  if (!xyRest || !pal || variant !== 'a' || typeof OffscreenCanvas !== 'function') return;
+  const k = `${W}x${H}@${dpr}|${mobile}|${Array.prototype.join.call(xyRest.subarray(0, 4))}`;
+  if (k === ribKey) return;
+  ribKey = k;
+  const g = makeGeo(W, H, mobile, xyRest);
+  const o = orbOf(g);
+  ribW ??= new OffscreenCanvas(1, 1);
+  ribD ??= new OffscreenCanvas(1, 1);
+  drawRibs(ribW, g, o, dpr, 0, pal.nearW, pal.lightW);
+  drawRibs(ribD, g, o, dpr, 1, pal.nearD, pal.lightD);
+  ribVer++;
+}
+
 /* 某一排上的锚点：calm ＝ 压平系数（0 压平 … 1 原样），inGap ＝ 是否落在标注的断口里 */
 function anchorAt(list: Anchor[], s: number): [number, boolean] {
   let calm = 1;
@@ -182,6 +206,13 @@ function build(now: number) {
   const unfold = still ? 1 : since < 0 ? 0 : sstep((since - 1.05) / 2.4);
   const skyIn = still ? 1 : since < 0 ? 0 : sstep((since - 2.0) / 2.2);
   const open = 1 - sstep(fold);
+
+  // 穹肋垫在最底下：入场随天空淡入，收拢时淡出（原 CSS --rib ＝ (1 − sstep(fold))²），醒梦交叉淡化
+  if (ribW && ribD) {
+    const ra = skyIn * open * open;
+    S.ops.push({ t: 'img', src: ribW, ver: ribVer, a: ra * (1 - d) });
+    S.ops.push({ t: 'img', src: ribD, ver: ribVer, a: ra * d });
+  }
 
   const ink = pal ? mix(pal.nearW, pal.nearD, d) : parse(colors.umber);
   const far = pal ? mix(pal.farW, pal.farD, d) : mix(parse(colors.wake), parse(colors.dream), d);
@@ -432,10 +463,11 @@ function paint(now: number) {
 }
 
 /* ── 帧率与降级 ──
-   常态约 30fps（24ms 间隔再等下一帧）。若 GPU 跟不上（帧间隔长期 > 50ms ⇒ 不到 20fps），
-   先降到约 15fps，仍跟不上就停在静帧：地形不再流动，只在滚动 / 醒梦 / 点按时重画一帧。
+   常态约 30fps：与脑电 Worker 共用出帧时隙（frame-slot.ts），两张画布在同一个 vsync 上提交。
+   若 GPU 跟不上（帧间隔长期 > 50ms ⇒ 不到 20fps），先降到约 15fps（隔一个时隙出一帧，仍与脑电同拍），
+   仍跟不上就停在静帧：地形不再流动，只在滚动 / 醒梦 / 点按时重画一帧。
    揭幕后 4s 内（页面本身还在忙）与切回前台的那一帧不计 */
-const GAP = [24, 56];
+const PERIOD = [SLOT, 2 * SLOT];
 let level = 0;
 let lastT = 0;
 let slowMs = 0;
@@ -446,7 +478,7 @@ function pace(t: number) {
   if (!dt || dt > 1000) return;
   const since = Number.isNaN(boot) ? -1 : (mainNow() - boot) / 1000;
   if (since < 4) return;
-  slowMs = dt > 50 + GAP[Math.min(level, 1)] - 24 ? slowMs + dt : Math.max(0, slowMs - dt);
+  slowMs = dt > 50 + PERIOD[Math.min(level, 1)] - SLOT ? slowMs + dt : Math.max(0, slowMs - dt);
   if (slowMs < 2000) return;
   slowMs = 0;
   level++;
@@ -468,7 +500,7 @@ function loop() {
   timer = setTimeout(() => {
     if (typeof self.requestAnimationFrame === 'function') self.requestAnimationFrame(loop);
     else loop();
-  }, GAP[Math.min(level, 1)]) as unknown as number;
+  }, slotWait(PERIOD[Math.min(level, 1)])) as unknown as number;
 }
 function setRunning(on: boolean) {
   if (still || frozen) {
@@ -548,6 +580,10 @@ self.onmessage = (e: MessageEvent<Msg>) => {
     fold = m.fold;
     boot = m.boot;
     setRunning(fold < 0.999);
+    if (!running || frozen) paint(mainNow());
+  } else if (m.type === 'rest') {
+    xyRest = m.xy;
+    ribsReady();
     if (!running || frozen) paint(mainNow());
   } else if (m.type === 'perf') {
     // 截图脚本用：报告并清零每帧绘制耗时（gl ＝ 是否走 WebGL2；level ＝ 降级档）
