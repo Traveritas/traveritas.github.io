@@ -1,9 +1,12 @@
 /* ─────────────────────────────────────────────────────────────
    主页 · 开屏穹肋（静态层）
    几道极大的弧从画面外来，向圆（顶眼）汇聚并溶进它的光里：观者站在一座看不全的穹顶里。
-   原型见 design/mocks/scene-linescape-vault-notes.md。原型里它画在地形 Worker 的每一帧里（贴缓存位图），
-   这里改成完全静态：尺寸变化时在主线程画两张画布（醒 / 梦各一张），之后不再重画 ——
-   醒梦切换由 CSS 按 --reality-mix 交叉淡化，滚动收拢由 CSS 按 --rib 淡出，逐帧零开销。
+   原型见 design/mocks/scene-linescape-vault-notes.md。
+   静态：尺寸变化时在地形 Worker 里画两张离屏位图（醒 / 梦各一张），之后不再重画；地形每帧把它们
+   当贴图铺在最底下（醒梦按梦度交叉淡化、滚动收拢时淡出、入场随天空淡入）。
+   原先是两张独立的全屏 DOM 画布，压在天空之上、雾 / 地平线微光 / 圆光之下 —— 首屏因此多两张全屏图层，
+   合成器每出一帧都要多铺两遍整屏。并进地形画布后，它到了那三层之上，所以落笔时把那三层在每一处
+   的遮挡（veilAt）乘进不透明度：被雾与光盖住多少，就照旧淡多少。
    每道肋是一条带：两条边线 ＋ 一条极淡的外侧回声（同一根线的回声），由画面边缘的宽收到顶眼处的零；
    边线带极弱的同源波纹（静止），梦面量化成台阶，呼应梦面地形。
    ───────────────────────────────────────────────────────────── */
@@ -35,8 +38,63 @@ const EDGES: [number, number, number][] = [
 
 const mix = (a: number[], b: number[], t: number) => a.map((v, i) => v + (b[i] - v) * t);
 
-/** 把一面（d：0 醒 / 1 梦）的穹肋画进画布。ink / light 为该面的线色与光色（rgb） */
-export function drawRibs(cv: HTMLCanvasElement, g: Geo, o: Orb, dpr: number, d: number, ink: number[], light: number[]) {
+/* 分段线性的不透明度剖面：[[位置, 不透明度], …]，位置递增 */
+function ramp(stops: [number, number][], t: number) {
+  if (t <= stops[0][0]) return stops[0][1];
+  for (let i = 1; i < stops.length; i++) {
+    const [t1, a1] = stops[i];
+    if (t <= t1) {
+      const [t0, a0] = stops[i - 1];
+      return a0 + ((a1 - a0) * (t - t0)) / (t1 - t0);
+    }
+  }
+  return stops[stops.length - 1][1];
+}
+/* 下面的几何与色标逐项照抄 new.astro 的 CSS（开屏 pos 0 时 --glow 的不透明度 .8）——改那边要一起改 */
+const GLOW_A = 0.8;
+const GLOW_BAND = ramp.bind(null, [
+  [0, 0],
+  [0.45, 0.6 * GLOW_A],
+  [0.53, GLOW_A],
+  [0.7, 0.35 * GLOW_A],
+  [1, 0],
+]);
+const SUN = ramp.bind(null, [
+  [0, 0.55],
+  [0.34, 0.32],
+  [0.64, 0.12],
+  [1, 0],
+]);
+const T14 = (14 * Math.PI) / 180;
+
+/** 在 (x, y) 处，原先压在穹肋之上的三层（.atmo 两团雾、.ls-glow、.ls-sun）合起来剩下多少透光（1 ＝ 不遮），
+    再除以地形画布底部那张遮罩（.ls-canvas 的 mask-image）—— 穹肋现在画在那张画布里，要把它抵回来 */
+function veilAt(x: number, y: number, W: number, H: number, o: Orb) {
+  const vm = Math.max(W, H) / 100;
+  // 雾（.f1 左上、.f2 右下）：closest-side 径向渐变 --glow → 透明
+  const fog = (cx: number, cy: number, rx: number, ry: number) =>
+    GLOW_A * Math.max(0, 1 - Math.hypot((x - cx) / rx, (y - cy) / ry));
+  const f1 = fog(15 * vm, 13 * vm, 35 * vm, 25 * vm);
+  const f2 = fog(W - 8 * vm, H - 8 * vm, 30 * vm, 22 * vm);
+  // 地平线微光：过视口中心、转 14° 的一条宽 26svh 的带，带内自上而下的渐变
+  const v = ((x - W / 2) * -Math.sin(T14) + (y - H / 2) * Math.cos(T14)) / (0.26 * H) + 0.5;
+  const glow = v > 0 && v < 1 ? GLOW_BAND(v) : 0;
+  // 圆光：边长 3R 的方块里 closest-side 的径向渐变，地平线以下由 194° 的线性遮罩收掉
+  const rr = Math.hypot(x - o.cx, y - o.cy) / (1.5 * o.R);
+  let sun = 0;
+  if (rr < 1) {
+    const dx = Math.sin((194 * Math.PI) / 180);
+    const dy = -Math.cos((194 * Math.PI) / 180);
+    const t = 0.5 + ((x - o.cx) * dx + (y - o.cy) * dy) / (3 * o.R * (Math.abs(dx) + Math.abs(dy)));
+    sun = SUN(rr) * (t < 0.51 ? 1 : t > 0.595 ? 0 : 1 - (t - 0.51) / 0.085);
+  }
+  const yr = y / H;
+  const mask = yr < 0.58 ? 1 : 1 - (0.88 * (yr - 0.58)) / 0.42;
+  return ((1 - f1) * (1 - f2) * (1 - glow) * (1 - sun)) / Math.max(0.12, mask);
+}
+
+/** 把一面（d：0 醒 / 1 梦）的穹肋画进离屏位图（尺寸 ＝ 视口 × dpr）。ink / light 为该面的线色与光色（rgb） */
+export function drawRibs(cv: OffscreenCanvas, g: Geo, o: Orb, dpr: number, d: number, ink: number[], light: number[]) {
   const { W, H, mobile, nx, ny } = g;
   cv.width = Math.round(W * dpr);
   cv.height = Math.round(H * dpr);
@@ -103,7 +161,10 @@ export function drawRibs(cv: HTMLCanvasElement, g: Geo, o: Orb, dpr: number, d: 
         const below = (x0 - hx) * nx + (y0 - hy) * ny; // 正 ＝ 地平线以下
         const fogd = below > 0 ? Math.exp(-below / 30) : 1;
         const nearFoot = below > -40 ? 0.45 + 0.55 * sstep(-below / 40) : 1;
-        const a = 0.42 * al * ka * (0.35 + 0.65 * (footIn ? taper : 1 - t)) * toEye * fogd * nearFoot * (1 - 0.2 * d);
+        const a = Math.min(
+          1,
+          0.42 * al * ka * (0.35 + 0.65 * (footIn ? taper : 1 - t)) * toEye * fogd * nearFoot * (1 - 0.2 * d) * veilAt(x, y, W, H, o),
+        );
         if (i && a > 0.003) seg(px, py, x, y, a, 1 - toEye, ka < 0.5);
         px = x;
         py = y;

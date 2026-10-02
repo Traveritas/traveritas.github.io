@@ -163,11 +163,10 @@ const heroChars = heroLines.map((l) => [...l].map((ch) => ({ ch, i: heroI++ })))
     <div class="fog f2"></div>
     <div class="dawnlight"></div>
   </div>
-  <!-- 线景：天空、地平线后的微光、圆光、穹肋（固定层，压在地形画布之下）；地形与线圈在画布里（home-linescape-worker.ts） -->
+  <!-- 线景：天空、地平线后的微光、圆光（固定层，压在地形画布之下）；穹肋、地形与线圈在画布里（home-linescape-worker.ts） -->
   <div class="ls-sky" aria-hidden="true"><i class="sky-w"></i><i class="sky-d"></i></div>
   <div class="ls-glow" aria-hidden="true"></div>
   <div class="ls-sun" aria-hidden="true"><i class="sun-w"></i><i class="sun-d"></i></div>
-  <div class="ls-ribs" aria-hidden="true"><canvas id="ls-rib-w"></canvas><canvas id="ls-rib-d"></canvas></div>
   <canvas class="ls-canvas" id="ls-canvas" aria-hidden="true"></canvas>
 
   <div class="home">
@@ -457,7 +456,8 @@ const heroChars = heroLines.map((l) => [...l].map((ch) => ({ ch, i: heroI++ })))
     white-space: nowrap;
   }
 
-  /* ── 环境层：雾 / 晨光（取代构块场） ── */
+  /* ── 环境层：雾 / 晨光（取代构块场）。雾是静止的：原先两团各自 38s / 46s 慢漂，
+     肉眼几乎看不出，却让两块大图层逐帧重绘、首屏静置时合成器不得歇 ── */
   .atmo {
     position: fixed;
     inset: 0;
@@ -475,24 +475,12 @@ const heroChars = heroLines.map((l) => [...l].map((ch) => ({ ch, i: heroI++ })))
     height: 50vmax;
     left: -20vmax;
     top: -12vmax;
-    animation: home-fog1 38s ease-in-out infinite alternate;
   }
   .atmo .f2 {
     width: 60vmax;
     height: 44vmax;
     right: -22vmax;
     bottom: -14vmax;
-    animation: home-fog2 46s ease-in-out infinite alternate;
-  }
-  @keyframes home-fog1 {
-    to {
-      transform: translate3d(8vmax, 6vmax, 0);
-    }
-  }
-  @keyframes home-fog2 {
-    to {
-      transform: translate3d(-10vmax, -4vmax, 0);
-    }
   }
   .atmo .dawnlight {
     position: absolute;
@@ -590,32 +578,8 @@ const heroChars = heroLines.map((l) => [...l].map((ch) => ({ ch, i: heroI++ })))
     pointer-events: none;
     opacity: var(--sky, 1);
   }
-    /* 穹肋（home-linescape-ribs.ts）：两张静态画布，醒 / 梦按 --reality-mix 交叉淡化，整层按 --rib 随收拢淡出；
-     入场在地形铺开之后淡入。z 与天空同层、DOM 在其后 ⇒ 压在天空之上、地形画布之下（近处的线从前面经过） */
-  .ls-ribs {
-    position: fixed;
-    inset: 0;
-    z-index: -4;
-    pointer-events: none;
-    opacity: var(--rib, 1);
-    visibility: hidden;
-  }
-  html.booted .ls-ribs {
-    visibility: visible;
-    animation: q-rise 2.2s ease 2s backwards;
-  }
-  .ls-ribs canvas {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-  }
-  #ls-rib-w {
-    opacity: var(--reality-mix, 1);
-  }
-  #ls-rib-d {
-    opacity: calc(1 - var(--reality-mix, 1));
-  }
+  /* 穹肋（home-linescape-ribs.ts）不再是独立图层：地形 Worker 把它画成静态位图、垫在地形画布的最底下，
+     醒梦交叉淡化、收拢淡出、入场淡入都在 Worker 里算 —— 首屏少两张全屏画布 */
   .ls-sky i {
     position: absolute;
     inset: 0;
@@ -1680,9 +1644,6 @@ const heroChars = heroLines.map((l) => [...l].map((ch) => ({ ch, i: heroI++ })))
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .atmo .fog {
-      animation: none;
-    }
     html.booted .s-hero .rise {
       animation: none;
       opacity: 1;
@@ -1694,9 +1655,6 @@ const heroChars = heroLines.map((l) => [...l].map((ch) => ({ ch, i: heroI++ })))
       opacity: var(--co, 1);
       transform: translate(var(--cx, 0px), var(--cy, 0px)) rotate(var(--cr, 0deg));
       filter: blur(var(--cb, 0px));
-    }
-    html.booted .ls-ribs {
-      animation: none;
     }
     html.booted .s-hero .cmark {
       animation: none;
