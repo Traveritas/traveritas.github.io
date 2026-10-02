@@ -55,6 +55,16 @@ const PAL: Pal = {
 PALETTE[0] = [0, [236, 233, 230], [40, 35, 33], [104, 94, 88], [255, 250, 246, 0.8], 0, 0];
 
 const mixArr = (A: number[], B: number[], t: number) => A.map((v, i) => lerp(v, B[i], t));
+/* 样式变量只在值变了时写：滚动时每帧重写根节点上的变量会让整页样式重算 */
+const written = new WeakMap<HTMLElement, Map<string, string>>();
+function setVar(el: HTMLElement, k: string, v: string) {
+  let m = written.get(el);
+  if (!m) written.set(el, (m = new Map()));
+  if (m.get(k) === v) return;
+  m.set(k, v);
+  el.style.setProperty(k, v);
+}
+
 const rgb = (c: number[]) =>
   c.length === 4
     ? `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${c[3].toFixed(3)})`
@@ -312,27 +322,6 @@ export function initLinescape() {
     });
   };
 
-  /* 问句逐字：每个 .q 里的字各包一层，入场时一字一字落定（纯 CSS 动画，序号写进 --i） */
-  let ci = 0;
-  for (const q of document.querySelectorAll<HTMLElement>('.s-hero .q')) {
-    const walk = (node: Node) => {
-      for (const n of [...node.childNodes]) {
-        if (n.nodeType === 3) {
-          const f = document.createDocumentFragment();
-          for (const ch of n.textContent ?? '') {
-            const c = document.createElement('span');
-            c.className = 'c';
-            c.style.setProperty('--i', String(ci++));
-            c.textContent = ch;
-            f.append(c);
-          }
-          n.parentNode?.replaceChild(f, n);
-        } else if (n.nodeType === 1 && (n as Element).tagName !== 'BR') walk(n);
-      }
-    };
-    walk(q);
-  }
-
   let vw = innerWidth;
   let vh = innerHeight;
   let poses: Pt[][] = [];
@@ -376,13 +365,13 @@ export function initLinescape() {
     const t = cl((p - a[0]) / (b[0] - a[0]));
     dark = lerp(a[5], b[5], t);
     const fg = mixArr(a[2], b[2], t);
-    root.style.setProperty('--bg', rgb(mixArr(a[1], b[1], t)));
-    root.style.setProperty('--fg', rgb(fg));
-    root.style.setProperty('--fg-soft', rgb(mixArr(a[3], b[3], t)));
-    root.style.setProperty('--line', `rgba(${fg[0] | 0},${fg[1] | 0},${fg[2] | 0},0.13)`);
-    root.style.setProperty('--glow', rgb(mixArr(a[4], b[4], t)));
-    root.style.setProperty('--dark', dark.toFixed(3));
-    root.style.setProperty('--dawn', lerp(a[6], b[6], t).toFixed(3));
+    setVar(root, '--bg', rgb(mixArr(a[1], b[1], t)));
+    setVar(root, '--fg', rgb(fg));
+    setVar(root, '--fg-soft', rgb(mixArr(a[3], b[3], t)));
+    setVar(root, '--line', `rgba(${fg[0] | 0},${fg[1] | 0},${fg[2] | 0},0.13)`);
+    setVar(root, '--glow', rgb(mixArr(a[4], b[4], t)));
+    setVar(root, '--dark', dark.toFixed(3));
+    setVar(root, '--dawn', lerp(a[6], b[6], t).toFixed(3));
   }
 
   function measure() {
@@ -401,14 +390,14 @@ export function initLinescape() {
     geo.forEach((g, k) => {
       const p = cl((y - g.top) / Math.max(1, g.h - vh));
       ps[k] = p;
-      g.el.style.setProperty('--p', p.toFixed(4));
+      setVar(g.el, '--p', p.toFixed(4));
       if (y >= g.top - 1) pos = k + p;
     });
     const g4 = geo[4];
     lift = g4 ? Math.max(0, y - (g4.top + g4.h - vh)) : 0;
     palette(Math.min(5, pos));
     // 天空层（静态渐变）：开屏全显，往第 1 幕交接时淡出到 --bg（只在滚动时写）
-    root.style.setProperty('--sky', (1 - sstep(cl((pos - 0.25) / 0.6))).toFixed(3));
+    setVar(root, '--sky', (1 - sstep(cl((pos - 0.25) / 0.6))).toFixed(3));
     for (const s of slips) {
       const ad = Math.abs(ps[3] - s.c);
       s.el.classList.toggle('on', s.el.classList.contains('on') ? ad < winFull + 0.04 : ad < winFull);
@@ -448,6 +437,7 @@ export function initLinescape() {
 
   function frame(now: number) {
     raf = 0;
+    if (!poses.length) return; // 还没测量过
     const reveal = RM ? 1 : t0 < 0 ? 0 : cl((now - t0 - 150) / 1150);
     if (scrollDirty) {
       scrollDirty = false;
@@ -483,7 +473,7 @@ export function initLinescape() {
       const s = sp.len * 0.72;
       let j = 1;
       while (j < L.length - 1 && L[j] < s) j++;
-      root.style.setProperty('--base', `${(sp.xy[2 * j + 1] + lift).toFixed(1)}px`);
+      setVar(root, '--base', `${(sp.xy[2 * j + 1] + lift).toFixed(1)}px`);
     }
     if (reveal < 1 && t0 >= 0) raf = requestAnimationFrame(frame);
   }
@@ -493,5 +483,6 @@ export function initLinescape() {
   mq.addEventListener('change', measure);
   addEventListener('load', measure);
   document.fonts?.ready.then(measure);
-  measure();
+  // 首次测量放到下一帧：读 offsetTop 会逼出整页排版，在模块求值里做就成了一个长任务、还多排一遍
+  requestAnimationFrame(measure);
 }

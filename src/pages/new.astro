@@ -143,6 +143,11 @@ const pins = [
     foot: '此处 →',
   },
 ];
+
+/* 题记逐字：构建时就拆好（每字一层 .c，序号写进 --i，入场时一字一字落定），运行时不再改 DOM */
+const heroLines = ['在即将醒来的那一瞬，', '世界究竟是在成形，', '还是正在融化？'];
+let heroI = 0;
+const heroChars = heroLines.map((l) => [...l].map((ch) => ({ ch, i: heroI++ })));
 ---
 
 <BaseLayout
@@ -172,7 +177,9 @@ const pins = [
         <p class="sr-only">Traveritas的个人网页 —— 随笔、项目，与正在成形的东西。</p>
         <div class="qset">
           <h1 class="q" id="hero-line">
-            <span class="ql">在即将醒来的那一瞬，</span><span class="ql">世界究竟是在成形，</span><span class="ql">还是正在融化？</span>
+            {heroChars.map((line) => (
+              <span class="ql">{line.map(({ ch, i }) => <span class="c" style={`--i:${i}`}>{ch}</span>)}</span>
+            ))}
           </h1>
         </div>
         <!-- 等高线标注：地平线上是入夜，最近那条线上是天亮（脚本按地形把它们钉到线上、给出沿线角度） -->
@@ -754,6 +761,12 @@ const pins = [
   .q .c {
     display: inline-block;
     opacity: 0;
+  }
+  /* 没有脚本就没有揭幕（html.booted）：题记直接落定 */
+  @media (scripting: none) {
+    .q .c {
+      opacity: var(--co, 1);
+    }
   }
   /* 逐字微错位与零星失焦：每字随序号带一点高低与倾角，零星几个失焦、压淡 ——
      像刚醒时还没对准焦的字。都是静态值（落定后不再变），不增加逐帧开销 */
