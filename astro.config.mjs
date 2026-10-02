@@ -14,8 +14,9 @@ export default defineConfig({
   server: { host: '127.0.0.1' },
   integrations: [
     // 样式预览（/styleguide/）是工作台不是内容页：不进 sitemap（robots.txt 同档禁收）
-    // /new/ 是「一根线的一夜」故事板主页的预览稿：保留可访问，但同样不进 sitemap、robots 禁收
-    sitemap({ filter: (page) => !page.includes('/styleguide') && !page.includes('/new') }),
+    // /new/ 是「一根线的一夜」故事板主页的预览稿、/mock/ 是设计原型：保留可访问，但同样不进 sitemap、robots 禁收
+    // 按整段路径匹配：裸 includes('/new') 会误伤 /tags/newsletter/ 这类页面
+    sitemap({ filter: (page) => !/^\/(styleguide|new|mock)\//.test(new URL(page).pathname) }),
   ],
   markdown: {
     // 醒梦两态正文语法（:::dream/:::wake 块、[[醒|梦]] 行内），见 docs/writing.md
