@@ -1319,3 +1319,52 @@ body[data-reality='dream'] [data-side='wake'] {
     display: none !important;
   }
 }
+
+/* ─────────────────────────────────────────────────────────────
+   站内跳转 · 余像（跨文档 View Transition，两页都要声明）
+   旧页不立刻走：先褪一半，停住，再往光里化开；新页稍晚、更快地成形，
+   交接处有一瞬两页同在。不支持的浏览器照常跳转。
+   opt-in（@view-transition）与减弱动效的关停都在上方「动效偏好」块里，这里只换动画。
+   注意：这里改写了根伪元素的 animation，UA 默认的 plus-lighter 混合随之不再生效，
+   两层按普通叠加（新页盖在旧页上），这正是想要的「旧页在新页底下化开」。
+   ───────────────────────────────────────────────────────────── */
+::view-transition-old(root) {
+  animation: vt-afterimage-old 1.15s cubic-bezier(0.3, 0, 0.2, 1) both;
+}
+
+::view-transition-new(root) {
+  animation: vt-afterimage-new 0.8s cubic-bezier(0.25, 0.1, 0.25, 1) 0.18s both;
+}
+
+@keyframes vt-afterimage-old {
+  0% {
+    opacity: 1;
+    filter: blur(0) brightness(1);
+    transform: none;
+  }
+  28% {
+    opacity: 0.5;
+    filter: blur(1.5px) brightness(1.03);
+  }
+  55% {
+    opacity: 0.32;
+  }
+  100% {
+    opacity: 0;
+    filter: blur(14px) brightness(1.12);
+    transform: scale(1.018);
+  }
+}
+
+@keyframes vt-afterimage-new {
+  from {
+    opacity: 0;
+    filter: blur(7px) saturate(0.4);
+    transform: scale(0.994);
+  }
+  to {
+    opacity: 1;
+    filter: none;
+    transform: none;
+  }
+}

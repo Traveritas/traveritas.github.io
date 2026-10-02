@@ -17,7 +17,6 @@ import Hairline from '../components/chrome/Hairline.astro';
 import BootVeil from '../components/chrome/BootVeil.astro';
 import Cursor from '../components/chrome/Cursor.astro';
 import Sound from '../components/chrome/Sound.astro';
-import LoaderProto from '../components/chrome/LoaderProto.astro';
 
 interface Props {
   title: string;
@@ -43,7 +42,8 @@ interface Props {
      （量在 src/scripts/sound.ts 的 READING_TRIM_DB），别和字抢注意力 */
   bgm?: 'ambient' | 'reading';
   /* 开屏面纱：样式预览这类反复进出的工具页关掉（initBoot 找不到面纱即刻印 booted） */
-  boot?: boolean;
+  /* always：每次进入都放（主页）；true：只在会话首访放 */
+  boot?: boolean | 'always';
   rail?: {
     mode: 'night' | 'depth' | 'station';
     station?: string;
@@ -142,9 +142,7 @@ const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site).href : un
     {/* ⛔ 从未渲染过：没有页面传 ambient（见上方 prop 标注）。
         wash-backdrop 是活的（全站，z −5，7% 醒梦洗染）；这一个是死的。 */}
     {ambient && <div class="page-ambient" aria-hidden="true" />}
-    {/* 【原型】开屏候选，?loader=a|b 开启；未开启时无效果 */}
-    {boot && <LoaderProto />}
-    {boot && <BootVeil />}
+    {boot && <BootVeil always={boot === 'always'} />}
     <Hairline />
     {seam !== 'none' && <Seam variant={seam} />}
     {/* 构块场与脑电同为 z −2，DOM 在前 ⇒ 脑电压在它上面 */}
