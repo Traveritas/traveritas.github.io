@@ -15,7 +15,7 @@
 2. ~~**P0 · GlassChip 白玻璃深夜不可读**~~ **已解决**：夜间分期（n1/n2/n3/rem/waso）玻璃下限抬至 `.80+`（昼夜「白玻深字」策略保留）；chip-meta #6d7681→#4c5560。含玻璃合成的元素级普查通过（此前测量漏算渐变背景，实况好于旧读数）。
    本轮一并修复：主页 vtag 62/38、50/50 → **15/85**；`.note-stamp/.wa-why/.tick-na/.pill-skin.dead small` faint→soft；`.dawn-time/.axis-l` umber→soft（静态 umber 跨暗亮两相必失一头）；`window.__ps` 已 DEV 门控（与 `__fx` 同标准）。
    仍遗留：主页 `.tick-ok` 50/50 与 projects 页 30/70 不一致（两处各自达标，纯一致性问题）；`user-select:none` 决议待记；多时钟并存（rail 时刻 vs 段范围 vs 页脚钟）建议给 rail 时刻加「此刻」标注；ghost 重影标签暗底观感待观察。
-3. **主页 `[data-boot]` 无脚本失败兜底**：JS 挂时面纱 6s 自动揭开但首屏元素永久 `opacity:0` = 空页（HEAD `index.astro` 门控样式）。给 `[data-boot]` 补与 BootVeil `boot-auto` 同节拍的 CSS keyframes 兜底。
+3. **主页 `[data-boot]` 无脚本失败兜底**：JS 挂时面纱 6s 自动揭开但首屏元素永久 `opacity:0` = 空页（HEAD `index.astro` 门控样式）。给 `[data-boot]` 补与 BootVeil 兜底同节拍的 CSS keyframes（2026-10-02 起面纱改为碎晶放射：`.bootveil:not(.go)` 3.2s 起淡出）。
 4. **300/900 字重下沉**：仅主页使用（标题/巨字），从 BaseLayout 挪进 index 自己 import——字体 P0（见下）的止血配合项。
 5. ~~**night 每帧写 root 级 CSS 变量**~~ **已解决（2026-09-22 三段平台）**：`documentElement` 上改继承变量 = 每帧全页 style recalc（实测值变化时 ~5ms/帧、值不变 0.07ms/帧，差 ~70×）。改为三段平台 + 值变才写：全页遍历只剩 2 次写入、空闲 0 次（此前 ~1.3 次/秒）。见附三。
 6. **首访揭幕 ≥3.1s 把首个 PV 的 LCP 顶过 2.5s**（boot.ts 两档均不可跳过）：设计决策，可选折中——子页首访走快版 / 允许点击跳过 / 压缩到 ~1.8s。
