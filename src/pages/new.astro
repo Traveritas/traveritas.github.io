@@ -107,7 +107,6 @@ const pins = [
     href: '/articles/',
     wake: '随笔',
     dream: '断章',
-    n: allArticles.length,
     badge: 'SAYABLE',
     at: [0.25, 0.63, 0.2, 0.62],
     rows: allArticles.slice(0, 2).map((a) => ({ t: a.data.title, d: fmtShort(a.data.date) })),
@@ -118,7 +117,6 @@ const pins = [
     href: '/moments/',
     wake: '瞬间',
     dream: '闪念',
-    n: allMoments.length,
     badge: 'EPHEMERAL',
     at: [0.55, 0.79, 0.66, 0.69],
     rows: allMoments.slice(0, 1).map((m) => ({ t: snippet(m.body ?? '', 30), d: fmtMomentTime(m.data.date) })),
@@ -129,7 +127,6 @@ const pins = [
     href: '/projects/',
     wake: '项目',
     dream: '造物',
-    n: allProjects.length,
     badge: 'BUILDABLE',
     at: [0.4, 0.71, 0.34, 0.78],
     rows: allProjects.slice(0, 2).map((p) => ({ t: p.data.title, d: `${depthOf(p.data.status)}/8` })),
@@ -140,7 +137,6 @@ const pins = [
     href: '/about/',
     wake: '关于',
     dream: '此身',
-    n: null,
     badge: 'PRESENCE',
     at: [0.12, 0.78, 0.78, 0.85],
     rows: [{ t: '知觉的留白，与「醒梦」', d: '' }],
@@ -194,7 +190,6 @@ const pins = [
                     <span data-morph data-true={p.wake} data-dream={p.dream}>
                       {p.wake}
                     </span>
-                    {p.n != null && <b>{p.n}</b>}
                   </span>
                 </button>
                 <a class="pw" id={`pw-${p.key}`} href={p.href}>
@@ -648,7 +643,7 @@ const pins = [
     --ls-hz: color-mix(in srgb, var(--sw-h) calc(var(--reality-mix, 1) * 100%), var(--sd-h));
   }
   html .q {
-    color: color-mix(in srgb, var(--q-w) calc(var(--reality-mix, 1) * 100%), var(--q-d));
+    color: color-mix(in srgb, color-mix(in srgb, var(--q-w) calc(var(--reality-mix, 1) * 100%), var(--q-d)) 74%, transparent);
   }
   html .sun-w {
     background: radial-gradient(closest-side, var(--sun-w));
@@ -736,15 +731,16 @@ const pins = [
     pointer-events: none;
     opacity: calc(1 - clamp(0, calc((var(--p) - 0.04) / 0.2), 1));
   }
+  /* 题记：字号与页头站名同级（1.05rem）、字距拉开、次墨 —— 站名仍是唯一的重心，画面交给线景 */
   .q {
-    --f: clamp(1.3rem, 1.95vw, 1.85rem);
+    --f: clamp(1rem, 1.1vw, 1.12rem);
     position: absolute;
     margin: 0;
     font-family: var(--font-display);
     font-weight: 300;
     font-size: var(--f);
-    line-height: 1.95;
-    letter-spacing: 0.12em;
+    line-height: 2.2;
+    letter-spacing: 0.2em;
     color: var(--fg);
     white-space: nowrap;
   }
@@ -772,12 +768,12 @@ const pins = [
     --cr: -0.8deg;
   }
   .q .c:nth-child(7n + 5) {
-    --cb: 0.7px;
-    --co: 0.8;
+    --cb: 0.55px;
+    --co: 0.78;
   }
   .q .c:nth-child(13n + 9) {
     --cx: 0.06em;
-    --cb: 0.4px;
+    --cb: 0.35px;
   }
   html.booted .q .c {
     animation: q-drip 1.1s cubic-bezier(0.2, 0.7, 0.2, 1) both;
@@ -924,13 +920,6 @@ const pins = [
     color: color-mix(in srgb, var(--fg) 82%, transparent);
     white-space: nowrap;
   }
-  .pin-l b {
-    font-family: var(--font-mono);
-    font-weight: 400;
-    font-size: 9.5px;
-    letter-spacing: 0.1em;
-    color: var(--fg-soft);
-  }
   .pin-dot:focus-visible {
     outline: 1px solid var(--fg);
     outline-offset: 3px;
@@ -945,7 +934,7 @@ const pins = [
   .pw {
     --tint: color-mix(in srgb, #ffffff calc(var(--reality-mix, 1) * 100%), #f8e9e3);
     position: absolute;
-    bottom: 26px;
+    bottom: 62px;
     left: clamp(calc(12px - var(--x, 0px)), calc(var(--w) / -2), calc(100vw - 12px - var(--x, 0px) - var(--w)));
     width: var(--w);
     display: block;
@@ -979,12 +968,60 @@ const pins = [
   .pin:focus-within {
     z-index: 2;
   }
+  /* 吊线：从点的外环顶上垂到窗底（先垂下、窗再浮起）；端点一粒极小的结 */
+  .pin::before {
+    content: '';
+    position: absolute;
+    left: -0.5px;
+    bottom: 7px;
+    width: 1px;
+    height: 56px;
+    background: linear-gradient(to top, color-mix(in srgb, var(--ls-mark, var(--umber)) 70%, transparent), color-mix(in srgb, var(--ls-mark, var(--umber)) 30%, transparent));
+    transform: scaleY(0);
+    transform-origin: 50% 100%;
+    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: none;
+  }
+  .pin.open::before,
+  .pin:focus-within::before {
+    transform: none;
+    transition: transform 0.5s cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  .pin.open .pw,
+  .pin:focus-within .pw {
+    transition-delay: 0.12s;
+  }
+  /* 激活的点：中心实、外环收紧（窗关着时的悬停只放大不变实） */
+  .pin.open .pin-dot i {
+    background:
+      radial-gradient(closest-side, var(--ls-mark, var(--umber)) 0 3.2px, transparent 3.7px),
+      radial-gradient(
+        closest-side,
+        transparent 0 5.4px,
+        color-mix(in srgb, var(--ls-mark, var(--umber)) 70%, transparent) 5.7px 6.5px,
+        transparent 6.9px
+      );
+  }
+  .pin.open .pin-l {
+    color: var(--fg);
+  }
   /* 一扇窗打开时，其余的点退成淡影（窄屏上窗会盖住别的标签，不让它们从窗里透出来） */
   .pin-l {
     transition: opacity 0.4s ease;
   }
-  .ls-pins:has(.pin.open) .pin:not(.open) .pin-l {
-    opacity: 0;
+  .pin-dot i {
+    transition:
+      transform 0.4s cubic-bezier(0.2, 0.7, 0.2, 1),
+      opacity 0.4s ease;
+  }
+  .ls-pins:has(.pin.open) .pin:not(.open) .pin-l,
+  .ls-pins:has(.pin.open) .pin:not(.open) .pin-dot i {
+    opacity: 0.3;
+  }
+  @media (max-width: 760px) {
+    .ls-pins:has(.pin.open) .pin:not(.open) .pin-l {
+      opacity: 0;
+    }
   }
   .pin.open .pw,
   .pin:focus-within .pw {
@@ -1003,6 +1040,10 @@ const pins = [
     }
     .pin:hover .pin-dot i {
       transform: scale(1.3);
+    }
+    .pin:hover::before {
+      transform: none;
+      transition: transform 0.5s cubic-bezier(0.2, 0.7, 0.2, 1);
     }
     .pin:hover .pw {
       pointer-events: auto;
@@ -1532,8 +1573,8 @@ const pins = [
       --g: 24px;
     }
     .q {
-      --f: 1.16rem;
-      letter-spacing: 0.05em;
+      --f: 1rem;
+      letter-spacing: 0.12em;
     }
     .q {
       top: 118px;

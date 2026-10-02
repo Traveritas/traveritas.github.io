@@ -26,6 +26,7 @@ import {
   frameAt,
   hillAt,
   makeGeo,
+  restPoint,
   orbOf,
   rowAt,
   rowsFor,
@@ -74,6 +75,8 @@ type Msg =
   /* xy ＝ 地平线（主线骨架，视口坐标）；fold ＝ 收拢度 0 展开 … 1 收回成单根线；
      boot ＝ 主线程揭幕时刻（performance.now，ms；NaN ＝ 还没揭幕）；anchors ＝ 锚点 */
   | { type: 'state'; xy: Float32Array; fold: number; boot: number; anchors: Anchor[] }
+  /* 测量点激活：k / s ＝ 该点所在的排与弧长（k < 0 ＝ 收起）；pulse ＝ 这一下要不要散一圈涟漪 */
+  | { type: 'focus'; k: number; s: number; pulse: boolean }
   | { type: 'perf' }
   | { type: 'hidden'; hidden: boolean };
 
@@ -102,6 +105,16 @@ let perfSum = 0;
 let perfN = 0;
 let perfMax = 0;
 let NPT = 0; // 每帧点数（截图脚本读）
+
+/* 测量点激活：那一排整条被点亮（淡入 / 淡出），点下去的那一下从点上散一圈涟漪 ——
+   被透视压扁的环沿地形扩散，经过的线被轻轻顶起。都在这里随帧画，主线程只发一条消息 */
+let hiK = -1;
+let hiOn = false;
+let hiT = -1e9;
+let puK = -1;
+let puS = 0;
+let puT = -1e9;
+const PULSE = 1.6; // s
 
 /* 圆的回声圈：[向内收(px), 读波延迟(s), 波幅倍数, 不透明度倍数, 线宽, 偏向光色]
    主圈最实；内侧两圈细而淡、波更晚到，像同一根线在圆上绕了几次；最外一圈极淡、几乎不动，像光晕的边 */
@@ -173,6 +186,28 @@ function paint(now: number) {
   const K = rowsFor(mobile);
   const f = [0, 0, 0, 0];
   const { nx, ny, tx, ty } = g;
+
+  // 激活排的亮度（0 … 1）
+  let hf = 0;
+  if (hiK >= 0) {
+    hf = still ? (hiOn ? 1 : 0) : hiOn ? sstep((now - hiT) / 600) : 1 - sstep((now - hiT) / 420);
+    if (!hiOn && hf <= 0) hiK = -1;
+  }
+  // 涟漪：环的半径 / 起伏 / 环宽；环心 ＝ 点在静止地形上的位置
+  const pt = (now - puT) / 1000;
+  const rip = !still && puK >= 0 && pt >= 0 && pt < PULSE;
+  let rR = 0;
+  let rA = 0;
+  let rpx = 0;
+  let rpy = 0;
+  if (rip) {
+    const u = pt / PULSE;
+    rR = 24 + (mobile ? 200 : 320) * (1 - (1 - u) ** 3);
+    rA = 7 * (1 - u) ** 1.6;
+    [rpx, rpy] = restPoint(g, puK, puS);
+  }
+  const RW = 34;
+  const SQ = 2.6; // 透视压扁：法向距离放大 ⇒ 环在地面上是扁的
 
   /* ── a：圆环与它的倒影 ── */
   let reflBand: Path2D | null = null;
@@ -301,6 +336,13 @@ function paint(now: number) {
       const xw = worldX(g, r, ss);
       let y = waveAt(xw / 600, ph - lag, A) * calm - hillAt(g, r, xw);
       y *= ek * open;
+      if (rip) {
+        const Y0 = o + y;
+        const ex = f[0] + f[2] * Y0 - rpx;
+        const ey = f[1] + f[3] * Y0 - rpy;
+        const dd = Math.hypot(ex * tx + ey * ty, (ex * nx + ey * ny) * SQ);
+        y -= rA * Math.exp(-(((dd - rR) / RW) ** 2));
+      }
       if (q > 0.3 && calm > 0.5) y = Math.round(y / q) * q;
       const Y = o + y;
       const X = f[0] + f[2] * Y;
@@ -362,6 +404,12 @@ function paint(now: number) {
     } else ctx.strokeStyle = rgba(col, alpha);
     ctx.lineWidth = width;
     ctx.stroke(path);
+    // 激活的那一排：整条换成光色、略粗（标注断口照旧留白）
+    if (k === hiK && hf > 0.001) {
+      ctx.strokeStyle = rgba(mix(ink, light, 0.55), (0.3 + 0.5 * hf) * hf * ek * open);
+      ctx.lineWidth = width + 0.7;
+      ctx.stroke(path);
+    }
 
     /* 倒影（a）：地形线穿过倒影环带的那几小段 —— 梦面被照亮（琥珀），醒面反而断开
        （只剩一圈空缺）。醒面没有异色（reality.ts 把 --amber 混成冷灰），倒影便以「缺席」出现 */
@@ -389,6 +437,15 @@ function paint(now: number) {
     }
   }
   if (orb && orb.kFront >= K) drawOrb();
+  // 涟漪的环本身：极淡的一道光色细线，与地形的起伏同步扩散
+  if (rip) {
+    const u = pt / PULSE;
+    ctx.strokeStyle = rgba(light, 0.32 * (1 - u) ** 1.5 * open);
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.ellipse(rpx, rpy, rR, rR / SQ, Math.atan2(ty, tx), 0, TAU);
+    ctx.stroke();
+  }
   ctx.globalAlpha = 1;
 }
 
@@ -450,6 +507,22 @@ self.onmessage = (e: MessageEvent<Msg>) => {
     resize(m.W, m.H, m.dpr);
     geoReady();
     if (!running) paint(mainNow());
+  } else if (m.type === 'focus') {
+    const now = mainNow();
+    if (m.k >= 0) {
+      hiK = m.k;
+      hiOn = true;
+      hiT = now;
+      if (m.pulse) {
+        puK = m.k;
+        puS = m.s;
+        puT = now;
+      }
+    } else if (hiOn) {
+      hiOn = false;
+      hiT = now;
+    }
+    if (!running) paint(now);
   } else if (m.type === 'mix') {
     d = m.d;
     colors = m.colors;

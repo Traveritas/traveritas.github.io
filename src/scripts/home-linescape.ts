@@ -189,6 +189,7 @@ export function initLinescape() {
   const ribD = document.getElementById('ls-rib-d') as HTMLCanvasElement | null;
   let ribKey = '';
   const pinsOn = true;
+  const pinAt = new Map<HTMLElement, Anchor>(); // 每个测量点钉在哪一排、哪一处（激活时告诉地形 Worker）
   const isA = true;
   const markH = document.querySelector<HTMLElement>('[data-mark="h"]');
   const markN = document.querySelector<HTMLElement>('[data-mark="n"]');
@@ -231,6 +232,7 @@ export function initLinescape() {
         const at = (el.dataset.at ?? '').split(',').map(Number);
         const [tx, ty] = m ? [at[2], at[3]] : [at[0], at[1]];
         const a = findAnchor(g, tx * vw, ty * vh, 0, Math.floor(K * 0.3), K - 1);
+        pinAt.set(el, a);
         put(el, g, a, (Math.atan2(g.ty, g.tx) * 180) / Math.PI); // 测量点一律沿地平线方向：各排局部角度不一，标签跟着歪会显得乱
         anchors.push(a);
       }
@@ -256,12 +258,20 @@ export function initLinescape() {
      键盘焦点（:focus-visible）由 CSS 直接浮窗，这里只管 .open 与 Esc ── */
   if (pinsOn) {
     const dotOf = (p: HTMLElement) => p.querySelector<HTMLButtonElement>('.pin-dot');
+    // 激活态交给地形 Worker：那一排整条点亮；点下去时再散一圈涟漪
+    const focusTerrain = (p: HTMLElement | null, pulse = false) => {
+      const a = p ? pinAt.get(p) : undefined;
+      terrain?.postMessage({ type: 'focus', k: a ? a.k : -1, s: a ? a.s : 0, pulse });
+    };
     const close = (except?: HTMLElement) => {
+      let any = false;
       for (const p of pinEls) {
         if (p === except) continue;
+        if (p.classList.contains('open')) any = true;
         p.classList.remove('open');
         dotOf(p)?.setAttribute('aria-expanded', 'false');
       }
+      if (any && !except) focusTerrain(null);
     };
     for (const p of pinEls) {
       const b = dotOf(p);
@@ -271,6 +281,7 @@ export function initLinescape() {
         p.classList.remove('shut');
         p.classList.toggle('open', on);
         b.setAttribute('aria-expanded', String(on));
+        focusTerrain(on ? p : null, on);
       });
       p.addEventListener('focusout', (e) => {
         if (!p.contains(e.relatedTarget as Node | null)) p.classList.remove('shut');
