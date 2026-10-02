@@ -65,7 +65,11 @@
         setTimeout(() => {
           if (!guide.classList.contains('is-dismissed')) {
             guide.classList.add('is-pulsing');
-            setTimeout(() => guide.classList.remove('is-pulsing'), 1800);
+            // 演示做完接着呼吸三次，之后静息（见样式里「光核」一节）
+            setTimeout(() => {
+              guide.classList.remove('is-pulsing');
+              guide.classList.add('is-breathing');
+            }, 1800);
           }
         }, 1800);
       };
@@ -211,6 +215,13 @@
     height: 12px;
   }
 
+  /* ── 光核：只在该引人注意的时候呼吸 ──
+     原先三条 infinite 呼吸（点 + 两层光晕）一直在跑：元素虽小，只要有一条无限动画，
+     合成器就每个 vsync 都得出一帧，首屏静置时这是除两个画布外最大的常驻开销。
+     现在：揭幕后先做一次微抽演示（is-pulsing），接着呼吸三次就静息在谷值；
+     悬停时再呼吸。静息时没有任何动画在跑。
+     全程只动 opacity / transform（可合成）：两层光晕各是一个伪元素上的静态 box-shadow，
+     交叉淡变它们的 opacity，代替在 box-shadow 之间插值（那会走主线程）。 */
   .rg-dot {
     display: block;
     width: 6px;
@@ -218,36 +229,55 @@
     border-radius: 50%;
     background: var(--amber);
     position: relative;
-    box-shadow: 0 0 0 0 transparent;
-    animation: rg-dot-breathe 3.6s ease-in-out infinite;
-    transition:
-      transform 0.25s ease,
-      box-shadow 0.25s ease;
+    /* 静息 ＝ 呼吸的谷值：呼吸停下时不跳 */
+    opacity: 0.75;
+    transform: scale(0.95);
+    transition: transform 0.25s ease;
   }
 
-  /* 呼吸：点本身只动 opacity / scale（可合成）；光晕的谷值、峰值各占一个伪元素，
-     交叉淡变 opacity，≈ 原先在两组 box-shadow 之间插值。直接动画 box-shadow
-     会走主线程，并把全站可合成的动画一起拖回逐帧重算（见 Seam.astro 同款注释） */
   .rg-dot::before,
   .rg-dot::after {
     content: '';
     position: absolute;
     inset: 0;
     border-radius: inherit;
-    animation: rg-glow-breathe 3.6s ease-in-out infinite;
   }
 
+  /* 谷值光晕：静息时亮着 */
   .rg-dot::before {
     box-shadow: 0 0 6px 1px color-mix(in srgb, var(--amber) 45%, transparent);
-    animation-direction: reverse;
   }
 
+  /* 峰值光晕：静息时熄着（长按中 / 演示时也用它） */
   .rg-dot::after {
     box-shadow: 0 0 10px 2px color-mix(in srgb, var(--amber) 80%, transparent);
+    opacity: 0;
+  }
+
+  /* 呼吸：演示做完后由脚本挂上 is-breathing，三次即止；悬停时一直呼吸 */
+  /* （每条都写完整的简写：拆成「无名简写 + animation-name」会被压缩器合并成 animation: none） */
+  .reality-guide.is-breathing .rg-dot {
+    animation: rg-dot-breathe 3.6s ease-in-out 0.2s 3 both;
+  }
+  .reality-guide.is-breathing .rg-dot::before {
+    animation: rg-glow-valley 3.6s ease-in-out 0.2s 3 both;
+  }
+  .reality-guide.is-breathing .rg-dot::after {
+    animation: rg-glow-peak 3.6s ease-in-out 0.2s 3 both;
+  }
+  .reality-guide:hover .rg-dot {
+    animation: rg-dot-breathe 3.6s ease-in-out infinite;
+  }
+  .reality-guide:hover .rg-dot::before {
+    animation: rg-glow-valley 3.6s ease-in-out infinite;
+  }
+  .reality-guide:hover .rg-dot::after {
+    animation: rg-glow-peak 3.6s ease-in-out infinite;
   }
 
   @keyframes rg-dot-breathe {
-    0%, 100% {
+    0%,
+    100% {
       opacity: 0.75;
       transform: scale(0.95);
     }
@@ -257,8 +287,19 @@
     }
   }
 
-  @keyframes rg-glow-breathe {
-    0%, 100% {
+  @keyframes rg-glow-valley {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0;
+    }
+  }
+
+  @keyframes rg-glow-peak {
+    0%,
+    100% {
       opacity: 0;
     }
     50% {
@@ -266,73 +307,102 @@
     }
   }
 
-  :global(body.reality-holding) .rg-dot {
-    animation: none;
-    transform: scale(1.4);
-    box-shadow: 0 0 12px 2px var(--amber);
-  }
-
+  /* 长按中：光核收紧放亮，停在峰值光晕上 */
+  :global(body.reality-holding) .rg-dot,
   :global(body.reality-holding) .rg-dot::before,
   :global(body.reality-holding) .rg-dot::after {
     animation: none;
+  }
+  :global(body.reality-holding) .rg-dot {
+    opacity: 1;
+    transform: scale(1.4);
+  }
+  :global(body.reality-holding) .rg-dot::before {
     opacity: 0;
   }
+  :global(body.reality-holding) .rg-dot::after {
+    opacity: 1;
+  }
 
-  /* 演示微抽发丝线（-4°倾角） */
+  /* 演示微抽发丝线（-4°倾角）：定长 42px，抽出 / 收回靠 scaleX（不动 width，免得逐帧排版） */
   .rg-demo-thread {
     position: absolute;
     right: 6px;
     top: 5.5px;
-    width: 0;
+    width: 42px;
     height: 1px;
     background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--amber) 40%, transparent) 20%, var(--amber));
     transform-origin: 100% 50%;
-    transform: rotate(-4deg);
+    transform: rotate(-4deg) scaleX(0);
     pointer-events: none;
     opacity: 0;
   }
 
-  /* 呼吸预演脉冲动效 */
+  /* 微抽演示：一次性，1.6s */
   .reality-guide.is-pulsing .rg-dot {
-    animation: rg-pulse-dot 1.6s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+    animation: rg-pulse-dot 1.6s cubic-bezier(0.2, 0.8, 0.3, 1);
+  }
+
+  .reality-guide.is-pulsing .rg-dot::before {
+    animation: none;
+    opacity: 0;
+  }
+
+  .reality-guide.is-pulsing .rg-dot::after {
+    animation: rg-pulse-glow 1.6s cubic-bezier(0.2, 0.8, 0.3, 1);
   }
 
   .reality-guide.is-pulsing .rg-demo-thread {
-    animation: rg-pulse-thread 1.6s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+    animation: rg-pulse-thread 1.6s cubic-bezier(0.2, 0.8, 0.3, 1);
   }
 
   @keyframes rg-pulse-dot {
     0% {
-      transform: scale(1);
+      opacity: 0.75;
+      transform: scale(0.95);
     }
     30% {
+      opacity: 1;
       transform: scale(1.5);
-      box-shadow: 0 0 14px 2px var(--amber);
     }
     70% {
+      opacity: 1;
       transform: scale(1.2);
-      box-shadow: 0 0 9px 1px var(--amber);
     }
     100% {
-      transform: scale(1);
+      opacity: 0.75;
+      transform: scale(0.95);
+    }
+  }
+
+  @keyframes rg-pulse-glow {
+    0%,
+    100% {
+      opacity: 0;
+    }
+    30% {
+      opacity: 1;
+    }
+    70% {
+      opacity: 0.7;
     }
   }
 
   @keyframes rg-pulse-thread {
     0% {
-      width: 0;
+      transform: rotate(-4deg) scaleX(0);
       opacity: 0;
     }
     35% {
-      width: 42px;
+      transform: rotate(-4deg) scaleX(1);
       opacity: 0.95;
     }
     75% {
-      width: 42px;
+      transform: rotate(-4deg) scaleX(1);
       opacity: 0.75;
     }
     100% {
-      width: 0;
+      transform: rotate(-4deg) scaleX(0);
       opacity: 0;
     }
   }
@@ -405,8 +475,10 @@
       transform: none !important;
     }
 
-    .reality-guide.is-pulsing .rg-dot,
-    .reality-guide.is-pulsing .rg-demo-thread {
+    .rg-dot,
+    .rg-dot::before,
+    .rg-dot::after,
+    .rg-demo-thread {
       animation: none !important;
     }
   }
