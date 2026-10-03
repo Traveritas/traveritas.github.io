@@ -9,7 +9,7 @@
    ───────────────────────────────────────────────────────────── */
 
 import { createEegWave, EEG_ECHO_COUNT, makeSpine, type Spine } from './eeg-wave';
-import { SLOT, slotWait } from './frame-slot';
+import { slotWait } from './frame-slot';
 import { Scene, makeGl, type Backend } from './home-linescape-gl';
 
 interface Colors {
@@ -295,17 +295,14 @@ function resize(w: number, h: number, r: number) {
 }
 
 /* 帧钟：约 30fps，等到共同时隙再等一个 rAF —— 与主页地形 Worker 落在同一个 vsync 上（frame-slot.ts）。
-   主页梦面（沿骨架走、已画满）与地形一起定格：每 HOLD 个时隙才换一帧，落在同一组墙钟时隙上；
-   滚动换骨架时（spineAt 之后一小会）照常帧率跟手。Worker 里没有 rAF 的环境退回纯定时器 */
+   梦面不跟地形一起降帧定格：两道阶梯波本就只在拍钟换格时才变，有色两道是连续流动的，
+   降帧会把它们也带成一顿一顿的。Worker 里没有 rAF 的环境退回纯定时器 */
 const hasRaf = typeof self.requestAnimationFrame === 'function';
-const HOLD = 4;
-let spineAt = -1e9;
 function schedule() {
-  const hold = spine && reveal >= 1 && d >= 0.98 && performance.now() - spineAt > 400;
   setTimeout(() => {
     if (hasRaf) self.requestAnimationFrame(tick);
     else tick(performance.now());
-  }, slotWait(hold ? HOLD * SLOT : SLOT));
+  }, slotWait());
 }
 function tick(ts: number) {
   if (!hidden) render(clock(ts));
@@ -356,7 +353,6 @@ self.onmessage = (e: MessageEvent<Msg>) => {
   } else if (m.type === 'spine') {
     spine = m.xy ? makeSpine(m.xy) : null;
     spineVer++;
-    spineAt = performance.now();
     dark = m.dark;
     reveal = m.reveal;
     dot = m.dot;

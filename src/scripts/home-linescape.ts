@@ -69,19 +69,20 @@ const rgb = (c: number[]) =>
     ? `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${c[3].toFixed(3)})`
     : `rgb(${c[0] | 0},${c[1] | 0},${c[2] | 0})`;
 
-/* ── 线的五个姿态（同主稿） ── */
+/* ── 线的五个姿态（同主稿）。断章 / 造物 / 闪念三幕是笔直的竖线 —— 线上本来就走着脑电的波，
+   骨架再弯就成了波上叠波；只有晨醒那一笔从左上垂下、拐成底线。 ── */
 const POSES_D: (Pt[] | null)[] = [
   null,
-  [[0.33, -0.1], [0.3, 0.18], [0.315, 0.42], [0.29, 0.68], [0.305, 0.9], [0.3, 1.1]],
-  [[0.31, -0.1], [0.29, 0.22], [0.305, 0.5], [0.285, 0.76], [0.3, 1.1]],
-  [[0.5, -0.1], [0.485, 0.24], [0.515, 0.5], [0.49, 0.76], [0.5, 1.1]],
+  [[0.3, -0.1], [0.3, 1.1]],
+  [[0.3, -0.1], [0.3, 1.1]],
+  [[0.5, -0.1], [0.5, 1.1]],
   [[0.2, -0.1], [0.2, 0.22], [0.215, 0.42], [0.28, 0.52], [0.55, 0.545], [0.85, 0.55], [1.12, 0.552]],
 ];
 const POSES_M: (Pt[] | null)[] = [
   null,
-  [[0.075, -0.1], [0.065, 0.3], [0.08, 0.6], [0.07, 1.1]],
-  [[0.075, -0.1], [0.065, 0.3], [0.08, 0.6], [0.07, 1.1]],
-  [[0.075, -0.1], [0.068, 0.3], [0.08, 0.6], [0.07, 1.1]],
+  [[0.072, -0.1], [0.072, 1.1]],
+  [[0.072, -0.1], [0.072, 1.1]],
+  [[0.072, -0.1], [0.072, 1.1]],
   [[0.075, -0.1], [0.07, 0.2], [0.085, 0.36], [0.2, 0.42], [0.6, 0.43], [1.12, 0.432]],
 ];
 const POSE_KEYS: [number, number][] = [
@@ -302,17 +303,32 @@ export function initLinescape() {
     );
   }
 
+  /* 两个姿态之间逐点插值时，端点走的是直线、会抄近路扫进画面（开屏斜线的端点在画外左右，
+     竖线的端点在画外上下，中途的连线正好切过视口的角）。所以换姿态的途中沿两端切向各补
+     一截画外的尾巴：途中长、到站归零；两端等长 ⇒ 波形的中点不动。 */
+  let tail = 0;
   function poseAt(p: number): Pt[] {
     let i = 0;
     while (i < POSE_KEYS.length - 2 && p > POSE_KEYS[i + 1][0]) i++;
     const [p0, a] = POSE_KEYS[i];
     const [p1, b] = POSE_KEYS[i + 1];
     const t = sstep(cl((p - p0) / (p1 - p0)));
+    tail = 0;
     if (a === b || t === 0) return poses[a];
     const A = poses[a];
     const B = poses[b];
+    tail = Math.hypot(vw, vh) * Math.min(1, 6 * t * (1 - t));
     return A.map((q, k) => [lerp(q[0], B[k][0], t), lerp(q[1], B[k][1], t)] as Pt);
   }
+  const extend = (pts: Pt[], e: number): Pt[] => {
+    if (e < 1) return pts;
+    const out = (q: Pt, r: Pt): Pt => {
+      const l = Math.hypot(q[0] - r[0], q[1] - r[1]) || 1;
+      return [q[0] + ((q[0] - r[0]) / l) * e, q[1] + ((q[1] - r[1]) / l) * e];
+    };
+    const n = pts.length;
+    return [out(pts[0], pts[1]), ...pts, out(pts[n - 1], pts[n - 2])];
+  };
 
   function palette(p: number) {
     let i = 0;
@@ -398,7 +414,7 @@ export function initLinescape() {
     if (scrollDirty) {
       scrollDirty = false;
       updateScroll();
-      const pts = poseAt(pos);
+      const pts = extend(poseAt(pos), tail);
       xy = new Float32Array(pts.length * 2);
       for (let i = 0; i < pts.length; i++) {
         xy[2 * i] = pts[i][0];
@@ -407,7 +423,9 @@ export function initLinescape() {
       sp = makeSpine(xy);
     }
     if (!sp) return;
-    const dotF = mq.matches ? 0.78 : 0.7;
+    // 琥珀点与底线按「不含尾巴」的弧长比例取，换算到补过尾巴的骨架上
+    const at = (f: number) => (tail + (sp.len - 2 * tail) * f) / sp.len;
+    const dotF = at(mq.matches ? 0.78 : 0.7);
     const key = `${pos.toFixed(4)}|${lift.toFixed(1)}|${reveal.toFixed(3)}|${dark.toFixed(3)}|${vw}x${vh}`;
     if (key !== lastSent) {
       lastSent = key;
@@ -423,7 +441,7 @@ export function initLinescape() {
     root.classList.toggle('ls-folded', fold > 0.5);
     if (pos > 3.9) {
       const L = sp.L;
-      const s = sp.len * 0.72;
+      const s = sp.len * at(0.72);
       let j = 1;
       while (j < L.length - 1 && L[j] < s) j++;
       setVar(root, '--base', `${(sp.xy[2 * j + 1] + lift).toFixed(1)}px`);
