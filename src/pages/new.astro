@@ -207,6 +207,8 @@ const heroChars = heroLines.map((l) => [...l].map((ch) => ({ ch, i: heroI++ })))
   <div class="ls-glow" aria-hidden="true"></div>
   <div class="ls-sun" aria-hidden="true"><i class="sun-w"></i><i class="sun-d"></i></div>
   <canvas class="ls-canvas" id="ls-canvas" aria-hidden="true"></canvas>
+  <!-- 圆区主体 · 晶苞：离线渲染的逐帧位图，按醒梦播放（src/scripts/home-bud.ts） -->
+  <canvas class="ls-bud" id="ls-bud" aria-hidden="true"></canvas>
 
   <div class="home">
     <!-- ═══ 场 0 · 23:07 入夜：线景 —— 那一根线是地平线，地平线下是它自己的一整片回声 ═══ -->
@@ -424,6 +426,7 @@ const heroChars = heroLines.map((l) => [...l].map((ch) => ({ ch, i: heroI++ })))
 
 <script>
   import { initLinescape } from '../scripts/home-linescape';
+  import { initHeroBud } from '../scripts/home-bud';
 
   /* 晶板窗口里的抽象百合（花瓣长度 / 开角抖动，避免机械放射对称） */
   let seed = 1;
@@ -445,6 +448,7 @@ const heroChars = heroLines.map((l) => [...l].map((ch) => ({ ch, i: heroI++ })))
   });
 
   initLinescape();
+  initHeroBud();
 
   /* 屏外各幕的排版挪到空闲时、一幕一个任务（见 .scene + .scene 的 content-visibility）。
      常驻的 Worker / 合成动画可能让空闲回调迟迟不来，故带 timeout 兜底 */
@@ -730,6 +734,28 @@ const heroChars = heroLines.map((l) => [...l].map((ch) => ({ ch, i: heroI++ })))
       rgba(236, 210, 205, 0) 100%
     );
     opacity: calc(1 - var(--reality-mix, 1));
+  }
+
+  /* ── 晶苞：圆心 / 半径与圆光同一份几何（--sx / --sy / --sr）；画布边长 3.6R：醒面晶体上下略出圆、左右仍在圆内。
+     z −2 且 DOM 在 Eeg 之后 ⇒ 压在地平线（脑电）之上：圆光 < 地形 < 地平线 < 晶体，线隔着半透明玻璃透出。
+     素材加载完才淡入（.on），收拢时与圆光一起淡出 ── */
+  .ls-bud {
+    position: fixed;
+    z-index: -2;
+    left: calc(var(--sx, -999px) - 1.8 * var(--sr, 0px));
+    top: calc(var(--sy, -999px) - 1.8 * var(--sr, 0px));
+    width: calc(3.6 * var(--sr, 0px));
+    height: calc(3.6 * var(--sr, 0px));
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 1.8s ease;
+  }
+  .ls-bud.on {
+    opacity: 1;
+  }
+  html.ls-folded .ls-bud {
+    opacity: 0;
+    transition-duration: 0.8s;
   }
 
   /* ── 问句：唯一的字。一种颜色、一个字号 ──

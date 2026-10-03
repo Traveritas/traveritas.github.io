@@ -271,6 +271,17 @@ function setTint(cc: number) {
 export function wakeMix(): number {
   return c;
 }
+
+/** 长按进行中（已过短按判定窗口）：要去的面与距闩锁的剩余秒数；否则 null。
+    供首屏晶苞在按压期间提前对齐循环点，松手即作废 */
+export function holdIntent(): { to: Reality; eta: number } | null {
+  if (mode !== 'hold' || !holdActive) return null;
+  const T = dir === 'go' ? T_GO : T_BACK;
+  return {
+    to: dir === 'go' ? 'wake' : 'dream',
+    eta: Math.max(0, T - (performance.now() - holdT0)) / 1000,
+  };
+}
 function showKnot(pack: boolean) {
   if (!knot) return;
   knot.style.transform = `translate(${px}px,${py}px) rotate(45deg)`;

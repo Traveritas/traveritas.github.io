@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>晶苞 · 首屏圆区主体</title>
+<style>
+  :root {
+    --bg: #f0f3f6;
+    --fg: #232830;
+    --fg-soft: #56606d;
+    --fg-faint: #858f9d;
+    --line: rgba(35, 40, 48, 0.12);
+    --amber: #d9a05b;
+    --panel: rgba(250, 248, 250, 0.82);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg);
+    font: 13px/1.6 system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif; }
+  body { display: grid; grid-template-columns: 1fr 300px; overflow: hidden; }
+  @media (max-width: 900px) { body { grid-template-columns: 1fr; grid-template-rows: 1fr auto; overflow: auto; } }
+
+  /* ── 舞台：按 1440×900 截图等比缩放 ── */
+  .viewport { position: relative; overflow: hidden; display: grid; place-items: center; min-height: 60vh; }
+  .stage { position: absolute; left: 50%; top: 50%; width: 1440px; height: 900px; transform-origin: center; }
+  .stage .bg { position: absolute; inset: 0; background: url(../bg-a.png) center / cover; transition: filter 1.6s ease; }
+  .stage.wake .bg { filter: saturate(0.25) hue-rotate(-30deg) brightness(1.02); }
+  .stage.plain .bg { background: radial-gradient(circle at 75% 50%, #f6f2f6, #ece6ec 60%); filter: none; }
+  /* 圆区中心 (1088, 470)，半径约 215 */
+  #hero { position: absolute; left: 1088px; top: 470px; width: 500px; height: 500px; transform: translate(-50%, -50%); }
+
+  /* ── 面板 ── */
+  aside { border-left: 1px solid var(--line); background: var(--panel); padding: 22px 20px; overflow: auto; }
+  h1 { font: 600 17px/1.4 'Noto Serif SC', 'Songti SC', serif; margin: 0 0 4px; letter-spacing: .04em; }
+  .kicker { font: 11px/1 ui-monospace, Consolas, monospace; letter-spacing: .14em; color: var(--amber); margin-bottom: 10px; }
+  .lede { color: var(--fg-soft); margin: 0 0 18px; }
+  h2 { font: 11px/1 ui-monospace, Consolas, monospace; letter-spacing: .12em; color: var(--fg-faint); margin: 20px 0 10px; text-transform: uppercase; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
+  button { font: inherit; border: 1px solid var(--line); background: #fff; color: var(--fg); padding: 6px 12px; border-radius: 3px; cursor: pointer; }
+  button[aria-pressed=true] { border-color: var(--amber); box-shadow: inset 0 0 0 1px var(--amber); }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+  label { display: flex; gap: 8px; align-items: center; color: var(--fg-soft); }
+  input[type=range] { flex: 1; accent-color: var(--amber); }
+  .stat { font: 11px/1.7 ui-monospace, Consolas, monospace; color: var(--fg-soft); white-space: pre-wrap; }
+  .note { color: var(--fg-soft); }
+  .note b { color: var(--fg); font-weight: 600; }
+  .load { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); font: 11px ui-monospace, Consolas, monospace; color: var(--fg-faint); letter-spacing: .1em; }
+</style>
+</head>
+<body>
+<div class="viewport" id="vp">
+  <div class="stage" id="stage">
+    <div class="bg"></div>
+    <canvas id="hero" width="1000" height="1000" aria-label="晶苞主体"></canvas>
+  </div>
+  <div class="load" id="load">LOADING 0%</div>
+</div>
+
+<aside>
+  <div class="kicker">HERO · CRYSTAL BUD</div>
+  <h1>晶苞</h1>
+  <p class="lede">醒时是一枚闭合的六方冰晶；入梦后，上六片三长三短向外卷开，下托松散下沉，中间一团暖光浮起。</p>
+
+  <h2>状态</h2>
+  <div class="row">
+    <button id="toWake" aria-pressed="true">醒 · 闭合</button>
+    <button id="toDream" aria-pressed="false">梦 · 绽开</button>
+  </div>
+  <div class="row note">也可以按住空格 1 秒切换。切换时会先加速转到循环点，再成形。</div>
+
+  <h2>播放</h2>
+  <label>转速 <input id="speed" type="range" min="0.25" max="3" step="0.05" value="1"><span id="speedV">1.0×</span></label>
+  <div class="row" style="margin-top:8px">
+    <label><input id="interp" type="checkbox" checked> 帧间混合</label>
+    <label><input id="plain" type="checkbox"> 纯底色</label>
+  </div>
+
+  <h2>数据</h2>
+  <div class="stat" id="stat"></div>
+
+  <h2>说明</h2>
+  <p class="note"><b>做法。</b>Blender Cycles 离线渲染，带透明通道的逐帧 WebP，页面用一张 canvas 按 12 fps 播放；运行时不需要 WebGL，也不做任何着色计算。</p>
+  <p class="note"><b>循环。</b>醒面六重对称，只渲 60°（40 帧）；梦面按百合三长三短做成三重对称，渲 120°（80 帧）。绽开与收拢各 40 帧，变形过程中旋转不停，首尾分别接在两个循环的起点。</p>
+  <p class="note"><b>材质。</b>外表面清透、内表面微糙、侧边磨砂，所以每片板都有一圈白边。环境里埋了几条细暗线，晶体里看到的横纹就是折射出来的线景。</p>
+  <p class="note"><b>底图。</b>截图来自 <code>/new/</code> 的默认状态；醒面的冷色只是用 CSS 滤镜近似的。</p>
+</aside>
+
+<script>
+const SEQ = { wake: 40, open: 40, dream: 80, close: 40 };
+const FPS = 12;
+// convert.sh 写出的各序列体积（字节）
+const SIZES = {"wake":420926,"open":810394,"dream":2252098,"close":805596};
+const frames = {};
+let loaded = 0, total = 0, bytes = 0;
+
+const stage = document.getElementById('stage');
+const vp = document.getElementById('vp');
+function fit() {
+  const s = Math.min(vp.clientWidth / 1440, vp.clientHeight / 900);
+  stage.style.transform = `translate(-50%, -50%) scale(${s})`;
+}
+addEventListener('resize', fit); fit();
+
+function load() {
+  const jobs = [];
+  for (const [name, n] of Object.entries(SEQ)) {
+    frames[name] = [];
+    for (let i = 0; i < n; i++) {
+      total++;
+      const img = new Image();
+      img.decoding = 'async';
+      const src = `frames-webp/${name}/${String(i).padStart(3, '0')}.webp`;
+      img.src = src;
+      frames[name].push(img);
+      jobs.push(img.decode().then(() => {
+        loaded++;
+        document.getElementById('load').textContent = `LOADING ${Math.round(loaded / total * 100)}%`;
+      }));
+    }
+  }
+  return Promise.all(jobs);
+}
+
+const cv = document.getElementById('hero');
+const ctx = cv.getContext('2d');
+
+// 状态机：wake ⇄ dream，经过 open / close
+let seq = 'wake', pos = 0;      // pos：当前序列内的浮点帧位置
+let want = 'wake';
+let speed = 1, interp = true;
+
+function step(dt) {
+  const n = SEQ[seq];
+  const loop = seq === 'wake' || seq === 'dream';
+  const target = (seq === 'wake' && want === 'dream') || (seq === 'dream' && want === 'wake');
+  // 循环序列在等待切换时加速转到循环点
+  const rate = FPS * speed * (loop && target ? 3.2 : 1);
+  pos += dt * rate;
+  if (pos >= n) {
+    pos -= n;
+    if (seq === 'wake' && want === 'dream') { seq = 'open'; pos = 0; }
+    else if (seq === 'dream' && want === 'wake') { seq = 'close'; pos = 0; }
+    else if (seq === 'open') seq = 'dream';
+    else if (seq === 'close') seq = 'wake';
+  }
+}
+
+function frameAt(s, i) {
+  const n = SEQ[s];
+  if (i < n) return frames[s][i];
+  // 越界帧：接到下一段的开头
+  const next = s === 'open' ? 'dream' : s === 'close' ? 'wake' : s;
+  return frames[next][(i - n) % SEQ[next]];
+}
+
+function draw() {
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  const i = Math.floor(pos), f = pos - i;
+  ctx.globalAlpha = 1;
+  ctx.drawImage(frameAt(seq, i), 0, 0, cv.width, cv.height);
+  if (interp && f > 0.02) {
+    ctx.globalAlpha = f;
+    ctx.drawImage(frameAt(seq, i + 1), 0, 0, cv.width, cv.height);
+  }
+}
+
+let last = 0, acc = 0, drawn = 0, t0 = 0;
+function tick(now) {
+  requestAnimationFrame(tick);
+  if (!last) { last = now; t0 = now; }
+  const dt = Math.min(0.1, (now - last) / 1000);
+  last = now;
+  step(dt);
+  // 帧间混合开时按 30fps 画（混合需要更密的绘制），关时只在整帧变化时画
+  acc += dt;
+  const budget = interp ? 1 / 30 : 1 / (FPS * speed);
+  if (acc >= budget) { acc = 0; draw(); drawn++; }
+  stage.classList.toggle('wake', seq === 'wake' || (seq === 'close' && pos > 20) || (seq === 'open' && pos < 20));
+}
+
+function setWant(w) {
+  want = w;
+  document.getElementById('toWake').setAttribute('aria-pressed', w === 'wake');
+  document.getElementById('toDream').setAttribute('aria-pressed', w === 'dream');
+}
+document.getElementById('toWake').onclick = () => setWant('wake');
+document.getElementById('toDream').onclick = () => setWant('dream');
+let hold = 0;
+addEventListener('keydown', e => {
+  if (e.code !== 'Space' || e.repeat) return;
+  e.preventDefault();
+  hold = setTimeout(() => setWant(want === 'wake' ? 'dream' : 'wake'), 1000);
+});
+addEventListener('keyup', e => { if (e.code === 'Space') clearTimeout(hold); });
+const sp = document.getElementById('speed');
+sp.oninput = () => { speed = +sp.value; document.getElementById('speedV').textContent = speed.toFixed(1) + '×'; };
+document.getElementById('interp').onchange = e => { interp = e.target.checked; };
+document.getElementById('plain').onchange = e => stage.classList.toggle('plain', e.target.checked);
+
+const params = new URLSearchParams(location.search);
+load().then(() => {
+  document.getElementById('load').remove();
+  if (params.get('state') === 'dream') { seq = 'dream'; want = 'dream'; setWant('dream'); }
+  if (params.has('pos')) pos = +params.get('pos');
+  if (params.has('freeze')) { draw(); stage.classList.toggle('wake', seq === 'wake'); return; }
+  requestAnimationFrame(tick);
+  Promise.resolve(SIZES).then(s => {
+    const kb = Object.values(s).reduce((a, b) => a + b, 0) / 1024;
+    const per = Object.entries(s).map(([k, v]) => `${k.padEnd(6)} ${(v / 1024).toFixed(0).padStart(5)} KB`).join('\n');
+    document.getElementById('stat').textContent =
+      `帧总数  ${total}\n画布    500×500 css · 1000² 位图\n${per}\n合计   ${kb.toFixed(0).padStart(6)} KB`;
+  }).catch(() => {});
+});
+</script>
+</body>
+</html>
