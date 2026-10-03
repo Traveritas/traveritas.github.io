@@ -1,0 +1,485 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>截面 · 首屏圆区主体</title>
+<style>
+  :root {
+    --bg: #f0f3f6;
+    --fg: #232830;
+    --fg-soft: #56606d;
+    --fg-faint: #858f9d;
+    --line: rgba(35, 40, 48, 0.12);
+    --amber: #d9a05b;
+    --panel: rgba(250, 248, 250, 0.82);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg);
+    font: 13px/1.6 system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif; }
+  body { display: grid; grid-template-columns: 1fr 300px; overflow: hidden; }
+  @media (max-width: 900px) { body { grid-template-columns: 1fr; grid-template-rows: 1fr auto; overflow: auto; } }
+
+  /* ── 舞台：按 1440×900 截图等比缩放 ── */
+  .viewport { position: relative; overflow: hidden; min-height: 60vh; }
+  .stage { position: absolute; left: 50%; top: 50%; width: 1440px; height: 900px; transform-origin: center; }
+  .stage .bg { position: absolute; inset: 0; background: url(../hero-bud/bg-a.png) center / cover; transition: filter 1.6s ease; }
+  .stage.wake .bg { filter: saturate(0.25) hue-rotate(-30deg) brightness(1.02); }
+  .stage.plain .bg { background: radial-gradient(circle at 75% 50%, #f6f2f6, #ece6ec 60%); filter: none; }
+  /* 圆区中心 (1088, 470)，半径约 215 */
+  #hero { position: absolute; left: 1088px; top: 470px; width: 500px; height: 500px; transform: translate(-50%, -50%); }
+
+  /* ── 面板 ── */
+  aside { border-left: 1px solid var(--line); background: var(--panel); padding: 22px 20px; overflow: auto; }
+  h1 { font: 600 17px/1.4 'Noto Serif SC', 'Songti SC', serif; margin: 0 0 4px; letter-spacing: .04em; }
+  .kicker { font: 11px/1 ui-monospace, Consolas, monospace; letter-spacing: .14em; color: var(--amber); margin-bottom: 10px; }
+  .lede { color: var(--fg-soft); margin: 0 0 18px; }
+  h2 { font: 11px/1 ui-monospace, Consolas, monospace; letter-spacing: .12em; color: var(--fg-faint); margin: 20px 0 10px; text-transform: uppercase; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
+  button { font: inherit; border: 1px solid var(--line); background: #fff; color: var(--fg); padding: 6px 12px; border-radius: 3px; cursor: pointer; }
+  button[aria-pressed=true] { border-color: var(--amber); box-shadow: inset 0 0 0 1px var(--amber); }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+  label { display: flex; gap: 8px; align-items: center; color: var(--fg-soft); }
+  input[type=range] { flex: 1; accent-color: var(--amber); }
+  .stat { font: 11px/1.7 ui-monospace, Consolas, monospace; color: var(--fg-soft); white-space: pre-wrap; }
+  .note { color: var(--fg-soft); }
+  .note b { color: var(--fg); font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="viewport" id="vp">
+  <div class="stage wake" id="stage">
+    <div class="bg"></div>
+    <canvas id="hero" aria-label="截面主体"></canvas>
+  </div>
+</div>
+
+<aside>
+  <div class="kicker">HERO · CROSS SECTION</div>
+  <h1>截面</h1>
+  <p class="lede">一个四维的晶体，我们只看得见它落在此处的一层切面。醒时切面停在一枚八面体上；入梦后，那个看不见的整体开始转动，切面随之换形，却从不破碎。</p>
+
+  <h2>状态</h2>
+  <div class="row">
+    <button id="toWake" aria-pressed="true">醒 · 定形</button>
+    <button id="toDream" aria-pressed="false">梦 · 换形</button>
+  </div>
+  <div class="row note">也可以按住空格 1 秒切换。</div>
+
+  <h2>播放</h2>
+  <label>转速 <input id="speed" type="range" min="0.25" max="4" step="0.05" value="1"><span id="speedV">1.0×</span></label>
+  <div class="row" style="margin-top:8px">
+    <label><input id="plain" type="checkbox"> 纯底色</label>
+  </div>
+
+  <h2>数据</h2>
+  <div class="stat" id="stat">—</div>
+
+  <h2>说明</h2>
+  <p class="note"><b>形。</b>24 胞体由 24 个八面体围成。用一张三维“平面”去切它，切口是一个凸多面体：贴着胞切是八面体，往中心移是截角八面体，切过中心是立方八面体；再让切面在四维里倾斜，就会出现介于这些之间、没有名字的形状。</p>
+  <p class="note"><b>算法。</b>24 胞体写成 24 个半空间（|xᵢ| ≤ 1 与 |±x₁±x₂±x₃±x₄| ≤ 2）。每帧把它们投到切面上的三维坐标里，逐面裁剪出多边形，面数不超过 24，在 JS 里不到 0.1 ms。</p>
+  <p class="note"><b>材质。</b>没有贴图：折射与反射都采样同一个程序化的环境（淡丁香渐变、地平线亮带、几条细暗线），叠一点 fresnel 与薄膜色；棱边按到边的真实距离提亮，内部一团琥珀暖光。</p>
+  <p class="note"><b>性能。</b>WebGL2、DPR ≤ 1.5、30 fps 上限、离屏或标签页隐藏即停；减少动效时只画一帧。</p>
+</aside>
+
+<script>
+'use strict';
+/* ───────────── 舞台缩放 ───────────── */
+const stage = document.getElementById('stage');
+const vp = document.getElementById('vp');
+function fit() {
+  const s = Math.min(vp.clientWidth / 1440, vp.clientHeight / 900);
+  stage.style.transform = `translate(-50%, -50%) scale(${s})`;
+}
+addEventListener('resize', fit); fit();
+
+/* ───────────── 24 胞体：24 个半空间 a·x ≤ b ───────────── */
+const HALF = [];
+for (let i = 0; i < 4; i++) for (const s of [1, -1]) {
+  const a = [0, 0, 0, 0]; a[i] = s; HALF.push([a, 1]);
+}
+for (let m = 0; m < 16; m++) {
+  HALF.push([[m & 1 ? -1 : 1, m & 2 ? -1 : 1, m & 4 ? -1 : 1, m & 8 ? -1 : 1], 2]);
+}
+
+/* 4D 小工具 */
+const dot4 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3];
+function rot4(M, i, j, th) { // M 的列向量在 (i,j) 平面内旋转
+  const c = Math.cos(th), s = Math.sin(th);
+  for (const col of M) {
+    const xi = col[i], xj = col[j];
+    col[i] = c * xi - s * xj; col[j] = s * xi + c * xj;
+  }
+}
+
+/* 3D 小工具 */
+const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+const mul = (a, k) => [a[0] * k, a[1] * k, a[2] * k];
+const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const len = a => Math.hypot(a[0], a[1], a[2]);
+const norm = a => mul(a, 1 / len(a));
+
+/**
+ * 截面：切面法向 n、切面内正交基 E=[e1,e2,e3]、偏移 h。
+ * 点 x = h·n + Σ yₖ eₖ；约束 a·x ≤ b → (Eᵀa)·y ≤ b − h(a·n)
+ * 返回面列表 [{n, pts}]（pts 逆时针朝外）
+ */
+function section(n, E, h) {
+  const planes = [];
+  for (const [a, b] of HALF) {
+    const p = [dot4(a, E[0]), dot4(a, E[1]), dot4(a, E[2])];
+    const l = len(p);
+    const d = b - h * dot4(a, n);
+    if (l < 1e-6) continue; // 与切面平行：要么恒满足，要么为空（h 在范围内时恒满足）
+    planes.push({ n: mul(p, 1 / l), d: d / l });
+  }
+  const faces = [];
+  for (let k = 0; k < planes.length; k++) {
+    const P = planes[k];
+    const helper = Math.abs(P.n[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0];
+    const u = norm(cross(helper, P.n));
+    const v = cross(P.n, u); // u × v = n
+    const o = mul(P.n, P.d);
+    const R = 8;
+    let poly = [add(o, add(mul(u, -R), mul(v, -R))), add(o, add(mul(u, R), mul(v, -R))),
+                add(o, add(mul(u, R), mul(v, R))), add(o, add(mul(u, -R), mul(v, R)))];
+    for (let j = 0; j < planes.length && poly.length >= 3; j++) {
+      if (j === k) continue;
+      const Q = planes[j];
+      const out = [];
+      for (let i = 0; i < poly.length; i++) {
+        const A = poly[i], B = poly[(i + 1) % poly.length];
+        const da = dot(Q.n, A) - Q.d, db = dot(Q.n, B) - Q.d;
+        if (da <= 1e-9) out.push(A);
+        if ((da <= 1e-9) !== (db <= 1e-9)) out.push(add(A, mul(sub(B, A), da / (da - db))));
+      }
+      poly = out;
+    }
+    if (poly.length < 3) continue;
+    // 面积过小（棱或顶点处的退化面）丢弃
+    let area = 0;
+    for (let i = 1; i + 1 < poly.length; i++) area += len(cross(sub(poly[i], poly[0]), sub(poly[i + 1], poly[0])));
+    if (area < 2e-4) continue;
+    faces.push({ n: P.n, pts: poly });
+  }
+  return faces;
+}
+
+/* ───────────── WebGL2 ───────────── */
+const cv = document.getElementById('hero');
+const DPR = Math.min(1.5, devicePixelRatio || 1);
+cv.width = cv.height = Math.round(500 * DPR);
+const gl = cv.getContext('webgl2', { antialias: true, premultipliedAlpha: true, alpha: true });
+
+const VS = `#version 300 es
+layout(location=0) in vec3 aPos;
+layout(location=1) in vec3 aNor;
+layout(location=2) in float aEdge;
+layout(location=3) in float aFace;
+uniform mat4 uModel, uView, uProj;
+out vec3 vW; out vec3 vN; out float vEdge; out float vFace;
+void main(){
+  vec4 w = uModel * vec4(aPos,1.);
+  vW = w.xyz; vN = mat3(uModel) * aNor; vEdge = aEdge; vFace = aFace;
+  gl_Position = uProj * uView * w;
+}`;
+
+const FS = `#version 300 es
+precision highp float;
+in vec3 vW; in vec3 vN; in float vEdge; in float vFace;
+uniform vec3 uCam; uniform float uBack; uniform float uDream; uniform float uScale;
+out vec4 o;
+// 程序化环境：淡丁香渐变 + 地平线亮带 + 地平线下细暗线 + 左上窗光
+vec3 env(vec3 d){
+  float y = d.y;
+  vec3 top = vec3(.90,.895,.97), hor = vec3(1.,.975,.965), low = vec3(.74,.70,.76);
+  vec3 c = y > 0. ? mix(hor, top, smoothstep(0., .65, y)) : mix(hor, low, smoothstep(0., .5, -y));
+  c += vec3(.22,.18,.15) * exp(-pow(y / .05, 2.));
+  if (y < .02) {
+    float f = fract(-y * 13. + .12 * sin(d.x * 5. + d.z * 3.));
+    float line = smoothstep(.06, .0, abs(f - .5));
+    c = mix(c, vec3(.38,.33,.40), line * .75 * smoothstep(.02, -.06, y));
+  }
+  c += vec3(1.,.99,.97) * 1.1 * smoothstep(.93, .985, dot(d, normalize(vec3(-.55,.62,.55))));
+  c += vec3(1.,.86,.70) * .45 * smoothstep(.90, .98, dot(d, normalize(vec3(.75,.15,-.6))));
+  return c;
+}
+void main(){
+  vec3 N = normalize(vN);
+  vec3 V = normalize(uCam - vW);
+  if (uBack > .5) N = -N;               // 背面：看到的是内表面
+  float ndv = clamp(dot(N, V), 0., 1.);
+  float F = .04 + .96 * pow(1. - ndv, 5.);
+  vec3 Rr = env(reflect(-V, N));
+  vec3 Rt = env(refract(-V, N, uBack > .5 ? 1.47 : 1. / 1.47));
+  // 薄膜：随视角变色的极淡虹彩
+  vec3 film = .5 + .5 * cos(6.2832 * (vec3(0., .33, .67) + 1.8 * (1. - ndv) + vFace * .07));
+  vec3 tint = mix(vec3(.97,.97,1.), vec3(1.,.96,.97), uDream);
+  // 斜穿时光程更长，吸收一点偏冷的丁香色
+  vec3 absorb = mix(vec3(.80,.79,.90), vec3(1.), pow(ndv, .6));
+  vec3 col = mix(Rt * tint * absorb, Rr * mix(vec3(1.), film, .16), F);
+  // 棱：按到边的真实距离（世界单位）提亮，内侧一道细暗线给出倒角厚度
+  float e = vEdge * uScale;
+  float bevel = 1. - smoothstep(.0, .015, e);
+  float hair = exp(-pow((e - .026) / .006, 2.));
+  col += vec3(1.,.995,.99) * bevel * (uBack > .5 ? .40 : .55);
+  col *= 1. - hair * (uBack > .5 ? .10 : .20);
+  // 主光的锐利高光
+  vec3 L = normalize(vec3(-.55,.62,.55));
+  float spec = pow(max(dot(N, normalize(L + V)), 0.), 220.);
+  col += vec3(1.) * spec * (uBack > .5 ? .3 : 1.2);
+  float a;
+  if (uBack > .5) {
+    col = mix(col, vec3(.93,.91,.95), .35);   // 内表面微糙
+    a = .50 + .45 * bevel;
+  } else {
+    a = mix(.46, .96, F) + .45 * bevel + spec;
+  }
+  a = clamp(a, 0., 1.);
+  o = vec4(col * a, a);
+}`;
+
+const VS_CORE = `#version 300 es
+layout(location=0) in vec2 aQ;
+uniform vec3 uC; uniform float uR; uniform mat4 uView, uProj;
+out vec2 vQ;
+void main(){
+  vQ = aQ;
+  vec3 r = vec3(uView[0][0], uView[1][0], uView[2][0]);
+  vec3 u = vec3(uView[0][1], uView[1][1], uView[2][1]);
+  gl_Position = uProj * uView * vec4(uC + (r * aQ.x + u * aQ.y) * uR, 1.);
+}`;
+const FS_CORE = `#version 300 es
+precision highp float;
+in vec2 vQ; uniform float uI; out vec4 o;
+void main(){
+  float r2 = dot(vQ, vQ);
+  float g = exp(-r2 * 4.2);
+  vec3 c = mix(vec3(1.,.93,.86), vec3(.85,.63,.36), smoothstep(0., .9, r2));
+  o = vec4(c * g * uI, 0.);   // 纯加色
+}`;
+
+function prog(vs, fs) {
+  const p = gl.createProgram();
+  for (const [t, s] of [[gl.VERTEX_SHADER, vs], [gl.FRAGMENT_SHADER, fs]]) {
+    const sh = gl.createShader(t); gl.shaderSource(sh, s); gl.compileShader(sh);
+    if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(sh));
+    gl.attachShader(p, sh);
+  }
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+  const U = {};
+  for (let i = 0, n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS); i < n; i++) {
+    const name = gl.getActiveUniform(p, i).name; U[name] = gl.getUniformLocation(p, name);
+  }
+  return { p, U };
+}
+const P = prog(VS, FS);
+const PC = prog(VS_CORE, FS_CORE);
+
+const MAXV = 24 * 12 * 3;
+const STRIDE = 8;
+const vdata = new Float32Array(MAXV * STRIDE);
+const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
+const vbo = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+gl.bufferData(gl.ARRAY_BUFFER, vdata.byteLength, gl.DYNAMIC_DRAW);
+gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, STRIDE * 4, 0);
+gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 3, gl.FLOAT, false, STRIDE * 4, 12);
+gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 1, gl.FLOAT, false, STRIDE * 4, 24);
+gl.enableVertexAttribArray(3); gl.vertexAttribPointer(3, 1, gl.FLOAT, false, STRIDE * 4, 28);
+const vaoC = gl.createVertexArray(); gl.bindVertexArray(vaoC);
+const qb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, qb);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+
+/* 矩阵 */
+function persp(fov, asp, n, f) {
+  const t = 1 / Math.tan(fov / 2);
+  return [t / asp, 0, 0, 0, 0, t, 0, 0, 0, 0, (f + n) / (n - f), -1, 0, 0, 2 * f * n / (n - f), 0];
+}
+function lookAt(e, c, up) {
+  const z = norm(sub(e, c)), x = norm(cross(up, z)), y = cross(z, x);
+  return [x[0], y[0], z[0], 0, x[1], y[1], z[1], 0, x[2], y[2], z[2], 0, -dot(x, e), -dot(y, e), -dot(z, e), 1];
+}
+function model(yaw, pitch, s, sy) {
+  const cy = Math.cos(yaw), syw = Math.sin(yaw), cp = Math.cos(pitch), sp = Math.sin(pitch);
+  // R = Rx(pitch) · Ry(yaw) · diag(s, s·sy, s)
+  const r = [
+    [cy, 0, -syw], [syw * sp, cp, cy * sp], [syw * cp, -sp, cy * cp],
+  ];
+  // 列主序：列 j = R 的第 j 列 × 缩放
+  const sc = [s, s * sy, s];
+  return [
+    r[0][0] * sc[0], r[1][0] * sc[0], r[2][0] * sc[0], 0,
+    r[0][1] * sc[1], r[1][1] * sc[1], r[2][1] * sc[1], 0,
+    r[0][2] * sc[2], r[1][2] * sc[2], r[2][2] * sc[2], 0,
+    0, 0, 0, 1];
+}
+const CAM = [0, 0.55, 6.2];
+const VIEW = lookAt(CAM, [0, 0, 0], [0, 1, 0]);
+const PROJ = persp(0.62, 1, 0.1, 50);
+
+/* ───────────── 状态 ───────────── */
+let dream = 0, want = 0;     // 0 醒 · 1 梦
+let tau = 0;                 // 梦的内在时钟：只在梦里走
+let yaw = 0.4;
+let speed = 1;
+let lastFaces = 0;
+
+const smooth = x => x * x * (3 - 2 * x);
+
+function slice() {
+  const d = smooth(dream);
+  // 切面法向从 e₁ 出发，在 (1,2)(1,3)(1,4) 平面里缓慢摆动；(2,3) 平面让截面本身在四维里滚动
+  const M = [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]];
+  rot4(M, 0, 1, d * (0.55 * Math.sin(tau * 0.21) + 0.25 * Math.sin(tau * 0.083 + 1.3)));
+  rot4(M, 0, 2, d * (0.45 * Math.sin(tau * 0.157 + 2.1)));
+  rot4(M, 0, 3, d * (0.35 * Math.sin(tau * 0.119 + 0.6)));
+  rot4(M, 1, 2, d * tau * 0.05);
+  // 偏移：醒时贴近胞（八面体，带极小的截角当作棱面），梦里往中心游移
+  const h = 0.9 - d * (0.38 + 0.3 * Math.sin(tau * 0.097 + 0.4));
+  return section(M[0], [M[1], M[2], M[3]], h);
+}
+
+function build(faces) {
+  // 质心归零、按外接半径归一
+  let c = [0, 0, 0], cnt = 0, rmax = 0;
+  for (const f of faces) for (const p of f.pts) { c = add(c, p); cnt++; }
+  c = mul(c, 1 / Math.max(1, cnt));
+  // 按体积归一：始终与外接半径 1 的八面体（体积 4/3）同等体量，换形时不胀不缩
+  let vol = 0;
+  for (const f of faces) {
+    let area = 0;
+    for (let i = 1; i + 1 < f.pts.length; i++) area += len(cross(sub(f.pts[i], f.pts[0]), sub(f.pts[i + 1], f.pts[0]))) / 2;
+    vol += area * Math.abs(dot(f.n, sub(f.pts[0], c))) / 3;
+  }
+  const inv = Math.cbrt((4 / 3) / (vol || 1));
+  let k = 0;
+  faces.forEach((f, fi) => {
+    const pts = f.pts.map(p => mul(sub(p, c), inv));
+    let fc = [0, 0, 0]; for (const p of pts) fc = add(fc, p); fc = mul(fc, 1 / pts.length);
+    for (let i = 0; i < pts.length; i++) {
+      const A = pts[i], B = pts[(i + 1) % pts.length];
+      // 质心到边 AB 的距离 → 扇形三角里线性插值后就是到边的真实距离
+      const ab = sub(B, A);
+      const hgt = len(cross(ab, sub(fc, A))) / len(ab);
+      for (const [p, e] of [[fc, hgt], [A, 0], [B, 0]]) {
+        vdata[k++] = p[0]; vdata[k++] = p[1]; vdata[k++] = p[2];
+        vdata[k++] = f.n[0]; vdata[k++] = f.n[1]; vdata[k++] = f.n[2];
+        vdata[k++] = e; vdata[k++] = fi;
+      }
+    }
+  });
+  gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+  gl.bufferSubData(gl.ARRAY_BUFFER, 0, vdata, 0, k);
+  lastFaces = faces.length;
+  return k / STRIDE;
+}
+
+function render() {
+  const faces = slice();
+  const n = build(faces);
+  const d = smooth(dream);
+  const s = 1.1;
+  const MOD = model(yaw, 0.0, s, 1.28 - 0.16 * d);
+  gl.viewport(0, 0, cv.width, cv.height);
+  gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+  gl.enable(gl.CULL_FACE);
+  gl.useProgram(P.p); gl.bindVertexArray(vao);
+  gl.uniformMatrix4fv(P.U.uModel, false, MOD);
+  gl.uniformMatrix4fv(P.U.uView, false, VIEW);
+  gl.uniformMatrix4fv(P.U.uProj, false, PROJ);
+  gl.uniform3fv(P.U.uCam, CAM);
+  gl.uniform1f(P.U.uDream, d);
+  gl.uniform1f(P.U.uScale, s);
+  // 1) 背面（内表面）
+  gl.cullFace(gl.FRONT); gl.uniform1f(P.U.uBack, 1); gl.drawArrays(gl.TRIANGLES, 0, n);
+  // 2) 暖光核（加色）
+  gl.disable(gl.CULL_FACE);
+  gl.useProgram(PC.p); gl.bindVertexArray(vaoC);
+  gl.uniformMatrix4fv(PC.U.uView, false, VIEW);
+  gl.uniformMatrix4fv(PC.U.uProj, false, PROJ);
+  gl.uniform3fv(PC.U.uC, [0, 0.05 + 0.1 * d, 0]);
+  gl.uniform1f(PC.U.uR, 0.62 + 0.12 * d);
+  gl.uniform1f(PC.U.uI, 0.15 + 0.08 * d);
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  // 3) 正面
+  gl.enable(gl.CULL_FACE);
+  gl.useProgram(P.p); gl.bindVertexArray(vao);
+  gl.cullFace(gl.BACK); gl.uniform1f(P.U.uBack, 0); gl.drawArrays(gl.TRIANGLES, 0, n);
+}
+
+/* ───────────── 循环：30fps 上限 + 可见性门控 + 帧时统计 ───────────── */
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const params = new URLSearchParams(location.search);
+let raf = 0, last = 0, acc = 0, visible = true, onscreen = true;
+const work = [];
+function tick(now) {
+  raf = requestAnimationFrame(tick);
+  if (!last) last = now;
+  const dt = Math.min(0.1, (now - last) / 1000);
+  last = now;
+  acc += dt;
+  if (acc < 1 / 30 - 0.002) return;
+  const step = acc; acc = 0;
+  const t0 = performance.now();
+  dream += Math.sign(want - dream) * Math.min(Math.abs(want - dream), step / 2.4);
+  tau += step * speed * smooth(dream);
+  yaw += step * speed * (0.06 + 0.16 * smooth(dream));
+  stage.classList.toggle('wake', dream < 0.5);
+  render();
+  work.push(performance.now() - t0);
+  if (work.length > 240) work.shift();
+}
+function start() { if (!raf && visible && onscreen && !reduced) { last = 0; raf = requestAnimationFrame(tick); } }
+function stop() { cancelAnimationFrame(raf); raf = 0; }
+document.addEventListener('visibilitychange', () => { visible = !document.hidden; visible ? start() : stop(); });
+new IntersectionObserver(es => { onscreen = es[0].isIntersecting; onscreen ? start() : stop(); }).observe(cv);
+
+setInterval(() => {
+  if (!work.length) return;
+  const s = [...work].sort((a, b) => a - b);
+  const avg = s.reduce((a, b) => a + b, 0) / s.length;
+  const p95 = s[Math.floor(s.length * 0.95)];
+  document.getElementById('stat').textContent =
+    `每帧 JS+提交  平均 ${avg.toFixed(2)} ms · p95 ${p95.toFixed(2)} ms\n` +
+    `帧率上限      30 fps\n` +
+    `画布          500² css · ${cv.width}² 位图 (DPR ${DPR})\n` +
+    `当前面数      ${lastFaces}\n` +
+    `运行状态      ${raf ? '播放' : '暂停'}`;
+}, 500);
+
+/* ───────────── 交互 ───────────── */
+function setWant(w) {
+  want = w;
+  document.getElementById('toWake').setAttribute('aria-pressed', w === 0);
+  document.getElementById('toDream').setAttribute('aria-pressed', w === 1);
+  if (reduced) { dream = w; stage.classList.toggle('wake', w === 0); render(); }
+}
+document.getElementById('toWake').onclick = () => setWant(0);
+document.getElementById('toDream').onclick = () => setWant(1);
+let hold = 0;
+addEventListener('keydown', e => {
+  if (e.code !== 'Space' || e.repeat) return;
+  e.preventDefault();
+  hold = setTimeout(() => setWant(want ? 0 : 1), 1000);
+});
+addEventListener('keyup', e => { if (e.code === 'Space') clearTimeout(hold); });
+const sp = document.getElementById('speed');
+sp.oninput = () => { speed = +sp.value; document.getElementById('speedV').textContent = speed.toFixed(1) + '×'; };
+document.getElementById('plain').onchange = e => stage.classList.toggle('plain', e.target.checked);
+
+// 截图用：?state=dream&tau=12&d=0.5&freeze
+if (params.has('d')) dream = +params.get('d');
+if (params.get('state') === 'dream') { dream = params.has('d') ? dream : 1; setWant(1); }
+if (params.has('tau')) tau = +params.get('tau');
+if (params.has('yaw')) yaw = +params.get('yaw');
+stage.classList.toggle('wake', dream < 0.5);
+render();
+if (!params.has('freeze')) start();
+</script>
+</body>
+</html>

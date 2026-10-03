@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>《醒梦》网页加载动画 Mockup 方案展厅 (Loader Showcase)</title>
+<link rel="preconnect" href="https://fastly.jsdelivr.net" crossorigin>
+<link rel="stylesheet" href="https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5.2.5/400.css">
+<link rel="stylesheet" href="https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5.2.5/600.css">
+<style>
+  :root {
+    --bg: #0f1217;
+    --bar-bg: rgba(20, 23, 30, 0.92);
+    --border: rgba(167, 177, 186, 0.2);
+    --fg: #dce2e9;
+    --fg-dim: #7f8a96;
+    --wake: #a7b1ba;
+    --dream: #c2a382;
+    --amber: #d9a05b;
+    --font-serif: 'Noto Serif SC', 'Source Han Serif SC', serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background-color: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-serif);
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* 顶部全局导航栏 */
+  .header-bar {
+    height: 56px;
+    background: var(--bar-bg);
+    border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 1.5rem;
+    z-index: 100;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    font-size: 0.96rem;
+    letter-spacing: 0.12em;
+  }
+  .brand-tag {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: var(--amber);
+    padding: 0.15rem 0.45rem;
+    border: 1px solid rgba(217, 160, 91, 0.4);
+    border-radius: 3px;
+  }
+
+  /* Tab 选项卡 */
+  .tab-nav {
+    display: flex;
+    gap: 0.4rem;
+    background: rgba(0,0,0,0.3);
+    padding: 3px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+  }
+
+  .tab-btn {
+    padding: 0.35rem 0.9rem;
+    background: transparent;
+    border: none;
+    color: var(--fg-dim);
+    font-family: var(--font-mono);
+    font-size: 0.74rem;
+    letter-spacing: 0.08em;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .tab-btn:hover {
+    color: var(--fg);
+  }
+  .tab-btn.active {
+    background: rgba(167, 177, 186, 0.16);
+    color: var(--amber);
+  }
+
+  /* 快捷操作 */
+  .quick-actions {
+    display: flex;
+    gap: 0.6rem;
+  }
+  .action-btn {
+    padding: 0.35rem 0.75rem;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--fg-dim);
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+  }
+  .action-btn:hover {
+    color: var(--fg);
+    border-color: var(--wake);
+  }
+
+  /* 视口舞台展示区 */
+  .stage-viewport {
+    flex: 1;
+    position: relative;
+    width: 100%;
+    height: calc(100% - 56px);
+  }
+
+  /* 单一标签聚焦模式 */
+  .frame-single {
+    width: 100%;
+    height: 100%;
+    border: none;
+    display: block;
+  }
+
+  /* 三分屏并排对比模式 */
+  .grid-split {
+    display: none;
+    width: 100%;
+    height: 100%;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: var(--border);
+  }
+
+  .split-cell {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    background: #000;
+  }
+
+  .split-cell iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+  }
+
+  .split-label {
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    z-index: 10;
+    background: rgba(20, 23, 30, 0.85);
+    border: 1px solid var(--border);
+    backdrop-filter: blur(8px);
+    padding: 0.3rem 0.65rem;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.12em;
+    color: var(--wake);
+    border-radius: 4px;
+    pointer-events: none;
+  }
+
+  .is-split .frame-single { display: none; }
+  .is-split .grid-split { display: grid; }
+</style>
+</head>
+<body>
+
+  <!-- 顶部状态与切换栏 -->
+  <header class="header-bar">
+    <div class="brand">
+      <span>醒梦 · 加载动画原型展厅</span>
+      <span class="brand-tag">MOCKUP V2</span>
+    </div>
+
+    <!-- 方案选项卡 -->
+    <nav class="tab-nav">
+      <button class="tab-btn active" data-src="loader-prism.html">A · 晶核显影</button>
+      <button class="tab-btn" data-src="loader-mist-flora.html">B · 雾染花影</button>
+      <button class="tab-btn" data-src="loader-dual-horizon.html">C · 双界折片</button>
+      <button class="tab-btn" data-split="true">三屏并排对比 ▤</button>
+    </nav>
+
+    <!-- 快捷外链 -->
+    <div class="quick-actions">
+      <a class="action-btn" id="openAloneBtn" href="loader-prism.html" target="_blank">新标签页打开 ↗</a>
+    </div>
+  </header>
+
+  <!-- 视口展示区 -->
+  <main class="stage-viewport" id="viewport">
+    <!-- 单屏聚焦 iframe -->
+    <iframe class="frame-single" id="singleFrame" src="loader-prism.html"></iframe>
+
+    <!-- 三分屏并排视图 -->
+    <div class="grid-split" id="splitGrid">
+      <div class="split-cell">
+        <span class="split-label">方案 A · 晶核显影 (Prism)</span>
+        <iframe src="loader-prism.html"></iframe>
+      </div>
+      <div class="split-cell">
+        <span class="split-label">方案 B · 雾染花影 (Mist Flora)</span>
+        <iframe src="loader-mist-flora.html"></iframe>
+      </div>
+      <div class="split-cell">
+        <span class="split-label">方案 C · 双界折片 (Dual-Horizon)</span>
+        <iframe src="loader-dual-horizon.html"></iframe>
+      </div>
+    </div>
+  </main>
+
+<script>
+  const viewport = document.getElementById('viewport');
+  const singleFrame = document.getElementById('singleFrame');
+  const openAloneBtn = document.getElementById('openAloneBtn');
+  const tabBtns = document.querySelectorAll('.tab-btn');
+
+  tabBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      tabBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      const isSplit = btn.getAttribute('data-split') === 'true';
+      if (isSplit) {
+        viewport.classList.add('is-split');
+        openAloneBtn.style.display = 'none';
+      } else {
+        viewport.classList.remove('is-split');
+        openAloneBtn.style.display = 'inline-block';
+        const targetSrc = btn.getAttribute('data-src');
+        singleFrame.src = targetSrc;
+        openAloneBtn.href = targetSrc;
+      }
+    });
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>《醒梦》加载动画 Mockup B · 雾染花影 (Mist Wash & Flora)</title>
+<link rel="preconnect" href="https://fastly.jsdelivr.net" crossorigin>
+<link rel="stylesheet" href="https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5.2.5/400.css">
+<link rel="stylesheet" href="https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5.2.5/600.css">
+<style>
+  :root {
+    --bg-dark: #14171e;
+    --bg-light: #f0f3f6;
+    --fg-dark: #e8ecf1;
+    --fg-light: #232830;
+    --wake: #a7b1ba;
+    --dream: #c2a382;
+    --amber: #d9a05b;
+    --line-dark: rgba(167, 177, 186, 0.16);
+    --line-light: rgba(35, 40, 48, 0.12);
+    --font-serif: 'Noto Serif SC', 'Source Han Serif SC', serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+
+    --theme-bg: var(--bg-dark);
+    --theme-fg: var(--fg-dark);
+    --theme-line: var(--line-dark);
+    --theme-card-bg: rgba(20, 23, 30, 0.85);
+  }
+
+  body[data-theme="light"] {
+    --theme-bg: var(--bg-light);
+    --theme-fg: var(--fg-light);
+    --theme-line: var(--line-light);
+    --theme-card-bg: rgba(240, 243, 246, 0.88);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background-color: var(--theme-bg);
+    color: var(--theme-fg);
+    font-family: var(--font-serif);
+    transition: background-color 0.4s ease, color 0.4s ease;
+    user-select: none;
+  }
+
+  /* ---------------- 底层模拟真实内容页 ---------------- */
+  .underlying-content {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    text-align: center;
+    z-index: 10;
+  }
+
+  .underlying-content .content-axis {
+    width: 140px;
+    height: 1px;
+    background: var(--dream);
+    margin: 1.5rem auto;
+    transform: rotate(-14deg);
+    opacity: 0.8;
+  }
+
+  .underlying-content h1 {
+    font-size: clamp(1.8rem, 4vw, 2.8rem);
+    font-weight: 400;
+    letter-spacing: 0.18em;
+    margin-bottom: 1rem;
+    color: var(--theme-fg);
+  }
+
+  .underlying-content p {
+    max-width: 32rem;
+    line-height: 1.9;
+    font-size: 1.02rem;
+    color: var(--wake);
+  }
+
+  .reset-veil-btn {
+    margin-top: 2rem;
+    padding: 0.6rem 1.4rem;
+    background: transparent;
+    border: 1px solid var(--theme-line);
+    color: var(--amber);
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    letter-spacing: 0.12em;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+  }
+  .reset-veil-btn:hover {
+    background: var(--theme-line);
+    border-color: var(--amber);
+  }
+
+  /* ---------------- 雾染遮罩舞台 ---------------- */
+  .veil-stage {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background-color: var(--theme-bg);
+    display: grid;
+    place-items: center;
+    transition: opacity 0.7s cubic-bezier(0.2, 0.8, 0.2, 1), visibility 0.7s step-end;
+  }
+
+  .veil-stage.unveiled {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  .stage-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.8rem;
+    position: relative;
+  }
+
+  /* 核心 SVG 舞台 */
+  .flora-svg {
+    width: 300px;
+    height: 300px;
+    overflow: visible;
+  }
+
+  /* 雾气漫射池 */
+  .mist-core {
+    fill: rgba(240, 243, 246, 0.14);
+    will-change: transform, opacity;
+  }
+
+  /* 花瓣基础样式 */
+  .petal {
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.1;
+    stroke-dasharray: 240;
+    stroke-dashoffset: 240;
+    will-change: stroke-dashoffset, opacity;
+  }
+
+  .petal-a {
+    stroke: rgba(235, 241, 248, 0.75);
+    fill: url(#petal-grad-wake);
+  }
+
+  .petal-b {
+    stroke: rgba(210, 185, 160, 0.8);
+    fill: url(#petal-grad-dream);
+  }
+
+  /* 菱形微晶露珠 */
+  .dew-gem {
+    fill: rgba(255, 255, 255, 0.95);
+    stroke: rgba(217, 160, 91, 0.6);
+    stroke-width: 0.6;
+    opacity: 0;
+    transform-origin: center;
+    will-change: opacity, transform;
+  }
+
+  /* 琥珀焦点 */
+  .amber-eye {
+    fill: var(--amber);
+    opacity: 0;
+    filter: drop-shadow(0 0 6px rgba(217, 160, 91, 0.85));
+    will-change: opacity;
+  }
+
+  /* 微排版度量数据 */
+  .stage-telemetry {
+    width: 260px;
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.16em;
+    color: var(--wake);
+  }
+
+  .telemetry-col {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+  .telemetry-col.right {
+    text-align: right;
+  }
+  .val-highlight {
+    color: var(--theme-fg);
+  }
+  .val-amber {
+    color: var(--amber);
+  }
+
+  /* ---------------- 底部悬浮控制栏 ---------------- */
+  .control-dock {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    background: var(--theme-card-bg);
+    border: 1px solid var(--theme-line);
+    backdrop-filter: blur(20px) saturate(130%);
+    -webkit-backdrop-filter: blur(20px) saturate(130%);
+    border-radius: 8px;
+    padding: 0.9rem 1.4rem;
+    display: flex;
+    align-items: center;
+    gap: 1.4rem;
+    box-shadow: 0 16px 36px -10px rgba(0,0,0,0.3);
+    font-family: var(--font-mono);
+    font-size: 0.74rem;
+    letter-spacing: 0.08em;
+  }
+
+  .dock-group {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+
+  .dock-btn {
+    padding: 0.45rem 0.85rem;
+    background: transparent;
+    border: 1px solid var(--theme-line);
+    color: var(--theme-fg);
+    font-family: inherit;
+    font-size: inherit;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .dock-btn:hover, .dock-btn.active {
+    background: var(--theme-line);
+    border-color: var(--amber);
+    color: var(--amber);
+  }
+
+  .dock-slider-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+  .dock-slider {
+    width: 110px;
+    accent-color: var(--amber);
+    cursor: pointer;
+  }
+
+  .dock-divider {
+    width: 1px;
+    height: 22px;
+    background: var(--theme-line);
+  }
+
+  @media (max-width: 768px) {
+    .control-dock {
+      flex-wrap: wrap;
+      width: 90%;
+      bottom: 12px;
+      justify-content: center;
+      gap: 0.8rem;
+    }
+  }
+</style>
+</head>
+<body data-theme="dark">
+
+  <!-- 底层真实内容页（供揭幕体验） -->
+  <main class="underlying-content">
+    <h1>在薄雾消融的清晨</h1>
+    <div class="content-axis"></div>
+    <p>“雾气抹平了现实与幻象的界线；隔着微温的磨砂玻璃，一朵半透明的花影在水汽凝露中缓慢析出，又随时准备蒸散于破晓之中。”</p>
+    <button class="reset-veil-btn" id="btnResetVeil">↻ 重新挂上开屏遮罩</button>
+  </main>
+
+  <!-- 网页加载遮罩 -->
+  <div class="veil-stage" id="veilStage">
+    <div class="stage-inner">
+      
+      <!-- 矢量雾染画布 (300 × 300) -->
+      <svg class="flora-svg" viewBox="0 0 300 300">
+        <defs>
+          <!-- 柔光雾染滤镜：高斯模糊 + Alpha 调控形成乳白漫射 -->
+          <filter id="mist-wash" x="-35%" y="-35%" width="170%" height="170%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="10" result="blur" />
+            <feColorMatrix in="blur" type="matrix" values="
+              1 0 0 0 0
+              0 1 0 0 0
+              0 0 1 0 0
+              0 0 0 16 -3" result="mist" />
+            <feBlend in="SourceGraphic" in2="mist" mode="screen" />
+          </filter>
+
+          <!-- 花瓣醒面渐变 (微冷乳白 -> 冷灰) -->
+          <linearGradient id="petal-grad-wake" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#ffffff" stop-opacity="0.28" />
+            <stop offset="60%" stop-color="#a7b1ba" stop-opacity="0.14" />
+            <stop offset="100%" stop-color="#556270" stop-opacity="0.04" />
+          </linearGradient>
+
+          <!-- 花瓣梦面渐变 (微温乳白 -> 暖沙) -->
+          <linearGradient id="petal-grad-dream" x1="100%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#ffffff" stop-opacity="0.25" />
+            <stop offset="70%" stop-color="#c2a382" stop-opacity="0.16" />
+            <stop offset="100%" stop-color="#765640" stop-opacity="0.03" />
+          </linearGradient>
+        </defs>
+
+        <!-- 阶段一：中央雾气漫射池 -->
+        <circle id="mistPool" class="mist-core" cx="150" cy="150" r="70" filter="url(#mist-wash)" />
+
+        <!-- 阶段二：4 片非对称抽象百合花瓣 (中心基准在 150, 150) -->
+        <g id="petalsGroup">
+          <!-- 1. 主立瓣 (修长，向左微倾 4°) -->
+          <path id="petal1" class="petal petal-a"
+            d="M150 144 C141 100, 132 64, 145 36 C161 60, 160 104, 150 144 Z" />
+          
+          <!-- 2. 右展瓣 (宽幅舒展，下垂弧光) -->
+          <path id="petal2" class="petal petal-b"
+            d="M153 148 C189 138, 232 144, 258 168 C228 186, 183 177, 153 148 Z" />
+
+          <!-- 3. 左拢瓣 (轻抱，内敛弧线) -->
+          <path id="petal3" class="petal petal-a"
+            d="M147 151 C111 157, 72 141, 48 123 C78 111, 123 123, 147 151 Z" />
+
+          <!-- 4. 底叠瓣 (托底短弧，略偏右) -->
+          <path id="petal4" class="petal petal-b"
+            d="M149 152 C138 187, 144 228, 165 252 C174 225, 171 187, 149 152 Z" />
+        </g>
+
+        <!-- 瓣尖菱形微晶露珠 (几何理性锚点) -->
+        <g id="dewGems">
+          <!-- 顶端露珠 -->
+          <polygon id="dew1" class="dew-gem" points="145,29 149,24 153,29 149,34" />
+          <!-- 右侧露珠 -->
+          <polygon id="dew2" class="dew-gem" points="258,168 263,163 268,168 263,173" />
+          <!-- 左侧露珠 -->
+          <polygon id="dew3" class="dew-gem" points="48,123 52,118 56,123 52,128" />
+        </g>
+
+        <!-- 阶段三：中心琥珀微温焦点 -->
+        <circle id="amberEye" class="amber-eye" cx="150" cy="150" r="3.2" />
+      </svg>
+
+      <!-- 实时微排版度量数据 -->
+      <div class="stage-telemetry">
+        <div class="telemetry-col">
+          <span>ATMOS // <span class="val-highlight">MIST-WASH</span></span>
+          <span>FLORA // <span class="val-highlight">ORGANIC</span></span>
+        </div>
+        <div class="telemetry-col right">
+          <span>DEPTH // <span id="depthVal" class="val-amber">0.00</span></span>
+          <span id="phaseState">DIFFUSION</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 底部悬浮控制台 -->
+  <footer class="control-dock">
+    <div class="dock-group">
+      <button class="dock-btn active" id="btnFull">全版 2.8s</button>
+      <button class="dock-btn" id="btnFast">快版 1.0s</button>
+      <button class="dock-btn" id="btnLoop">循环 Loop</button>
+    </div>
+
+    <div class="dock-divider"></div>
+
+    <div class="dock-slider-wrap">
+      <span>SCRUB</span>
+      <input type="range" id="scrubber" class="dock-slider" min="0" max="1000" value="0">
+    </div>
+
+    <div class="dock-divider"></div>
+
+    <div class="dock-group">
+      <button class="dock-btn" id="btnTheme">底色: 深墨</button>
+      <button class="dock-btn" id="btnUnveil">触发揭幕 ↗</button>
+    </div>
+  </footer>
+
+<script>
+  // ================= 雾染花影动效驱动器 =================
+  const mistPool = document.getElementById('mistPool');
+  const petals = [
+    document.getElementById('petal1'),
+    document.getElementById('petal2'),
+    document.getElementById('petal3'),
+    document.getElementById('petal4')
+  ];
+  const dewGems = [
+    document.getElementById('dew1'),
+    document.getElementById('dew2'),
+    document.getElementById('dew3')
+  ];
+  const amberEye = document.getElementById('amberEye');
+  const petalsGroup = document.getElementById('petalsGroup');
+  const depthVal = document.getElementById('depthVal');
+  const phaseState = document.getElementById('phaseState');
+  const scrubber = document.getElementById('scrubber');
+  const veilStage = document.getElementById('veilStage');
+
+  let currentDuration = 2800;
+  let isLooping = false;
+  let isPlaying = false;
+  let animStartTime = 0;
+
+  function easeOutCubic(x) { return 1 - Math.pow(1 - x, 3); }
+
+  function renderProgress(p) {
+    scrubber.value = Math.floor(p * 1000);
+    depthVal.textContent = p.toFixed(2);
+
+    // 状态判定
+    if (p < 0.25) {
+      phaseState.textContent = 'DIFFUSION';
+      phaseState.style.color = 'var(--wake)';
+    } else if (p < 0.65) {
+      phaseState.textContent = 'CONDENSATION';
+      phaseState.style.color = 'var(--dream)';
+    } else if (p < 0.88) {
+      phaseState.textContent = 'SUSPENSION';
+      phaseState.style.color = 'var(--amber)';
+    } else {
+      phaseState.textContent = 'EVAPORATION';
+      phaseState.style.color = '#fff';
+    }
+
+    // 1. 雾气漫射池 (0.0 ~ 0.35 泛起并扩散)
+    if (p < 0.35) {
+      const mistP = p / 0.35;
+      const scale = 0.4 + 0.6 * easeOutCubic(mistP);
+      mistPool.setAttribute('transform', `scale(${scale})`);
+      mistPool.style.transformOrigin = '150px 150px';
+      mistPool.style.opacity = (0.2 + 0.7 * mistP).toFixed(2);
+    } else {
+      mistPool.setAttribute('transform', 'scale(1)');
+      mistPool.style.transformOrigin = '150px 150px';
+      mistPool.style.opacity = (0.9 - 0.4 * ((p - 0.35) / 0.65)).toFixed(2);
+    }
+
+    // 2. 4片抽象百合花瓣凝露描画 (0.25 ~ 0.75)
+    petals.forEach((petal, idx) => {
+      const startP = 0.22 + idx * 0.05;
+      const endP = startP + 0.38;
+      if (p < startP) {
+        petal.style.strokeDashoffset = '240';
+        petal.style.fillOpacity = '0';
+      } else if (p <= endP) {
+        const prog = (p - startP) / (endP - startP);
+        const ease = easeOutCubic(prog);
+        petal.style.strokeDashoffset = (240 * (1 - ease)).toFixed(1);
+        petal.style.fillOpacity = (ease * 0.9).toFixed(2);
+      } else {
+        petal.style.strokeDashoffset = '0';
+        petal.style.fillOpacity = '0.9';
+      }
+    });
+
+    // 3. 菱形晶露闪亮析出 (0.60 ~ 0.82)
+    dewGems.forEach((gem, idx) => {
+      const startP = 0.60 + idx * 0.06;
+      if (p < startP) {
+        gem.style.opacity = '0';
+        gem.setAttribute('transform', 'scale(0.2)');
+      } else if (p <= startP + 0.14) {
+        const prog = (p - startP) / 0.14;
+        const scale = 0.2 + 0.8 * easeOutCubic(prog);
+        gem.style.opacity = (prog * 1).toFixed(2);
+        gem.setAttribute('transform', `scale(${scale})`);
+      } else {
+        gem.style.opacity = '1';
+        gem.setAttribute('transform', 'scale(1)');
+      }
+    });
+
+    // 4. 中心琥珀焦点凝固 (0.75 ~ 0.88)
+    if (p < 0.72) {
+      amberEye.style.opacity = '0';
+    } else if (p <= 0.88) {
+      const prog = (p - 0.72) / 0.16;
+      amberEye.style.opacity = (easeOutCubic(prog) * 0.95).toFixed(2);
+    } else {
+      amberEye.style.opacity = '0.95';
+    }
+
+    // 5. 呼吸轻颤与清晨蒸散 (0.88 ~ 1.0)
+    if (p > 0.88) {
+      const evapP = (p - 0.88) / 0.12;
+      const scale = 1 + 0.05 * evapP;
+      petalsGroup.setAttribute('transform', `scale(${scale}) translateY(${-3 * evapP}px)`);
+      petalsGroup.style.transformOrigin = '150px 150px';
+    } else {
+      petalsGroup.removeAttribute('transform');
+    }
+  }
+
+  function runAnimation() {
+    isPlaying = true;
+    animStartTime = performance.now();
+
+    function step(now) {
+      if (!isPlaying) return;
+      const elapsed = now - animStartTime;
+      const progress = Math.min(elapsed / currentDuration, 1);
+      renderProgress(progress);
+
+      if (progress < 1) {
+        requestAnimationFrame(step);
+      } else {
+        isPlaying = false;
+        if (isLooping) {
+          setTimeout(() => {
+            if (isLooping) runAnimation();
+          }, 450);
+        }
+      }
+    }
+    requestAnimationFrame(step);
+  }
+
+  // 控制逻辑
+  const btnFull = document.getElementById('btnFull');
+  const btnFast = document.getElementById('btnFast');
+  const btnLoop = document.getElementById('btnLoop');
+  const btnTheme = document.getElementById('btnTheme');
+  const btnUnveil = document.getElementById('btnUnveil');
+  const btnResetVeil = document.getElementById('btnResetVeil');
+
+  function setActiveModeBtn(btn) {
+    [btnFull, btnFast, btnLoop].forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+
+  btnFull.addEventListener('click', () => {
+    isLooping = false;
+    currentDuration = 2800;
+    setActiveModeBtn(btnFull);
+    veilStage.classList.remove('unveiled');
+    runAnimation();
+  });
+
+  btnFast.addEventListener('click', () => {
+    isLooping = false;
+    currentDuration = 1000;
+    setActiveModeBtn(btnFast);
+    veilStage.classList.remove('unveiled');
+    runAnimation();
+  });
+
+  btnLoop.addEventListener('click', () => {
+    isLooping = true;
+    currentDuration = 2400;
+    setActiveModeBtn(btnLoop);
+    veilStage.classList.remove('unveiled');
+    runAnimation();
+  });
+
+  scrubber.addEventListener('input', (e) => {
+    isPlaying = false;
+    isLooping = false;
+    setActiveModeBtn(btnFull);
+    const p = parseFloat(e.target.value) / 1000;
+    renderProgress(p);
+  });
+
+  btnTheme.addEventListener('click', () => {
+    const isDark = document.body.getAttribute('data-theme') === 'dark';
+    const nextTheme = isDark ? 'light' : 'dark';
+    document.body.setAttribute('data-theme', nextTheme);
+    btnTheme.textContent = isDark ? '底色: 晨雾' : '底色: 深墨';
+  });
+
+  btnUnveil.addEventListener('click', () => {
+    veilStage.classList.add('unveiled');
+  });
+
+  btnResetVeil.addEventListener('click', () => {
+    veilStage.classList.remove('unveiled');
+    runAnimation();
+  });
+
+  runAnimation();
+</script>
+</body>
+</html>

@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>《醒梦》加载动画 Mockup A · 晶核显影 (Prism Shards & Lattice)</title>
+<link rel="preconnect" href="https://fastly.jsdelivr.net" crossorigin>
+<link rel="stylesheet" href="https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5.2.5/400.css">
+<link rel="stylesheet" href="https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5.2.5/600.css">
+<style>
+  :root {
+    --bg-dark: #14171e;
+    --bg-light: #f0f3f6;
+    --fg-dark: #e8ecf1;
+    --fg-light: #232830;
+    --wake: #a7b1ba;
+    --dream: #c2a382;
+    --amber: #d9a05b;
+    --line-dark: rgba(167, 177, 186, 0.18);
+    --line-light: rgba(35, 40, 48, 0.14);
+    --font-serif: 'Noto Serif SC', 'Source Han Serif SC', serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+
+    /* 当前动态主题 */
+    --theme-bg: var(--bg-dark);
+    --theme-fg: var(--fg-dark);
+    --theme-line: var(--line-dark);
+    --theme-card-bg: rgba(20, 23, 30, 0.85);
+  }
+
+  body[data-theme="light"] {
+    --theme-bg: var(--bg-light);
+    --theme-fg: var(--fg-light);
+    --theme-line: var(--line-light);
+    --theme-card-bg: rgba(240, 243, 246, 0.88);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background-color: var(--theme-bg);
+    color: var(--theme-fg);
+    font-family: var(--font-serif);
+    transition: background-color 0.4s ease, color 0.4s ease;
+    user-select: none;
+  }
+
+  /* ---------------- 底层模拟真实内容页 ---------------- */
+  .underlying-content {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    text-align: center;
+    z-index: 10;
+    pointer-events: auto;
+  }
+
+  .underlying-content .content-axis {
+    width: 140px;
+    height: 1px;
+    background: var(--amber);
+    margin: 1.5rem auto;
+    transform: rotate(-14deg);
+    opacity: 0.8;
+  }
+
+  .underlying-content h1 {
+    font-size: clamp(1.8rem, 4vw, 2.8rem);
+    font-weight: 400;
+    letter-spacing: 0.18em;
+    margin-bottom: 1rem;
+    color: var(--theme-fg);
+  }
+
+  .underlying-content p {
+    max-width: 32rem;
+    line-height: 1.9;
+    font-size: 1.02rem;
+    color: var(--wake);
+    font-weight: 400;
+  }
+
+  .reset-veil-btn {
+    margin-top: 2rem;
+    padding: 0.6rem 1.4rem;
+    background: transparent;
+    border: 1px solid var(--theme-line);
+    color: var(--amber);
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    letter-spacing: 0.12em;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+  }
+  .reset-veil-btn:hover {
+    background: var(--theme-line);
+    border-color: var(--amber);
+  }
+
+  /* ---------------- 加载遮罩舞台 ---------------- */
+  .veil-stage {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background-color: var(--theme-bg);
+    display: grid;
+    place-items: center;
+    transition: opacity 0.65s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.65s step-end;
+  }
+
+  .veil-stage.unveiled {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  .stage-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.8rem;
+    position: relative;
+  }
+
+  /* 核心 SVG 舞台 */
+  .prism-svg {
+    width: 280px;
+    height: 280px;
+    overflow: visible;
+  }
+
+  /* 14° 斜率发丝轴 */
+  .hairline-axis {
+    stroke: var(--theme-line);
+    stroke-width: 1;
+    stroke-dasharray: 4 6;
+  }
+
+  .reticle-grid {
+    stroke: var(--theme-line);
+    stroke-width: 0.8;
+    fill: none;
+  }
+
+  /* 晶面碎片通用样式 */
+  .shard {
+    stroke-linejoin: round;
+    stroke-width: 0.75;
+    will-change: transform, opacity, filter;
+  }
+
+  .shard-1 {
+    fill: rgba(167, 177, 186, 0.35); /* 醒 · 冷灰 */
+    stroke: rgba(167, 177, 186, 0.7);
+  }
+  .shard-2 {
+    fill: rgba(194, 163, 130, 0.38); /* 梦 · 暖沙 */
+    stroke: rgba(194, 163, 130, 0.75);
+  }
+  .shard-3 {
+    fill: rgba(167, 177, 186, 0.22);
+    stroke: rgba(167, 177, 186, 0.55);
+  }
+  .shard-4 {
+    fill: rgba(194, 163, 130, 0.28);
+    stroke: rgba(194, 163, 130, 0.6);
+  }
+  .shard-5 {
+    fill: rgba(217, 160, 91, 0.32); /* 琥珀微晶 */
+    stroke: rgba(217, 160, 91, 0.8);
+  }
+
+  /* 琥珀光蚀折射刃 */
+  .caustic-path {
+    fill: none;
+    stroke: var(--amber);
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    opacity: 0;
+    filter: drop-shadow(0 0 5px rgba(217, 160, 91, 0.7));
+  }
+
+  /* 微排版度量数据 */
+  .stage-telemetry {
+    width: 260px;
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.16em;
+    color: var(--wake);
+  }
+
+  .telemetry-col {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+  .telemetry-col.right {
+    text-align: right;
+  }
+  .val-highlight {
+    color: var(--theme-fg);
+  }
+  .val-amber {
+    color: var(--amber);
+  }
+
+  /* ---------------- 底部悬浮控制栏 ---------------- */
+  .control-dock {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    background: var(--theme-card-bg);
+    border: 1px solid var(--theme-line);
+    backdrop-filter: blur(20px) saturate(130%);
+    -webkit-backdrop-filter: blur(20px) saturate(130%);
+    border-radius: 8px;
+    padding: 0.9rem 1.4rem;
+    display: flex;
+    align-items: center;
+    gap: 1.4rem;
+    box-shadow: 0 16px 36px -10px rgba(0,0,0,0.3);
+    font-family: var(--font-mono);
+    font-size: 0.74rem;
+    letter-spacing: 0.08em;
+  }
+
+  .dock-group {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+
+  .dock-btn {
+    padding: 0.45rem 0.85rem;
+    background: transparent;
+    border: 1px solid var(--theme-line);
+    color: var(--theme-fg);
+    font-family: inherit;
+    font-size: inherit;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .dock-btn:hover, .dock-btn.active {
+    background: var(--theme-line);
+    border-color: var(--amber);
+    color: var(--amber);
+  }
+
+  .dock-slider-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+  .dock-slider {
+    width: 110px;
+    accent-color: var(--amber);
+    cursor: pointer;
+  }
+
+  .dock-divider {
+    width: 1px;
+    height: 22px;
+    background: var(--theme-line);
+  }
+
+  @media (max-width: 768px) {
+    .control-dock {
+      flex-wrap: wrap;
+      width: 90%;
+      bottom: 12px;
+      justify-content: center;
+      gap: 0.8rem;
+    }
+  }
+</style>
+</head>
+<body data-theme="dark">
+
+  <!-- 底层真实内容页（供揭幕体验） -->
+  <main class="underlying-content">
+    <h1>在成形与融化之间</h1>
+    <div class="content-axis"></div>
+    <p>“在即将醒来的那一瞬，世界究竟是在成形，还是正在融化？世界应当始终保留一种感觉：它随时可能消失，又随时可能重新被记起。”</p>
+    <button class="reset-veil-btn" id="btnResetVeil">↻ 重新挂上开屏遮罩</button>
+  </main>
+
+  <!-- 网页加载遮罩 -->
+  <div class="veil-stage" id="veilStage">
+    <div class="stage-inner">
+      
+      <!-- 矢量晶核画布 (280 × 280) -->
+      <svg class="prism-svg" viewBox="0 0 280 280">
+        <defs>
+          <radialGradient id="prism-glow" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#d9a05b" stop-opacity="0.18" />
+            <stop offset="100%" stop-color="#d9a05b" stop-opacity="0" />
+          </radialGradient>
+        </defs>
+
+        <!-- 底层发丝瞄准基准网格 -->
+        <g class="reticle-grid">
+          <!-- 14° 斜率发丝轴 -->
+          <line class="hairline-axis" x1="20" y1="245" x2="260" y2="35" />
+          <!-- 中心十字发丝 (留出 6px 中心空腔) -->
+          <line x1="120" y1="140" x2="137" y2="140" />
+          <line x1="143" y1="140" x2="160" y2="140" />
+          <line x1="140" y1="120" x2="140" y2="137" />
+          <line x1="140" y1="143" x2="140" y2="160" />
+          <!-- 四角 L-Tick 瞄准标 -->
+          <path d="M50 64 H44 V70" />
+          <path d="M230 64 H236 V70" />
+          <path d="M50 216 H44 V210" />
+          <path d="M230 216 H236 V210" />
+          <!-- 辅助微圆 -->
+          <circle cx="140" cy="140" r="76" stroke-dasharray="1 7" opacity="0.4" />
+        </g>
+
+        <!-- 中心微光晕 -->
+        <circle id="coreGlow" cx="140" cy="140" r="50" fill="url(#prism-glow)" opacity="0" />
+
+        <!-- 5 片不规则几何棱面碎片 (构成非对称多边晶核) -->
+        <!-- 晶核中心约为 (140, 140) -->
+        <g id="shardsGroup">
+          <!-- Shard 1: 顶棱尖角面 (冷灰醒面) -->
+          <polygon id="shard1" class="shard shard-1" points="140,78 114,124 140,140" />
+          <!-- Shard 2: 右上主尖棱 (暖沙梦面) -->
+          <polygon id="shard2" class="shard shard-2" points="140,78 140,140 186,118" />
+          <!-- Shard 3: 右下复合透光面 -->
+          <polygon id="shard3" class="shard shard-3" points="140,140 186,118 162,192 140,202" />
+          <!-- Shard 4: 左下底座面 -->
+          <polygon id="shard4" class="shard shard-4" points="140,140 140,202 102,156" />
+          <!-- Shard 5: 核心交接微核 -->
+          <polygon id="shard5" class="shard shard-5" points="114,124 140,140 102,156" />
+        </g>
+
+        <!-- 琥珀微光折射刃线 -->
+        <path id="causticPath" class="caustic-path" d="M140,78 L140,140 L162,192" stroke-dasharray="130" stroke-dashoffset="130" />
+      </svg>
+
+      <!-- 实时微排版度量数据 -->
+      <div class="stage-telemetry">
+        <div class="telemetry-col">
+          <span>AXIS // <span class="val-highlight">14.0°</span></span>
+          <span>INDEX // <span class="val-highlight">n=1.517</span></span>
+        </div>
+        <div class="telemetry-col right">
+          <span>DEPTH // <span id="depthVal" class="val-amber">0.00</span></span>
+          <span id="phaseState">DISPERSAL</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 底部悬浮控制台 -->
+  <footer class="control-dock">
+    <div class="dock-group">
+      <button class="dock-btn active" id="btnFull">全版 2.8s</button>
+      <button class="dock-btn" id="btnFast">快版 1.0s</button>
+      <button class="dock-btn" id="btnLoop">循环 Loop</button>
+    </div>
+
+    <div class="dock-divider"></div>
+
+    <div class="dock-slider-wrap">
+      <span>SCRUB</span>
+      <input type="range" id="scrubber" class="dock-slider" min="0" max="1000" value="0">
+    </div>
+
+    <div class="dock-divider"></div>
+
+    <div class="dock-group">
+      <button class="dock-btn" id="btnTheme">底色: 深墨</button>
+      <button class="dock-btn" id="btnUnveil">触发揭幕 ↗</button>
+    </div>
+  </footer>
+
+<script>
+  // ================= 碎片运动参数与几何插值 =================
+  // 5 个碎片在弥散态 (p = 0) 下的空间位移、旋转与虚焦
+  const SHARD_CONFIGS = [
+    { el: document.getElementById('shard1'), dx: -22, dy: -26, rot: -12, blur: 8, cx: 131, cy: 114 },
+    { el: document.getElementById('shard2'), dx: 26, dy: -20, rot: 14, blur: 7, cx: 155, cy: 112 },
+    { el: document.getElementById('shard3'), dx: 28, dy: 24, rot: -10, blur: 9, cx: 162, cy: 150 },
+    { el: document.getElementById('shard4'), dx: -24, dy: 22, rot: 8, blur: 8, cx: 127, cy: 166 },
+    { el: document.getElementById('shard5'), dx: -18, dy: -6, rot: -15, blur: 6, cx: 118, cy: 140 },
+  ];
+
+  const causticPath = document.getElementById('causticPath');
+  const coreGlow = document.getElementById('coreGlow');
+  const depthVal = document.getElementById('depthVal');
+  const phaseState = document.getElementById('phaseState');
+  const scrubber = document.getElementById('scrubber');
+  const veilStage = document.getElementById('veilStage');
+
+  let currentDuration = 2800; // ms
+  let isLooping = false;
+  let isPlaying = false;
+  let animStartTime = 0;
+  let currentP = 0; // 0.0 ~ 1.0
+
+  // 缓动函数
+  function easeOutCubic(x) { return 1 - Math.pow(1 - x, 3); }
+  function easeOutQuad(x) { return 1 - (1 - x) * (1 - x); }
+  function easeInOutQuad(x) { return x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2; }
+
+  // 核心渲染函数：根据进度 p (0 ~ 1) 更新一切视图
+  function renderProgress(p) {
+    currentP = p;
+    scrubber.value = Math.floor(p * 1000);
+    depthVal.textContent = p.toFixed(2);
+
+    // 阶段状态判定
+    if (p < 0.28) {
+      phaseState.textContent = 'DISPERSAL';
+      phaseState.style.color = 'var(--wake)';
+    } else if (p < 0.68) {
+      phaseState.textContent = 'CONVERGENCE';
+      phaseState.style.color = 'var(--dream)';
+    } else if (p < 0.88) {
+      phaseState.textContent = 'REFRACTION';
+      phaseState.style.color = 'var(--amber)';
+    } else {
+      phaseState.textContent = 'COHERENT';
+      phaseState.style.color = '#fff';
+    }
+
+    // 1. 碎片相向聚合进度 (0 ~ 0.68 完成咬合)
+    const gatherP = Math.min(p / 0.68, 1);
+    const easeGather = easeOutCubic(gatherP);
+
+    SHARD_CONFIGS.forEach(cfg => {
+      const curDx = cfg.dx * (1 - easeGather);
+      const curDy = cfg.dy * (1 - easeGather);
+      const curRot = cfg.rot * (1 - easeGather);
+      const curBlur = cfg.blur * (1 - easeGather);
+      const curOpacity = 0.2 + 0.75 * easeGather;
+
+      cfg.el.setAttribute('transform', `translate(${curDx}, ${curDy}) rotate(${curRot}, ${cfg.cx}, ${cfg.cy})`);
+      cfg.el.style.filter = `blur(${curBlur.toFixed(1)}px)`;
+      cfg.el.style.opacity = curOpacity.toFixed(2);
+    });
+
+    // 2. 琥珀光蚀刃线 (0.68 ~ 0.88)
+    if (p < 0.68) {
+      causticPath.style.opacity = '0';
+      causticPath.style.strokeDashoffset = '130';
+      coreGlow.style.opacity = '0';
+    } else if (p <= 0.88) {
+      const caustP = (p - 0.68) / 0.20;
+      causticPath.style.opacity = '1';
+      causticPath.style.strokeDashoffset = (130 * (1 - caustP)).toFixed(1);
+      coreGlow.style.opacity = (Math.sin(caustP * Math.PI) * 0.9).toFixed(2);
+    } else {
+      // 0.88 ~ 1.0
+      causticPath.style.opacity = (1 - (p - 0.88) / 0.12).toFixed(2);
+      causticPath.style.strokeDashoffset = '0';
+      coreGlow.style.opacity = '0.2';
+    }
+
+    // 3. 晶核整体微幅悬浮与消融 (p > 0.88)
+    const shardsGroup = document.getElementById('shardsGroup');
+    if (p > 0.88) {
+      const dissP = (p - 0.88) / 0.12;
+      const scale = 1 + 0.04 * dissP;
+      shardsGroup.setAttribute('transform', `scale(${scale})`);
+      shardsGroup.style.transformOrigin = '140px 140px';
+    } else {
+      shardsGroup.removeAttribute('transform');
+    }
+  }
+
+  // 动画循环驱动器
+  function runAnimation() {
+    isPlaying = true;
+    animStartTime = performance.now();
+
+    function step(now) {
+      if (!isPlaying) return;
+      const elapsed = now - animStartTime;
+      const progress = Math.min(elapsed / currentDuration, 1);
+      renderProgress(progress);
+
+      if (progress < 1) {
+        requestAnimationFrame(step);
+      } else {
+        isPlaying = false;
+        if (isLooping) {
+          setTimeout(() => {
+            if (isLooping) runAnimation();
+          }, 450);
+        }
+      }
+    }
+    requestAnimationFrame(step);
+  }
+
+  // ================= 交互控制面板逻辑 =================
+  const btnFull = document.getElementById('btnFull');
+  const btnFast = document.getElementById('btnFast');
+  const btnLoop = document.getElementById('btnLoop');
+  const btnTheme = document.getElementById('btnTheme');
+  const btnUnveil = document.getElementById('btnUnveil');
+  const btnResetVeil = document.getElementById('btnResetVeil');
+
+  function setActiveModeBtn(btn) {
+    [btnFull, btnFast, btnLoop].forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+
+  btnFull.addEventListener('click', () => {
+    isLooping = false;
+    currentDuration = 2800;
+    setActiveModeBtn(btnFull);
+    veilStage.classList.remove('unveiled');
+    runAnimation();
+  });
+
+  btnFast.addEventListener('click', () => {
+    isLooping = false;
+    currentDuration = 1000;
+    setActiveModeBtn(btnFast);
+    veilStage.classList.remove('unveiled');
+    runAnimation();
+  });
+
+  btnLoop.addEventListener('click', () => {
+    isLooping = true;
+    currentDuration = 2400;
+    setActiveModeBtn(btnLoop);
+    veilStage.classList.remove('unveiled');
+    runAnimation();
+  });
+
+  scrubber.addEventListener('input', (e) => {
+    isPlaying = false;
+    isLooping = false;
+    setActiveModeBtn(btnFull);
+    const p = parseFloat(e.target.value) / 1000;
+    renderProgress(p);
+  });
+
+  btnTheme.addEventListener('click', () => {
+    const isDark = document.body.getAttribute('data-theme') === 'dark';
+    const nextTheme = isDark ? 'light' : 'dark';
+    document.body.setAttribute('data-theme', nextTheme);
+    btnTheme.textContent = isDark ? '底色: 晨雾' : '底色: 深墨';
+  });
+
+  btnUnveil.addEventListener('click', () => {
+    veilStage.classList.add('unveiled');
+  });
+
+  btnResetVeil.addEventListener('click', () => {
+    veilStage.classList.remove('unveiled');
+    runAnimation();
+  });
+
+  // 初始启动
+  runAnimation();
+</script>
+</body>
+</html>

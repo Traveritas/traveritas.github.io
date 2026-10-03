@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>《醒梦》加载动画 Mockup C · 双界折片 (Dual-Horizon & Folding Rhombus)</title>
+<link rel="preconnect" href="https://fastly.jsdelivr.net" crossorigin>
+<link rel="stylesheet" href="https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5.2.5/400.css">
+<link rel="stylesheet" href="https://fastly.jsdelivr.net/npm/@fontsource/noto-serif-sc@5.2.5/600.css">
+<style>
+  :root {
+    --bg-dark: #14171e;
+    --bg-light: #f0f3f6;
+    --fg-dark: #e8ecf1;
+    --fg-light: #232830;
+    --wake: #a7b1ba;
+    --dream: #c2a382;
+    --amber: #d9a05b;
+    --line-dark: rgba(167, 177, 186, 0.18);
+    --line-light: rgba(35, 40, 48, 0.14);
+    --font-serif: 'Noto Serif SC', 'Source Han Serif SC', serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+
+    --theme-bg: var(--bg-dark);
+    --theme-fg: var(--fg-dark);
+    --theme-line: var(--line-dark);
+    --theme-card-bg: rgba(20, 23, 30, 0.85);
+  }
+
+  body[data-theme="light"] {
+    --theme-bg: var(--bg-light);
+    --theme-fg: var(--fg-light);
+    --theme-line: var(--line-light);
+    --theme-card-bg: rgba(240, 243, 246, 0.88);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background-color: var(--theme-bg);
+    color: var(--theme-fg);
+    font-family: var(--font-serif);
+    transition: background-color 0.4s ease, color 0.4s ease;
+    user-select: none;
+  }
+
+  /* ---------------- 底层模拟真实内容页 ---------------- */
+  .underlying-content {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    text-align: center;
+    z-index: 10;
+  }
+
+  .underlying-content .content-axis {
+    width: 140px;
+    height: 1px;
+    background: var(--amber);
+    margin: 1.5rem auto;
+    transform: rotate(-14deg);
+    opacity: 0.8;
+  }
+
+  .underlying-content h1 {
+    font-size: clamp(1.8rem, 4vw, 2.8rem);
+    font-weight: 400;
+    letter-spacing: 0.18em;
+    margin-bottom: 1rem;
+    color: var(--theme-fg);
+  }
+
+  .underlying-content p {
+    max-width: 32rem;
+    line-height: 1.9;
+    font-size: 1.02rem;
+    color: var(--wake);
+  }
+
+  .reset-veil-btn {
+    margin-top: 2rem;
+    padding: 0.6rem 1.4rem;
+    background: transparent;
+    border: 1px solid var(--theme-line);
+    color: var(--amber);
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    letter-spacing: 0.12em;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+  }
+  .reset-veil-btn:hover {
+    background: var(--theme-line);
+    border-color: var(--amber);
+  }
+
+  /* ---------------- 遮罩舞台 ---------------- */
+  .veil-stage {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background-color: var(--theme-bg);
+    display: grid;
+    place-items: center;
+    transition: opacity 0.65s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.65s step-end;
+  }
+
+  .veil-stage.unveiled {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  .stage-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2rem;
+    position: relative;
+    perspective: 900px; /* 3D 纸页透视景深 */
+  }
+
+  /* 3D 折片舞台容器 */
+  .horizon-container {
+    position: relative;
+    width: 280px;
+    height: 280px;
+    transform-style: preserve-3d;
+  }
+
+  .horizon-svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  /* 14° 发丝轴线 */
+  .horizon-axis {
+    stroke: var(--theme-line);
+    stroke-width: 1.1;
+    transform-origin: 140px 140px;
+    will-change: transform, stroke;
+  }
+
+  /* 醒面折片 (Facet Wake: 冷灰) */
+  .facet-wake {
+    fill: #a7b1ba;
+    stroke: rgba(255, 255, 255, 0.5);
+    stroke-width: 0.5;
+    transform-origin: 140px 140px;
+    will-change: transform, opacity;
+  }
+
+  /* 梦面折片 (Facet Dream: 暖沙) */
+  .facet-dream {
+    fill: #c2a382;
+    stroke: rgba(255, 255, 255, 0.4);
+    stroke-width: 0.5;
+    transform-origin: 140px 140px;
+    will-change: transform, opacity;
+  }
+
+  /* 琥珀异质晶核点 */
+  .amber-kernel {
+    fill: var(--amber);
+    opacity: 0;
+    transform-origin: 140px 140px;
+    filter: drop-shadow(0 0 6px rgba(217, 160, 91, 0.9));
+    will-change: opacity, transform;
+  }
+
+  /* 微排版度量数据 */
+  .stage-telemetry {
+    width: 260px;
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.16em;
+    color: var(--wake);
+  }
+
+  .telemetry-col {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+  .telemetry-col.right {
+    text-align: right;
+  }
+  .val-highlight {
+    color: var(--theme-fg);
+  }
+  .val-amber {
+    color: var(--amber);
+  }
+
+  /* ---------------- 底部悬浮控制栏 ---------------- */
+  .control-dock {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    background: var(--theme-card-bg);
+    border: 1px solid var(--theme-line);
+    backdrop-filter: blur(20px) saturate(130%);
+    -webkit-backdrop-filter: blur(20px) saturate(130%);
+    border-radius: 8px;
+    padding: 0.9rem 1.4rem;
+    display: flex;
+    align-items: center;
+    gap: 1.4rem;
+    box-shadow: 0 16px 36px -10px rgba(0,0,0,0.3);
+    font-family: var(--font-mono);
+    font-size: 0.74rem;
+    letter-spacing: 0.08em;
+  }
+
+  .dock-group {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+
+  .dock-btn {
+    padding: 0.45rem 0.85rem;
+    background: transparent;
+    border: 1px solid var(--theme-line);
+    color: var(--theme-fg);
+    font-family: inherit;
+    font-size: inherit;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .dock-btn:hover, .dock-btn.active {
+    background: var(--theme-line);
+    border-color: var(--amber);
+    color: var(--amber);
+  }
+
+  .dock-slider-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+  .dock-slider {
+    width: 110px;
+    accent-color: var(--amber);
+    cursor: pointer;
+  }
+
+  .dock-divider {
+    width: 1px;
+    height: 22px;
+    background: var(--theme-line);
+  }
+
+  @media (max-width: 768px) {
+    .control-dock {
+      flex-wrap: wrap;
+      width: 90%;
+      bottom: 12px;
+      justify-content: center;
+      gap: 0.8rem;
+    }
+  }
+</style>
+</head>
+<body data-theme="dark">
+
+  <!-- 底层真实内容页（供揭幕体验） -->
+  <main class="underlying-content">
+    <h1>两界翻折的瞬间</h1>
+    <div class="content-axis"></div>
+    <p>“当意识在醒与梦的两界翻折，几何不仅是形状，而是边界的度量。冷灰与暖沙在 14° 的发丝线上正切咬合，世界在此成形。”</p>
+    <button class="reset-veil-btn" id="btnResetVeil">↻ 重新挂上开屏遮罩</button>
+  </main>
+
+  <!-- 网页加载遮罩 -->
+  <div class="veil-stage" id="veilStage">
+    <div class="stage-inner">
+      
+      <!-- 3D 折片舞台 (280 × 280) -->
+      <div class="horizon-container" id="horizonContainer">
+        <svg class="horizon-svg" viewBox="0 0 280 280">
+          <defs>
+            <!-- 发丝轴线性渐变 -->
+            <linearGradient id="axisGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#a7b1ba" stop-opacity="0" />
+              <stop offset="35%" stop-color="#a7b1ba" stop-opacity="0.6" />
+              <stop offset="50%" stop-color="#d9a05b" stop-opacity="1" />
+              <stop offset="65%" stop-color="#c2a382" stop-opacity="0.6" />
+              <stop offset="100%" stop-color="#c2a382" stop-opacity="0" />
+            </linearGradient>
+          </defs>
+
+          <!-- 14° 发丝轴线 (原点 140, 140) -->
+          <line id="horizonAxis" class="horizon-axis" x1="20" y1="170" x2="260" y2="110" stroke="url(#axisGrad)" />
+
+          <!-- 游标辅助刻度线 -->
+          <g id="vernierTicks" opacity="0.4">
+            <line x1="140" y1="130" x2="140" y2="150" stroke="var(--theme-line)" stroke-width="0.8" />
+            <circle cx="140" cy="140" r="65" stroke="var(--theme-line)" stroke-width="0.6" stroke-dasharray="2 6" fill="none" />
+          </g>
+
+          <!-- 醒片：冷灰半晶面 (左上) -->
+          <!-- 顶点基准：A(140, 70), B(195, 140), C(140, 210), D(85, 140) -->
+          <!-- 14° 切线穿过 (140, 140)，与 AD 交于 (102, 118)，与 BC 交于 (178, 162) -->
+          <polygon id="facetWake" class="facet-wake" 
+            points="85,140 140,70 178,130.5 102,149.5" />
+
+          <!-- 梦片：暖沙半晶面 (右下) -->
+          <polygon id="facetDream" class="facet-dream" 
+            points="178,130.5 195,140 140,210 102,149.5" />
+
+          <!-- 中心琥珀晶核 -->
+          <circle id="amberKernel" class="amber-kernel" cx="140" cy="140" r="2.8" />
+        </svg>
+      </div>
+
+      <!-- 实时微排版度量数据 -->
+      <div class="stage-telemetry">
+        <div class="telemetry-col">
+          <span>AXIS // <span class="val-highlight">14.0° HORIZON</span></span>
+          <span>CALIB // <span class="val-highlight">SHEAR-PLANE</span></span>
+        </div>
+        <div class="telemetry-col right">
+          <span>DEPTH // <span id="depthVal" class="val-amber">0.00</span></span>
+          <span id="phaseState">INSCRIPTION</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 底部悬浮控制台 -->
+  <footer class="control-dock">
+    <div class="dock-group">
+      <button class="dock-btn active" id="btnFull">全版 2.8s</button>
+      <button class="dock-btn" id="btnFast">快版 1.0s</button>
+      <button class="dock-btn" id="btnLoop">循环 Loop</button>
+    </div>
+
+    <div class="dock-divider"></div>
+
+    <div class="dock-slider-wrap">
+      <span>SCRUB</span>
+      <input type="range" id="scrubber" class="dock-slider" min="0" max="1000" value="0">
+    </div>
+
+    <div class="dock-divider"></div>
+
+    <div class="dock-group">
+      <button class="dock-btn" id="btnTheme">底色: 深墨</button>
+      <button class="dock-btn" id="btnUnveil">触发揭幕 ↗</button>
+    </div>
+  </footer>
+
+<script>
+  // ================= 双界折片动效驱动器 =================
+  const horizonAxis = document.getElementById('horizonAxis');
+  const facetWake = document.getElementById('facetWake');
+  const facetDream = document.getElementById('facetDream');
+  const amberKernel = document.getElementById('amberKernel');
+  const horizonContainer = document.getElementById('horizonContainer');
+  const depthVal = document.getElementById('depthVal');
+  const phaseState = document.getElementById('phaseState');
+  const scrubber = document.getElementById('scrubber');
+  const veilStage = document.getElementById('veilStage');
+
+  let currentDuration = 2800;
+  let isLooping = false;
+  let isPlaying = false;
+  let animStartTime = 0;
+
+  function easeOutCubic(x) { return 1 - Math.pow(1 - x, 3); }
+  function easeInOutQuad(x) { return x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2; }
+
+  function renderProgress(p) {
+    scrubber.value = Math.floor(p * 1000);
+    depthVal.textContent = p.toFixed(2);
+
+    // 状态判定
+    if (p < 0.28) {
+      phaseState.textContent = 'INSCRIPTION';
+      phaseState.style.color = 'var(--wake)';
+    } else if (p < 0.65) {
+      phaseState.textContent = 'PARALLAX-FOLD';
+      phaseState.style.color = 'var(--dream)';
+    } else if (p < 0.85) {
+      phaseState.textContent = 'OCCLUSION';
+      phaseState.style.color = 'var(--amber)';
+    } else {
+      phaseState.textContent = 'PARTING';
+      phaseState.style.color = '#fff';
+    }
+
+    // 1. 14° 发丝轴线划出 (0.0 ~ 0.35)
+    if (p < 0.35) {
+      const axisP = p / 0.35;
+      const scaleX = easeOutCubic(axisP);
+      horizonAxis.setAttribute('transform', `scale(${scaleX}, 1)`);
+      horizonAxis.style.opacity = axisP.toFixed(2);
+    } else {
+      horizonAxis.setAttribute('transform', 'scale(1, 1)');
+      horizonAxis.style.opacity = '1';
+    }
+
+    // 2. 醒片与梦片 3D 折叠与对角咬合 (0.20 ~ 0.75)
+    if (p < 0.20) {
+      facetWake.style.opacity = '0';
+      facetDream.style.opacity = '0';
+      facetWake.setAttribute('transform', 'translate(-18, -14) rotateY(28)');
+      facetDream.setAttribute('transform', 'translate(18, 14) rotateY(-28)');
+    } else if (p <= 0.70) {
+      const foldP = (p - 0.20) / 0.50;
+      const ease = easeOutCubic(foldP);
+
+      const dx = 18 * (1 - ease);
+      const dy = 14 * (1 - ease);
+      const rotY = 28 * (1 - ease);
+      const op = Math.min(foldP * 1.5, 0.92);
+
+      facetWake.style.opacity = op.toFixed(2);
+      facetDream.style.opacity = op.toFixed(2);
+
+      facetWake.setAttribute('transform', `translate(${-dx}, ${-dy}) rotateY(${rotY})`);
+      facetDream.setAttribute('transform', `translate(${dx}, ${dy}) rotateY(${-rotY})`);
+    } else {
+      facetWake.style.opacity = '0.92';
+      facetDream.style.opacity = '0.92';
+      facetWake.setAttribute('transform', 'translate(0, 0) rotateY(0)');
+      facetDream.setAttribute('transform', 'translate(0, 0) rotateY(0)');
+    }
+
+    // 3. 琥珀晶核聚光 (0.65 ~ 0.85)
+    if (p < 0.65) {
+      amberKernel.style.opacity = '0';
+      amberKernel.setAttribute('transform', 'scale(0.3)');
+    } else if (p <= 0.85) {
+      const amberP = (p - 0.65) / 0.20;
+      const scale = 0.3 + 0.9 * Math.sin(amberP * Math.PI);
+      amberKernel.style.opacity = Math.sin(amberP * Math.PI * 0.5).toFixed(2);
+      amberKernel.setAttribute('transform', `scale(${scale})`);
+    } else {
+      amberKernel.style.opacity = '0.95';
+      amberKernel.setAttribute('transform', 'scale(1)');
+    }
+
+    // 4. 阶段四：轴线贯通与两片拉幕滑移 (0.85 ~ 1.0)
+    if (p > 0.85) {
+      const partP = (p - 0.85) / 0.15;
+      const easePart = easeInOutQuad(partP);
+
+      const slide = 35 * easePart;
+      facetWake.setAttribute('transform', `translate(${-slide}, ${-slide * 0.7})`);
+      facetDream.setAttribute('transform', `translate(${slide}, ${slide * 0.7})`);
+      horizonAxis.setAttribute('transform', `scale(${1 + easePart * 1.5}, 1)`);
+    }
+  }
+
+  function runAnimation() {
+    isPlaying = true;
+    animStartTime = performance.now();
+
+    function step(now) {
+      if (!isPlaying) return;
+      const elapsed = now - animStartTime;
+      const progress = Math.min(elapsed / currentDuration, 1);
+      renderProgress(progress);
+
+      if (progress < 1) {
+        requestAnimationFrame(step);
+      } else {
+        isPlaying = false;
+        if (isLooping) {
+          setTimeout(() => {
+            if (isLooping) runAnimation();
+          }, 450);
+        }
+      }
+    }
+    requestAnimationFrame(step);
+  }
+
+  // 控制逻辑
+  const btnFull = document.getElementById('btnFull');
+  const btnFast = document.getElementById('btnFast');
+  const btnLoop = document.getElementById('btnLoop');
+  const btnTheme = document.getElementById('btnTheme');
+  const btnUnveil = document.getElementById('btnUnveil');
+  const btnResetVeil = document.getElementById('btnResetVeil');
+
+  function setActiveModeBtn(btn) {
+    [btnFull, btnFast, btnLoop].forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+
+  btnFull.addEventListener('click', () => {
+    isLooping = false;
+    currentDuration = 2800;
+    setActiveModeBtn(btnFull);
+    veilStage.classList.remove('unveiled');
+    runAnimation();
+  });
+
+  btnFast.addEventListener('click', () => {
+    isLooping = false;
+    currentDuration = 1000;
+    setActiveModeBtn(btnFast);
+    veilStage.classList.remove('unveiled');
+    runAnimation();
+  });
+
+  btnLoop.addEventListener('click', () => {
+    isLooping = true;
+    currentDuration = 2400;
+    setActiveModeBtn(btnLoop);
+    veilStage.classList.remove('unveiled');
+    runAnimation();
+  });
+
+  scrubber.addEventListener('input', (e) => {
+    isPlaying = false;
+    isLooping = false;
+    setActiveModeBtn(btnFull);
+    const p = parseFloat(e.target.value) / 1000;
+    renderProgress(p);
+  });
+
+  btnTheme.addEventListener('click', () => {
+    const isDark = document.body.getAttribute('data-theme') === 'dark';
+    const nextTheme = isDark ? 'light' : 'dark';
+    document.body.setAttribute('data-theme', nextTheme);
+    btnTheme.textContent = isDark ? '底色: 晨雾' : '底色: 深墨';
+  });
+
+  btnUnveil.addEventListener('click', () => {
+    veilStage.classList.add('unveiled');
+  });
+
+  btnResetVeil.addEventListener('click', () => {
+    veilStage.classList.remove('unveiled');
+    runAnimation();
+  });
+
+  runAnimation();
+</script>
+</body>
+</html>
