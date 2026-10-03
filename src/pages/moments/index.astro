@@ -1,34 +1,48 @@
 ---
+/* ─────────────────────────────────────────────────────────────
+   瞬间（定稿自 /mock/moments-slides/ 的 C 稿 · 显影薄片）
+   瞬间不是目录而是正文：一则一片磨砂树脂薄片，两列错落。
+   · 构建期按顺序左右分发（新的在上），右列下沉 4.5rem 错开；窄屏两列拆回单列，
+     用 order 恢复时间顺序（列容器 display: contents）；
+   · 配图（frontmatter images，1–9 张）出血铺在片顶，文字在下；
+   · 越旧越透：--age（同一年内 新 0 → 旧 1）把片的底色与字一起压淡。
+   配图：MomentGallery（网格）+ MomentLightbox（页尾大图层，纯 :target）。
+   ───────────────────────────────────────────────────────────── */
 import BaseLayout from '../../layouts/BaseLayout.astro';
+import MomentGallery from '../../components/moments/MomentGallery.astro';
+import MomentLightbox from '../../components/moments/MomentLightbox.astro';
 import { getCollection, render } from 'astro:content';
 
-const entries = (await getCollection('moments', (m) => !m.data.draft))
-  .sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf() || b.id.localeCompare(a.id));
-
-const momentsWithContent = await Promise.all(
-  entries.map(async (m) => {
-    const { Content } = await render(m);
-    return {
-      ...m,
-      Content,
-    };
-  })
+const entries = (await getCollection('moments', (m) => !m.data.draft)).sort(
+  (a, b) => b.data.date.valueOf() - a.data.date.valueOf() || b.id.localeCompare(a.id)
+);
+const moments = await Promise.all(
+  entries.map(async (m) => ({
+    id: m.id,
+    title: m.data.title,
+    date: m.data.date,
+    images: m.data.images,
+    Content: (await render(m)).Content,
+  }))
 );
 
-const fmtDate = (d: Date) =>
-  `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
-
-const fmtTime = (d: Date) =>
-  `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-
-// 按年份分组（保持倒序）
-const byYear = new Map<number, typeof momentsWithContent>();
-for (const m of momentsWithContent) {
-  const y = m.data.date.getFullYear();
+// 按年分组；每组左右分发成两列，order 记组内顺序（窄屏恢复时间顺序用）
+const byYear = new Map<number, typeof moments>();
+for (const m of moments) {
+  const y = m.date.getFullYear();
   if (!byYear.has(y)) byYear.set(y, []);
   byYear.get(y)!.push(m);
 }
-const years = [...byYear.keys()].sort((a, b) => b - a);
+const years = [...byYear].map(([y, list]) => ({
+  y,
+  cols: [list.filter((_, i) => i % 2 === 0), list.filter((_, i) => i % 2 === 1)],
+  order: new Map(list.map((m, i) => [m.id, i])),
+  age: new Map(list.map((m, i) => [m.id, list.length > 1 ? i / (list.length - 1) : 0])),
+}));
+
+const pad = (n: number) => String(n).padStart(2, '0');
+const md = (d: Date) => `${pad(d.getMonth() + 1)}.${pad(d.getDate())}`;
+const full = (d: Date) => `${d.getFullYear()}.${md(d)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 ---
 
 <BaseLayout
@@ -36,9 +50,11 @@ const years = [...byYear.keys()].sort((a, b) => b - a);
   dreamTitle="闪念 — AveritA"
   description="即逝的直觉、断简与思绪微光。"
   ambient
+  maskLines
+  fieldVeil
   rail={{ mode: 'station', station: '瞬间 · 异相', en: 'MOMENTS · REM' }}
 >
-  <div class="container page-body">
+  <div class="container-wide page-body">
     <header class="page-head">
       <h1 data-morph data-true="瞬间" data-dream="闪念">瞬间</h1>
       <p class="lede" data-morph data-true="即逝的直觉、断简与思绪微光。" data-dream="“在即将醒来的那一瞬，尚未串联成篇的散落光斑。”">
@@ -47,207 +63,194 @@ const years = [...byYear.keys()].sort((a, b) => b - a);
     </header>
 
     {
-      years.map((y) => (
-        <section class="year-group">
-          <div class="axis" aria-hidden="true">
-            <span class="axis-tag mono">
-              {y} · {byYear.get(y)!.length} 则
-            </span>
-          </div>
-
-          <div class="moments-stream">
-            {byYear.get(y)!.map((m) => (
-              <article class="moment-card" id={m.id}>
-                <header class="moment-head">
-                  <div class="moment-meta mono">
-                    <span class="moment-date">{fmtDate(m.data.date)}</span>
-                    <span class="moment-time">{fmtTime(m.data.date)}</span>
-                    {m.data.tags.length > 0 && (
-                      <span class="moment-tags">
-                        {m.data.tags.map((t) => (
-                          <span class="tag-pill">#{t}</span>
-                        ))}
-                      </span>
+      years.map(({ y, cols, order, age }) => (
+        <section class="m-year">
+          <h2 class="s-year mono">{y}</h2>
+          <div class="sheets">
+            {cols.map((col) => (
+              <div class="col">
+                {col.map((m) => (
+                  <article class="sheet" id={m.id} style={`--age: ${age.get(m.id)!.toFixed(3)}; order: ${order.get(m.id)}`}>
+                    {m.images.length > 0 && (
+                      <div class="sheet-media">
+                        <MomentGallery images={m.images} anchor={m.id} />
+                      </div>
                     )}
-                  </div>
-                  <a href={`#${m.id}`} class="moment-anchor mono" title="锚点链接" aria-label="永久链接">#</a>
-                </header>
-
-                {m.data.title && <h2 class="moment-title">{m.data.title}</h2>}
-
-                <div class="md moment-content">
-                  <m.Content />
-                </div>
-              </article>
+                    <div class="sheet-text">
+                      <header class="sheet-head">
+                        {m.title && <h3 class="sheet-title">{m.title}</h3>}
+                        <a class="sheet-date" href={`#${m.id}`} title={full(m.date)}>
+                          <time datetime={m.date.toISOString()}>{md(m.date)}</time>
+                        </a>
+                      </header>
+                      <div class="sheet-body md">
+                        <m.Content />
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
             ))}
           </div>
         </section>
       ))
     }
   </div>
+
+  {moments.map((m) => <MomentLightbox images={m.images} anchor={m.id} />)}
 </BaseLayout>
 
 <style>
-  .page-body {
-    padding-block: 4rem 8rem;
-    max-width: 44rem;
-  }
-
-  .page-head {
+  .m-year {
     margin-bottom: 4rem;
   }
 
-  .page-head h1 {
-    font-family: var(--font-display);
-    font-size: clamp(2rem, 4vw, 2.6rem);
-    font-weight: 600;
-    letter-spacing: -0.01em;
-    margin: 0 0 1rem;
-    color: var(--fg);
-  }
-
-  .lede {
-    font-size: 0.96rem;
-    line-height: 1.8;
-    color: var(--fg-soft);
-    margin: 0;
-  }
-
-  .year-group {
-    margin-bottom: 4rem;
-  }
-
-  .axis {
-    margin: 0 0 2rem;
-    padding-left: 0.2rem;
-    display: flex;
-    align-items: baseline;
-  }
-
-  .axis-tag {
+  .s-year {
+    margin: 0 0 2.2rem;
+    font-weight: 400;
+    line-height: 1.6;
     font-size: 0.72rem;
     letter-spacing: 0.2em;
     color: var(--umber);
   }
 
-  /* 瞬间时间流卡片列表 */
-  .moments-stream {
-    display: flex;
-    flex-direction: column;
-    gap: 2.2rem;
+  .sheets {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 1.6rem;
+    align-items: start;
   }
 
-  .moment-card {
+  .col {
+    display: flex;
+    flex-direction: column;
+    gap: 1.6rem;
+  }
+
+  .col + .col {
+    padding-top: 4.5rem;
+  }
+
+  /* ── 一片薄片 ── */
+  .sheet {
     position: relative;
-    scroll-margin-top: 5.5rem;
-    padding: 1.8rem 2.2rem;
+    overflow: hidden;
+    scroll-margin-top: 6rem;
     border-radius: 6px;
-    background: linear-gradient(
-      135deg,
-      rgba(255, 255, 255, 0.75) 0%,
-      rgba(255, 255, 255, 0.45) 100%
-    );
-    border: 1px solid rgba(255, 255, 255, 0.82);
+    background: rgba(255, 255, 255, calc(0.6 - var(--age) * 0.32));
+    border: 1px solid rgba(255, 255, 255, calc(0.85 - var(--age) * 0.35));
     -webkit-backdrop-filter: blur(14px);
     backdrop-filter: blur(14px);
     box-shadow:
-      inset 0 1px 1px rgba(255, 255, 255, 0.7),
-      0 12px 32px -10px rgba(38, 44, 51, 0.06);
+      inset 0 1px 1px rgba(255, 255, 255, 0.6),
+      0 14px 34px -16px rgba(38, 44, 51, calc(0.12 - var(--age) * 0.07));
     transition:
-      border-color 0.24s ease,
-      box-shadow 0.24s ease,
-      transform 0.24s ease;
+      background 0.4s ease,
+      transform 0.4s ease,
+      box-shadow 0.4s ease;
   }
 
-  .moment-card:hover {
-    border-color: color-mix(in srgb, var(--amber) 40%, rgba(255, 255, 255, 0.85));
+  .sheet:hover,
+  .sheet:target {
+    background: rgba(255, 255, 255, 0.68);
+    transform: translateY(-2px);
     box-shadow:
-      inset 0 1px 1px rgba(255, 255, 255, 0.9),
-      0 16px 36px -8px rgba(38, 44, 51, 0.09);
-    transform: translateY(-1px);
+      inset 0 1px 1px rgba(255, 255, 255, 0.8),
+      0 18px 40px -16px rgba(38, 44, 51, 0.14);
   }
 
-  .moment-card:target {
-    border-color: var(--amber);
-    box-shadow:
-      0 0 0 1px var(--amber),
-      0 16px 36px -8px rgba(200, 140, 50, 0.16);
+  .sheet:target {
+    border-color: color-mix(in srgb, var(--amber) 60%, #fff);
   }
 
-  .moment-head {
+  /* 配图出血铺在片顶：网格贴边、缝细一档 */
+  .sheet-media :global(.gallery) {
+    margin: 0;
+    gap: 2px;
+    max-width: none;
+  }
+
+  .sheet-media :global(.g-cell) {
+    border-radius: 0;
+  }
+
+  .sheet-media :global(.g-single img) {
+    max-height: 24rem;
+    object-fit: cover;
+  }
+
+  .sheet-text {
+    padding: 1.35rem 1.6rem 1.5rem;
+    opacity: calc(1 - var(--age) * 0.3);
+    transition: opacity 0.4s ease;
+  }
+
+  .sheet:hover .sheet-text,
+  .sheet:target .sheet-text {
+    opacity: 1;
+  }
+
+  .sheet-head {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: baseline;
     gap: 1rem;
-    margin-bottom: 1.1rem;
-    padding-bottom: 0.75rem;
-    border-bottom: 1px solid var(--line);
+    margin-bottom: 0.6rem;
   }
 
-  .moment-meta {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.65rem 0.9rem;
-    font-size: 0.72rem;
+  .sheet-title {
+    font-size: 1rem;
+    letter-spacing: 0.04em;
+    color: var(--fg);
+  }
+
+  .sheet-date {
+    flex: none;
+    margin-left: auto;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 0.7rem;
+    letter-spacing: 0.12em;
     color: var(--fg-soft);
-  }
-
-  .moment-time {
-    color: var(--fg-faint);
-  }
-
-  .moment-tags {
-    display: flex;
-    gap: 0.45rem;
-  }
-
-  .tag-pill {
-    color: var(--umber);
-    opacity: 0.85;
-    font-size: 0.68rem;
-  }
-
-  .moment-anchor {
-    color: var(--fg-faint);
     text-decoration: none;
-    font-size: 0.85rem;
-    opacity: 0.4;
-    transition: opacity 0.18s ease, color 0.18s ease;
   }
 
-  .moment-anchor:hover {
-    opacity: 1;
-    color: var(--amber);
+  .sheet-date:hover,
+  .sheet:target .sheet-date {
+    color: var(--umber);
   }
 
-  .moment-title {
+  .sheet-body {
     font-family: var(--font-display);
-    font-size: 1.15rem;
-    font-weight: 600;
-    letter-spacing: 0.02em;
-    color: var(--fg);
-    margin: 0 0 0.85rem;
-  }
-
-  .moment-content {
-    font-family: var(--font-serif);
-    font-size: 0.95rem;
+    font-weight: 400;
+    font-size: 1.02rem;
     line-height: 1.95;
+    letter-spacing: 0.015em;
     color: var(--fg);
   }
 
-  .moment-content :global(p) {
-    margin: 0 0 0.9rem;
+  .sheet-body :global(p) {
+    margin: 0 0 0.6em;
   }
 
-  .moment-content :global(p:last-child) {
+  .sheet-body :global(p:last-child) {
     margin-bottom: 0;
   }
 
-  @media (max-width: 480px) {
-    .moment-card {
-      padding: 1.4rem 1.4rem;
+  /* 窄屏：拆回单列，order 恢复时间顺序 */
+  @media (max-width: 760px) {
+    .sheets {
+      display: flex;
+      flex-direction: column;
+      gap: 1.4rem;
+    }
+
+    .col {
+      display: contents;
+    }
+
+    .col + .col {
+      padding-top: 0;
     }
   }
 </style>

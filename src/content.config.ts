@@ -32,12 +32,18 @@ const projects = defineCollection({
 
 const moments = defineCollection({
   loader: glob({ pattern: '**/[^_]*.{md,mdx}', base: './src/content/moments' }),
-  schema: z.object({
-    title: z.string().optional(),
-    date: z.coerce.date(),
-    tags: z.array(z.string()).default([]),
-    draft: z.boolean().default(false),
-  }),
+  schema: ({ image }) =>
+    z.object({
+      title: z.string().optional(),
+      date: z.coerce.date(),
+      tags: z.array(z.string()).default([]),
+      draft: z.boolean().default(false),
+      // 配图 1–9 张：相对本文件的路径，或 { src, alt }；构建期由 astro:assets 出缩略与大图
+      images: z
+        .array(z.union([image(), z.object({ src: image(), alt: z.string().default('') })]))
+        .max(9)
+        .default([]),
+    }),
 });
 
 export const collections = { articles, projects, moments };

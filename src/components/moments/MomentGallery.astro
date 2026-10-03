@@ -1,0 +1,94 @@
+---
+/* ─────────────────────────────────────────────────────────────
+   瞬间配图：1–9 张，断简里的那一格网格。
+   · 1 张：保留原比例（横图满宽、竖图收窄），不裁；
+   · 2–9 张：方格裁切，列数按张数定 ——
+       2 → 两列 · 3 → 三列 · 4 → 2×2（收到三列的宽度）· 5–9 → 三列；
+   · 每格链到 <MomentLightbox> 的大图锚点。大图层另放在页尾：它是 position: fixed，
+     祖先只要带 filter / opacity / transform 就会被困在断简里（A 稿的远近正带着这些）。
+   ───────────────────────────────────────────────────────────── */
+import { Image } from 'astro:assets';
+import { normalize, boxId, type MomentImage } from './images';
+
+interface Props {
+  images: MomentImage[];
+  /** 所在断简的锚点 id（大图 id 的前缀） */
+  anchor: string;
+}
+
+const { images, anchor } = Astro.props;
+const list = normalize(images);
+const n = list.length;
+const single = n === 1;
+const cols = n === 2 || n === 4 ? 2 : 3;
+---
+
+{
+  n > 0 && (
+    <div class:list={['gallery', { 'g-single': single, 'g-portrait': single && list[0].src.height > list[0].src.width, 'g-four': n === 4 }]} style={`--cols: ${cols}`}>
+      {list.map((im, i) => (
+        <a class="g-cell" href={`#${boxId(anchor, i)}`} aria-label={im.alt || `第 ${i + 1} 张配图，点开看大图`}>
+          {single ? (
+            <Image src={im.src} alt={im.alt} widths={[640, 1080]} sizes="(max-width: 760px) 100vw, 34rem" loading="lazy" />
+          ) : (
+            <Image src={im.src} alt={im.alt} width={480} height={480} fit="cover" loading="lazy" />
+          )}
+        </a>
+      ))}
+    </div>
+  )
+}
+
+<style>
+  .gallery {
+    display: grid;
+    grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
+    gap: 4px;
+    margin-top: 1.1rem;
+  }
+
+  /* 四张：2×2 收到三列格的宽度，格子与九宫格同大 */
+  .g-four {
+    max-width: calc((100% - 8px) / 3 * 2 + 4px);
+  }
+
+  .g-single {
+    display: block;
+  }
+
+  .g-portrait {
+    max-width: 62%;
+  }
+
+  .g-cell {
+    display: block;
+    overflow: hidden;
+    border-radius: 2px;
+    background: color-mix(in srgb, var(--fg) 5%, transparent);
+  }
+
+  .g-cell :global(img) {
+    display: block;
+    width: 100%;
+    height: auto;
+    transition:
+      opacity 0.4s ease,
+      transform 0.6s ease;
+  }
+
+  .gallery:not(.g-single) .g-cell :global(img) {
+    aspect-ratio: 1;
+    object-fit: cover;
+  }
+
+  .g-cell:hover :global(img) {
+    opacity: 0.88;
+    transform: scale(1.015);
+  }
+
+  @media (max-width: 760px) {
+    .g-portrait {
+      max-width: 78%;
+    }
+  }
+</style>

@@ -117,6 +117,7 @@ npm run new:article -- "标题" my-slug
 
 - 随笔模板：`docs/templates/article-template.md`
 - 项目模板：`docs/templates/project-template.md`
+- 瞬间模板：`docs/templates/moment-template.md`（含 1–9 张配图的写法）
 
 另有两份写完的示例稿，演示成稿的样子（模板管字段，示例稿管写法）：
 

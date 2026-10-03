@@ -1,0 +1,101 @@
+---
+/* ─────────────────────────────────────────────────────────────
+   瞬间配图的大图层：纯 :target，零客户端 JS。
+   · 每张一层 position: fixed 的锚点目标（浏览器不为它滚动）；翻页就是换锚点，
+     关闭回到所在断简的锚点。
+   · 大图 loading="lazy" 且平时 display: none，不打开就不下载。
+   · 放在页尾、所有带 filter / opacity 的断简之外（见 MomentGallery 的注）。
+   ───────────────────────────────────────────────────────────── */
+import { getImage } from 'astro:assets';
+import { normalize, boxId, type MomentImage } from './images';
+
+interface Props {
+  images: MomentImage[];
+  anchor: string;
+}
+
+const { images, anchor } = Astro.props;
+const list = normalize(images);
+const n = list.length;
+const full = await Promise.all(
+  list.map((im) => getImage({ src: im.src, width: Math.min(im.src.width, 1800), format: 'webp' }))
+);
+---
+
+{
+  list.map((im, i) => (
+    <div class="g-box" id={boxId(anchor, i)} role="dialog" aria-label={`配图 ${i + 1} / ${n}`}>
+      <a class="g-close" href={`#${anchor}`} aria-label="关闭" />
+      <img src={full[i].src} alt={im.alt} width={full[i].attributes.width} height={full[i].attributes.height} loading="lazy" decoding="async" />
+      {n > 1 && (
+        <span class="g-nav mono">
+          {i > 0 ? <a href={`#${boxId(anchor, i - 1)}`} aria-label="上一张">‹</a> : <span />}
+          <span>
+            {i + 1} / {n}
+          </span>
+          {i < n - 1 ? <a href={`#${boxId(anchor, i + 1)}`} aria-label="下一张">›</a> : <span />}
+        </span>
+      )}
+    </div>
+  ))
+}
+
+<style>
+  .g-box {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    place-items: center;
+    padding: clamp(1rem, 5vw, 4rem) clamp(1rem, 5vw, 4rem) 5rem;
+    background: color-mix(in srgb, var(--bg) 82%, transparent);
+    -webkit-backdrop-filter: blur(18px);
+    backdrop-filter: blur(18px);
+  }
+
+  .g-box:target {
+    display: grid;
+  }
+
+  .g-close {
+    position: absolute;
+    inset: 0;
+    cursor: zoom-out;
+  }
+
+  .g-box img {
+    position: relative;
+    max-width: 100%;
+    max-height: calc(100vh - 9.5rem);
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    pointer-events: none;
+    box-shadow: 0 24px 60px -24px rgba(38, 44, 51, 0.28);
+  }
+
+  .g-nav {
+    position: absolute;
+    left: 50%;
+    bottom: 1.6rem;
+    transform: translateX(-50%);
+    display: grid;
+    grid-template-columns: 2rem auto 2rem;
+    align-items: center;
+    gap: 1rem;
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    color: var(--fg-soft);
+  }
+
+  .g-nav a {
+    text-align: center;
+    font-size: 1.1rem;
+    color: var(--fg-soft);
+    text-decoration: none;
+  }
+
+  .g-nav a:hover {
+    color: var(--umber);
+  }
+</style>
