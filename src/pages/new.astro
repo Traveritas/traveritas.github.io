@@ -98,49 +98,45 @@ const exits = [
 
 const manifesto = '在即将醒来的那一瞬，世界究竟是在成形，还是正在融化？';
 
-/* ── 测量点：版块入口钉在地形的几条等高线上，平时只有一粒点与一行小字；
-   hover / focus / 点按时，floatwin 式的半透明小窗从点上浮起。窗内容与取数同 scene-floatwin。
+/* ── 测量点：版块入口钉在地形的几条等高线上，平时为一粒点与一行小字；
+   点击后作为下潜锚点平滑降落到下方对应栏目。
    tx / ty ＝ 目标位置（视口比例；桌面 / 窄屏各一组），脚本找离它最近的那条线把点钉上去 ── */
 const pins = [
   {
     key: 'articles',
-    href: '/articles/',
+    target: '#ns-essays',
     wake: '随笔',
     dream: '断章',
-    badge: 'SAYABLE',
+    subWake: '23:19 · 浅梦 ↓',
+    subDream: '23:19 · 潜行 ↓',
     at: [0.25, 0.63, 0.2, 0.62],
-    rows: allArticles.slice(0, 2).map((a) => ({ t: a.data.title, d: fmtShort(a.data.date) })),
-    foot: `共 ${allArticles.length} 篇 →`,
   },
   {
     key: 'moments',
-    href: '/moments/',
+    target: '#ns-rem',
     wake: '瞬间',
     dream: '闪念',
-    badge: 'EPHEMERAL',
+    subWake: '02:08 · 异相 ↓',
+    subDream: '02:08 · 闪念 ↓',
     at: [0.55, 0.79, 0.66, 0.69],
-    rows: allMoments.slice(0, 1).map((m) => ({ t: snippet(m.body ?? '', 30), d: fmtMomentTime(m.data.date) })),
-    foot: `共 ${allMoments.length} 则 →`,
   },
   {
     key: 'projects',
-    href: '/projects/',
+    target: '#ns-projects',
     wake: '项目',
     dream: '造物',
-    badge: 'BUILDABLE',
+    subWake: '01:11 · 深眠 ↓',
+    subDream: '01:11 · 造物 ↓',
     at: [0.4, 0.71, 0.34, 0.78],
-    rows: allProjects.slice(0, 2).map((p) => ({ t: p.data.title, d: `${depthOf(p.data.status)}/8` })),
-    foot: `共 ${allProjects.length} 件 →`,
   },
   {
     key: 'about',
-    href: '/about/',
+    target: '#ns-dawn',
     wake: '关于',
     dream: '此身',
-    badge: 'PRESENCE',
+    subWake: '06:31 · 晨醒 ↓',
+    subDream: '06:31 · 晨光 ↓',
     at: [0.12, 0.78, 0.78, 0.85],
-    rows: [{ t: '知觉的留白，与「醒梦」', d: '' }],
-    foot: '此处 →',
   },
 ];
 
@@ -186,34 +182,20 @@ const heroChars = heroLines.map((l) => [...l].map((ch) => ({ ch, i: heroI++ })))
           <span class="cmark cmark-h" data-mark="h">23:07</span>
           <span class="cmark" data-mark="n">06:31</span>
         </div>
-        <nav class="ls-pins" aria-label="版块">
+        <nav class="ls-pins" aria-label="版块导航">
           {
             pins.map((p) => (
               <div class={`pin pin-${p.key}`} data-pin={p.key} data-at={p.at.join(',')}>
-                <button class="pin-dot" type="button" aria-expanded="false" aria-controls={`pw-${p.key}`}>
+                <a class="pin-dot" href={p.target}>
                   <i aria-hidden="true" />
                   <span class="pin-l">
-                    <span data-morph data-true={p.wake} data-dream={p.dream}>
+                    <span class="pin-t" data-morph data-true={p.wake} data-dream={p.dream}>
                       {p.wake}
                     </span>
-                  </span>
-                </button>
-                <a class="pw" id={`pw-${p.key}`} href={p.href}>
-                  <span class="fw-h">
-                    <span class="nm" data-morph data-true={p.wake} data-dream={p.dream}>
-                      {p.wake}
+                    <span class="pin-sub mono" data-morph data-true={p.subWake} data-dream={p.subDream}>
+                      {p.subWake}
                     </span>
-                    <span class="bd">{p.badge}</span>
                   </span>
-                  <span class="fw-b">
-                    {p.rows.map((r) => (
-                      <span class="row">
-                        <span class="rt">{r.t}</span>
-                        {r.d && <span class="rd">{r.d}</span>}
-                      </span>
-                    ))}
-                  </span>
-                  <span class="fw-f">{p.foot}</span>
                 </a>
               </div>
             ))
@@ -836,11 +818,9 @@ const heroChars = heroLines.map((l) => [...l].map((ch) => ({ ch, i: heroI++ })))
     }
   }
 
-  /* ── 测量点：一粒点 + 一行很小的标签，钉在某条等高线上（--x / --y / --rot 由脚本写入）。
-     hover / 键盘焦点 / 点按（.open）时，floatwin 式的半透明小窗从点上浮起（只动 opacity / transform）。
-     窗以点为轴站位，左右夹在视口内 ── */
+  /* ── 测量点：一粒点 + 一行很小的标签，钉在某条等高线上（--x / --y / --rot 由脚本写入）
+     点击作为下潜锚点平滑降落到下方对应栏目 ── */
   .pin {
-    --w: 248px;
     position: absolute;
     left: var(--x, 0px);
     top: var(--y, 0px);
@@ -868,8 +848,10 @@ const heroChars = heroLines.map((l) => [...l].map((ch) => ({ ch, i: heroI++ })))
     transform-origin: 10px 10px;
     transform: rotate(var(--rot, 14deg));
     font: inherit;
+    text-decoration: none;
   }
   .pin-dot i {
+    position: relative;
     display: block;
     flex: none;
     width: 20px;
@@ -883,12 +865,39 @@ const heroChars = heroLines.map((l) => [...l].map((ch) => ({ ch, i: heroI++ })))
         color-mix(in srgb, var(--ls-mark, var(--umber)) 40%, transparent) 5.7px 6.3px,
         transparent 6.7px
       );
-    transition: transform 0.4s cubic-bezier(0.2, 0.7, 0.2, 1);
+    transition:
+      transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1),
+      filter 0.3s ease;
+  }
+  /* 方向 3：下探发丝引线（悬浮时由光核底端向深处垂落至视口底端） */
+  .pin-dot i::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: calc(100% - 3px);
+    width: 1px;
+    height: 140vh;
+    margin-left: -0.5px;
+    background: linear-gradient(
+      to bottom,
+      var(--amber) 0%,
+      color-mix(in srgb, var(--ls-mark, var(--amber)) 75%, transparent) 6%,
+      color-mix(in srgb, var(--ls-mark, var(--amber)) 35%, transparent) 30%,
+      color-mix(in srgb, var(--ls-mark, var(--amber)) 10%, transparent) 65%,
+      transparent 100%
+    );
+    opacity: 0;
+    transform: scaleY(0);
+    transform-origin: 50% 0;
+    transition:
+      opacity 0.4s ease,
+      transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    pointer-events: none;
   }
   .pin-l {
-    display: flex;
+    display: inline-flex;
     align-items: baseline;
-    gap: 6px;
+    gap: 7px;
     /* 标签浮在线上方一点，不压线 */
     transform: translateY(-9px);
     font-family: var(--font-display);
@@ -896,219 +905,69 @@ const heroChars = heroLines.map((l) => [...l].map((ch) => ({ ch, i: heroI++ })))
     letter-spacing: 0.16em;
     color: color-mix(in srgb, var(--fg) 82%, transparent);
     white-space: nowrap;
+    transition: color 0.3s ease;
+  }
+  .pin-t {
+    transition: letter-spacing 0.35s cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  /* 方向 1：仪轨微刻（平时收敛，悬浮时平滑向右浮现） */
+  .pin-sub {
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    letter-spacing: 0.18em;
+    color: var(--amber);
+    opacity: 0;
+    transform: translateX(-5px);
+    transition:
+      opacity 0.35s ease,
+      transform 0.38s cubic-bezier(0.2, 0.7, 0.2, 1);
+    pointer-events: none;
   }
   .pin-dot:focus-visible {
     outline: 1px solid var(--fg);
     outline-offset: 3px;
     border-radius: 10px;
   }
-  .pin.open .pin-dot i,
+  /* 悬浮反馈（方向 1 + 3 融合） */
+  .pin-dot:hover i,
   .pin-dot:focus-visible i {
-    transform: scale(1.3);
+    /* 表面张力：光核向下微沉 2.5px，并带微弱张力拉伸与微温琥珀聚光 */
+    transform: translateY(2.5px) scale(1.12, 1.22);
+    filter: drop-shadow(0 0 6px var(--amber));
   }
-
-  /* 小窗：同 floatwin 的树脂薄片（醒面冷白、梦面微暖），从点上方浮起 */
-  .pw {
-    --tint: color-mix(in srgb, #ffffff calc(var(--reality-mix, 1) * 100%), #f8e9e3);
-    position: absolute;
-    bottom: 62px;
-    left: clamp(calc(12px - var(--x, 0px)), calc(var(--w) / -2), calc(100vw - 12px - var(--x, 0px) - var(--w)));
-    width: var(--w);
-    display: block;
-    padding: 13px 16px 11px;
-    border-radius: 2px;
-    color: var(--fg);
-    text-decoration: none;
-    background:
-      linear-gradient(118deg, rgba(255, 255, 255, 0.36), rgba(255, 255, 255, 0) 42%),
-      linear-gradient(
-        180deg,
-        color-mix(in srgb, var(--tint) 95%, transparent),
-        color-mix(in srgb, var(--tint) 90%, transparent)
-      );
-    border: 1px solid transparent;
-    border-top-color: color-mix(in srgb, var(--tint) 92%, transparent);
-    border-left-color: color-mix(in srgb, var(--tint) 70%, transparent);
-    border-bottom-color: color-mix(in srgb, var(--fg) 5%, transparent);
-    border-right-color: color-mix(in srgb, var(--tint) 30%, transparent);
-    box-shadow: 0 22px 46px -22px rgba(36, 44, 60, 0.2);
-    pointer-events: none;
-    visibility: hidden;
-    opacity: 0;
-    transform: translateY(8px);
-    transition:
-      opacity 0.45s cubic-bezier(0.2, 0.7, 0.2, 1),
-      transform 0.55s cubic-bezier(0.2, 0.7, 0.2, 1),
-      visibility 0s 0.55s;
+  .pin-dot:hover i::after,
+  .pin-dot:focus-visible i::after {
+    opacity: 0.85;
+    transform: scaleY(1);
+    transition-delay: 0.04s;
   }
-  .pin.open,
-  .pin:focus-within {
-    z-index: 2;
-  }
-  /* 吊线：从点的外环顶上垂到窗底（先垂下、窗再浮起）；端点一粒极小的结 */
-  .pin::before {
-    content: '';
-    position: absolute;
-    left: -0.5px;
-    bottom: 7px;
-    width: 1px;
-    height: 56px;
-    background: linear-gradient(to top, color-mix(in srgb, var(--ls-mark, var(--umber)) 70%, transparent), color-mix(in srgb, var(--ls-mark, var(--umber)) 30%, transparent));
-    transform: scaleY(0);
-    transform-origin: 50% 100%;
-    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-    pointer-events: none;
-  }
-  .pin.open::before,
-  .pin:focus-within::before {
-    transform: none;
-    transition: transform 0.5s cubic-bezier(0.2, 0.7, 0.2, 1);
-  }
-  .pin.open .pw,
-  .pin:focus-within .pw {
-    transition-delay: 0.12s;
-  }
-  /* 激活的点：中心实、外环收紧（窗关着时的悬停只放大不变实） */
-  .pin.open .pin-dot i {
-    background:
-      radial-gradient(closest-side, var(--ls-mark, var(--umber)) 0 3.2px, transparent 3.7px),
-      radial-gradient(
-        closest-side,
-        transparent 0 5.4px,
-        color-mix(in srgb, var(--ls-mark, var(--umber)) 70%, transparent) 5.7px 6.5px,
-        transparent 6.9px
-      );
-  }
-  .pin.open .pin-l {
+  .pin-dot:hover .pin-l,
+  .pin-dot:focus-visible .pin-l {
     color: var(--fg);
   }
-  /* 一扇窗打开时，其余的点退成淡影（窄屏上窗会盖住别的标签，不让它们从窗里透出来） */
-  .pin-l {
-    transition: opacity 0.4s ease;
-  }
-  .pin-dot i {
-    transition:
-      transform 0.4s cubic-bezier(0.2, 0.7, 0.2, 1),
-      opacity 0.4s ease;
-  }
-  .ls-pins:has(.pin.open) .pin:not(.open) .pin-l,
-  .ls-pins:has(.pin.open) .pin:not(.open) .pin-dot i {
-    opacity: 0.3;
-  }
-  @media (max-width: 760px) {
-    .ls-pins:has(.pin.open) .pin:not(.open) .pin-l {
-      opacity: 0;
-    }
-  }
-  .pin.open .pw,
-  .pin:focus-within .pw {
-    pointer-events: auto;
-    visibility: visible;
-    opacity: 1;
-    transform: none;
-    transition:
-      opacity 0.45s cubic-bezier(0.2, 0.7, 0.2, 1),
-      transform 0.55s cubic-bezier(0.2, 0.7, 0.2, 1),
-      visibility 0s;
-  }
-  @media (hover: hover) {
-    .pin:hover {
-      z-index: 2;
-    }
-    .pin:hover .pin-dot i {
-      transform: scale(1.3);
-    }
-    .pin:hover::before {
-      transform: none;
-      transition: transform 0.5s cubic-bezier(0.2, 0.7, 0.2, 1);
-    }
-    .pin:hover .pw {
-      pointer-events: auto;
-      visibility: visible;
-      opacity: 1;
-      transform: none;
-      transition:
-        opacity 0.45s cubic-bezier(0.2, 0.7, 0.2, 1),
-        transform 0.55s cubic-bezier(0.2, 0.7, 0.2, 1),
-        visibility 0s;
-    }
-  }
-  .pw:focus-visible {
-    outline: 1px solid var(--fg);
-    outline-offset: 4px;
-  }
-  .pw .fw-h {
-    display: flex;
-    align-items: baseline;
-    gap: 10px;
-    padding-bottom: 9px;
-    margin-bottom: 9px;
-    border-bottom: 1px solid color-mix(in srgb, var(--fg) 9%, transparent);
-  }
-  .pw .nm {
-    font-family: var(--font-display);
-    font-weight: 500;
-    font-size: 14px;
-    letter-spacing: 0.24em;
-  }
-  .pw .bd,
-  .pw .fw-f,
-  .pw .rd {
-    font-family: var(--font-mono);
-    font-size: 9px;
+  .pin-dot:hover .pin-t,
+  .pin-dot:focus-visible .pin-t {
     letter-spacing: 0.22em;
-    color: var(--fg-soft);
   }
-  .pw .bd {
-    margin-left: auto;
-    opacity: 0.75;
+  .pin-dot:hover .pin-sub,
+  .pin-dot:focus-visible .pin-sub {
+    opacity: 0.88;
+    transform: none;
+    transition-delay: 0.03s;
   }
-  .pw .fw-b {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-  }
-  .pw .row {
-    display: flex;
-    align-items: baseline;
-    gap: 14px;
-  }
-  .pw .rt {
-    flex: 1;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-family: var(--font-display);
-    font-size: 13px;
-    line-height: 1.8;
-    letter-spacing: 0.06em;
-    color: color-mix(in srgb, var(--fg) 86%, transparent);
-  }
-  .pin-moments .row,
-  .pin-about .row {
-    flex-direction: column;
-    gap: 2px;
-  }
-  .pin-moments .rd {
-    order: -1;
-  }
-  .pin-moments .rt,
-  .pin-about .rt {
-    white-space: normal;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-  }
-  .pw .fw-f {
-    display: block;
-    margin-top: 8px;
-    text-align: right;
-    transition: color 0.4s;
-  }
-  .pw:hover .fw-f,
-  .pw:focus-visible .fw-f {
-    color: var(--umber);
+  @media (prefers-reduced-motion: reduce) {
+    .pin-dot i,
+    .pin-dot i::after,
+    .pin-l,
+    .pin-t,
+    .pin-sub {
+      transition: none;
+      transform: none !important;
+    }
+    .pin-dot:hover .pin-sub,
+    .pin-dot:focus-visible .pin-sub {
+      opacity: 0.88;
+    }
   }
 
   .s-hero .reality-guide {
@@ -1556,9 +1415,7 @@ const heroChars = heroLines.map((l) => [...l].map((ch) => ({ ch, i: heroI++ })))
     .q {
       top: 118px;
     }
-    .pin {
-      --w: min(270px, calc(100vw - 24px));
-    }
+
     .side .chap {
       left: 14vw;
       top: 15svh;

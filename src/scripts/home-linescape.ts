@@ -255,49 +255,24 @@ export function initLinescape() {
     root.classList.add('ls-placed');
   }
 
-  /* ── 测量点的开合：点按开 / 再按或点空白收；Esc 收起并把焦点还给点。
-     键盘焦点（:focus-visible）由 CSS 直接浮窗，这里只管 .open 与 Esc ── */
+  /* ── 测量点下潜锚点：平滑滚动到对应夜段的最佳阅读位（p ≈ 0.45） ── */
   if (pinsOn) {
-    const dotOf = (p: HTMLElement) => p.querySelector<HTMLButtonElement>('.pin-dot');
-    // 激活态交给地形 Worker：那一排整条点亮；点下去时再散一圈涟漪
-    const focusTerrain = (p: HTMLElement | null, pulse = false) => {
-      const a = p ? pinAt.get(p) : undefined;
-      terrain?.postMessage({ type: 'focus', k: a ? a.k : -1, s: a ? a.s : 0, pulse });
-    };
-    const close = (except?: HTMLElement) => {
-      let any = false;
-      for (const p of pinEls) {
-        if (p === except) continue;
-        if (p.classList.contains('open')) any = true;
-        p.classList.remove('open');
-        dotOf(p)?.setAttribute('aria-expanded', 'false');
-      }
-      if (any && !except) focusTerrain(null);
-    };
-    for (const p of pinEls) {
-      const b = dotOf(p);
-      b?.addEventListener('click', () => {
-        const on = !p.classList.contains('open');
-        close(p);
-        p.classList.remove('shut');
-        p.classList.toggle('open', on);
-        b.setAttribute('aria-expanded', String(on));
-        focusTerrain(on ? p : null, on);
+    document.querySelectorAll<HTMLAnchorElement>('.pin-dot').forEach((a) => {
+      a.addEventListener('click', (e) => {
+        const href = a.getAttribute('href');
+        if (!href?.startsWith('#')) return;
+        const target = document.querySelector<HTMLElement>(href);
+        if (!target) return;
+        e.preventDefault();
+        const top = target.offsetTop;
+        const h = target.offsetHeight;
+        const targetY = top + Math.max(0, h - innerHeight) * 0.45;
+        window.scrollTo({
+          top: targetY,
+          behavior: RM ? 'auto' : 'smooth',
+        });
+        history.pushState(null, '', href);
       });
-      p.addEventListener('focusout', (e) => {
-        if (!p.contains(e.relatedTarget as Node | null)) p.classList.remove('shut');
-      });
-    }
-    document.addEventListener('click', (e) => {
-      if (!(e.target as Element | null)?.closest?.('.pin')) close();
-    });
-    document.addEventListener('keydown', (e) => {
-      if (e.key !== 'Escape') return;
-      const p = pinEls.find((x) => x.classList.contains('open') || x.contains(document.activeElement));
-      close();
-      if (!p) return;
-      p.classList.add('shut'); // 焦点还在点上时也收起，直到焦点离开
-      dotOf(p)?.focus();
     });
   }
 
