@@ -1,5 +1,5 @@
 /* ─────────────────────────────────────────────────────────────
-   主页 · 一根线的一夜（/new/）—— 开屏是「线景」（原型 design/mocks/scene-linescape*-notes.md）
+   主页 · 一根线的一夜（/）—— 开屏是「线景」（原型 design/mocks/scene-linescape*-notes.md）
    由 home-storyboard.ts 演化而来，去掉开屏大字那一套。开屏 ＝ 线景：
    全站那条线当地平线，地平线下方一整片「同一根线的回声」由另一个 Worker 画
    （home-linescape-worker.ts，OffscreenCanvas，不占主线程）；天上的穹肋是静态位图，也由那个 Worker 画、垫在地形底下（home-linescape-ribs.ts）。

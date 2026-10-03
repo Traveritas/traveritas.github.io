@@ -1,4 +1,4 @@
-/* /new/ 测量点点击反馈截图：node design/mocks/.shot-new-pins.cjs [tag]
+/* 主页测量点点击反馈截图：node design/mocks/.shot-new-pins.cjs [tag]
    常态 → 点「随笔」后 0.45s（涟漪中途）→ 1.8s（激活常驻）；桌面醒 / 梦各一组，窄屏醒面一组。 */
 const path = require('path');
 const fs = require('fs');
@@ -18,7 +18,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
       try { sessionStorage.setItem('xm-reality', r); localStorage.setItem('xm-reality-guided-v2', '1'); } catch {}
     }, reality);
     page.on('pageerror', (e) => console.log('pageerror', e.message));
-    await page.goto('http://localhost:4321/new/', { waitUntil: 'networkidle0' });
+    await page.goto('http://localhost:4321/', { waitUntil: 'networkidle0' });
     await sleep(9000);
     const tag = `${reality}-${mobile ? 'm' : 'd'}`;
     await page.screenshot({ path: name(`${tag}-0`) });

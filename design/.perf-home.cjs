@@ -1,6 +1,6 @@
 /* 主页性能对比：加载 / 首屏静置 / 滚到底 / 中段与页底静置，Chrome trace 按线程汇总每秒占用（ms/s）。
    用法（先 npm run build）：node design/.perf-home.cjs
-   环境变量：PAGES=/,/new/（Git Bash 下要加 MSYS_NO_PATHCONV=1）、W / H / DPR、CPU=4（CPU 降速倍数）。
+   环境变量：PAGES=/legacy/,/（Git Bash 下要加 MSYS_NO_PATHCONV=1）、W / H / DPR、CPU=4（CPU 降速倍数）。
    读法：GPU:CrGpuMain 接近 1000 ＝ GPU 进程主线程打满（合成会被拖住，滚动掉帧）；
    lsWorker ＝ 线景地形 Worker 自报的每帧耗时与帧数、是否走 WebGL2、降级档；
    longMain ＝ 主线程超过 40ms 的任务与其中最耗时的子项。
@@ -15,7 +15,7 @@ const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 const ROOT = path.resolve(__dirname, '..', 'dist');
 const W = +(process.env.W || 1440), H = +(process.env.H || 900), DPR = +(process.env.DPR || 1.5);
 const THROTTLE = +(process.env.CPU || 1);
-const PAGES = (process.env.PAGES || '/,/new/').split(',');
+const PAGES = (process.env.PAGES || '/legacy/,/').split(',');
 
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.woff2': 'font/woff2', '.woff': 'font/woff', '.json': 'application/json', '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg', '.m4a': 'audio/mp4', '.opus': 'audio/ogg' };
 function serve() {

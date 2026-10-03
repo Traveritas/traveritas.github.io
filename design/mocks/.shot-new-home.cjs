@@ -1,4 +1,4 @@
-/* 主页 /new/（线景开屏）验收截图：node design/mocks/.shot-new-home.cjs [tag] [base]
+/* 主页 /（线景开屏）验收截图：node design/mocks/.shot-new-home.cjs [tag] [base]
    醒 / 梦 × 桌面 / 窄屏开屏；桌面醒面再截开屏滚动中途两帧；测静置 3 秒主线程开销、地形 Worker 每帧耗时、
    开屏 → 第 1 幕左上角天空块的最大相邻色差（ΔE76，查跳色）。页面报错一并打印。
    输出 design/mocks/_shots-scene/new-<tag->*.png。 */
@@ -34,7 +34,7 @@ const WAIT = Number(process.env.WAIT || 9000);
     }, reality);
     page.on('pageerror', (e) => console.log('pageerror', reality, w, e.message));
     page.on('console', (m) => m.type() === 'error' && console.log('console', reality, w, m.text()));
-    await page.goto(`${BASE}/new/`, { waitUntil: 'networkidle0' });
+    await page.goto(`${BASE}/`, { waitUntil: 'networkidle0' });
     await sleep(WAIT);
     return page;
   };
