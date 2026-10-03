@@ -21,6 +21,7 @@ const moments = await Promise.all(
     id: m.id,
     title: m.data.title,
     date: m.data.date,
+    tags: m.data.tags,
     images: m.data.images,
     Content: (await render(m)).Content,
   }))
@@ -52,7 +53,7 @@ const full = (d: Date) => `${d.getFullYear()}.${md(d)} ${pad(d.getHours())}:${pa
   ambient
   maskLines
   fieldVeil
-  rail={{ mode: 'station', station: '瞬间 · 异相', en: 'MOMENTS · REM' }}
+  gauge={{ kind: 'index', unit: '则' }}
 >
   <div class="container-wide page-body">
     <header class="page-head">
@@ -65,12 +66,21 @@ const full = (d: Date) => `${d.getFullYear()}.${md(d)} ${pad(d.getHours())}:${pa
     {
       years.map(({ y, cols, order, age }) => (
         <section class="m-year">
-          <h2 class="s-year mono">{y}</h2>
+          <h2 class="s-year mono" id={`y${y}`} data-g-node="major" data-g-label={String(y)}>
+            {y}
+          </h2>
           <div class="sheets">
             {cols.map((col) => (
               <div class="col">
                 {col.map((m) => (
-                  <article class="sheet" id={m.id} style={`--age: ${age.get(m.id)!.toFixed(3)}; order: ${order.get(m.id)}`}>
+                  <article
+                    class="sheet"
+                    id={m.id}
+                    style={`--age: ${age.get(m.id)!.toFixed(3)}; order: ${order.get(m.id)}`}
+                    data-g-item
+                    data-tags={m.tags.join('|')}
+                    data-ym={`${m.date.getFullYear()}-${pad(m.date.getMonth() + 1)}`}
+                  >
                     {m.images.length > 0 && (
                       <div class="sheet-media">
                         <MomentGallery images={m.images} anchor={m.id} />

@@ -1,11 +1,6 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import { getCollection, render } from 'astro:content';
-import { stageAt, STAGE_INFO } from '../../data/night';
-
-/* 夜时刻：与随笔列表同一规则（写作先后在浅梦段 12→124 分内等分） */
-const SEG_FROM = 12;
-const SEG_TO = 124;
 
 const fmt = (d: Date) =>
   `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
@@ -27,19 +22,10 @@ export async function getStaticPaths() {
   const articles = (await getCollection('articles', (a) => !a.data.draft)).sort(
     (a, b) => a.data.date.valueOf() - b.data.date.valueOf() || a.id.localeCompare(b.id),
   );
-  /* 夜时刻：与随笔列表同一规则（写作先后在浅梦段 12→124 分内等分）；
-     getStaticPaths 编译在独立 chunk，段落常量需本地定义 */
-  const SEG_FROM = 12;
-  const SEG_TO = 124;
-  const nightMin = new Map<string, number>();
-  articles.forEach((a, i) => {
-    nightMin.set(a.id, SEG_FROM + ((SEG_TO - SEG_FROM) * (i + 0.5)) / articles.length);
-  });
   return articles.map((a, i) => ({
     params: { slug: a.id },
     props: {
       article: a,
-      nightMin: nightMin.get(a.id) ?? SEG_FROM,
       // 此处按旧→新排列：较早的一篇在前面，较晚的一篇在后面
       older: i > 0 ? articles[i - 1] : undefined,
       newer: i < articles.length - 1 ? articles[i + 1] : undefined,
@@ -47,14 +33,12 @@ export async function getStaticPaths() {
   }));
 }
 
-const { article, older, newer, nightMin } = Astro.props;
+const { article, older, newer } = Astro.props;
 const { Content } = await render(article);
 const { title, description, date, tags, related } = article.data;
 
 const chars = countChars(article.body ?? '');
 const readMin = Math.max(1, Math.round(chars / 400));
-const stage = STAGE_INFO[stageAt(nightMin)];
-const stageLabel = `${stage.zh} · ${stage.wave}`;
 ---
 
 <BaseLayout
@@ -62,12 +46,9 @@ const stageLabel = `${stage.zh} · ${stage.wave}`;
   description={description}
   type="article"
   bgm="reading"
-  rail={{
-    mode: 'depth',
-    station: '入梦 · 阅读',
-    en: 'READING DEPTH',
+  gauge={{
+    kind: 'reading',
     depthTarget: 'article.prose',
-    readout: { fromMin: nightMin, durMin: readMin, stage: stageLabel },
   }}
 >
   <div class="dawn-glow" aria-hidden="true"></div>
@@ -139,40 +120,6 @@ const stageLabel = `${stage.zh} · ${stage.wave}`;
     </article>
   </div>
 </BaseLayout>
-
-<script>
-  // 夜内时钟：阅读进度在本篇夜时刻 → +读时（分钟）之间爬行。
-  // 进度公式与 chrome.ts 的深度轨一致（0.6 视高处入文），光标点与时钟同步下行。
-  const readout = document.querySelector<HTMLElement>('.rail-read[data-from-min]');
-  const prose = document.querySelector<HTMLElement>('article.prose');
-  const clock = readout?.querySelector<HTMLElement>('.rail-clock');
-  if (readout && prose && clock) {
-    const from = Number(readout.dataset.fromMin ?? 0);
-    const dur = Number(readout.dataset.durMin ?? 1);
-    const NIGHT_START = 23 * 60 + 7;
-    const fmtNight = (m: number) => {
-      const total = NIGHT_START + Math.min(Math.max(m, 0), 444);
-      const h = String(Math.floor(total / 60) % 24).padStart(2, '0');
-      const mm = String(Math.floor(total % 60)).padStart(2, '0');
-      return `${h}:${mm}`;
-    };
-    let raf = 0;
-    const tick = () => {
-      raf = 0;
-      const r = prose!.getBoundingClientRect();
-      const p = Math.min(1, Math.max(0, (innerHeight * 0.6 - r.top) / Math.max(r.height, 1)));
-      clock!.textContent = fmtNight(from + p * dur);
-    };
-    addEventListener(
-      'scroll',
-      () => {
-        if (!raf) raf = requestAnimationFrame(tick);
-      },
-      { passive: true },
-    );
-    tick();
-  }
-</script>
 
 <style>
   /* 晓线：暖光随阅读进度从底部升起，读到末尾天亮 */

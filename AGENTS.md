@@ -38,10 +38,11 @@
 
 ## 3. 工程硬性规范
 
-- **站点框架**：Astro 纯静态生成，内容页**严格零客户端 JS**。
+- **站点框架**：Astro 纯静态生成。正文内容在无 JS 时仍须完整可读；交互（页内导览轨、入梦检验等）可以使用客户端脚本。
 - **核心逻辑概览**：
   - `src/data/night.ts`：以 23:07 到 06:31 的时间轴驱动昼夜色板插值；
   - `src/scripts/reality.ts` & `src/scripts/morph.ts`：负责“入梦检验”与双声轨文字转换；
+  - `src/components/chrome/Gauge.astro` & `src/scripts/gauge.ts`：目录页 / 阅读页左侧的页内导览轨（滚动进度、节点、筛选、目录与阅读设置）；
   - `src/styles/tokens.css` & `global.css`：全站设计令牌与全局样式。
 - **修改验证**：任何代码修改后，务必在根目录运行 `npm run build`，确保 100% 静态编译通过。
 

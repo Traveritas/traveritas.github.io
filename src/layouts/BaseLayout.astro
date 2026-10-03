@@ -13,6 +13,7 @@ import Seam from '../components/chrome/Seam.astro';
 import Constructs from '../components/chrome/Constructs.astro';
 import Eeg from '../components/chrome/Eeg.astro';
 import Rail from '../components/chrome/Rail.astro';
+import Gauge, { type Props as GaugeProps } from '../components/chrome/Gauge.astro';
 import Hairline from '../components/chrome/Hairline.astro';
 import BootVeil from '../components/chrome/BootVeil.astro';
 import Cursor from '../components/chrome/Cursor.astro';
@@ -47,14 +48,10 @@ interface Props {
   /* 开屏面纱：样式预览这类反复进出的工具页关掉（initBoot 找不到面纱即刻印 booted） */
   /* always：每次进入都放（主页）；true：只在会话首访放 */
   boot?: boolean | 'always';
-  rail?: {
-    mode: 'night' | 'depth' | 'station';
-    station?: string;
-    en?: string;
-    depthTarget?: string;
-    /* depth 模式夜内时钟（透传 Rail：阅读进度在 fromMin→fromMin+durMin 爬行） */
-    readout?: { fromMin: number; durMin: number; stage: string };
-  };
+  /* 主页整夜仪表轨（目录页 / 阅读页用 gauge） */
+  rail?: { mode: 'night' };
+  /* 页内导览轨（目录页 / 阅读页）：与 rail 二选一 */
+  gauge?: GaugeProps;
 }
 
 const {
@@ -72,6 +69,7 @@ const {
   bgm,
   boot = true,
   rail,
+  gauge,
 } = Astro.props;
 
 // 醒/梦双态标题推导规则（符合 AGENTS.md 核心词汇映射）
@@ -154,6 +152,7 @@ const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site).href : un
     {constructs !== 'none' && <Constructs layer={constructs} />}
     <Eeg />
     {rail && <Rail {...rail} />}
+    {gauge && <Gauge {...gauge} />}
     <div class="page">
       <SiteHeader />
       <main>

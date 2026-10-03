@@ -1,7 +1,7 @@
 /* ─────────────────────────────────────────────────────────────
    全局 chrome：发丝进度线 / 叠影 --echo / past-hero /
    缝线锚点（函数图巡行：随结停靠、逐站沿线越走越远；
-   停靠点附近沿线大幅无规律游走交给 Seam.astro 的 CSS）/ 阅读深度轨。
+   停靠点附近沿线大幅无规律游走交给 Seam.astro 的 CSS）/ 阅读页晓线（随 [data-depth] 指定的正文爬升）。
    ───────────────────────────────────────────────────────────── */
 
 import { clamp, onFrame30, onScrollRaf, reducedMotion } from './lib';
@@ -167,11 +167,10 @@ export function initChrome() {
   }, 700);
 
   const hairline = document.querySelector<HTMLElement>('.hairline-fill');
-  const rail = document.querySelector<HTMLElement>('.rail[data-depth]');
-  const depthTarget = rail?.dataset.depth
-    ? document.querySelector<HTMLElement>(rail.dataset.depth)
+  const depthHost = document.querySelector<HTMLElement>('[data-depth]');
+  const depthTarget = depthHost?.dataset.depth
+    ? document.querySelector<HTMLElement>(depthHost.dataset.depth)
     : null;
-  const depthDot = rail?.querySelector<HTMLElement>('.rail-dot');
   const dawnGlow = document.querySelector<HTMLElement>('.dawn-glow');
 
   const heroEl = document.getElementById('ns-hero');
@@ -226,7 +225,6 @@ export function initChrome() {
     if (hairline) hairline.style.transform = `scaleX(${p.toFixed(4)})`;
 
     if (depthTarget) {
-      if (depthDot) depthDot.style.top = `${(6 + prog * 84).toFixed(1)}%`;
       if (dawnGlow) dawnGlow.style.opacity = (0.12 + prog * 0.85).toFixed(3);
     }
 

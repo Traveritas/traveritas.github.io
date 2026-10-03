@@ -1,0 +1,689 @@
+---
+/* 页内导览轨（目录页 / 阅读页左侧）
+   · 静息：发丝线 + 琥珀游标（整页滚动百分比）+ 节点刻度（目录页只标年份；阅读页主刻度 = h2，细刻度 = h3）
+   · 浮起：悬停 / 聚焦 / 拖动时显出节点名；点轨跳转，拖动擦过并在刻度处吸附
+   · 展开：点按游标（不拖动）或浮起时游标旁的「展开」，侧面玻璃薄片——目录页：寻找 / 标签 / 年月；阅读页：目录 / 字号 / 行距
+   节点与筛选对象都从页面 DOM 里取，逻辑见 src/scripts/gauge.ts。
+   < 1200px 隐藏（顶部发丝线仍在）。 */
+export interface Props {
+  kind: 'index' | 'reading';
+  /* 目录页计数单位：篇 / 则 / 项 */
+  unit?: string;
+  /* 阅读页：晓线等深度效果的参照元素（chrome.ts 认 [data-depth]） */
+  depthTarget?: string;
+}
+
+const { kind, unit, depthTarget } = Astro.props;
+---
+
+<nav
+  class:list={['gauge', `gauge--${kind}`]}
+  data-kind={kind}
+  data-unit={unit}
+  data-depth={depthTarget}
+  aria-label="页内导览"
+>
+  <div class="g-body">
+    <div
+      class="g-track"
+      role="slider"
+      tabindex="0"
+      aria-label="页面进度"
+      aria-orientation="vertical"
+      aria-valuemin="0"
+      aria-valuemax="100"
+      aria-valuenow="0"
+    >
+      <i class="g-line"></i>
+      <i class="g-fill"></i>
+      <div class="g-ticks" aria-hidden="true"></div>
+      <i class="g-probe"></i>
+    </div>
+    <button class="g-open mono" type="button" aria-expanded="false" aria-controls="g-panel">展开</button>
+  </div>
+
+  <div class="g-panel" id="g-panel" inert>
+    {
+      kind === 'index' ? (
+        <>
+          <div class="g-sec">
+            <label class="g-find">
+              <span class="g-h mono">寻找 · FIND</span>
+              <input type="search" placeholder="标题、描述或正文里的字" autocomplete="off" spellcheck="false" />
+            </label>
+            <p class="g-count-line mono">
+              <span class="g-count" />
+              <button class="g-clear" type="button" hidden>
+                清除
+              </button>
+            </p>
+          </div>
+          <div class="g-sec">
+            <p class="g-h mono">标签 · TAGS</p>
+            <div class="g-tags" />
+          </div>
+          <div class="g-sec">
+            <p class="g-h mono">时间 · TIME</p>
+            <div class="g-time" />
+          </div>
+        </>
+      ) : (
+        <>
+          <div class="g-sec">
+            <p class="g-h mono">目录 · CONTENTS</p>
+            <div class="g-toc" />
+          </div>
+          <div class="g-sec">
+            <p class="g-h mono">阅读 · READING</p>
+            <div class="g-set">
+              <span>字号</span>
+              <span class="g-seg" data-key="size">
+                <button type="button" data-v="s">小</button>
+                <button type="button" data-v="m">中</button>
+                <button type="button" data-v="l">大</button>
+              </span>
+            </div>
+            <div class="g-set">
+              <span>行距</span>
+              <span class="g-seg" data-key="lead">
+                <button type="button" data-v="m">常</button>
+                <button type="button" data-v="l">疏</button>
+              </span>
+            </div>
+          </div>
+        </>
+      )
+    }
+  </div>
+</nav>
+
+{
+  kind === 'reading' && (
+    <script is:inline>
+      /* 阅读设置在正文排版之前就位，免得先按默认字号排一遍再跳 */
+      try {
+        var d = document.documentElement;
+        var s = localStorage.getItem('xm-read-size');
+        var l = localStorage.getItem('xm-read-lead');
+        if (s) d.dataset.readSize = s;
+        if (l) d.dataset.readLead = l;
+      } catch (e) {}
+    </script>
+  )
+}
+
+<script>
+  import { initGauge } from '../../scripts/gauge';
+  initGauge();
+</script>
+
+<!-- 全局样式：刻度、标签、目录项、筛选块都是 gauge.ts 运行时生成的，拿不到组件作用域属性；
+     选择器一律 .gauge / .g- 前缀自守 -->
+<style is:global>
+  .gauge {
+    --g-x: 11px; /* 轨线在轨盒内的横坐标 */
+    position: fixed;
+    left: 17px;
+    top: 50%;
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1.1rem;
+    color: var(--fg-soft);
+    opacity: 0;
+    visibility: hidden;
+    /* 横竖偏移都写在 translate 里：与 transform 混写时压缩器会把 translate 并进 transform，
+       下面的浮现态就覆盖不掉那 −16px 了 */
+    translate: -16px -50%;
+    transition:
+      opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+      translate 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+      visibility 0.6s;
+  }
+
+  body.past-hero:not(.in-dawn) .gauge {
+    opacity: 1;
+    visibility: visible;
+    translate: 0 -50%;
+  }
+
+  /* 轨与「展开」同处一盒：--p（0–1）由 gauge.ts 写，游标与「展开」都按它定高 */
+  .g-body {
+    --p: 0;
+    position: relative;
+  }
+
+  /* ── 轨 ── */
+  .g-track {
+    position: relative;
+    width: calc(var(--g-x) * 2 + 1px);
+    height: min(44vh, 340px);
+    cursor: pointer;
+    touch-action: none;
+    outline: none;
+  }
+
+  .g-line,
+  .g-fill {
+    position: absolute;
+    left: var(--g-x);
+    top: 0;
+    width: 1px;
+    height: 100%;
+  }
+
+  .g-line {
+    background: var(--line);
+  }
+
+  /* 两端渐隐，不生硬截断 */
+  .g-line::before,
+  .g-line::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    width: 1px;
+    height: 24px;
+  }
+
+  .g-line::before {
+    bottom: 100%;
+    background: linear-gradient(to top, var(--line), transparent);
+  }
+
+  .g-line::after {
+    top: 100%;
+    background: linear-gradient(to bottom, var(--line), transparent);
+  }
+
+  .g-fill {
+    background: color-mix(in srgb, var(--fg) 30%, transparent);
+    transform: scaleY(0);
+    transform-origin: top;
+  }
+
+  .g-ticks {
+    position: absolute;
+    inset: 0;
+  }
+
+  /* 刻度：11px 高的命中盒，可见的只是中间一道 1px */
+  .g-tick {
+    position: absolute;
+    left: 0;
+    width: 100%;
+    height: 11px;
+    translate: 0 -50%;
+    transition: opacity 0.4s ease;
+  }
+
+  .g-tick::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: calc(var(--g-x) + 1px);
+    width: 4px;
+    height: 1px;
+    background: var(--fg-soft);
+    opacity: 0.32;
+    transition: opacity 0.3s ease;
+  }
+
+  .g-tick.is-major::before {
+    left: calc(var(--g-x) - 3px);
+    width: 8px;
+    opacity: 0.6;
+  }
+
+  .g-tick.is-veiled {
+    opacity: 0.25;
+  }
+
+  .g-label {
+    position: absolute;
+    left: calc(var(--g-x) * 2 + 4px);
+    top: 50%;
+    translate: -4px -50%;
+    max-width: 9.5rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.66rem;
+    line-height: 1.5;
+    letter-spacing: 0.06em;
+    color: var(--fg-soft);
+    opacity: 0;
+    pointer-events: none;
+    transition:
+      opacity 0.3s ease,
+      translate 0.3s ease,
+      color 0.3s ease;
+  }
+
+  .g-tick.is-major .g-label {
+    font-family: var(--font-mono);
+    letter-spacing: 0.14em;
+  }
+
+  .g-probe {
+    position: absolute;
+    left: calc(var(--g-x) - 3px);
+    top: calc(var(--p) * 100%);
+    width: 7px;
+    height: 7px;
+    translate: 0 -50%;
+    border-radius: 50%;
+    background: var(--amber);
+    box-shadow: 0 0 8px 1px color-mix(in srgb, var(--amber) 50%, transparent);
+    pointer-events: none;
+    transition:
+      top 0.15s linear,
+      scale 0.3s ease,
+      box-shadow 0.35s ease;
+  }
+
+  /* 「展开」：浮起时贴在游标右侧；点它或点按游标本身都开合薄片 */
+  .g-open {
+    position: absolute;
+    left: calc(var(--g-x) * 2 + 4px);
+    top: calc(var(--p) * 100%);
+    translate: -4px -50%;
+    padding: 0.2rem 0.3rem;
+    border: 0;
+    background: none;
+    font-size: 0.58rem;
+    letter-spacing: 0.22em;
+    color: var(--fg);
+    white-space: nowrap;
+    cursor: pointer;
+    opacity: 0;
+    pointer-events: none;
+    transition:
+      top 0.15s linear,
+      opacity 0.3s ease,
+      translate 0.3s ease,
+      color 0.2s ease;
+  }
+
+  .g-open:hover,
+  .gauge.is-open .g-open {
+    color: var(--amber);
+  }
+
+  .g-open:focus-visible {
+    outline: 1px solid var(--amber);
+    outline-offset: 2px;
+  }
+
+  /* ── 浮起：悬停 / 聚焦 / 拖动 / 展开时显出节点名、游标细环与「展开」 ── */
+  .gauge:is(:hover, :focus-within, .is-open) .g-open {
+    opacity: 1;
+    pointer-events: auto;
+    translate: 0 -50%;
+    transition-delay: 0s, 0.12s, 0.12s, 0s;
+  }
+
+  .gauge:is(:hover, :focus-within, .is-open) .g-probe {
+    box-shadow:
+      0 0 0 4px color-mix(in srgb, var(--bg) 90%, transparent),
+      0 0 0 5px color-mix(in srgb, var(--amber) 45%, transparent),
+      0 0 8px 1px color-mix(in srgb, var(--amber) 50%, transparent);
+  }
+
+  /* 游标旁的刻度名让给「展开」 */
+  .gauge:is(:hover, :focus-within, .is-open) .g-tick.is-near .g-label {
+    opacity: 0 !important;
+  }
+
+  .gauge:is(:hover, :focus-within, .is-dragging, .is-open) .g-label {
+    pointer-events: auto;
+    translate: 0 -50%;
+    transition-delay: 0.12s;
+  }
+
+  .gauge:is(:hover, :focus-within, .is-dragging, .is-open) .g-tick.is-major .g-label {
+    opacity: 0.66;
+  }
+
+  .gauge:is(:hover, :focus-within, .is-dragging, .is-open) .g-tick:is(:hover, .is-current) .g-label {
+    opacity: 1;
+    color: var(--fg);
+  }
+
+  .gauge:is(:hover, :focus-within, .is-dragging, .is-open) .g-tick:is(:hover, .is-current)::before {
+    opacity: 0.9;
+  }
+
+  .gauge:is(:hover, :focus-within, .is-dragging, .is-open) .g-tick.is-veiled .g-label {
+    opacity: 0;
+  }
+
+  .gauge.is-dragging :is(.g-probe, .g-open) {
+    transition: none;
+    scale: 1.3;
+  }
+
+  .gauge.is-dragging .g-open {
+    opacity: 0;
+  }
+
+  .gauge.is-dragging .g-track {
+    cursor: grabbing;
+  }
+
+  .g-track:focus-visible .g-probe {
+    outline: 1px solid var(--amber);
+    outline-offset: 3px;
+  }
+
+  /* ── 展开薄片 ── */
+  .g-panel {
+    position: absolute;
+    left: calc(var(--g-x) * 2 + 2.2rem);
+    top: 50%;
+    width: 17rem;
+    max-height: min(72vh, 34rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: none;
+    padding: 1.15rem 1.25rem 1.25rem;
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--bg) 70%, transparent);
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    -webkit-backdrop-filter: blur(18px) saturate(1.08);
+    backdrop-filter: blur(18px) saturate(1.08);
+    box-shadow:
+      inset 0 1px 1px rgba(255, 255, 255, 0.6),
+      0 18px 42px -18px rgba(38, 44, 51, 0.2);
+    color: var(--fg);
+    opacity: 0;
+    visibility: hidden;
+    translate: -10px -50%;
+    transition:
+      opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+      translate 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+      visibility 0.4s;
+  }
+
+  .gauge.is-open .g-panel {
+    opacity: 1;
+    visibility: visible;
+    translate: 0 -50%;
+  }
+
+  .g-sec + .g-sec {
+    margin-top: 1.15rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--line);
+  }
+
+  .g-h {
+    display: block;
+    margin: 0 0 0.6rem;
+    font-size: 0.56rem;
+    letter-spacing: 0.26em;
+    color: var(--umber);
+  }
+
+  .g-find {
+    display: block;
+  }
+
+  .g-find input {
+    width: 100%;
+    padding: 0.35rem 0 0.4rem;
+    border: 0;
+    border-bottom: 1px solid var(--line);
+    background: none;
+    color: var(--fg);
+    font: inherit;
+    font-size: 0.86rem;
+    outline: none;
+    transition: border-color 0.3s ease;
+  }
+
+  .g-find input::placeholder {
+    color: var(--fg-faint);
+  }
+
+  .g-find input:focus {
+    border-bottom-color: color-mix(in srgb, var(--amber) 70%, transparent);
+  }
+
+  .g-count-line {
+    display: flex;
+    justify-content: space-between;
+    margin: 0.55rem 0 0;
+    font-size: 0.6rem;
+    letter-spacing: 0.14em;
+    color: var(--fg-soft);
+  }
+
+  .g-clear,
+  .g-chip,
+  .g-yr-y,
+  .g-mo,
+  .g-seg button {
+    border: 0;
+    background: none;
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+  }
+
+  .g-clear {
+    padding: 0;
+    letter-spacing: inherit;
+    color: var(--umber);
+  }
+
+  .g-clear:hover {
+    color: var(--amber);
+  }
+
+  .g-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+
+  .g-chip {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.4em;
+    padding: 0.16rem 0.5rem 0.12rem;
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    color: var(--fg-soft);
+    transition:
+      color 0.2s ease,
+      border-color 0.2s ease,
+      background 0.2s ease;
+  }
+
+  .g-chip i {
+    font-style: normal;
+    font-size: 0.86em;
+    opacity: 0.6;
+  }
+
+  .g-chip:hover {
+    color: var(--fg);
+    border-color: color-mix(in srgb, var(--dream) 50%, transparent);
+  }
+
+  .g-chip[aria-pressed='true'] {
+    color: var(--fg);
+    border-color: color-mix(in srgb, var(--amber) 70%, transparent);
+    background: color-mix(in srgb, var(--amber) 10%, transparent);
+  }
+
+  .g-yr {
+    display: flex;
+    align-items: baseline;
+    gap: 0.9rem;
+  }
+
+  .g-yr + .g-yr {
+    margin-top: 0.35rem;
+  }
+
+  .g-yr-y {
+    padding: 0.1rem 0;
+    font-size: 0.72rem;
+    letter-spacing: 0.16em;
+    color: var(--umber);
+  }
+
+  .g-yr-m {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.15rem 0.2rem;
+  }
+
+  .g-mo {
+    padding: 0.1rem 0.3rem;
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    color: var(--fg-soft);
+    border-radius: 2px;
+    transition:
+      color 0.2s ease,
+      background 0.2s ease;
+  }
+
+  .g-yr-y:hover,
+  .g-mo:hover {
+    color: var(--fg);
+    background: color-mix(in srgb, var(--fg) 6%, transparent);
+  }
+
+  /* 阅读页目录 */
+  .g-toc {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .g-toc .g-toc-item {
+    position: relative;
+    padding: 0.28rem 0 0.28rem 0.85rem;
+    font-family: var(--font-display);
+    font-size: 0.84rem;
+    line-height: 1.55;
+    color: var(--fg-soft);
+    text-decoration: none;
+    transition: color 0.2s ease;
+  }
+
+  .g-toc .g-toc-item.is-sub {
+    padding-left: 1.75rem;
+    font-size: 0.78rem;
+  }
+
+  .g-toc .g-toc-item::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    width: 4px;
+    height: 4px;
+    translate: 0 -50%;
+    border-radius: 50%;
+    background: var(--line);
+    transition: background 0.2s ease;
+  }
+
+  .g-toc .g-toc-item.is-sub::before {
+    left: 0.9rem;
+  }
+
+  .g-toc .g-toc-item:hover {
+    color: var(--fg);
+  }
+
+  .g-toc .g-toc-item[aria-current] {
+    color: var(--fg);
+  }
+
+  .g-toc .g-toc-item[aria-current]::before {
+    background: var(--amber);
+  }
+
+  .g-set {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.78rem;
+    color: var(--fg-soft);
+  }
+
+  .g-set + .g-set {
+    margin-top: 0.45rem;
+  }
+
+  .g-seg {
+    display: inline-flex;
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .g-seg button {
+    min-width: 2.1rem;
+    padding: 0.18rem 0.5rem;
+    font-family: var(--font-display);
+    font-size: 0.76rem;
+    color: var(--fg-soft);
+    transition:
+      color 0.2s ease,
+      background 0.2s ease;
+  }
+
+  .g-seg button + button {
+    border-left: 1px solid var(--line);
+  }
+
+  .g-seg button:hover {
+    color: var(--fg);
+  }
+
+  .g-seg button[aria-pressed='true'] {
+    color: var(--fg);
+    background: color-mix(in srgb, var(--amber) 14%, transparent);
+  }
+
+  /* 筛掉的条目：消隐，不删除 */
+  .g-veiled {
+    opacity: 0.16 !important;
+    filter: blur(0.6px);
+    pointer-events: none;
+    transition:
+      opacity 0.45s ease,
+      filter 0.45s ease;
+  }
+
+  @media (max-width: 1200px) {
+    .gauge {
+      display: none;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .gauge,
+    .g-panel,
+    .g-label,
+    .g-probe,
+    .g-open {
+      transition: none;
+    }
+
+    .gauge {
+      opacity: 1;
+      visibility: visible;
+      translate: 0 -50%;
+    }
+  }
+</style>
