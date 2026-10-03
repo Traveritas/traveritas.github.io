@@ -5,7 +5,8 @@ import IndexRow from '../../components/index/IndexRow.astro';
 import { getCollection } from 'astro:content';
 
 /* 八阶成形：状态 → 浮现度（与项目页同表） */
-const depthOf = (status: string) => ({ 构想中: 2, 进行中: 5, 已完成: 8 })[status] ?? 3;
+const depthOf = (status: string, depth?: number) =>
+  depth ?? ({ 构想中: 2, 进行中: 5, 已完成: 8 } as Record<string, number>)[status] ?? 5;
 
 // 新→旧；按年份分组
 const projects = (await getCollection('projects', (p) => !p.data.draft))
@@ -41,9 +42,9 @@ for (const p of projects) {
         <YearGroup year={y}>
           {list.map((p) => (
             <IndexRow date={p.date} href={`/projects/${p.id}/`} title={p.title} desc={p.description}>
-              <span slot="aside" class="stitch-meter" title={`${p.status} · 浮现度 ${depthOf(p.status)} / 8`}>
+              <span slot="aside" class="stitch-meter" title={`${p.status} · 浮现度 ${depthOf(p.status, p.depth)} / 8`}>
                 {Array.from({ length: 8 }).map((_, i) => (
-                  <i class:list={{ on: i < depthOf(p.status) }} />
+                  <i class:list={{ on: i < depthOf(p.status, p.depth) }} />
                 ))}
                 <span class="sr-only">{p.status}</span>
               </span>

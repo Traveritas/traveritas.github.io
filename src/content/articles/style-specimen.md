@@ -2,15 +2,13 @@
 title: 字面与光景 · 全样式样张
 description: 随笔正文排版正典、小节序号、两态文字与行内光景的完整表现存目。
 date: 2026-09-28
-tags: [样张, 排版, 醒梦]
+tags: [样张, 排版, 醒梦, AI生成]
 draft: false
 related:
-  - label: 《开站：在醒与梦之间》
-    href: /articles/hello-xingmeng/
-  - label: 《母题探索记录：从碎块到花》
-    href: /articles/motif-exploration-log/
-  - label: 项目 · 样式系统与构造规范 →
-    href: /projects/style-showcase/
+  - label: 《在显影处：三个声部》
+    href: /articles/co-creation-notes/
+  - label: 项目 · 这个网站本身 →
+    href: /projects/personal-website/
 ---
 
 这一段未作任何两态标记，醒与梦两面读到的是同一组字。大多数日常行文皆依此展开，两态机制只在需要分岔处点落：一个词的[[换面|倒影]]，或者一整段的另一种可能。在随笔变体下，正文字形采用**思源宋体**，排版保持克制、舒展的两端对齐，行高与字距均经过微调，使长文具备沉静的阅读体温。

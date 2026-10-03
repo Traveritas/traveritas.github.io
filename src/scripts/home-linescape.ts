@@ -423,8 +423,9 @@ export function initLinescape() {
       sp = makeSpine(xy);
     }
     if (!sp) return;
+    const spLen = sp.len;
     // 琥珀点与底线按「不含尾巴」的弧长比例取，换算到补过尾巴的骨架上
-    const at = (f: number) => (tail + (sp.len - 2 * tail) * f) / sp.len;
+    const at = (f: number) => (tail + (spLen - 2 * tail) * f) / spLen;
     const dotF = at(mq.matches ? 0.78 : 0.7);
     const key = `${pos.toFixed(4)}|${lift.toFixed(1)}|${reveal.toFixed(3)}|${dark.toFixed(3)}|${vw}x${vh}`;
     if (key !== lastSent) {

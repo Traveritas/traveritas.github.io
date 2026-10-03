@@ -25,7 +25,8 @@ const projects = (await getCollection('projects', (p) => !p.data.draft))
 const fmt = (d: Date) =>
   `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
 
-const pinsOf = (status: string) => ({ 构想中: 2, 进行中: 5, 已完成: 8 })[status] ?? 3;
+const pinsOf = (status: string, depth?: number) =>
+  depth ?? ({ 构想中: 2, 进行中: 5, 已完成: 8 } as Record<string, number>)[status] ?? 5;
 
 /* 仓库标记：仓库链接在 frontmatter 里，有即 ✓，无即 ✗ */
 const repoOf = (p: (typeof projects)[number]) =>
@@ -209,7 +210,7 @@ const wakeAnchors = [
             const dur = (8.4 + i * 0.9).toFixed(1);
             const phase = (-i * 2.3).toFixed(1);
             const lift = [0, 10, 4][i % 3];
-            const pinCount = pinsOf(p.status);
+            const pinCount = pinsOf(p.status, p.depth);
             return (
               <div
                 class="project-slab-wrap drift"

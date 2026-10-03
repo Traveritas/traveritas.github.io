@@ -5,7 +5,8 @@ import { getCollection, render } from 'astro:content';
 const fmt = (d: Date) =>
   `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
 
-const pinsOf = (status: string) => ({ 构想中: 2, 进行中: 5, 已完成: 8 })[status] ?? 3;
+const pinsOf = (status: string, depth?: number) =>
+  depth ?? ({ 构想中: 2, 进行中: 5, 已完成: 8 } as Record<string, number>)[status] ?? 5;
 
 export async function getStaticPaths() {
   const projects = await getCollection('projects', (p) => !p.data.draft);
@@ -28,8 +29,8 @@ export async function getStaticPaths() {
 
 const { project, code, other } = Astro.props;
 const { Content } = await render(project);
-const { title, description, date, status, links, related, note } = project.data;
-const pins = pinsOf(status);
+const { title, description, date, status, links, related, note, depth } = project.data;
+const pins = pinsOf(status, depth);
 ---
 
 <BaseLayout

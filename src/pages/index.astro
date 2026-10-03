@@ -32,7 +32,8 @@ const fmtMomentTime = (d: Date) =>
   `${fmtShort(d)} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 
 /* 八阶成形 / 浮现度 */
-const depthOf = (status: string) => ({ 构想中: 2, 进行中: 5, 已完成: 8 })[status] ?? 3;
+const depthOf = (status: string, depth?: number) =>
+  depth ?? ({ 构想中: 2, 进行中: 5, 已完成: 8 } as Record<string, number>)[status] ?? 5;
 const repoOf = (links: { href: string }[]) => links.some((l) => /^https:\/\/github\.com\//.test(l.href));
 
 /* 闪念摘句：去掉两态块与行内语法，只留醒面文字 */
@@ -281,7 +282,7 @@ const heroChars = heroLines.map((l) => [...l].map((ch) => ({ ch, i: heroI++ })))
         <div class="slabs">
           {
             projects.map((p, j) => {
-              const depth = depthOf(p.data.status);
+              const depth = depthOf(p.data.status, p.data.depth);
               const repo = repoOf(p.data.links);
               return (
                 <a class="slab" href={`/projects/${p.id}/`} style={`--j:${j};--depth:${depth}`}>
@@ -322,21 +323,27 @@ const heroChars = heroLines.map((l) => [...l].map((ch) => ({ ch, i: heroI++ })))
           <span class="cap">异相 · 02:08 — 04:59</span>
         </div>
         {
-          moments.map((m) => (
-            <a
-              class="slip"
-              href={`/moments/#${m.id}`}
-              data-c={m.c}
-              style={m.vars}
-            >
-              <span class="h">
-                <span>{m.time}</span>
-                {m.tag && <em>#{m.tag}</em>}
-              </span>
-              {m.title && <b>{m.title}</b>}
-              <span class="t">{m.text}</span>
-            </a>
-          ))
+          moments.length > 0 ? (
+            moments.map((m) => (
+              <a
+                class="slip"
+                href={`/moments/#${m.id}`}
+                data-c={m.c}
+                style={m.vars}
+              >
+                <span class="h">
+                  <span>{m.time}</span>
+                  {m.tag && <em>#{m.tag}</em>}
+                </span>
+                {m.title && <b>{m.title}</b>}
+                <span class="t">{m.text}</span>
+              </a>
+            ))
+          ) : (
+            <div class="slip-empty in-out">
+              <span data-morph data-true="夜色深沉，尚无停留的断片。" data-dream="“在此处，世界尚在深眠中悬停。”">夜色深沉，尚无停留的断片。</span>
+            </div>
+          )
         }
         <div class="more in-out"><a class="all" href="/moments/"><span data-morph data-true="全部瞬间" data-dream="全部闪念">全部瞬间</span> →</a></div>
       </div>
@@ -395,7 +402,7 @@ const heroChars = heroLines.map((l) => [...l].map((ch) => ({ ch, i: heroI++ })))
                 <li>
                   <a href={`/projects/${p.id}/`}>
                     {p.data.title}
-                    <span>{depthOf(p.data.status)}/8</span>
+                    <span>{depthOf(p.data.status, p.data.depth)}/8</span>
                   </a>
                 </li>
               ))
@@ -415,6 +422,11 @@ const heroChars = heroLines.map((l) => [...l].map((ch) => ({ ch, i: heroI++ })))
                 </li>
               ))
             }
+            {allMoments.length === 0 && (
+              <li>
+                <span class="empty-item mono">暂无留存</span>
+              </li>
+            )}
             <li>
               <a href="/moments/"><span data-morph data-true="全部瞬间 →" data-dream="全部闪念 →">全部瞬间 →</span><span></span></a>
             </li>
@@ -1191,6 +1203,16 @@ const heroChars = heroLines.map((l) => [...l].map((ch) => ({ ch, i: heroI++ })))
   .s-rem .chap h2 {
     font-size: clamp(36px, 4vw, 56px);
   }
+  .slip-empty {
+    position: absolute;
+    left: 14vw;
+    top: 36svh;
+    font-size: 0.92rem;
+    letter-spacing: 0.08em;
+    color: var(--sfg-soft, #a99fba);
+    opacity: 0.7;
+    pointer-events: none;
+  }
   /* 一张便签的行程（窗口半宽 --w0 全显 / --w1 散尽，由脚本按屏宽写进来）：
      · --t 是行程比例（0 ＝ 正落位，1 ＝ 满程），--f 取它的四次方（只用乘法，不依赖 pow()）——
        贴住中心的一大段（含整个全显段）几乎不动：停稳时它是真的停住了；越往外越快，
@@ -1419,6 +1441,12 @@ const heroChars = heroLines.map((l) => [...l].map((ch) => ({ ch, i: heroI++ })))
     font-size: 10.5px;
     color: var(--fg-soft);
     white-space: nowrap;
+  }
+  .dir li .empty-item {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    color: var(--fg-soft);
   }
   .dir a:hover {
     color: var(--umber);
