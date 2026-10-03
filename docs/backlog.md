@@ -85,7 +85,7 @@
 
 1. h1 字号两套 clamp 中档发散：`prose-head` `clamp(1.5rem,4vw,2.05rem)` vs `page-head` `clamp(1.5rem,3.5vw,2rem)`，768 档差 ~4px——统一或写明设计决议。
 2. 触控目标：nav 链接 43×32、tag chips ≈24.5px 踩线——padding 加一档（`.site-nav a` padding-block 0.3→0.55rem）。
-3. 标签页仍用旧款 `.ledger`，与随笔页 `essay-ledger` 两代方言并存——降配复用或记录「结页从简」。
+3. 标签页仍用旧款 `.ledger`，与随笔 / 项目目录页的 `IndexRow` 组件两代方言并存——改用 `IndexRow` 或记录「结页从简」。
 4. 页脚钟无 JS 停 `--:--`：SSR 写死构建时刻或保持现状（诚实显示）皆可，需拍板。
 5. 404 无 Rail 仪表（全站唯一断档）：补 `rail={{ station: '失线 · 断口' }}` 或明确记录有意免轨。
 6. 390 档正文 18.7–21.4 字/行（理想 30–45）：≤640px 字号再放大半档。手机物理宽度所限，非破相。
@@ -112,8 +112,7 @@
    实测 `dist/styleguide/index.html` 里 `#24292e` 出现 0 次、
    `<pre>` 的行内底为 `color-mix(in srgb, var(--fg) 4%, transparent)`、`const` → `var(--umber)`、
    类型 `number` → `var(--ghost-ink)`。琥珀在代码里一次都不出现（数字与运算符回到中性 `--fg`）。
-2. **页面专属块进不了预览**（Astro `<style>` 作用域隔离）：`.essay-ledger` / `.prj-ledger` /
-   `.coverband` / `.wake-card` / `.link-list` / `.signal-list` / `.pill` / `.wake-anchor` /
+2. **页面专属块进不了预览**（Astro `<style>` 作用域隔离）：`.coverband` / `.wake-card` / `.link-list` / `.signal-list` / `.pill` / `.wake-anchor` /
    `.lost` / 首页千层纸，眼下只能给实物入口。要进预览得先抽成组件或挪进公共表，
    两条路与各自代价写在 `docs/design/styleguide.md` 第五节 —— 需要一次拍板。
    预览页第六节那张索引表就是这条的临时答案。

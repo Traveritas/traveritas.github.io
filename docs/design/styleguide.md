@@ -89,15 +89,15 @@
 
 ## 五、已知缺口：页面专属块还没有一种不重复的做法
 
-Astro 的 `<style>` 是**组件作用域**的：`articles/index.astro` 里的 `.essay-ledger` 编译成
-`.essay-ledger.astro-xxxx`，预览页即使照抄同样的类名也拿不到样式。于是 `.essay-ledger`、
-`.prj-ledger`、`.coverband`、`.wake-card`、`.pin-line`、`.link-list`、`.signal-list`、
+Astro 的 `<style>` 是**组件作用域**的：`projects/[slug].astro` 里的 `.coverband` 编译成
+`.coverband.astro-xxxx`，预览页即使照抄同样的类名也拿不到样式。于是 `.coverband`、`.wake-card`、`.pin-line`、`.link-list`、`.signal-list`、
 `.pill`、`.wake-anchor`、`.lost`、以及主页首屏的千层纸，眼下只能靠索引表给实物入口。
 
 要把它们也搬进预览页，得先让样式可复用，两条路（都需要动真实页面，属下一轮的决定）：
 
-1. **抽成组件**（推荐）：把块连同 markup 移进 `src/components/`（例如
-   `EssayLedger.astro` / `ProjectLedger.astro` / `WakeCard.astro`），页面改用组件，
+1. **抽成组件**（推荐）：把块连同 markup 移进 `src/components/`（已落地一例：
+   随笔 / 项目两个目录页共用的 `components/index/YearGroup.astro` + `IndexRow.astro`，
+   预览页第三节直接 import；其余如 `WakeCard.astro` 待办），页面改用组件，
    预览页也 `import` 同一个。作用域样式跟着组件走，**不改变层叠顺序**，风险最小；
    顺带消掉「同一段 markup 在四个页面里各抄一遍」的现存重复。
 2. **挪进公共样式表**：把各页 `<style>` 里可复用的部分搬进 `src/styles/` 下按用途分的表，

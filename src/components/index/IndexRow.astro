@@ -1,0 +1,159 @@
+---
+/* ─────────────────────────────────────────────────────────────
+   目录行：日期 ‖ 标题（悬停叠影）+ 描述 ‖ 尾列
+   随笔 / 项目两个目录页共用一套骨架，每页只往尾列放一个信号。
+   年份由外层 <YearGroup> 给，这里日期只写月日。
+   （瞬间是正文不是目录，另有自己的排法，见 pages/moments/index.astro）
+   ───────────────────────────────────────────────────────────── */
+interface Props {
+  date: Date;
+  href: string;
+  title: string;
+  desc?: string;
+}
+
+const { date, href, title, desc } = Astro.props;
+
+const pad = (n: number) => String(n).padStart(2, '0');
+const md = `${pad(date.getMonth() + 1)}.${pad(date.getDate())}`;
+const hasAside = Astro.slots.has('aside');
+---
+
+<li class="row">
+  <a class="row-in" href={href}>
+    <time class="row-date" datetime={date.toISOString()} title={`${date.getFullYear()}.${md}`}>{md}</time>
+    <span class="row-main">
+      <span class="row-title">
+        <span class="ghost" aria-hidden="true">
+          {title}
+        </span>
+        {title}
+      </span>
+      {desc && <span class="row-desc">{desc}</span>}
+    </span>
+    {
+      hasAside && (
+        <span class="row-aside">
+          <slot name="aside" />
+        </span>
+      )
+    }
+  </a>
+</li>
+
+<style>
+  .row {
+    border-top: 1px solid var(--line);
+  }
+
+  .row:last-child {
+    border-bottom: 1px solid var(--line);
+  }
+
+  .row-in {
+    display: grid;
+    grid-template-columns: 3.6rem minmax(0, 1fr) auto;
+    gap: 0 1.8rem;
+    padding-block: 1.45rem;
+    align-items: start;
+    text-decoration: none;
+    color: inherit;
+  }
+
+  /* 日期：只写月日，与标题首行对齐 */
+  .row-date {
+    padding-top: 0.5rem;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 0.76rem;
+    line-height: 1.4;
+    letter-spacing: 0.1em;
+    color: var(--fg-soft);
+  }
+
+  .row-title {
+    position: relative;
+    display: inline-block;
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 1.2rem;
+    letter-spacing: 0.03em;
+    line-height: 1.5;
+    color: var(--fg);
+    transition: color 0.3s ease;
+  }
+
+  /* 半醒复视：悬停时标题显出暖色的另一份 */
+  .ghost {
+    position: absolute;
+    inset: 0;
+    color: var(--ghost-ink);
+    opacity: 0;
+    pointer-events: none;
+    transform: translate(-7px, 4px);
+    filter: blur(0.4px);
+    transition:
+      opacity 0.55s ease,
+      transform 0.55s ease;
+  }
+
+  .row-in:hover .row-title {
+    color: var(--umber);
+  }
+
+  .row-in:hover .ghost {
+    opacity: 0.5;
+    transform: translate(7px, -3px);
+  }
+
+  .row-desc {
+    display: block;
+    margin-top: 0.3rem;
+    color: var(--fg-soft);
+    font-size: 0.95rem;
+    line-height: 1.8;
+    max-width: 34em;
+  }
+
+  /* 尾列：每页一个信号 */
+  .row-aside {
+    padding-top: 0.55rem;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+    color: var(--fg-soft);
+    white-space: nowrap;
+  }
+
+  .row-aside :global(.stitch-meter) {
+    margin-left: 0;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ghost {
+      display: none;
+    }
+  }
+
+  /* 窄屏：日期到标题上方，尾列落到末尾 */
+  @media (max-width: 760px) {
+    .row-in {
+      grid-template-columns: 1fr;
+      gap: 0.3rem;
+      padding-block: 1.3rem;
+    }
+
+    .row-date,
+    .row-aside {
+      padding-top: 0;
+    }
+
+    .row-aside {
+      margin-top: 0.2rem;
+    }
+
+    .row-title {
+      font-size: 1.12rem;
+    }
+  }
+</style>

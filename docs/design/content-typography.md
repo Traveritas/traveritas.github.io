@@ -136,8 +136,8 @@ h2 的序号由 `src/markdown/ordinal.mjs` 这个 **mdast 插件在构建期注�
 
 - 变体类名沿用 `prose--essay` / `prose--project`；再加页面时照此扩展。
 - `AGENTS.md` 红线 3 禁「账目 / 台账 / 案号」这类词汇。现存仍与红线冲突的地方：
-  `global.css` 里的 `.ledger` 一族（被首页与标签页使用）、`articles/index.astro` 的 `.essay-ledger`、
-  `projects/index.astro` 的 `.prj-ledger`、以及项目页封面渲染出的 `PRJ-01` 文案。
+  `global.css` 里的 `.ledger` 一族（被首页与标签页使用），以及项目页封面渲染出的 `PRJ-01` 文案。
+  （随笔 / 项目目录页的 `.essay-ledger` / `.prj-ledger` 已随目录页统一换成 `IndexRow` 组件。）
   类名与注释不影响用户，但下一轮顺手改名成本最低。
 
 ## 五、改完怎么验证（这次踩过的坑）
