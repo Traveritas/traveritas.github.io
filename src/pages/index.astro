@@ -206,6 +206,7 @@ const heroChars = heroLines.map((l) => [...l].map((ch) => ({ ch, i: heroI++ })))
   </div>
   <!-- 线景：天空、地平线后的微光、圆光（固定层，压在地形画布之下）；穹肋、地形与线圈在画布里（home-linescape-worker.ts） -->
   <div class="ls-sky" aria-hidden="true"><i class="sky-w"></i><i class="sky-d"></i></div>
+  <div class="ls-mist" aria-hidden="true"><i></i></div>
   <div class="ls-glow" aria-hidden="true"></div>
   <div class="ls-sun" aria-hidden="true"><i class="sun-w"></i><i class="sun-d"></i></div>
   <canvas class="ls-canvas" id="ls-canvas" aria-hidden="true"></canvas>
@@ -702,6 +703,43 @@ const heroChars = heroLines.map((l) => [...l].map((ch) => ({ ch, i: heroI++ })))
     opacity: 0;
   }
 
+  /* ── 雾纹（梦面）：天空上一层极淡的流雾，只改空气，不添物件。
+     贴图 public/textures/mist.webp（周期噪声、四边无缝，生成脚本 design/textures/gen-mist.mjs）放大铺开，
+     横向平移一个贴图宽（10s 一程，首尾无缝）。不转 14° 去贴地平线：雾是糊的，那点倾斜看不出来，
+     转了却要把层放大到能盖住视口的旋转外接框（1920 宽时约 5000×1800px，高分屏再 ×4），长按时 GPU 吃紧。
+     层只铺视口上 76%（地平线在右沿最低约 72%），宽 ＝ 视口 + 一个贴图宽。
+     z −4 且 DOM 在天空之后 ⇒ 盖在天空上、压在圆光 / 地形 / 晶体之下；194° 遮罩向地平线（视口中心）淡出。
+     opacity 乘 --still（醒 0 → 梦 1）与 --sky（随滚动往第 1 幕淡出）—— 普通样式；
+     keyframes 只动 translate、数值写死 ⇒ 合成线程。醒面落定或收拢时停摆 ── */
+  .ls-mist {
+    position: fixed;
+    inset: 0;
+    z-index: -4;
+    overflow: hidden;
+    pointer-events: none;
+    opacity: calc(0.55 * var(--still, 0) * var(--sky, 1));
+    -webkit-mask-image: linear-gradient(194deg, #000 0 18%, transparent 50%);
+    mask-image: linear-gradient(194deg, #000 0 18%, transparent 50%);
+  }
+  .ls-mist i {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: calc(100% + 1800px);
+    height: 76%;
+    background: url('/textures/mist.webp') 0 0 / 1800px 900px repeat;
+    animation: ls-mist 10s linear infinite;
+  }
+  html.ls-folded .ls-mist i,
+  body[data-reality='wake']:not(.reality-holding) .ls-mist i {
+    animation-play-state: paused;
+  }
+  @keyframes ls-mist {
+    to {
+      translate: -1800px 0;
+    }
+  }
+
   /* ── a · 线圈后的那团圆光（参考 floatwin 的圆光）：固定层，圆心 / 半径由脚本在尺寸变化时写入
      （--sx / --sy / --sr，与 Worker 里的线圈同一份几何）。地平线以下的半截用一张静止遮罩收掉：
      渐变方向 194° ＝ 地平线的法向（朝下），盒子边长 3R ⇒ 渐变全长 3.64R，地平线在圆心下方 0.3R
@@ -769,6 +807,22 @@ const heroChars = heroLines.map((l) => [...l].map((ch) => ({ ch, i: heroI++ })))
   html.ls-folded .ls-bud {
     opacity: 0;
     transition-duration: 0.8s;
+    animation-play-state: paused;
+  }
+  /* 梦面悬浮：自转在梦里是 4fps 跳格（home-bud.ts），地形与地平线也都定格出帧 —— 整屏没有一样东西
+     在连续地动，跳格就被读成掉帧。给晶体一层平滑的上下浮动做对位：转是一格一格的，身子却一直在漂。
+     与 .ord-digit 同一套写法：动画常驻、振幅乘 --still（醒 0 → 梦 1），入梦渐渐浮起、出梦渐渐落定，
+     相位从不断。百分比相对画布自身（3.6R）⇒ 振幅随圆半径缩放，≈ ±0.04R */
+  .ls-bud {
+    animation: bud-float 4.6s cubic-bezier(0.37, 0, 0.63, 1) infinite alternate;
+  }
+  @keyframes bud-float {
+    from {
+      translate: 0 calc(1.2% * var(--still, 0));
+    }
+    to {
+      translate: 0 calc(-1.2% * var(--still, 0));
+    }
   }
 
   /* ── 问句：唯一的字。一种颜色、一个字号 ──
@@ -1566,6 +1620,12 @@ const heroChars = heroLines.map((l) => [...l].map((ch) => ({ ch, i: heroI++ })))
     html.booted .ls-sun {
       animation: none;
       opacity: 1;
+    }
+    .ls-bud {
+      animation: none;
+    }
+    .ls-mist i {
+      animation: none;
     }
     /* 便签：只留显影 —— 不飘、不转、不荡（行程位移、失焦、卡身收势与那一圈涟漪一并去掉） */
     .home .slip,
