@@ -70,8 +70,14 @@ export function initPaperstack() {
   const hero = document.getElementById('ns-hero');
   if (!hero) return;
 
+  /* 入幕淡入落在谁身上：纸壳平面（data-shell，满屏且带磨砂 / 模糊）自身不淡，只带动作入场，
+     淡入交给它里面标了 data-fade 的文字层（没有就不淡）。整块磨砂平面一旦半透明，
+     合成器每帧都得为它单开一张满屏离屏画布——几张叠在揭幕那一秒，低配核显直接掉帧 */
   const groups = PLANES.map((_, i) =>
     [...hero.querySelectorAll<HTMLElement>(`[data-p="${i}"]`)],
+  );
+  const faders = groups.map((els) =>
+    els.flatMap((el) => ('shell' in el.dataset ? [...el.querySelectorAll<HTMLElement>('[data-fade]')] : [el])),
   );
   if (groups.every((g) => !g.length)) return;
 
@@ -122,10 +128,8 @@ export function initPaperstack() {
         `perspective(1600px) translate3d(${tx.toFixed(2)}px,${ty.toFixed(2)}px,${p.z}px) ` +
         `rotate(${rr.toFixed(3)}deg) rotateX(${rx.toFixed(3)}deg) rotateY(${ry.toFixed(3)}deg)`;
       const op = p.ent.fade ? ez.toFixed(3) : Math.min(1, ez * 2.6).toFixed(3);
-      for (const el of els) {
-        el.style.transform = tr;
-        el.style.opacity = op;
-      }
+      for (const el of els) el.style.transform = tr;
+      for (const el of faders[i]) el.style.opacity = op;
     }
   }
 
