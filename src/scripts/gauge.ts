@@ -335,6 +335,10 @@ function initIndex(root: HTMLElement, panel: HTMLElement, nodes: GNode[], go: (t
       if (ok) shown++;
     }
     for (const b of tagBtns) b.setAttribute('aria-pressed', String(b.dataset.tag === tag));
+    for (const c of inlineChips) {
+      if (c.dataset.tagName === tag) c.setAttribute('aria-current', 'true');
+      else c.removeAttribute('aria-current');
+    }
     const filtering = Boolean(needle || tag);
     count.textContent = filtering ? `${shown} / ${items.length} ${unit}` : `${items.length} ${unit}`;
     clear.hidden = !filtering;
@@ -358,5 +362,17 @@ function initIndex(root: HTMLElement, panel: HTMLElement, nodes: GNode[], go: (t
     input.value = '';
     apply();
   });
+
+  /* 条目里的标签框（TagChip）：就地筛选，再点一次撤销；修饰键点按照常走链接 */
+  const inlineChips = items.flatMap((it) => [...it.el.querySelectorAll<HTMLAnchorElement>('.tag-chip[data-tag-name]')]);
+  for (const c of inlineChips) {
+    c.addEventListener('click', (e) => {
+      if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      e.preventDefault();
+      const t = c.dataset.tagName!;
+      tag = tag === t ? '' : t;
+      apply();
+    });
+  }
   apply();
 }
