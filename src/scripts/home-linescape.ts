@@ -197,8 +197,6 @@ export function initLinescape() {
   const pinsOn = true;
   const pinAt = new Map<HTMLElement, Anchor>(); // 每个测量点钉在哪一排、哪一处（激活时告诉地形 Worker）
   const isA = true;
-  const markH = document.querySelector<HTMLElement>('[data-mark="h"]');
-  const markN = document.querySelector<HTMLElement>('[data-mark="n"]');
   const pinEls = [...document.querySelectorAll<HTMLElement>('.pin')];
   let anchors: Anchor[] = [];
   let anchorVer = 0;
@@ -225,14 +223,7 @@ export function initLinescape() {
     const m = mq.matches;
     const g = makeGeo(vw, vh, m, xy0);
     const K = rowsFor(m);
-    // 23:07：地平线本身（Eeg 那张画布上，断口由 DOM 上的底色小晕遮出来）
-    const sH = ((m ? 0.3 : 0.36) * vw - xy0[0]) / (g.tx || 1);
-    const [hx, hy] = restPoint(g, -1, sH);
-    put(markH, g, { k: -1, s: sH, x: hx, y: hy, gap: 0 });
-    // 06:31：最近的那几排里离目标最近的一条（远是入夜、近是天亮）
-    const aN = findAnchor(g, (m ? 0.5 : 0.42) * vw, (m ? 0.9 : 0.885) * vh, 24, Math.floor(K * 0.55), K - 1);
-    put(markN, g, aN);
-    anchors = [aN];
+    anchors = [];
     if (pinsOn)
       for (const el of pinEls) {
         const at = (el.dataset.at ?? '').split(',').map(Number);

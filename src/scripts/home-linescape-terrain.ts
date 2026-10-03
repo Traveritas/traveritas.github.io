@@ -24,7 +24,7 @@ export const sstep = (t: number) => {
 /* 透视：第 k 排的 t ∈ [T0, 1]，法向偏移 o ＝ Rm·t^G（远密近疏），透视比例 p ＝ t^G */
 export const T0 = 0.1;
 export const G = 2.7;
-export const rowsFor = (mobile: boolean) => (mobile ? 28 : 34);
+export const rowsFor = (mobile: boolean) => (mobile ? 20 : 24);
 
 /* 缓丘：世界横坐标（视口宽的比例，0 ＝ 地平线中点）/ 半宽 / 所在的排（t） */
 const MOUND_X = 0.12;

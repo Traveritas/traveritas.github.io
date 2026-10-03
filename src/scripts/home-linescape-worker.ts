@@ -15,7 +15,8 @@
        圆在地形上有倒影 —— 错开一截，且圆轻轻浮动时倒影纹丝不动。
      · b「回声飘起」：最远的几排越过地平线，继续向天空极淡地延伸、渐隐（蜃景）。
    锚点（等高线标注 / 测量点）：附近的波形压平；标注处线断开一小段，留给 DOM 上的小字。
-   预算：30fps；行数 ≤ 34、步长按透视给、视口裁剪，一帧约 5–8k 点。
+   预算：梦里定格约 7.5fps、一次性动作 30fps、醒面静稳后不出帧（见下方「醒静梦动」）；
+   行数 24（移动端 20）、步长按透视给、视口裁剪。
    绘制：这里只把每帧整理成绘制列表，真正落笔在 home-linescape-gl.ts（首选 WebGL2，退路 Canvas 2D）；
    GPU 跟不上时先降帧、再停在静帧（见下方「帧率与降级」）。
    ───────────────────────────────────────────────────────────── */
@@ -200,7 +201,7 @@ function build(now: number) {
   S.nx = g.nx;
   S.ny = g.ny;
 
-  const ph = now / 1000;
+  const ph = vt;
   const since = Number.isNaN(boot) ? -1 : (now - boot) / 1000;
   // 入场：线从中心往两端画出（约 1.3s）之后，地形从地平线一排排往下铺开
   const unfold = still ? 1 : since < 0 ? 0 : sstep((since - 1.05) / 2.4);
@@ -321,6 +322,7 @@ function build(now: number) {
     const o = r.o * ek * open;
     const A = r.A * (1 + 0.5 * d);
     const q = d * (1.2 + 7 * p); // 梦态量化格（px）
+    const cw = d * (12 + 44 * p); // 梦态台地宽（沿地平线的弧长）：一格之内高度不变，台阶少而宽
     // 雾：远处淡入地平线；整体再乘入场 / 收拢
     const fog = sstep((t - 0.1) / 0.42);
     const alpha = (0.08 + 0.66 * fog) * ek * open * open;
@@ -356,7 +358,7 @@ function build(now: number) {
       const ss = Math.min(s, g.len);
       cur = frameAt(g, ss, f, cur);
       const [calm, inGap] = al.length ? anchorAt(al, ss) : [1, false];
-      const xw = worldX(g, r, ss);
+      const xw = worldX(g, r, q > 0.3 && calm > 0.5 ? (Math.floor(ss / cw) + 0.5) * cw : ss);
       let y = waveAt(xw / 600, ph - lag, A) * calm - hillAt(g, r, xw);
       y *= ek * open;
       if (rip) {
@@ -456,29 +458,60 @@ function build(now: number) {
   }
 }
 
+/* ── 醒静梦动 ──
+   波的秒针 vt 只在梦里走（速度随醒梦混合 d 渐变）：醒面的地形停在一帧上，入梦后从停下的地方接着流。
+   梦里按定格出帧：每 HOLD 个时隙才换一帧（约 7.5fps），帧与帧之间纹丝不动，与梦态的台地笔触同一种读法；
+   入场、涟漪、点亮、醒梦交替、滚动收拢这类一次性的动作仍按常态帧率走，免得它们也一顿一顿。
+   醒面静稳后整个停掉，只在消息来时重画一帧 */
+const HOLD = 4;
+let vt = 0; // 波的秒针（s）
+let vtAt = NaN; // 上次推进时的主线程时钟（ms）
+let stateAt = -1e9; // 上次滚动消息的时刻：收拢 / 展开时按常态帧率跟手
+function advance(now: number) {
+  // 起点对齐主线程秒针：不曾醒过时与地平线（脑电线）同一相位，排排回声对得上
+  if (Number.isNaN(vtAt)) vt = now / 1000;
+  else if (!still) vt += (cl(now - vtAt, 0, 250) / 1000) * sstep(d);
+  vtAt = now;
+}
+/** 是否有一次性的动作在演（要按常态帧率出帧） */
+function busy(now: number): boolean {
+  const since = Number.isNaN(boot) ? -1 : (now - boot) / 1000;
+  return (
+    since < 4.6 || // 入场：线画出、地形铺开、天空淡入
+    (d > 0.02 && d < 0.98) ||
+    now - puT < PULSE * 1000 ||
+    (hiK >= 0 && now - hiT < 700) ||
+    now - stateAt < 400
+  );
+}
+
 function paint(now: number) {
   if (!gfx) return;
+  advance(now);
   build(now);
   gfx.draw(scene);
 }
 
 /* ── 帧率与降级 ──
-   常态约 30fps：与脑电 Worker 共用出帧时隙（frame-slot.ts），两张画布在同一个 vsync 上提交。
-   若 GPU 跟不上（帧间隔长期 > 50ms ⇒ 不到 20fps），先降到约 15fps（隔一个时隙出一帧，仍与脑电同拍），
+   常态约 30fps：与脑电 Worker 共用出帧时隙（frame-slot.ts），两张画布在同一个 vsync 上提交；梦里定格时
+   每 HOLD 个时隙出一帧（墙钟上同一组时隙，脑电线在主页梦面里也按它定格，两边一起换帧）。
+   若 GPU 跟不上（帧间隔长期比预期多 17ms 以上），先降到约 15fps（隔一个时隙出一帧，仍与脑电同拍），
    仍跟不上就停在静帧：地形不再流动，只在滚动 / 醒梦 / 点按时重画一帧。
-   揭幕后 4s 内（页面本身还在忙）与切回前台的那一帧不计 */
+   揭幕后 4s 内（页面本身还在忙）与切回前台、换帧率后的那一帧不计 */
 const PERIOD = [SLOT, 2 * SLOT];
 let level = 0;
 let lastT = 0;
 let slowMs = 0;
 let frozen = false;
+let parked = false; // 醒面静稳：不再出帧，等消息
+let period = SLOT;
 function pace(t: number) {
   const dt = lastT ? t - lastT : 0;
   lastT = t;
   if (!dt || dt > 1000) return;
   const since = Number.isNaN(boot) ? -1 : (mainNow() - boot) / 1000;
   if (since < 4) return;
-  slowMs = dt > 50 + PERIOD[Math.min(level, 1)] - SLOT ? slowMs + dt : Math.max(0, slowMs - dt);
+  slowMs = dt > period + 17 ? slowMs + dt : Math.max(0, slowMs - dt);
   if (slowMs < 2000) return;
   slowMs = 0;
   level++;
@@ -488,19 +521,50 @@ function pace(t: number) {
 function loop() {
   timer = 0;
   if (!running || frozen) return;
+  const now = mainNow();
   if (!hidden) {
     const a = performance.now();
     pace(a);
-    paint(mainNow());
+    paint(now);
     const ms = performance.now() - a;
     perfSum += ms;
     perfN++;
     if (ms > perfMax) perfMax = ms;
   }
+  const hot = busy(now);
+  if (!hot && d <= 0.02) {
+    parked = true; // 醒面：停在这一帧
+    return;
+  }
+  const p = hot ? PERIOD[Math.min(level, 1)] : Math.max(HOLD * SLOT, PERIOD[Math.min(level, 1)]);
+  if (p !== period) {
+    period = p;
+    lastT = 0;
+  }
   timer = setTimeout(() => {
     if (typeof self.requestAnimationFrame === 'function') self.requestAnimationFrame(loop);
     else loop();
-  }, slotWait(PERIOD[Math.min(level, 1)])) as unknown as number;
+  }, slotWait(p)) as unknown as number;
+}
+/** 没在出帧（收拢 / 静帧 / 醒面停着）：消息来了就地重画一帧 */
+const idle = () => !running || frozen || parked;
+/** 停着的循环在需要动的时候重新起来（入梦、点按、滚动）；定格中的循环若有动作开演，提前到下一个常态时隙 */
+function wake() {
+  if (!running || frozen || still) return;
+  if (parked) {
+    if (d <= 0.02 && !busy(mainNow())) return;
+    parked = false;
+    lastT = 0;
+    loop();
+  } else if (timer && period > PERIOD[Math.min(level, 1)] && busy(mainNow())) {
+    clearTimeout(timer);
+    period = PERIOD[Math.min(level, 1)];
+    lastT = 0;
+    timer = setTimeout(() => {
+      if (typeof self.requestAnimationFrame === 'function') self.requestAnimationFrame(loop);
+      else loop();
+    }, slotWait(period)) as unknown as number;
+  }
 }
 function setRunning(on: boolean) {
   if (still || frozen) {
@@ -510,8 +574,10 @@ function setRunning(on: boolean) {
   }
   if (on === running) return;
   running = on;
-  if (on) loop();
-  else paint(mainNow()); // 收拢到底：画一帧空白就停
+  if (on) {
+    parked = false;
+    loop();
+  } else paint(mainNow()); // 收拢到底：画一帧空白就停
 }
 
 self.onmessage = (e: MessageEvent<Msg>) => {
@@ -552,7 +618,7 @@ self.onmessage = (e: MessageEvent<Msg>) => {
     dpr = m.dpr;
     gfx.resize(W, H, dpr);
     geoReady();
-    if (!running || frozen) paint(mainNow());
+    if (idle()) paint(mainNow());
   } else if (m.type === 'focus') {
     const now = mainNow();
     if (m.k >= 0) {
@@ -568,23 +634,27 @@ self.onmessage = (e: MessageEvent<Msg>) => {
       hiOn = false;
       hiT = now;
     }
-    if (!running || frozen) paint(now);
+    if (idle()) paint(now);
+    wake();
   } else if (m.type === 'mix') {
     d = m.d;
     colors = m.colors;
-    if (!running || frozen) paint(mainNow());
+    if (idle()) paint(mainNow());
+    wake();
   } else if (m.type === 'state') {
     xyLast = m.xy;
     anchors = m.anchors ?? [];
     geoReady();
     fold = m.fold;
     boot = m.boot;
+    stateAt = mainNow();
     setRunning(fold < 0.999);
-    if (!running || frozen) paint(mainNow());
+    if (idle()) paint(mainNow());
+    wake();
   } else if (m.type === 'rest') {
     xyRest = m.xy;
     ribsReady();
-    if (!running || frozen) paint(mainNow());
+    if (idle()) paint(mainNow());
   } else if (m.type === 'perf') {
     // 截图脚本用：报告并清零每帧绘制耗时（gl ＝ 是否走 WebGL2；level ＝ 降级档）
     self.postMessage({

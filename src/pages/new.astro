@@ -143,6 +143,49 @@ const pins = [
 /* 题记逐字：构建时就拆好（每字一层 .c，序号写进 --i，入场时一字一字落定），运行时不再改 DOM */
 const heroLines = ['在即将醒来的那一瞬，', '世界究竟是在成形，', '还是正在融化？'];
 let heroI = 0;
+/* 逐字的失焦与错位（静态值，落定后不再变）：像刚醒时还没对准焦的字。
+   失焦三档 —— 1 微虚、2 半化、3 将散；「醒」与「成形」清楚，越往「融化」越散。
+   [序号, 失焦档, 纵移 em, 横移 em, 倾角 deg, 缩放] */
+const BLUR = [0, 0.45, 0.8, 1.2]; // px（字号约 16px：再重就认不出了）
+const DIM = [1, 0.86, 0.74, 0.62];
+const heroFx: Record<number, [number, number, number, number, number]> = {
+  1: [1, 0.08, 0, 0, 1],
+  2: [0, -0.1, 0, 0, 1.06],
+  4: [2, 0.14, 0, 1.2, 0.92],
+  5: [1, 0, 0.05, 0, 1],
+  6: [0, -0.06, 0, -1, 1],
+  7: [1, 0.1, 0, 0, 0.9],
+  8: [1, -0.12, 0, 1.4, 1.08],
+  9: [1, 0, 0, 0, 1],
+  11: [1, 0.1, 0, 0, 1],
+  13: [2, -0.14, 0, -1.6, 1.1],
+  14: [1, 0.06, 0.06, 0, 1],
+  15: [0, 0, 0, 0.8, 1],
+  16: [0, 0, 0, 0, 1.04],
+  17: [0, -0.04, 0, 0, 1],
+  18: [1, 0, 0, 0, 1],
+  19: [1, 0.08, 0, -1, 1],
+  21: [1, -0.08, 0, 0, 0.94],
+  22: [2, 0.14, 0, 1.2, 1],
+  23: [3, -0.18, 0.06, -2, 1.12],
+  24: [3, 0.2, 0, 2.4, 0.9],
+  25: [2, 0.1, 0, -1.5, 1],
+};
+const heroStyle = (i: number) => {
+  const fx = heroFx[i];
+  if (!fx) return `--i:${i}`;
+  const [b, cy, cx, cr, cs] = fx;
+  return [
+    `--i:${i}`,
+    b && `--cb:${BLUR[b]}px;--co:${DIM[b]}`,
+    cy && `--cy:${cy}em`,
+    cx && `--cx:${cx}em`,
+    cr && `--cr:${cr}deg`,
+    cs !== 1 && `--cs:${cs}`,
+  ]
+    .filter(Boolean)
+    .join(';');
+};
 const heroChars = heroLines.map((l) => [...l].map((ch) => ({ ch, i: heroI++ })));
 ---
 
@@ -173,14 +216,9 @@ const heroChars = heroLines.map((l) => [...l].map((ch) => ({ ch, i: heroI++ })))
         <div class="qset">
           <h1 class="q" id="hero-line">
             {heroChars.map((line) => (
-              <span class="ql">{line.map(({ ch, i }) => <span class="c" style={`--i:${i}`}>{ch}</span>)}</span>
+              <span class="ql">{line.map(({ ch, i }) => <span class="c" style={heroStyle(i)}>{ch}</span>)}</span>
             ))}
           </h1>
-        </div>
-        <!-- 等高线标注：地平线上是入夜，最近那条线上是天亮（脚本按地形把它们钉到线上、给出沿线角度） -->
-        <div class="ls-marks" aria-hidden="true">
-          <span class="cmark cmark-h" data-mark="h">23:07</span>
-          <span class="cmark" data-mark="n">06:31</span>
         </div>
         <nav class="ls-pins" aria-label="版块导航">
           {
@@ -407,6 +445,20 @@ const heroChars = heroLines.map((l) => [...l].map((ch) => ({ ch, i: heroI++ })))
   });
 
   initLinescape();
+
+  /* 屏外各幕的排版挪到空闲时、一幕一个任务（见 .scene + .scene 的 content-visibility）。
+     常驻的 Worker / 合成动画可能让空闲回调迟迟不来，故带 timeout 兜底 */
+  const idle = (cb: () => void) =>
+    'requestIdleCallback' in window ? requestIdleCallback(cb, { timeout: 800 }) : setTimeout(cb, 120);
+  const pending = [...document.querySelectorAll<HTMLElement>('.home .scene + .scene')];
+  const warm = () => {
+    const el = pending.shift();
+    if (!el) return;
+    el.classList.add('cv-ready');
+    void el.offsetHeight; // 就在这个空闲任务里排完，别拖进下一帧
+    idle(warm);
+  };
+  addEventListener('load', () => setTimeout(() => idle(warm), 300), { once: true });
 </script>
 
 <style is:global>
@@ -480,6 +532,12 @@ const heroChars = heroLines.map((l) => [...l].map((ch) => ({ ch, i: heroI++ })))
   /* 相邻两幕首尾叠一屏：上一幕舞台离开的同时下一幕舞台已钉住 */
   .home .scene + .scene {
     margin-top: -100svh;
+  }
+  /* 屏外四幕先不排版：冷启动时的首帧排版大头是各幕中文字形的首次初始化，按幕分摊；
+     只排首屏后首帧 ~270 → ~170ms、字体到位后的重排 ~100 → ~30ms。各幕高度由 --len 写死，
+     延后排版不改任何几何；页面闲下来后脚本逐幕放开（.cv-ready），滚到时早已排好 */
+  .home .scene + .scene:not(.cv-ready) {
+    content-visibility: auto;
   }
   .home .stage {
     position: sticky;
@@ -592,8 +650,6 @@ const heroChars = heroLines.map((l) => [...l].map((ch) => ({ ch, i: heroI++ })))
   }
   html {
     --ls-mark: color-mix(in srgb, var(--mk-w) calc(var(--reality-mix, 1) * 100%), var(--mk-d));
-    /* 地平线上那枚标注底下的托底 ＝ 天空在地平线处的雾带色（不是 --bg，否则在天空层上露出一块异色） */
-    --ls-hz: color-mix(in srgb, var(--sw-h) calc(var(--reality-mix, 1) * 100%), var(--sd-h));
   }
   html .q {
     color: color-mix(in srgb, color-mix(in srgb, var(--q-w) calc(var(--reality-mix, 1) * 100%), var(--q-d)) 74%, transparent);
@@ -714,26 +770,7 @@ const heroChars = heroLines.map((l) => [...l].map((ch) => ({ ch, i: heroI++ })))
       opacity: var(--co, 1);
     }
   }
-  /* 逐字微错位与零星失焦：每字随序号带一点高低与倾角，零星几个失焦、压淡 ——
-     像刚醒时还没对准焦的字。都是静态值（落定后不再变），不增加逐帧开销 */
-  .q .c:nth-child(5n + 2) {
-    --cy: 0.06em;
-  }
-  .q .c:nth-child(7n + 3) {
-    --cy: -0.05em;
-    --cr: 0.6deg;
-  }
-  .q .c:nth-child(9n + 6) {
-    --cr: -0.8deg;
-  }
-  .q .c:nth-child(7n + 5) {
-    --cb: 0.55px;
-    --co: 0.78;
-  }
-  .q .c:nth-child(13n + 9) {
-    --cx: 0.06em;
-    --cb: 0.35px;
-  }
+  /* 逐字的失焦 / 错位 / 大小差异写在每个字的行内变量里（见文件头 heroFx） */
   html.booted .q .c {
     animation: q-drip 1.1s cubic-bezier(0.2, 0.7, 0.2, 1) both;
     animation-delay: calc(0.9s + var(--i) * 40ms);
@@ -742,12 +779,12 @@ const heroChars = heroLines.map((l) => [...l].map((ch) => ({ ch, i: heroI++ })))
   @keyframes q-drip {
     from {
       opacity: 0;
-      transform: translate(var(--cx, 0px), calc(-0.45em + var(--cy, 0px))) rotate(var(--cr, 0deg));
+      transform: translate(var(--cx, 0px), calc(-0.45em + var(--cy, 0px))) rotate(var(--cr, 0deg)) scale(var(--cs, 1));
       filter: blur(calc(3px + var(--cb, 0px)));
     }
     to {
       opacity: var(--co, 1);
-      transform: translate(var(--cx, 0px), var(--cy, 0px)) rotate(var(--cr, 0deg));
+      transform: translate(var(--cx, 0px), var(--cy, 0px)) rotate(var(--cr, 0deg)) scale(var(--cs, 1));
       filter: blur(var(--cb, 0px));
     }
   }
@@ -761,9 +798,6 @@ const heroChars = heroLines.map((l) => [...l].map((ch) => ({ ch, i: heroI++ })))
     }
   }
 
-  /* ── 等高线标注：地形图的惯例 —— 线在此断开一小段（Worker 断开；地平线那条在另一张画布上，
-     用一块底色小晕把它遮出一个口），写上数字，字沿线方向。--x / --y / --rot 由脚本写入 ── */
-  .ls-marks,
   .ls-pins {
     position: absolute;
     inset: 0;
@@ -771,51 +805,11 @@ const heroChars = heroLines.map((l) => [...l].map((ch) => ({ ch, i: heroI++ })))
     opacity: calc(1 - var(--fadeP));
     visibility: hidden;
   }
-  html.ls-placed .ls-marks {
-    visibility: visible;
-  }
   html.ls-placed .ls-pins {
     visibility: visible;
   }
-  html.ls-folded .ls-marks,
   html.ls-folded .ls-pins {
     visibility: hidden;
-  }
-  .cmark {
-    position: absolute;
-    left: var(--x, 0px);
-    top: var(--y, 0px);
-    transform: translate(-50%, -50%) rotate(var(--rot, 14deg));
-    font-family: var(--font-mono);
-    font-size: 9.5px;
-    line-height: 1;
-    letter-spacing: 0.14em;
-    color: var(--ls-mark, var(--umber));
-    white-space: nowrap;
-    opacity: 0;
-  }
-  .cmark-h {
-    padding: 13px 14px;
-    background: radial-gradient(
-      closest-side,
-      var(--ls-hz, var(--bg)) 58%,
-      color-mix(in srgb, var(--ls-hz, var(--bg)) 70%, transparent) 78%,
-      transparent
-    );
-  }
-  html.booted .cmark {
-    animation: mark-in 1.6s cubic-bezier(0.2, 0.7, 0.2, 1) 2.2s both;
-  }
-  html.booted .cmark:not(.cmark-h) {
-    animation-delay: 3.4s;
-  }
-  @keyframes mark-in {
-    from {
-      opacity: 0;
-    }
-    to {
-      opacity: 0.8;
-    }
   }
 
   /* ── 测量点：一粒点 + 一行很小的标签，钉在某条等高线上（--x / --y / --rot 由脚本写入）
@@ -1510,12 +1504,8 @@ const heroChars = heroLines.map((l) => [...l].map((ch) => ({ ch, i: heroI++ })))
     html.booted .s-hero .q .c {
       animation: none;
       opacity: var(--co, 1);
-      transform: translate(var(--cx, 0px), var(--cy, 0px)) rotate(var(--cr, 0deg));
+      transform: translate(var(--cx, 0px), var(--cy, 0px)) rotate(var(--cr, 0deg)) scale(var(--cs, 1));
       filter: blur(var(--cb, 0px));
-    }
-    html.booted .s-hero .cmark {
-      animation: none;
-      opacity: 0.8;
     }
     html.booted .s-hero .pin,
     html.booted .ls-sun {
