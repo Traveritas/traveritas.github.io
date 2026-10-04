@@ -1,7 +1,7 @@
 ---
 title: 这地方不错欸
 date: 2026-10-04T01:00:00+09:00
-tags: [𝔄𝔳𝔢✦𝔏𝔲𝔠𝔞𝔫𝔞, 知觉]
+tags: [𝔄𝔳𝔢✦𝔏𝔞𝔠𝔲𝔫𝔞, 知觉]
 draft: false
 images:
   - { src: ./lacuna-dream.jpg, alt: Ave Lacuna站在风吹过的橙紫色原野前微笑着回头 }
