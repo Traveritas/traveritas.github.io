@@ -67,13 +67,18 @@ const cols = n === 2 || n === 4 ? 2 : 3;
     background: color-mix(in srgb, var(--fg) 5%, transparent);
   }
 
+  /* 潜像析出：默认处于柔和高斯模糊与微弱对比抑制中；提前移开时在 1.2s 内温和归于微雾 */
   .g-cell :global(img) {
     display: block;
     width: 100%;
     height: auto;
+    filter: blur(14px) brightness(1.02) contrast(0.88);
+    transform: scale(1.04);
+    will-change: filter, transform;
     transition:
-      opacity 0.4s ease,
-      transform 0.6s ease;
+      filter 1.2s ease,
+      transform 1.2s ease,
+      opacity 0.4s ease;
   }
 
   .gallery:not(.g-single) .g-cell :global(img) {
@@ -81,9 +86,37 @@ const cols = n === 2 || n === 4 ? 2 : 3;
     object-fit: cover;
   }
 
-  .g-cell:hover :global(img) {
+  /* 悬浮中且未显影：启动 3 秒潜像显影过程；提前移开则打断并回退上方默认规则 */
+  .g-cell:hover:not(.is-revealed) :global(img) {
+    filter: blur(0) brightness(1) contrast(1);
+    transform: scale(1);
+    transition:
+      filter 3s cubic-bezier(0.3, 0.1, 0.25, 1),
+      transform 3s cubic-bezier(0.3, 0.1, 0.25, 1);
+  }
+
+  /* 已完全显影状态：永久定影清晰，尺度回归 1.0 */
+  .g-cell.is-revealed :global(img) {
+    filter: blur(0) brightness(1) contrast(1);
+    transform: scale(1);
+    transition:
+      filter 1.2s ease,
+      transform 0.4s ease,
+      opacity 0.4s ease;
+  }
+
+  /* 已显影后的悬浮微交互：保持原有的轻微呼吸感 */
+  .g-cell.is-revealed:hover :global(img) {
     opacity: 0.88;
     transform: scale(1.015);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .g-cell :global(img),
+    .g-cell:hover:not(.is-revealed) :global(img),
+    .g-cell.is-revealed :global(img) {
+      transition: none !important;
+    }
   }
 
   @media (max-width: 760px) {
@@ -92,3 +125,73 @@ const cols = n === 2 || n === 4 ? 2 : 3;
     }
   }
 </style>
+
+<script>
+  function setupMomentGalleries() {
+    const cells = document.querySelectorAll<HTMLElement>('.g-cell:not([data-revealed-init])');
+    if (!cells.length) return;
+
+    const isTouch = window.matchMedia('(hover: none)').matches;
+
+    let observer: IntersectionObserver | null = null;
+    if (isTouch && 'IntersectionObserver' in window) {
+      observer = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            if (entry.isIntersecting) {
+              entry.target.classList.add('is-revealed');
+              observer?.unobserve(entry.target);
+            }
+          }
+        },
+        { threshold: 0.15 }
+      );
+    }
+
+    cells.forEach((cell) => {
+      cell.setAttribute('data-revealed-init', '');
+
+      let timer: number | null = null;
+
+      const cleanup = () => {
+        if (timer !== null) {
+          clearTimeout(timer);
+          timer = null;
+        }
+        cell.removeEventListener('pointerenter', onEnter);
+        cell.removeEventListener('pointerleave', onLeave);
+      };
+
+      const onEnter = () => {
+        if (cell.classList.contains('is-revealed')) return;
+        timer = window.setTimeout(() => {
+          cell.classList.add('is-revealed');
+          cleanup();
+        }, 3000);
+      };
+
+      const onLeave = () => {
+        if (cell.classList.contains('is-revealed')) return;
+        if (timer !== null) {
+          clearTimeout(timer);
+          timer = null;
+        }
+      };
+
+      cell.addEventListener('click', () => {
+        cell.classList.add('is-revealed');
+        cleanup();
+      });
+
+      cell.addEventListener('pointerenter', onEnter, { passive: true });
+      cell.addEventListener('pointerleave', onLeave, { passive: true });
+
+      if (observer) {
+        observer.observe(cell);
+      }
+    });
+  }
+
+  setupMomentGalleries();
+  document.addEventListener('astro:page-load', setupMomentGalleries);
+</script>
