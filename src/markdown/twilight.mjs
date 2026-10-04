@@ -59,7 +59,7 @@ function escapeHtml(s) {
 function inlineDualHtml(wake, dream) {
   const w = escapeHtml(wake.trim());
   const d = escapeHtml(dream.trim());
-  return `<span data-morph data-true="${w}" data-dream="${d}">${w}</span>`;
+  return `<span class="morph-dual" data-morph data-true="${w}" data-dream="${d}">${w}</span>`;
 }
 
 /** `key=value,key=value` → 已校验的 style 声明串（前缀带空格，可能为空串） */

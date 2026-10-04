@@ -195,6 +195,32 @@ hr {
   cursor: default;
 }
 
+/* ── 行内双面潜影重影（Micro Echo：零模糊微错位，静默提示背后存在另一声轨） ──
+   · Markdown 语法 [[醒|梦]]（twilight.mjs 产出 .morph-dual）
+   · 采用零模糊（blur: 0）微错位 text-shadow，字形锐利不发糊，不破坏中文方块行气
+   · 醒面：脱离单纯冷灰，注入更清晰的琥珀微温（#d9a05b 46%），错位 1.2px 1px，
+     在黑底与白底上皆清晰可见如厚玻璃双折射；
+   · 梦面：琥珀温色转深明亮（#d9a05b 72%），纯静态呈现，零动画与重绘性能开销
+   · 显式排除 h1 / 站头等大标题 ── */
+.morph-dual,
+.md [data-morph][data-dream] {
+  text-shadow: 1.2px 1px 0 color-mix(in srgb, #d9a05b 46%, transparent);
+  transition: text-shadow 0.4s ease;
+}
+
+/* 梦面：琥珀温色加深，纯静态，零额外性能开销 */
+body[data-reality='dream'] .morph-dual,
+body[data-reality='dream'] .md [data-morph][data-dream] {
+  text-shadow: 1.4px 1.2px 0 color-mix(in srgb, #d9a05b 72%, transparent);
+}
+
+/* 排除大标题与站头 */
+h1 [data-morph],
+.stitch-head [data-morph] {
+  text-shadow: none !important;
+}
+
+
 /* ── 叠影残影：真身在层内，残影是暖色的另一份 ── */
 .ghost-pair {
   position: relative;
@@ -1271,6 +1297,63 @@ body[data-reality='dream'] [data-side='wake'] {
   transition:
     opacity 0.9s cubic-bezier(0.2, 0.6, 0.2, 1),
     translate 0.9s cubic-bezier(0.2, 0.6, 0.2, 1);
+}
+
+/* ── 整段两态块显影（:::wake / :::dream）──
+   · 文段本身绝对不动（padding 为零，维持正典字面对齐）
+   · 外侧两侧悬浮发丝方括号「[」与「]」：
+     - 左侧 ::before 画出方括号「[」
+     - 右侧 ::after 画出方括号「]」
+   · 醒面：沉静的冷沙微温发丝线（color-mix(#d9a05b 36%, var(--line))）
+   · 梦面：琥珀温色转亮，纯静态零性能开销 ── */
+.md div[data-side] {
+  position: relative;
+}
+
+.md div[data-side]::before,
+.md div[data-side]::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 7px;
+  border-color: color-mix(in srgb, #d9a05b 36%, var(--line));
+  border-style: solid;
+  opacity: 0.55;
+  pointer-events: none;
+  box-sizing: border-box;
+  transition: border-color 0.4s ease, opacity 0.4s ease;
+}
+
+/* 左侧方括号「[」 */
+.md div[data-side]::before {
+  left: -12px;
+  border-width: 1px 0 1px 1px;
+}
+
+/* 右侧方括号「]」 */
+.md div[data-side]::after {
+  right: -12px;
+  border-width: 1px 1px 1px 0;
+}
+
+/* 梦面：转为更清晰的琥珀微温 */
+body[data-reality='dream'] .md div[data-side]::before,
+body[data-reality='dream'] .md div[data-side]::after {
+  border-color: color-mix(in srgb, var(--amber) 65%, var(--line));
+  opacity: 0.82;
+}
+
+/* 移动端窄屏自适应：略微收拢外侧距离，防止抵到视口边缘 */
+@media (max-width: 640px) {
+  .md div[data-side]::before {
+    left: -8px;
+    width: 5px;
+  }
+  .md div[data-side]::after {
+    right: -8px;
+    width: 5px;
+  }
 }
 
 @starting-style {
