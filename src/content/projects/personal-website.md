@@ -1,5 +1,5 @@
 ---
-title: 这个网站本身
+title: 𝔸𝕧𝕖𝕣𝕚𝕥𝔸的昼梦叙集
 description: 一件永远正在成形的作品
 date: 2026-09-19
 status: ꧁༺◇永恒◇༻꧂
