@@ -1,5 +1,7 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
+import YearGroup from '../../components/index/YearGroup.astro';
+import IndexRow from '../../components/index/IndexRow.astro';
 import { getCollection } from 'astro:content';
 
 export async function getStaticPaths() {
@@ -7,7 +9,7 @@ export async function getStaticPaths() {
     .map(({ id, data }) => ({ id, ...data }))
     .sort((a, b) => b.date.valueOf() - a.date.valueOf() || b.id.localeCompare(a.id));
 
-  const tags = new Map<string, { id: string; title: string; description?: string; date: Date }[]>();
+  const tags = new Map<string, typeof articles>();
   for (const a of articles) {
     for (const t of a.tags ?? []) {
       if (!tags.has(t)) tags.set(t, []);
@@ -19,15 +21,20 @@ export async function getStaticPaths() {
 
 const { tag, articles } = Astro.props;
 
-const fmt = (d: Date) =>
-  `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
+// 与随笔目录同一套：按年份分组，行用 <IndexRow>
+const byYear = new Map<number, typeof articles>();
+for (const a of articles) {
+  const y = a.date.getFullYear();
+  if (!byYear.has(y)) byYear.set(y, []);
+  byYear.get(y)!.push(a);
+}
 ---
 
 <BaseLayout
   title={`标签「${tag}」 — Traveritas`}
   description={`标签「${tag}」下的全部随笔`}
 >
-  <div class="container page-body">
+  <div class="container-wide page-body">
     <header class="page-head knot-head">
       <span class="big-knot" aria-hidden="true"></span>
       <h1>{tag}</h1>
@@ -36,21 +43,15 @@ const fmt = (d: Date) =>
       </p>
     </header>
 
-    <ul class="ledger">
-      {
-        articles.map((a) => (
-          <li>
-            <a href={`/articles/${a.id}/`}>
-              <span class="ledger-date">{fmt(a.date)}</span>
-              <span>
-                <span class="ledger-title">{a.title}</span>
-                {a.description && <span class="ledger-desc">{a.description}</span>}
-              </span>
-            </a>
-          </li>
-        ))
-      }
-    </ul>
+    {
+      [...byYear].map(([y, list]) => (
+        <YearGroup year={y}>
+          {list.map((a) => (
+            <IndexRow date={a.date} href={`/articles/${a.id}/`} title={a.title} desc={a.description} tags={a.tags} />
+          ))}
+        </YearGroup>
+      ))
+    }
   </div>
 </BaseLayout>
 

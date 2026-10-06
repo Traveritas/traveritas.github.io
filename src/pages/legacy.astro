@@ -2,7 +2,7 @@
 /* ── 旧主页（千层纸，/legacy/）──────────────────────────────
    2026-10-03 让位给「一根线的一夜」（src/pages/index.astro），挪到 /legacy/ 留存：
    千层纸首屏 + 各夜段 + 构块场 + 14° 发丝线。不进 sitemap，robots 禁收。
-   依赖的 home/ 组件与 paperstack / slip 脚本仍只为它服务。
+   依赖的 home/ 组件与 paperstack 脚本仍只为它服务；玻璃签的 three.js 版已撤（2026-10-07），只留静态版。
    ───────────────────────────────────────────────────────────── */
 import BaseLayout from '../layouts/BaseLayout.astro';
 import StitchHeader from '../components/home/StitchHeader.astro';
@@ -298,8 +298,7 @@ const wakeAnchors = [
         </div>
         <div class="slip-stage">
           <div class="slip-glow" aria-hidden="true"></div>
-          <canvas id="slip-canvas" aria-hidden="true"></canvas>
-          <div class="slip-fallback" aria-hidden="true">
+          <div class="slip-fallback show" aria-hidden="true">
             <span class="sf-t">它可能<br />马上消失。</span>
             <span class="sf-b mono">GLASS SLIP · 玻璃签</span>
           </div>
@@ -341,43 +340,6 @@ const wakeAnchors = [
 <script>
   import { initPaperstack } from '../scripts/paperstack';
   initPaperstack();
-
-  // 3D 懒加载：IO 优先，轮询兜底（覆盖渲染被节流、IO 回调滞后的环境）
-  const lazy = (id: string, run: () => Promise<unknown>) => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    let loaded = false;
-    const near = () => {
-      const r = el.getBoundingClientRect();
-      return r.bottom > -innerHeight && r.top < innerHeight * 2;
-    };
-    const load = () => {
-      if (loaded) return;
-      loaded = true;
-      io.disconnect();
-      clearInterval(timer);
-      el.dataset.loading = '1';
-      run()
-        .then(() => {
-          el.dataset.loaded = '1';
-        })
-        .catch((err) => {
-          el.dataset.loadErr = String(err);
-          /* WebGL 不可用时由静态回退接手 */
-        });
-    };
-    const io = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((en) => en.isIntersecting)) load();
-      },
-      { rootMargin: '280px' },
-    );
-    io.observe(el);
-    const timer = setInterval(() => {
-      if (near()) load();
-    }, 900);
-  };
-  lazy('slip-canvas', () => import('../scripts/slip').then((m) => m.initSlip()));
 </script>
 
 <style>
@@ -1403,24 +1365,16 @@ const wakeAnchors = [
     transform: translate(-50%, -50%);
     background: radial-gradient(circle, color-mix(in srgb, var(--amber) 18%, transparent), transparent 65%);
     pointer-events: none;
-    /* 光晕只在玻璃签就位（canvas 加载或静态回退）后浮现，未加载时不裸奔 */
+    /* 光晕随玻璃签（.slip-fallback.show）浮现 */
     opacity: 0;
     transition: opacity 1.2s ease;
   }
 
-  .slip-stage:has(#slip-canvas[data-loaded]) .slip-glow,
   .slip-stage:has(.slip-fallback.show) .slip-glow {
     opacity: 1;
   }
 
-  #slip-canvas {
-    width: min(300px, 74vw);
-    height: 420px;
-    position: relative;
-    z-index: 1;
-  }
-
-  /* WebGL 不可用时的静态回退 */
+  /* 静态玻璃签（three.js 版已撤） */
   .slip-fallback {
     display: none;
     width: min(300px, 74vw);
