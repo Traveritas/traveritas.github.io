@@ -26,16 +26,16 @@ interface Props {
   awayDreamTitle?: string;
   description?: string;
   type?: 'website' | 'article';
+  /* 不给搜索引擎收录（404 这类没有固定地址的页）：输出 robots noindex，并省掉 canonical / og:url */
+  noindex?: boolean;
   /* none：不画 14° 发丝线（主页故事板：脑电线自己就是那条缝） */
   seam?: 'default' | 'faint' | 'broken' | 'none';
   /* 构块场的挂法：through = z −2（默认，画在千层纸之上）；
      below = z −3（被首页千层纸遮住，滚过首屏才出现） */
   constructs?: 'through' | 'below' | 'none';
-  /* ⛔ 已失效（2026-09-28 标注）：全页微温环境渐变叠加层（冷雾灰/薄暮灰紫/
-     暖杏微温，视口固定 GPU 独立合成）。**没有任何页面传过这个 prop**，
-     传了才会渲染 .page-ambient（见下方 body 内），故该层从未出现过。
-     样式仍留在 global.css 的「全页微温环境微光叠加层」块里，同样是死的。
-     要启用：某个页面写 ambient={true} 即可；要清理：删这三处。 */
+  /* 全页微温环境渐变叠加层（冷雾灰/薄暮灰紫/暖杏微温，视口固定 GPU 独立合成）：
+     渲染 .page-ambient，样式在 global.css「全页微温环境微光叠加层」。
+     目前随笔 / 项目 / 瞬间三个目录页开着。 */
   ambient?: boolean;
   /* 阅读/长文页面中央线条消隐蒙版：正文列避让 14° 发丝线与脑电波（保留背景方块） */
   maskLines?: boolean;
@@ -61,6 +61,7 @@ const {
   awayDreamTitle,
   description = 'Traveritas 的个人网站——随笔、项目，与一些尚在成形的东西。',
   type = 'website',
+  noindex = false,
   seam = 'faint',
   constructs = 'through',
   ambient = false,
@@ -89,7 +90,7 @@ const deriveDreamTitle = (wake: string): string => {
 
 const resolvedDreamTitle = dreamTitle ?? deriveDreamTitle(title);
 
-const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site).href : undefined;
+const canonical = Astro.site && !noindex ? new URL(Astro.url.pathname, Astro.site).href : undefined;
 ---
 
 <!doctype html>
@@ -104,7 +105,8 @@ const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site).href : un
       data-away-dream={awayDreamTitle}
     >{title}</title>
     <meta name="description" content={description} />
-    <link rel="canonical" href={canonical} />
+    {noindex && <meta name="robots" content="noindex" />}
+    {canonical && <link rel="canonical" href={canonical} />}
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link
       rel="alternate"
@@ -116,7 +118,7 @@ const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site).href : un
     <meta property="og:site_name" content="Traveritas的个人网站" />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
-    <meta property="og:url" content={canonical} />
+    {canonical && <meta property="og:url" content={canonical} />}
     <meta name="twitter:card" content="summary" />
     <meta name="generator" content={Astro.generator} />
     <noscript>
@@ -142,8 +144,7 @@ const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site).href : un
     data-bgm={bgm === 'reading' ? 'reading' : undefined}
   >
     <div class="wash-backdrop" aria-hidden="true"></div>
-    {/* ⛔ 从未渲染过：没有页面传 ambient（见上方 prop 标注）。
-        wash-backdrop 是活的（全站，z −5，7% 醒梦洗染）；这一个是死的。 */}
+    {/* wash-backdrop 全站常驻（z −5，7% 醒梦洗染）；page-ambient 只在传了 ambient 的页面出现 */}
     {ambient && <div class="page-ambient" aria-hidden="true" />}
     {boot && <BootVeil always={boot === 'always'} />}
     <Hairline />
@@ -166,7 +167,7 @@ const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site).href : un
       import { initBoot } from '../scripts/boot';
       import { initChrome } from '../scripts/chrome';
       import { initMorph } from '../scripts/morph';
-      import { initNight } from '../scripts/night';
+      import { initNight } from '../scripts/overnight';
       import { initBrand } from '../scripts/brand';
       import { initReality } from '../scripts/reality';
       import { initTitle } from '../scripts/title';

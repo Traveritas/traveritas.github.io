@@ -8,6 +8,7 @@ Traveritas 的个人网站。Astro 纯静态站，「醒梦」审美方向（见
 npm install     # 安装依赖
 npm run dev     # 本地开发（http://localhost:4321）
 npm run build   # 构建到 dist/
+npm run check   # 类型检查（astro check）
 npm run preview # 预览构建产物
 ```
 
@@ -18,20 +19,33 @@ src/
   content/            # 内容源（Markdown）
     articles/         #   随笔
     projects/         #   项目
+    moments/          #   瞬间（可带 1–9 张配图）
   content.config.ts   # 内容集合定义与字段校验
-  layouts/            # 页面骨架
-  components/         # 组件（页头/页脚/印记/styleguide 样张原语）
-  pages/              # 路由页面（styleguide.astro = 样式预览工作台）
+  layouts/            # 页面骨架（BaseLayout：head / 开屏 / 全站仪器层）
+  components/         # 组件
+    chrome/           #   全站仪器层（缝线 / 脑电 / 构块场 / 导览轨 / 开屏 / 环境声）
+    home/             #   主页与旧主页存档用的块
+    index/            #   目录行（随笔 / 项目目录页、标签页共用）
+    article/ project/ about/  #   各内容页的专属块
+    styleguide/       #   样式预览的样张原语
+  pages/              # 路由页面（styleguide.astro = 样式预览工作台，legacy.astro = 旧主页存档）
+  scripts/            # 客户端脚本（入梦检验 reality / 双声轨 morph / 导览轨 gauge / 主页故事板等）
+  data/               # 数据源（night.ts：23:07 → 06:31 的一夜时间轴）
+  markdown/           # 构建期 markdown 插件（两态语法 twilight / 小节序号 ordinal / 代码配色）
+  lib/                # 构建期小工具（excerpt：description 回退摘要）
   styleguide/         # 样式预览用的 markdown 样张
-  styles/global.css   # 全局样式（令牌/排版分层）
-  styles/tokens.css   # 设计令牌（醒梦色彩/字体）
+  styles/tokens.css   # 设计令牌（醒梦色彩 / 字体 / 度量）
+  styles/global.css   # 全局样式（排版分层 / 内容页正文 / 行内光景）
   styles/styleguide.css  # 只在 /styleguide/ 载入的工具样式
 docs/
+  backlog.md               # 待办（已完成的在 docs/archive/）
+  writing.md               # 写作手册（两态语法 / 发布规则）
   tech-stack-decision.md   # 技术选型决议
   design/aesthetic-direction.md  # 审美方向简报
   design/content-typography.md   # 内页正文排版分层地图
   design/styleguide.md           # 样式预览页怎么用、怎么加新样张
-.github/workflows/deploy.yml   # GitHub Pages 自动部署
+  design/bgm.md                  # 环境声与两态 BGM
+.github/workflows/deploy.yml   # GitHub Pages 自动部署（类型检查 + 构建）
 ```
 
 ## 样式预览
@@ -56,8 +70,6 @@ npm run dev   # → http://localhost:4321/styleguide/
 推送 `main` 分支即触发 GitHub Pages 自动部署（Actions）。站点地址：https://traveritas.github.io
 
 ## 已安装的项目级 Agent Skills（.agents/skills/）
-
-仅在本项目内生效（在 ZCode 中打开本目录后自动发现）；想改为全局生效，把对应文件夹移到 `C:\Users\Traveritas\.agents\skills\` 即可。
 
 仅在本项目内生效（在 ZCode 中打开本目录后自动发现）；想改为全局生效，把对应文件夹移到 `C:\Users\Traveritas\.agents\skills\` 即可。
 

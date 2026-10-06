@@ -4,6 +4,43 @@ import sitemap from '@astrojs/sitemap';
 import { twilight } from './src/markdown/twilight.mjs';
 import { ordinal } from './src/markdown/ordinal.mjs';
 import { xingmeng } from './src/markdown/shiki-theme.mjs';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { join } from 'node:path';
+
+/* sitemap 的 lastmod：按 frontmatter 的 date 给。配置文件里拿不到内容集合，直接读 md 头。
+   详情页 = 该篇日期；目录页 = 该集合最新一篇；主页 = 全站最新一篇。草稿不计。 */
+function contentDates(collection) {
+  const dir = join('src/content', collection);
+  const dates = new Map();
+  for (const name of readdirSync(dir)) {
+    if (name.startsWith('_')) continue;
+    const full = join(dir, name);
+    const file = statSync(full).isDirectory() ? join(full, 'index.md') : full;
+    if (!/\.mdx?$/.test(file)) continue;
+    let head = '';
+    try {
+      head = readFileSync(file, 'utf8').match(/^---\r?\n([\s\S]*?)\r?\n---/)?.[1] ?? '';
+    } catch {
+      continue;
+    }
+    if (/^draft:\s*true\s*$/m.test(head)) continue;
+    const d = head.match(/^date:\s*['"]?([^'"\r\n]+)/m)?.[1];
+    if (d && !Number.isNaN(Date.parse(d))) dates.set(name.replace(/\.mdx?$/, ''), new Date(d));
+  }
+  return dates;
+}
+
+const newest = (dates) => new Date(Math.max(...dates));
+const LASTMOD = new Map();
+const allDates = [];
+for (const c of ['articles', 'projects', 'moments']) {
+  const dates = contentDates(c);
+  if (!dates.size) continue;
+  if (c !== 'moments') for (const [id, d] of dates) LASTMOD.set(`/${c}/${id}/`, d);
+  LASTMOD.set(`/${c}/`, newest(dates.values()));
+  allDates.push(...dates.values());
+}
+if (allDates.length) LASTMOD.set('/', newest(allDates));
 
 // https://astro.build/config
 export default defineConfig({
@@ -16,7 +53,13 @@ export default defineConfig({
     // 样式预览（/styleguide/）是工作台不是内容页：不进 sitemap（robots.txt 同档禁收）
     // /legacy/ 是换下来的旧主页、/new/ 是新主页预览期的旧址（现已跳转到 /）、/mock/ 是设计原型：保留可访问，但同样不进 sitemap、robots 禁收
     // 按整段路径匹配：裸 includes('/new') 会误伤 /tags/newsletter/ 这类页面
-    sitemap({ filter: (page) => !/^\/(styleguide|new|legacy|mock)\//.test(new URL(page).pathname) }),
+    sitemap({
+      filter: (page) => !/^\/(styleguide|new|legacy|mock)\//.test(new URL(page).pathname),
+      serialize(item) {
+        const d = LASTMOD.get(decodeURI(new URL(item.url).pathname));
+        return d ? { ...item, lastmod: d.toISOString() } : item;
+      },
+    }),
   ],
   markdown: {
     // 醒梦两态正文语法（:::dream/:::wake 块、[[醒|梦]] 行内），见 docs/writing.md

@@ -115,6 +115,14 @@ npm run new:article -- "标题" my-slug
 
 创建 `src/content/articles/yyyy-mm-dd-slug.md`，默认 `draft: true`。
 
+**发布只看 `draft`，不看日期。** 本站是纯静态构建，没有定时发布：`date` 写成未来的日子，
+下一次构建照样会把它发出去（目录、RSS、sitemap 一起）。还不想公开的稿子请保持 `draft: true`，
+到时候改成 `false` 再推送。
+
+`description` 可以不写：不写时，页面的 `<meta description>` 与 RSS 会从正文开头自动取约 90 字
+（只取醒面，见 `src/lib/excerpt.ts`），目录行则不显示描述。想控制搜索结果里那一句，就自己写上。
+RSS 输出全文，同样只有醒面（`:::dream` 块整块略去）。
+
 项目没有对应的脚手架，新项目请从模板复制命名：
 
 - 随笔模板：`docs/templates/article-template.md`

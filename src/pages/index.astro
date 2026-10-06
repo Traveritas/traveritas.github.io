@@ -14,6 +14,7 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import RealityGuide from '../components/home/RealityGuide.astro';
 import { getCollection } from 'astro:content';
+import { depthOf, fmtDate } from '../lib/format';
 
 const byDate = <T extends { id: string; data: { date: Date } }>(a: T, b: T) =>
   b.data.date.valueOf() - a.data.date.valueOf() || b.id.localeCompare(a.id);
@@ -25,15 +26,10 @@ const allMoments = (await getCollection('moments', (m) => !m.data.draft)).sort(b
 const articles = allArticles.slice(0, 3);
 const projects = allProjects.slice(0, 3);
 
-const fmt = (d: Date) =>
-  `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
 const fmtShort = (d: Date) => `${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
 const fmtMomentTime = (d: Date) =>
   `${fmtShort(d)} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 
-/* 八阶成形 / 浮现度 */
-const depthOf = (status: string, depth?: number) =>
-  depth ?? ({ 构想中: 2, 进行中: 5, 已完成: 8 } as Record<string, number>)[status] ?? 5;
 const repoOf = (links: { href: string }[]) => links.some((l) => /^https:\/\/github\.com\//.test(l.href));
 
 /* 闪念摘句：去掉两态块与行内语法，只留醒面文字 */
@@ -261,7 +257,7 @@ const heroChars = heroLines.map((l) => [...l].map((ch) => ({ ch, i: heroI++ })))
               <a class="essay" href={`/articles/${a.id}/`} style={`--j:${j}`}>
                 <span class="no">{String(j + 1).padStart(2, '0')}</span>
                 <div>
-                  <span class="meta">{[fmt(a.data.date), ...a.data.tags].join(' · ')}</span>
+                  <span class="meta">{[fmtDate(a.data.date), ...a.data.tags].join(' · ')}</span>
                   <h3>{a.data.title}</h3>
                   {a.data.description && <p>{a.data.description}</p>}
                 </div>
@@ -293,7 +289,7 @@ const heroChars = heroLines.map((l) => [...l].map((ch) => ({ ch, i: heroI++ })))
                   </div>
                   <div class="slab-body">
                     <div class="slab-head">
-                      <span>{fmt(p.data.date)}</span>
+                      <span>{fmtDate(p.data.date)}</span>
                       <span>{p.data.status}</span>
                     </div>
                     <div>

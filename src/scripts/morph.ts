@@ -156,10 +156,8 @@ function ambientTick() {
   );
   if (pool.length) {
     const m = pool[rand(pool.length)];
-    // 梦态双面元素已在梦面：走神＝纯乱码扰动再归回当前面
-    const driftTo =
-      m.el.dataset.dream !== undefined ? scrambleFace(m.cur) : (m.el.dataset.dream || scrambleFace(m.cur));
-    animate(m, driftTo, 520, () => {
+    // 走神＝纯乱码扰动，再归回当前面（双面元素此刻只会在梦面，见上方 pool 的过滤）
+    animate(m, scrambleFace(m.cur), 520, () => {
       setTimeout(() => {
         if (visible(m)) settle(m);
       }, 950);
@@ -191,6 +189,9 @@ function clockTick() {
 }
 
 export function initMorph() {
+  clockTick();
+  setInterval(clockTick, 5000);
+
   for (const el of document.querySelectorAll<HTMLElement>('[data-morph]')) {
     const faces = el.dataset.faces
       ? el.dataset.faces.split('|').map((s) => s.trim())
@@ -227,7 +228,3 @@ export function initMorph() {
   setTimeout(ambientTick, 3500 + rand(3000));
 }
 
-if (typeof document !== 'undefined') {
-  clockTick();
-  setInterval(clockTick, 5000);
-}

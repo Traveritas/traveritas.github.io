@@ -21,10 +21,10 @@
 | --- | --- |
 | 一 · 设计令牌 | 醒梦缝色板、面与底线、四种字体、度量与容器宽度（宽度与色值都读计算值回填） |
 | 二 · 内容页正文 | **同一份 markdown 样张**放进默认层 / 随笔 / 项目三条管道并置；另附页头元信息、任务清单（两页同款 ✓ 行与 ○ 符号）、互链块 |
-| 三 · 通用构件 | StitchHeader、GlassChip（夜色舞台）、`.ledger` 名录、`.stitch-meter`、ShardMark |
+| 三 · 通用构件 | StitchHeader、GlassChip（夜色舞台）、目录行 `YearGroup` / `IndexRow`、`.stitch-meter` |
 | 四 · 醒梦双态 | `data-morph` 行内 / `[data-side]` 块级、`.drift`、`.ghost-pair`（带 `--echo` 滑杆）、`::selection` 与 `:focus-visible` |
 | 五 · 全站仪器层 | 缝线三变体与主页仪表轨装框预览；发丝线 / 脑电 / 构块场 / 开屏只能整页看，故给逐层隔离开关 |
-| 六 · 页面专属块 | 索引表：散在各页 `<style>` 里的块，给出类名、所在文件与实物入口 |
+| 六 · 页面专属块 | 已抽成组件的专属块直接预览；还在各页 `<style>` 里的块列索引表，给出类名、所在文件与实物入口 |
 
 ## 三、怎么把新样式加进来
 
@@ -71,7 +71,7 @@
 原因是这个项目已经有一处「同一元素两处各写一份」的教训（见 content-typography.md 开头）。
 所以：
 
-- 能用真实组件就用真实组件（StitchHeader / GlassChip / Rail / Seam / ShardMark 都是直接
+- 能用真实组件就用真实组件（StitchHeader / GlassChip / Rail / Seam / IndexRow 都是直接
   `import` 的实物）。
 - 正文样张一律走 markdown 文件，不手抄 DOM。
 - 需要「深色语境」才成立的构件（玻璃片），给它一块标注清楚的夜色舞台，而不是改它的颜色。

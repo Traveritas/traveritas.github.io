@@ -3,17 +3,8 @@
    23:07 入睡 → 06:31 天亮，共 444 分钟。
    主页滚动即过夜：段落按睡眠深度驻扎。
 
-   ⚠ 本文件里有**两处已失效**的东西，改之前先读这一段（2026-09-28 标注）：
-
-     · 底色的三段平台（ZONES，文件下半）：**没有消费方**。initNight()
-       只写 `body.dataset.stage`（给夜轨与脑电波用），从不写颜色。
-       ⇒ 改底色别改 ZONES：主页是千层纸版，地面仍是
-       components/home/StageBackdrop.astro 的五层平色；「一根线的一夜」
-       故事板稿在 /new/，底色由 scripts/home-storyboard.ts 的 PALETTE
-       按幕写到根变量（--bg / --fg / --fg-soft / --line / --glow / --dark / --dawn）；
-       其余页面地面就是 `body { background: var(--bg) }`。
-     · 下面注释里提到的 components/chrome/NightVeil.astro：**该组件已不存在**
-       （换面幕布已废除）。这段历史注记留着备查，不要再去找那个组件。
+   底色不在这里：首页地面由主页自己的故事板写，其余页面就是 `body { background: var(--bg) }`。
+   （旧版的三段平台色板 ZONES 已于 2026-10-07 删除，设计记录见 docs/archive/backlog-2026-09-21.md 附三、附四。）
    ───────────────────────────────────────────────────────────── */
 
 export const NIGHT_START_MIN = 23 * 60 + 7; // 1387
@@ -64,79 +55,6 @@ export const SECTIONS = [
   { id: 'ns-rem', from: 181, to: 352 },
   { id: 'ns-dawn', from: 352, to: 444 },
 ] as const;
-
-/* ── 过夜色板：三段平台 ──────────────────────────────────────
-   ⛔ **已失效 · 无消费方**（2026-09-28 标注）。以下 Zone / ZONES 及其
-      enter 判定都还留着，但没有任何模块 import 它们 —— initNight() 只写
-      body.dataset.stage，不写颜色；--bg 也无人运行时改写。
-      首页地面 = components/home/StageBackdrop.astro 的五层平色；
-      其余页面地面 = `body { background: var(--bg) }`。
-      改底色请改那两处。**下面这段历史设计注记只作存档，不要再照着它改色。**
-      （另：文中提到的 NightVeil.astro 组件已不存在。）──────────────── */
-
-/* 历史注记（原文，勿据此改色）：
-   页面底色不再随滚动连续漂移：全程只有三个稳定状态，颜色只在两次
-   换面（熄灯 / 见晨）时改变。三段落位：光面＝入夜·初刻（首屏千层纸的
-   上半程）；夜面＝首屏下半程 → 浅梦·随笔 → 深眠·项目 → 异相·试验场；
-   纸面＝晨醒·关于后半程。首屏横跨两段，故「千层纸」有昼/夜两套外观，
-   两套都须可读（普查槽位：首屏顶、首屏腰·暗面）。
-   三次取色都取自上一版 13 站色板中已校准的站点，故每段的 ink/soft 对
-   （7% 洗染后、梦/醒两态取小）bg 均 ≥4.5:1——平台是读者会久留的地方，
-   必须整段可读。校验：design/.calib-night.cjs
-   两次换面由全屏幕布盖住（components/chrome/NightVeil.astro）：四色在
-   「全遮」的那一拍里一次换掉，所以不存在 bg 与 ink 亮度交错、半途
-   谁也读不清的过渡态。 */
-
-type SectionId = (typeof SECTIONS)[number]['id'];
-
-export interface Zone {
-  name: 'light' | 'deep' | 'paper';
-  bg: string;
-  ink: string;
-  soft: string;
-  /** 与 ink 同色、0.16 的器线（--line） */
-  line: string;
-  /** 进入本段的时机：enter.section 的段顶到达视口 enter.vh 处即换面。
-      正值＝还没进场（如 0.85：段顶在视口下缘）——比 SECTIONS 的锚点
-      （段顶到视口中心）早，免得换面正压在段首 StitchHeader 上；
-      负值＝段顶已越过视口顶端（如 -0.12：上一屏彻底离场后才换）。
-      首段为 null。 */
-  enter: { section: SectionId; vh: number } | null;
-}
-
-/** ⛔ 已失效 · 无消费方（2026-09-28 标注，见上方说明）。
-    保留仅为存档；改它不会有任何视觉效果——首页地面在 StageBackdrop，
-    其余页面在 `body { background: var(--bg) }`。 */
-export const ZONES: Zone[] = [
-  {
-    name: 'light',
-    bg: '#f0f3f6',
-    ink: '#232830',
-    soft: '#56606d',
-    line: 'rgba(35, 40, 48, 0.12)',
-    enter: null,
-  },
-  {
-    name: 'deep',
-    bg: '#c4ceda',
-    ink: '#232830',
-    soft: '#56606d',
-    line: 'rgba(35, 40, 48, 0.12)',
-    // 换面在「随笔段顶走到视口 38%」处
-    enter: { section: 'ns-essays', vh: 0.38 },
-  },
-  {
-    name: 'paper',
-    bg: '#f5f2eb',
-    ink: '#232830',
-    soft: '#56606d',
-    line: 'rgba(35, 40, 48, 0.12)',
-    enter: { section: 'ns-dawn', vh: 0.5 },
-  },
-];
-
-/** 换面滞回（滚动像素）：读者停在边界上来回蹭时不反复重放淡变 */
-export const ZONE_HYSTERESIS = 120;
 
 /* ── 轨图几何（SVG viewBox 48 × 300；时间向下） ── */
 export const HY_W = 48;

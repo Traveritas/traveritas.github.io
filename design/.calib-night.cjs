@@ -1,3 +1,4 @@
+// ⛔ 已退役（2026-10-07）：它校验的 ZONES 色板已从 src/data/night.ts 删除，本脚本留作存档，运行会报 ZONES parse failed。
 // 过夜色板校准台（三段平台版）：解析 src/data/night.ts 的 ZONES，
 // 逐段核验 ink/soft 对（7% 洗染后、梦/醒两态取小）bg 的 WCAG 对比度。
 // 平台是读者久留的地方，三段都必须整段 ≥4.5:1。

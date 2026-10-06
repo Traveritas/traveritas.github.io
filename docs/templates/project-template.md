@@ -14,10 +14,6 @@ date: 2026-09-24 # 必填。越早编号越小，同时决定列表页从新到�
 status: 进行中 # 三选一：构想中 / 进行中 / 已完成 → 对应八阶成形度第 2 / 5 / 8 阶
 draft: true # 写完改 false。draft 不进构建、不进列表页
 
-# cover: https://example.com/cover.jpg
-#   选填，但当前版本的项目页并不读这个字段——页首封面是自动生成的 δ 波纹底板
-#   加描边幽灵编号，与图片无关。填了不会显示任何东西。
-
 # links:                               # 选填。页尾「出口 · 源码坐标」
 #   - label: GitHub 仓库               #   href 必须是完整 https:// 地址（schema 校验 url）
 #     href: https://github.com/Traveritas/traveritas.github.io

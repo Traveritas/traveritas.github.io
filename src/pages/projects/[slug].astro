@@ -2,17 +2,12 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import { getCollection, render } from 'astro:content';
 import { excerpt } from '../../lib/excerpt';
+import { depthOf, fmtDate } from '../../lib/format';
 import PinLine from '../../components/project/PinLine.astro';
 import Coverband from '../../components/project/Coverband.astro';
 import FileNote from '../../components/project/FileNote.astro';
 import LinkList from '../../components/project/LinkList.astro';
 import ProjectNav from '../../components/project/ProjectNav.astro';
-
-const fmt = (d: Date) =>
-  `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
-
-const pinsOf = (status: string, depth?: number) =>
-  depth ?? ({ 构想中: 2, 进行中: 5, 已完成: 8 } as Record<string, number>)[status] ?? 5;
 
 export async function getStaticPaths() {
   const projects = await getCollection('projects', (p) => !p.data.draft);
@@ -36,7 +31,7 @@ export async function getStaticPaths() {
 const { project, code, other } = Astro.props;
 const { Content } = await render(project);
 const { title, description, date, status, links, related, note, depth } = project.data;
-const pins = pinsOf(status, depth);
+const pins = depthOf(status, depth);
 ---
 
 <BaseLayout
@@ -50,7 +45,7 @@ const pins = pinsOf(status, depth);
       <header class="prose-head">
         <h1 data-morph data-entrance data-true={title} aria-label={title}>{title}</h1>
         <p class="prose-meta">
-          <span class="status">{status}</span> · <time datetime={date.toISOString()}>{fmt(date)}</time>
+          <span class="status">{status}</span> · <time datetime={date.toISOString()}>{fmtDate(date)}</time>
         </p>
       </header>
       <hr class="prose-rule" />

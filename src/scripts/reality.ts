@@ -124,7 +124,13 @@ let watchdog: ReturnType<typeof setTimeout> | 0 = 0;
 let knotShown = false;
 let holdActive = false;
 
-const RM = reducedMotion();
+/* 减弱动效偏好：跟着系统设置走，读者中途切换也即时生效 */
+let RM = reducedMotion();
+if (typeof matchMedia !== 'undefined') {
+  matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', (e) => {
+    RM = e.matches;
+  });
+}
 let docEl: HTMLElement;
 let body: HTMLElement;
 let sinkTarget: HTMLElement | null = null;
