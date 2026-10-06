@@ -34,7 +34,7 @@ src/
   markdown/           # 构建期 markdown 插件（两态语法 twilight / 小节序号 ordinal / 代码配色）
   lib/                # 构建期小工具（excerpt：description 回退摘要）
   styleguide/         # 样式预览用的 markdown 样张
-  styles/tokens.css   # 设计令牌（醒梦色彩 / 字体 / 度量）
+  styles/tokens.css   # 设计令牌（醒梦色彩 / 字体栈 / 度量）
   styles/global.css   # 全局样式（排版分层 / 内容页正文 / 行内光景）
   styles/styleguide.css  # 只在 /styleguide/ 载入的工具样式
 docs/
@@ -45,8 +45,24 @@ docs/
   design/content-typography.md   # 内页正文排版分层地图
   design/styleguide.md           # 样式预览页怎么用、怎么加新样张
   design/bgm.md                  # 环境声与两态 BGM
+scripts/
+  fonts.mjs                # 正文字体按用字自切（dev / build 前自动跑）
+  new-article.mjs          # 新随笔脚手架
 .github/workflows/deploy.yml   # GitHub Pages 自动部署（类型检查 + 构建）
 ```
+
+## 字体
+
+正文与标题的 Noto Serif SC **按站内实际用字自切**，不走 `@fontsource`：
+
+- `scripts/fonts.mjs` 扫描 `src/` 下全部源码与内容收字（约一千六百字），从 Google Fonts 的可变字体切出 **500 / 600** 两个字重，
+  每个字重分 5 包（核心包放拉丁字符、全部标点和最常用的字），每包一条带 `unicode-range` 的 `@font-face`，页面只下载用得到的包。
+- `npm run dev` / `npm run build` 前自动跑（`predev` / `prebuild`）；用字没变就跳过。也可以单独 `npm run fonts`。
+- 源字体（约 25MB）首次运行时下载到 `.cache/fonts/` 并校验 sha256；产物在 `public/fonts/noto-serif-sc/`。两者都不进仓库，CI 里缓存源字体。
+- 全站只有 500 / 600：写 400 会落到 500，不要再写 300 / 700 / 900。
+- 新写的字会在下次 dev / build 时自动收进来，不用手动处理。
+
+等宽（IBM Plex Mono 400）与像素字（Silkscreen）是拉丁字体，仍用 `@fontsource`。
 
 ## 样式预览
 
