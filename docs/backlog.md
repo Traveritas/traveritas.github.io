@@ -9,14 +9,13 @@
 ## 一、主页相关
 
 1. **主页脚本出错时的揭幕兜底（待复核）**：新主页由 `html.booted` 门控，无脚本时题记直接落定；但「脚本加载了却在揭幕前抛错」时，首屏各块（`.q .c`、`.pin`、`.s-hero .rise` 等）是否会停在 `opacity:0`，需要复核，必要时补 CSS keyframes 兜底。
-2. **300/900 字重下沉**：只有主页用（标题 / 巨字），从 BaseLayout 挪进 `index.astro` 自己 import。是字体 P0（二.1）的止血配合项。
-3. **`.sr-only` 各写一份**（主页、404、`/legacy/`）：提取进 `global.css` 全站复用。
-4. **新导览轨小字对比度未普查**：`Rail.astro` / `Gauge.astro` 的半隐小字没按合成后的不透明度测过，可用 `design/.sweep-night.cjs` 的 C 段补测。
-5. ghost 重影标签在暗底上的观感，待观察。
+2. **`.sr-only` 各写一份**（主页、404、`/legacy/`）：提取进 `global.css` 全站复用。
+3. **新导览轨小字对比度未普查**：`Rail.astro` / `Gauge.astro` 的半隐小字没按合成后的不透明度测过，可用 `design/.sweep-night.cjs` 的 C 段补测。
+4. ghost 重影标签在暗底上的观感，待观察。
 
 ## 二、等 BaseLayout 改动一起做
 
-1. **字体 P0**：全站共享 CSS 约 540KB，绝大部分是 @font-face（Noto Serif SC 4 字重 ×101 子集），/about 字体实载约 805KB、文章页约 1MB。治本办法是用 `cn-font-split` 按全站实际用字自切（CSS 可压到 50KB gzip 以下），并且只输出 woff2（现在 dist 里有 397 个多余的 .woff，共 31MB）。
+1. **字体 P0**：Noto Serif SC 已收敛为全站 500 / 600 两个字重（2026-10-07），每页阻塞渲染的 CSS 仍有约 298KB（gzip 118KB），其中 209 条 @font-face；改前 /about 字体实载约 805KB、文章页约 1MB。治本办法是按全站实际用字自切（目前约 941 个不同汉字，另需加上 `data-morph` 乱码的字符池），CSS 可压到 50KB gzip 以下，并且只输出 woff2（现在 dist 里有 398 个多余的 .woff，共 17MB）。字重已定，可以直接切。
    - 2026-10-03 逐项剥离测得：首帧排版的大头是**冷启动时中文字形的首次初始化**，不是 @font-face 声明数。自切能省掉字体到位后那次约 100ms 的重排和下载量，但别指望它单独解决首帧。新主页屏外四幕已加 `content-visibility: auto`。
 2. **og:image + JSON-LD**：BaseLayout 加 `og:image`（先做一张 1200×630 默认图放进 `public/og/`），`twitter:card` 升为 `summary_large_image`，加 `og:locale zh_CN`。JSON-LD 最小集：主页 `WebSite` + `Person`，文章页 `BlogPosting`。
 3. **article:published_time / modified_time**：BaseLayout 加可选 props，文章页传 `date.toISOString()`；content schema 加可选的 `updated`。
@@ -28,7 +27,7 @@
 
 ## 三、性能（可独立排期）
 
-1. **字重收敛**：文章正文请求 400 实际只载了 500（隐性匹配，多下一套 CJK 子集）；`projects/[slug]` 请求 700 匹配到 900；SiteHeader 的 mono 用了 500/600，但只载了 IBM Plex Mono 400（伪粗体）。终态：全站 2 个字重，并补上 `@fontsource/ibm-plex-mono/500.css`。
+1. **等宽字体的伪粗体**：页头等处的 mono 写了 500 / 600，但 IBM Plex Mono 只载了 400，浏览器在合成粗体。要么补 `@fontsource/ibm-plex-mono/500.css`（观感会变成真正的中粗），要么把这些声明改回 400（Noto Serif SC 的字重已于 2026-10-07 收敛为 500 / 600）。
 2. **新主页第 2 幕偶发首次显影卡顿**：滚到造物幕（scrollY≈2900）时偶尔出一帧约 180ms，是玻璃板模糊滤镜第一次进入视口时的光栅化。可试：给 `.slab .win svg` 预先加 `will-change: filter`；或者把滚动驱动的 `filter: blur()` 换成静态两层交叉淡化。
 3. **文章页构块场并进 WebGL 画布**（2026-10-03 暂缓，阅读页目前够流畅）：160 块方块画进脑电线那张全屏画布（`eeg-worker.ts`），去掉 160 个合成层，需要逐像素对照。注意「滚出视口就暂停」已验证无效，别再试。
 4. **线景地形几何搬进顶点着色器**（低优先）：Worker 里每帧约 4–5ms，已经不占主线程。
