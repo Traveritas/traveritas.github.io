@@ -87,25 +87,31 @@
 3. **`--still` 归零后不能直接验叠影**：错位量与残影不透明度都乘 `--still`，锁相以后恒为 0；
    验残影要先撤掉那支内联 `--still`（醒面本来就该归零，别把它当 bug）。
 
-## 五、已知缺口：页面专属块还没有一种不重复的做法
+## 五、页面专属块：抽成组件（2026-10-07 定案）
 
-Astro 的 `<style>` 是**组件作用域**的：`projects/[slug].astro` 里的 `.coverband` 编译成
-`.coverband.astro-xxxx`，预览页即使照抄同样的类名也拿不到样式。于是 `.coverband`、`.wake-card`、`.pin-line`、`.link-list`、`.signal-list`、
-`.pill`、`.wake-anchor`、`.lost`、以及主页首屏的千层纸，眼下只能靠索引表给实物入口。
+Astro 的 `<style>` 是**组件作用域**的：写在 `projects/[slug].astro` 里的 `.coverband` 会编译成
+`.coverband.astro-xxxx`，预览页即使照抄同样的类名也拿不到样式。曾经有两条路可选：抽成组件，或者挪进公共样式表。
+**定案：抽成组件**。块连同 markup 移进 `src/components/`，页面改用组件，预览页 `import` 同一个。
+作用域样式跟着组件走，选择器权重不变，层叠结果也不变。
 
-要把它们也搬进预览页，得先让样式可复用，两条路（都需要动真实页面，属下一轮的决定）：
+已抽出（预览页第六节直接预览）：
 
-1. **抽成组件**（推荐）：把块连同 markup 移进 `src/components/`（已落地一例：
-   随笔 / 项目两个目录页共用的 `components/index/YearGroup.astro` + `IndexRow.astro`，
-   预览页第三节直接 import；其余如 `WakeCard.astro` 待办），页面改用组件，
-   预览页也 `import` 同一个。作用域样式跟着组件走，**不改变层叠顺序**，风险最小；
-   顺带消掉「同一段 markup 在四个页面里各抄一遍」的现存重复。
-2. **挪进公共样式表**：把各页 `<style>` 里可复用的部分搬进 `src/styles/` 下按用途分的表，
-   页面只留页面独有块。代价是失去作用域、选择器权重下降，得逐个核对层叠结果
-   （`articles/[slug].astro` 那类页内规则原先靠作用域类赢过 `global.css` 的同权重规则）。
+| 组件 | 原先写在 | 用在 |
+| --- | --- | --- |
+| `index/YearGroup` + `index/IndexRow` | 两个目录页 | 随笔 / 项目目录页、标签页 |
+| `project/PinLine` · `Coverband` · `FileNote` · `LinkList` · `ProjectNav` | `projects/[slug].astro` | 项目页 |
+| `article/TagRow` · `WakeCard` | `articles/[slug].astro` | 随笔页文末 |
+| `about/SignalList` | `about.astro` | 关于页出口名录 |
 
-两条路都要重跑一遍全站验收：改前 / 改后逐路由对比 `article.prose` 子树的几何与排版
-（方法见 content-typography.md 第五节，含「先预热再采样」那条坑）。
+仍留在页面里、只在索引表给实物入口的：晓线 `.dawn-glow`（整页效果）、标签页的结、关于页区块本身、
+404 失线页（整页即一块），以及旧主页存档 `/legacy/` 的各块（只为存档服务，不再抽）。
+
+**抽组件时的验收**：改前留一份 `dist`，改后逐路由对比目标块子树的几何与计算样式
+（1440 / 390 两档，含文档总高）。2026-10-07 这一批对照了两篇随笔、两个项目与关于页，
+248 个元素零差异。注意两点：
+- 页面里形如 `.about-section p` 的作用域规则**够不到组件里的元素**（组件有自己的作用域类）。
+  所以 `.signal-title` 这类受页面规则影响的元素留在页面里，只把下面的列表抽出去。
+- 采样方法与「先预热再采样」那条坑见 content-typography.md 第五节。
 
 ## 六、改完怎么验
 

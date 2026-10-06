@@ -56,7 +56,7 @@
 - **流光**构建期按字拆成 `inline-block` 单元（西文按词），每个单元叠一层琥珀副本、只动 `opacity`，
   曲线是按单元在整段里的位置算好的 `linear()` 缓动（`src/markdown/sheen-timing.mjs`，与原「整段渐变 +
   background-position」同式）⇒ 整条交给合成器。代价：单元整体变色、`angle` 不再生效、段内两端对齐留缺口。
-  （原写法动 `background-position` 走主线程，会把全站可合成的动画逐帧拉回主线程重算，见 backlog 附五。）
+  （原写法动 `background-position` 走主线程，会把全站可合成的动画逐帧拉回主线程重算，见 `docs/archive/backlog-2026-09-21.md` 附五。）
 - 参数都是自定义属性（`--float-amp/dur/stagger/tint/sway`、`--sheen-hue/dur`；`span`/`steps` 在构建期烘焙），
   默认值写在 keyframes 与 `sheen-timing.mjs` 里；正文侧由 `((…|k=v,…))` 覆盖，预览页「醒梦双态」一节有滑杆。
 
