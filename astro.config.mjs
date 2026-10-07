@@ -51,10 +51,10 @@ export default defineConfig({
   server: { host: '127.0.0.1' },
   integrations: [
     // 样式预览（/styleguide/）是工作台不是内容页：不进 sitemap（robots.txt 同档禁收）
-    // /legacy/ 是换下来的旧主页、/new/ 是新主页预览期的旧址（现已跳转到 /）、/mock/ 是设计原型：保留可访问，但同样不进 sitemap、robots 禁收
+    // /new/ 是新主页预览期的旧址（现已跳转到 /）：同样不进 sitemap、robots 禁收
     // 按整段路径匹配：裸 includes('/new') 会误伤 /tags/newsletter/ 这类页面
     sitemap({
-      filter: (page) => !/^\/(styleguide|new|legacy|mock)\//.test(new URL(page).pathname),
+      filter: (page) => !/^\/(styleguide|new)\//.test(new URL(page).pathname),
       serialize(item) {
         const d = LASTMOD.get(decodeURI(new URL(item.url).pathname));
         return d ? { ...item, lastmod: d.toISOString() } : item;

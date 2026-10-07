@@ -11,19 +11,18 @@
 title: 项目名 # 必填。纯文本字段，不解析 markdown，也不支持 [[醒|梦]]
 description: 一句话说清它是什么。 # 选填。列表页标题下的副标题
 date: 2026-09-24 # 必填。越早编号越小，同时决定列表页从新到旧的排序
-status: 进行中 # 三选一：构想中 / 进行中 / 已完成 → 对应八阶成形度第 2 / 5 / 8 阶
+status: 进行中 # 自由文本，原样显示在标题下
 draft: true # 写完改 false。draft 不进构建、不进列表页
 
-# links:                               # 选填。页尾「出口 · 源码坐标」
+# links:                               # 选填。页尾「相关链接」，没有就整块不出
 #   - label: GitHub 仓库               #   href 必须是完整 https:// 地址（schema 校验 url）
 #     href: https://github.com/Traveritas/traveritas.github.io
-#   给了 github.com 链接，列表页那行的「✓ 公开仓库」才会亮起；没有则显示「○ 暂无公开」。
 
 # related:                             # 选填。页尾「关联记述」互链，href 写站内路径（不做 url 校验）
 #   - label: 《母题探索记录：从碎块到花》——三轮探索与两次否决的完整记录
 #     href: /articles/motif-exploration-log/
 
-# note:                                # 选填。页尾「N3 · 深眠注记」的琥珀左边注
+# note:                                # 选填。页尾的琥珀左边注
 #   awake: 醒面的注记，冷静、笃定，像给自己留下的朴素记录。   # awake 与 dream 两个都必须写，
 #   dream: “梦面的注记，可以是一句诗性的引用。”          # 只给一个会校验失败
 ---
@@ -41,10 +40,5 @@ draft: true # 写完改 false。draft 不进构建、不进列表页
 - [ ] 正在进行的一步
 
 任务清单中：已勾选的是琥珀色 ✓，未勾选的是灰色 ○。
-
-## 状态
-
-项目页首的八阶成形度由 frontmatter 的 `status` 决定，与这里的清单无关；
-清单负责说清「做到哪一步了」，两个字段各管一件事。
 
 h2 的小节序号（01、02、03）由构建期插件 src/markdown/ordinal.mjs 自动注入，标题里不要再手写编号。

@@ -3,7 +3,6 @@ title: ℱ𝒶𝓃𝒸𝓎𝒯ℯ𝓍𝓉
 description: 零依赖、低占用的本地 Unicode 文本形态转换器与轻量工具套件。
 date: 2026-09-20
 status: 𝔖𝔬 𝔉𝔞𝔫𝔠𝔶~
-depth: 7
 links:
   - label: GitHub 仓库
     href: https://github.com/Traveritas/fancytext

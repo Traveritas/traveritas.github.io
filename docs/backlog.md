@@ -9,7 +9,7 @@
 ## 一、主页相关
 
 1. **主页脚本出错时的揭幕兜底（待复核）**：新主页由 `html.booted` 门控，无脚本时题记直接落定；但「脚本加载了却在揭幕前抛错」时，首屏各块（`.q .c`、`.pin`、`.s-hero .rise` 等）是否会停在 `opacity:0`，需要复核，必要时补 CSS keyframes 兜底。
-2. **`.sr-only` 各写一份**（主页、404、`/legacy/`）：提取进 `global.css` 全站复用。
+2. **`.sr-only` 各写一份**（主页、404）：提取进 `global.css` 全站复用。
 3. **新导览轨小字对比度未普查**：`Rail.astro` / `Gauge.astro` 的半隐小字没按合成后的不透明度测过，可用 `design/.sweep-night.cjs` 的 C 段补测。
 4. ghost 重影标签在暗底上的观感，待观察。
 

@@ -28,7 +28,7 @@ src/
     index/            #   目录行（随笔 / 项目目录页、标签页共用）
     article/ project/ about/  #   各内容页的专属块
     styleguide/       #   样式预览的样张原语
-  pages/              # 路由页面（styleguide.astro = 样式预览工作台，legacy.astro = 旧主页存档）
+  pages/              # 路由页面（styleguide.astro = 样式预览工作台）
   scripts/            # 客户端脚本（入梦检验 reality / 双声轨 morph / 导览轨 gauge / 主页故事板等）
   data/               # 数据源（night.ts：23:07 → 06:31 的一夜时间轴）
   markdown/           # 构建期 markdown 插件（两态语法 twilight / 小节序号 ordinal / 代码配色）

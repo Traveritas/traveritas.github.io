@@ -99,12 +99,11 @@ Astro 的 `<style>` 是**组件作用域**的：写在 `projects/[slug].astro` �
 | 组件 | 原先写在 | 用在 |
 | --- | --- | --- |
 | `index/YearGroup` + `index/IndexRow` | 两个目录页 | 随笔 / 项目目录页、标签页 |
-| `project/PinLine` · `Coverband` · `FileNote` · `LinkList` · `ProjectNav` | `projects/[slug].astro` | 项目页 |
+| `project/Coverband` · `FileNote` · `LinkList` · `ProjectNav` | `projects/[slug].astro` | 项目页 |
 | `article/TagRow` · `WakeCard` | `articles/[slug].astro` | 随笔页文末 |
-| `about/SignalList` | `about.astro` | 关于页出口名录 |
 
-仍留在页面里、只在索引表给实物入口的：晓线 `.dawn-glow`（整页效果）、标签页的结、关于页区块本身、
-404 失线页（整页即一块），以及旧主页存档 `/legacy/` 的各块（只为存档服务，不再抽）。
+仍留在页面里、只在索引表给实物入口的：晓线 `.dawn-glow`（整页效果）、标签页的结、
+404 失线页（整页即一块）。
 
 **抽组件时的验收**：改前留一份 `dist`，改后逐路由对比目标块子树的几何与计算样式
 （1440 / 390 两档，含文档总高）。2026-10-07 这一批对照了两篇随笔、两个项目与关于页，
