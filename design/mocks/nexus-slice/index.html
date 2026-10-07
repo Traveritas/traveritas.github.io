@@ -1,0 +1,558 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>截面 · 调整版</title>
+<style>
+  :root {
+    --bg: #f0f3f6;
+    --fg: #232830;
+    --fg-soft: #56606d;
+    --fg-faint: #858f9d;
+    --line: rgba(35, 40, 48, 0.12);
+    --amber: #d9a05b;
+    --panel: rgba(250, 248, 250, 0.86);
+    --mix: 1; /* 1 醒 · 0 梦，与站点 --reality-mix 同向 */
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; color: var(--fg);
+    font: 13px/1.6 system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif; }
+  body { display: grid; grid-template-columns: 1fr 300px; overflow: hidden; background: var(--bg); }
+  @media (max-width: 900px) { body { grid-template-columns: 1fr; grid-template-rows: minmax(70vh, 1fr) auto; overflow: auto; } }
+
+  /* ── 舞台：复刻站点普通页的地面（--bg + 7% 醒冷灰 / 梦暖褐洗染） ── */
+  .viewport { position: relative; overflow: hidden; background: var(--bg); }
+  .viewport::before, .viewport::after { content: ''; position: absolute; inset: 0; pointer-events: none; }
+  .viewport::before { background: #8a5a30; opacity: calc((1 - var(--mix)) * 0.07); }
+  .viewport::after { background: #556270; opacity: calc(var(--mix) * 0.07); }
+
+  /* 关于页语境：标题 + 正文占位条 */
+  .ctx { position: absolute; left: clamp(20px, 7vw, 110px); top: clamp(40px, 14vh, 140px); z-index: 1; width: min(34ch, 40%); }
+  .ctx h2 { font: 500 clamp(28px, 3.4vw, 44px)/1.2 'Noto Serif SC', 'Songti SC', serif; margin: 0 0 1.4em; letter-spacing: .08em; }
+  .ctx i { display: block; height: 7px; margin: 0 0 15px; border-radius: 2px; background: rgba(35, 40, 48, .075); }
+  body.noctx .ctx { display: none; }
+
+  .door { position: absolute; z-index: 2; right: clamp(10px, 9vw, 160px); top: 50%; transform: translateY(-50%);
+    width: clamp(260px, 40vmin, 520px); aspect-ratio: 1; display: block; border-radius: 50%; outline: none; }
+  body.noctx .door { right: 50%; transform: translate(50%, -50%); }
+  .door canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  /* 投影：不贴地，只是一团很淡的丁香灰 */
+  .door .shade { position: absolute; left: 22%; right: 22%; bottom: 2%; height: 9%; border-radius: 50%;
+    background: radial-gradient(closest-side, rgba(90, 80, 110, .12), rgba(90, 80, 110, 0));
+    filter: blur(6px); }
+
+  /* ── 面板 ── */
+  aside { border-left: 1px solid var(--line); background: var(--panel); padding: 22px 20px; overflow: auto; position: relative; z-index: 3; }
+  h1 { font: 600 17px/1.4 'Noto Serif SC', 'Songti SC', serif; margin: 0 0 4px; letter-spacing: .04em; }
+  .kicker { font: 11px/1 ui-monospace, Consolas, monospace; letter-spacing: .14em; color: var(--amber); margin-bottom: 10px; }
+  .lede { color: var(--fg-soft); margin: 0 0 18px; }
+  h3 { font: 11px/1 ui-monospace, Consolas, monospace; letter-spacing: .12em; color: var(--fg-faint); margin: 20px 0 10px; text-transform: uppercase; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
+  button { font: inherit; border: 1px solid var(--line); background: #fff; color: var(--fg); padding: 6px 12px; border-radius: 3px; cursor: pointer; }
+  button[aria-pressed=true] { border-color: var(--amber); box-shadow: inset 0 0 0 1px var(--amber); }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+  label { display: flex; gap: 8px; align-items: center; color: var(--fg-soft); }
+  input[type=range] { flex: 1; accent-color: var(--amber); }
+  .stat { font: 11px/1.7 ui-monospace, Consolas, monospace; color: var(--fg-soft); white-space: pre-wrap; }
+  .note { color: var(--fg-soft); }
+  .note b { color: var(--fg); font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="viewport" id="vp">
+  <div class="ctx" aria-hidden="true">
+    <h2>关于</h2>
+    <i style="width:100%"></i><i style="width:92%"></i><i style="width:97%"></i><i style="width:58%"></i>
+  </div>
+  <div class="door" id="door" aria-hidden="true">
+    <span class="shade" aria-hidden="true"></span>
+    <canvas id="hero"></canvas>
+  </div>
+</div>
+
+<aside>
+  <div class="kicker">NEXUS · CROSS SECTION · v2</div>
+  <h1>截面 · 调整版</h1>
+  <p class="lede">一个四维晶体落在此处的一层切面，作为通往 NEXUS 的门。原版见 <a href="../hero-slice/">hero-slice</a>。</p>
+
+  <h3>状态</h3>
+  <div class="row">
+    <button id="toWake" aria-pressed="true">醒 · 定形</button>
+    <button id="toDream" aria-pressed="false">梦 · 换形</button>
+  </div>
+  <div class="row note">也可以按住 Shift + 空格 1 秒切换。</div>
+
+  <div class="row note">NEXUS 还没做，门暂时不响应悬停与点击。</div>
+  <div class="row">
+    <label><input id="ctx" type="checkbox" checked> 关于页语境</label>
+  </div>
+
+  <h3>播放</h3>
+  <label>转速 <input id="speed" type="range" min="0.25" max="4" step="0.05" value="1"><span id="speedV">1.0×</span></label>
+
+  <h3>数据</h3>
+  <div class="stat" id="stat">—</div>
+
+  <h3>相对原版改了什么</h3>
+  <p class="note"><b>真实光程。</b>切面永远是凸多面体，所以每个像素都能沿折射光线算出它从哪一面射出：入射 → 体内全反射至多三次 → 出射。光程决定吸收的深浅，体内的光核按光线离它的距离积分。原版是把背面和正面各叠一层半透明。</p>
+  <p class="note"><b>环境。</b>沿用原版的丁香配色与薄膜虹彩，去掉了地平线细暗线；另加一块左上柔光箱和一张左侧暗卡，晶面靠反射暗卡得到轮廓，不再描白边。</p>
+  <p class="note"><b>棱。</b>按到相邻面的真实距离做圆角，法线向邻面弯过去，亮暗随朝向自然起伏；体内的棱只在出射点留一丝很淡的影。</p>
+  <p class="note"><b>光核。</b>强度做了饱和（1 − e⁻ˣ），梦里更亮但不会洗白晶面。</p>
+  <p class="note"><b>色散。</b>出射时三色各用一个折射率，醒时极弱，梦里稍强。</p>
+  <p class="note"><b>性能。</b>WebGL2，DPR ≤ 2，30 fps 上限，离屏或隐藏即停；减少动效时只画一帧。</p>
+</aside>
+
+<script>
+'use strict';
+/* ───────────── 24 胞体：24 个半空间 a·x ≤ b ───────────── */
+const HALF = [];
+for (let i = 0; i < 4; i++) for (const s of [1, -1]) {
+  const a = [0, 0, 0, 0]; a[i] = s; HALF.push([a, 1]);
+}
+for (let m = 0; m < 16; m++) {
+  HALF.push([[m & 1 ? -1 : 1, m & 2 ? -1 : 1, m & 4 ? -1 : 1, m & 8 ? -1 : 1], 2]);
+}
+const dot4 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3];
+function rot4(M, i, j, th) {
+  const c = Math.cos(th), s = Math.sin(th);
+  for (const col of M) { const xi = col[i], xj = col[j]; col[i] = c * xi - s * xj; col[j] = s * xi + c * xj; }
+}
+const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+const mul = (a, k) => [a[0] * k, a[1] * k, a[2] * k];
+const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const len = a => Math.hypot(a[0], a[1], a[2]);
+const norm = a => mul(a, 1 / len(a));
+
+/** 截面 → 面列表 [{n, d, pts}]：pts 是切面三维坐标里的凸多边形，n·x ≤ d 是它所在的半空间 */
+function section(n, E, h) {
+  const planes = [];
+  for (const [a, b] of HALF) {
+    const p = [dot4(a, E[0]), dot4(a, E[1]), dot4(a, E[2])];
+    const l = len(p);
+    if (l < 1e-6) continue;
+    planes.push({ n: mul(p, 1 / l), d: (b - h * dot4(a, n)) / l });
+  }
+  const faces = [];
+  for (let k = 0; k < planes.length; k++) {
+    const P = planes[k];
+    const helper = Math.abs(P.n[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0];
+    const u = norm(cross(helper, P.n)), v = cross(P.n, u), o = mul(P.n, P.d), R = 8;
+    let poly = [add(o, add(mul(u, -R), mul(v, -R))), add(o, add(mul(u, R), mul(v, -R))),
+                add(o, add(mul(u, R), mul(v, R))), add(o, add(mul(u, -R), mul(v, R)))];
+    for (let j = 0; j < planes.length && poly.length >= 3; j++) {
+      if (j === k) continue;
+      const Q = planes[j], out = [];
+      for (let i = 0; i < poly.length; i++) {
+        const A = poly[i], B = poly[(i + 1) % poly.length];
+        const da = dot(Q.n, A) - Q.d, db = dot(Q.n, B) - Q.d;
+        if (da <= 1e-9) out.push(A);
+        if ((da <= 1e-9) !== (db <= 1e-9)) out.push(add(A, mul(sub(B, A), da / (da - db))));
+      }
+      poly = out;
+    }
+    if (poly.length < 3) continue;
+    let area = 0;
+    for (let i = 1; i + 1 < poly.length; i++) area += len(cross(sub(poly[i], poly[0]), sub(poly[i + 1], poly[0])));
+    if (area < 1e-7) continue; // 只丢真正退化的面；原版 2e-4 会让小面在看得见时被整片拿掉
+    faces.push({ n: P.n, d: P.d, pts: poly, area: area / 2 });
+  }
+  return faces;
+}
+
+/* ───────────── WebGL2 ───────────── */
+const cv = document.getElementById('hero');
+const door = document.getElementById('door');
+let DPR = Math.min(2, devicePixelRatio || 1);
+const gl = cv.getContext('webgl2', { antialias: true, premultipliedAlpha: true, alpha: true });
+
+const MAXP = 24;
+const VS = `#version 300 es
+layout(location=0) in vec3 aPos;
+layout(location=1) in vec3 aNor;
+uniform mat4 uView, uProj;
+out vec3 vW; out vec3 vN;
+void main(){ vW = aPos; vN = aNor; gl_Position = uProj * uView * vec4(aPos, 1.); }`;
+
+const FS = `#version 300 es
+precision highp float;
+#define MAXP ${MAXP}
+in vec3 vW; in vec3 vN;
+uniform vec3 uCam;
+uniform vec4 uPl[MAXP];     // 世界坐标里的半空间：xyz·p ≤ w
+uniform int uNP;
+uniform float uPw[MAXP];    // 每面的圆角权重：面将消失时趋于 0，棱上的光随之收掉
+uniform vec3 uBg;           // 页面地面色（已含醒梦洗染）
+uniform float uDream;       // 0 醒 · 1 梦
+uniform float uCore;        // 光核强度
+uniform vec3 uCoreC;
+uniform float uRough;       // 体内磨砂度
+out vec4 o;
+
+// 环境：沿用原版的配色 —— 淡丁香天顶、近白地平亮带、偏紫的下半球（去掉了地平线细暗线）；
+// 另加左上柔光箱与左侧暗卡给轮廓，右后一盏很淡的粉白小灯
+// r：粗糙度 0..1 —— 表面反射用 0（清楚），体内透射用较大值（磨砂树脂：光斑化开、暗卡变浅）
+vec3 env(vec3 d, float r){
+  float w = 1.0 + 3.0 * r;
+  float y = d.y;
+  vec3 top = vec3(0.90, 0.895, 0.97), hor = vec3(1.0, 0.975, 0.965), low = vec3(0.78, 0.745, 0.80);
+  top = mix(top, vec3(0.94, 0.90, 0.95), uDream);                          // 梦：天顶微微转粉
+  vec3 c = y > 0.0 ? mix(hor, top, smoothstep(0.0, 0.65 * w, y)) : mix(hor, low, smoothstep(0.0, 0.5 * w, -y));
+  c += vec3(0.12, 0.10, 0.09) * exp(-pow(y / (0.06 * w), 2.0));          // 地平亮带（无细线）
+  c *= mix(1.0, 0.92, smoothstep(0.15, 0.95, d.z));                        // 观者一侧：房间
+  float k = 1.0 - r * 0.6;
+  c *= 1.0 - 0.30 * k * smoothstep(1.0 - 0.20 * w, 0.97, dot(d, normalize(vec3(-0.95, 0.05, -0.30))));  // 暗卡
+  c *= 1.0 - 0.15 * k * smoothstep(1.0 - 0.25 * w, 0.97, dot(d, normalize(vec3(0.85, -0.25, 0.45))));  // 右前暗卡
+  float key = smoothstep(1.0 - 0.10 * w, 0.975, dot(d, normalize(vec3(-0.50, 0.70, 0.50))));
+  c += vec3(1.0, 0.99, 0.97) * 0.75 * k * key;
+  c += vec3(1.0, 0.94, 0.96) * 0.30 * k * smoothstep(1.0 - 0.07 * w, 0.99, dot(d, normalize(vec3(0.75, 0.25, -0.60))));
+  return c;
+}
+
+// 射线 P + tT 在凸体内到出射面的距离；返回 t，ni = 出射面序号
+float exitT(vec3 P, vec3 T, out int ni){
+  float tm = 1e9; ni = -1;
+  for (int i = 0; i < MAXP; i++) {
+    if (i >= uNP) break;
+    float dn = dot(uPl[i].xyz, T);
+    if (dn > 1e-5) {
+      float t = (uPl[i].w - dot(uPl[i].xyz, P)) / dn;
+      if (t < tm) { tm = t; ni = i; }
+    }
+  }
+  return max(tm, 0.0);
+}
+
+// 面上点到最近棱的距离（沿面量），nb = 那条棱另一侧的面法向
+float edgeDist(vec3 P, vec3 N, out vec3 nb){
+  float best = 1e9; nb = N;
+  for (int i = 0; i < MAXP; i++) {
+    if (i >= uNP) break;
+    vec3 n = uPl[i].xyz;
+    float c = dot(n, N);
+    if (c > 0.9995) continue;                      // 自己这一面
+    float e = (uPl[i].w - dot(n, P)) / sqrt(max(1e-4, 1.0 - c * c)) / max(uPw[i], 1e-3);
+    if (e < best) { best = e; nb = n; }
+  }
+  return best;
+}
+
+float glowSeg(vec3 A, vec3 B){
+  vec3 ab = B - A;
+  float t = clamp(dot(uCoreC - A, ab) / max(dot(ab, ab), 1e-6), 0.0, 1.0);
+  vec3 q = A + ab * t - uCoreC;
+  return exp(-dot(q, q) / 0.12) * length(ab);
+}
+
+void main(){
+  vec3 N = normalize(vN);
+  vec3 I = normalize(vW - uCam);
+  vec3 V = -I;
+
+  // 圆角棱：靠近棱时法线朝邻面弯过去
+  vec3 nb;
+  float e = edgeDist(vW, N, nb);
+  float bw = 0.028;
+  float tb = 1.0 - smoothstep(0.0, bw, e);
+  vec3 Nb = normalize(mix(N, normalize(N + nb), tb * tb));
+
+  float ndv = clamp(dot(Nb, V), 0.0, 1.0);
+  float F = 0.04 + 0.96 * pow(1.0 - ndv, 5.0);
+  vec3 refl = env(reflect(I, Nb), 0.0);
+
+  // 透射：入射 → 至多三次体内全反射 → 出射
+  float ior = 1.52;
+  vec3 T = refract(I, Nb, 1.0 / ior);
+  vec3 P = vW;
+  float L = 0.0, g = 0.0, inner = 0.0;
+  vec3 trans = vec3(0.0);
+  bool done = false;
+  float disp = mix(0.006, 0.018, uDream);
+  for (int b = 0; b < 4; b++) {
+    int ni;
+    float t = exitT(P, T, ni);
+    vec3 Q = P + T * t;
+    L += t; g += glowSeg(P, Q);
+    if (ni < 0) break;
+    vec3 Ne = uPl[ni].xyz;
+    if (b == 0) {                                  // 体内的棱：只在第一个出射点留一丝影
+      vec3 dummy;
+      float ei = edgeDist(Q, Ne, dummy);
+      inner = exp(-pow(ei / 0.010, 2.0));
+    }
+    vec3 Tg = refract(T, -Ne, ior);
+    if (dot(Tg, Tg) > 0.0) {
+      vec3 Tr = refract(T, -Ne, ior - disp);
+      vec3 Tb = refract(T, -Ne, ior + disp);
+      if (dot(Tr, Tr) == 0.0) Tr = Tg;
+      if (dot(Tb, Tb) == 0.0) Tb = Tg;
+      float Fe = 0.04 + 0.96 * pow(1.0 - clamp(dot(Ne, Tg), 0.0, 1.0), 5.0);
+      trans = vec3(env(Tr, uRough).r, env(Tg, uRough).g, env(Tb, uRough).b) * (1.0 - Fe);
+      done = true;
+      break;
+    }
+    T = reflect(T, -Ne);                           // 全反射：留在体内继续走
+    P = Q + T * 1e-4;
+  }
+  if (!done) trans = env(T, uRough) * 0.85;
+
+  // 吸收：丁香色（原版的 absorb），梦里偏一点粉；光程越长越深
+  vec3 k = mix(vec3(0.060, 0.064, 0.012), vec3(0.030, 0.058, 0.030), uDream);
+  trans *= exp(-k * L) * 1.03;
+  trans *= 1.0 - inner * 0.16;
+  // 光核：沿光程积分后饱和，不会洗白；只是一团近白的微温，不走橙色
+  float gc = 1.0 - exp(-g * uCore);
+  vec3 glow = mix(vec3(1.0, 0.975, 0.955), vec3(1.0, 0.955, 0.965), uDream);
+  trans = mix(trans, glow * 1.05, gc * 0.55);
+
+  // 薄膜：随视角变色的极淡虹彩，只上在反射里（原版同款）
+  vec3 film = 0.5 + 0.5 * cos(6.2832 * (vec3(0.0, 0.33, 0.67) + 1.8 * (1.0 - ndv)));
+  refl *= mix(vec3(1.0), film, 0.16);
+  vec3 col = mix(trans, refl, F);
+  // 主光高光（落在圆角棱上最亮）
+  vec3 Lk = normalize(vec3(-0.50, 0.70, 0.50));
+  float spec = pow(max(dot(Nb, normalize(Lk + V)), 0.0), 260.0);
+  col += vec3(1.0) * spec * (0.9 + 0.6 * tb);
+  o = vec4(col, 1.0);
+}`;
+
+function prog(vs, fs) {
+  const p = gl.createProgram();
+  for (const [t, s] of [[gl.VERTEX_SHADER, vs], [gl.FRAGMENT_SHADER, fs]]) {
+    const sh = gl.createShader(t); gl.shaderSource(sh, s); gl.compileShader(sh);
+    if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(sh));
+    gl.attachShader(p, sh);
+  }
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+  const U = {};
+  for (let i = 0, n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS); i < n; i++) {
+    const name = gl.getActiveUniform(p, i).name.replace(/\[0\]$/, '');
+    U[name] = gl.getUniformLocation(p, name);
+  }
+  return { p, U };
+}
+const P = prog(VS, FS);
+
+const MAXV = 24 * 12 * 3, STRIDE = 6;
+const vdata = new Float32Array(MAXV * STRIDE);
+const pl = new Float32Array(MAXP * 4);
+const pw = new Float32Array(MAXP);
+const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
+const vbo = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+gl.bufferData(gl.ARRAY_BUFFER, vdata.byteLength, gl.DYNAMIC_DRAW);
+gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, STRIDE * 4, 0);
+gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 3, gl.FLOAT, false, STRIDE * 4, 12);
+
+function persp(fov, asp, n, f) {
+  const t = 1 / Math.tan(fov / 2);
+  return [t / asp, 0, 0, 0, 0, t, 0, 0, 0, 0, (f + n) / (n - f), -1, 0, 0, 2 * f * n / (n - f), 0];
+}
+function lookAt(e, c, up) {
+  const z = norm(sub(e, c)), x = norm(cross(up, z)), y = cross(z, x);
+  return [x[0], y[0], z[0], 0, x[1], y[1], z[1], 0, x[2], y[2], z[2], 0, -dot(x, e), -dot(y, e), -dot(z, e), 1];
+}
+const CAM = [0, 0.55, 6.2];
+const VIEW = lookAt(CAM, [0, 0, 0], [0, 1, 0]);
+const PROJ = persp(0.62, 1, 0.1, 50);
+
+/* ───────────── 状态 ───────────── */
+let dream = 0, want = 0;   // 0 醒 · 1 梦
+let tau = 0;               // 四维转动的内在时钟
+let yaw = 0.4, speed = 1;
+let lastFaces = 0;
+const smooth = x => x * x * (3 - 2 * x);
+const hexRgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255);
+const BG = hexRgb('#f0f3f6'), WASH_W = hexRgb('#556270'), WASH_D = hexRgb('#8a5a30');
+const lerp3 = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
+
+function slice() {
+  const d = smooth(dream);
+  const amp = d;
+  const M = [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]];
+  rot4(M, 0, 1, amp * (0.55 * Math.sin(tau * 0.21) + 0.25 * Math.sin(tau * 0.083 + 1.3)));
+  rot4(M, 0, 2, amp * (0.45 * Math.sin(tau * 0.157 + 2.1)));
+  rot4(M, 0, 3, amp * (0.35 * Math.sin(tau * 0.119 + 0.6)));
+  rot4(M, 1, 2, d * tau * 0.05);
+  // 醒时贴近胞（八面体 + 极小截角）；梦里往中心游移
+  const h = 0.9 - d * (0.38 + 0.3 * Math.sin(tau * 0.097 + 0.4));
+  return section(M[0], [M[1], M[2], M[3]], h);
+}
+
+/* 面 → 世界坐标的顶点与半空间（模型矩阵烘进去，着色器全程在世界坐标里算） */
+function build(faces) {
+  const d = smooth(dream);
+  // 中心取按面积加权的面心：将消失的小面权重趋于 0，面数增减时整体不跳
+  // （原版按顶点平均，一枚多顶点小面出没会让整颗晶体错一下位）
+  let c = [0, 0, 0], wsum = 0;
+  for (const f of faces) {
+    let fc = [0, 0, 0];
+    for (const p of f.pts) fc = add(fc, p);
+    c = add(c, mul(fc, f.area / f.pts.length)); wsum += f.area;
+  }
+  c = mul(c, 1 / Math.max(1e-9, wsum));
+  let vol = 0;
+  for (const f of faces) vol += f.area * Math.abs(dot(f.n, sub(f.pts[0], c))) / 3;
+  const inv = Math.cbrt((4 / 3) / (vol || 1));
+  const s = 1.1, sy = 1.28 - 0.16 * d;
+  const cy = Math.cos(yaw), sw = Math.sin(yaw);
+  const R = v => [cy * v[0] - sw * v[2], v[1], sw * v[0] + cy * v[2]];      // 绕 y 轴
+  const toW = p => R([p[0] * s, p[1] * s * sy, p[2] * s]);
+  let k = 0;
+  faces.forEach((f, fi) => {
+    // 法向经 S⁻¹ 再旋转；半空间偏移按同一比例
+    const nl = R([f.n[0] / s, f.n[1] / (s * sy), f.n[2] / s]);
+    const L = len(nl), nw = mul(nl, 1 / L);
+    pl[fi * 4] = nw[0]; pl[fi * 4 + 1] = nw[1]; pl[fi * 4 + 2] = nw[2];
+    pl[fi * 4 + 3] = (f.d - dot(f.n, c)) * inv / L;
+    pw[fi] = smooth(Math.min(1, f.area * inv * inv / 0.03));
+    const pts = f.pts.map(p => toW(mul(sub(p, c), inv)));
+    for (let i = 1; i + 1 < pts.length; i++) for (const p of [pts[0], pts[i], pts[i + 1]]) {
+      vdata[k++] = p[0]; vdata[k++] = p[1]; vdata[k++] = p[2];
+      vdata[k++] = nw[0]; vdata[k++] = nw[1]; vdata[k++] = nw[2];
+    }
+  });
+  gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+  gl.bufferSubData(gl.ARRAY_BUFFER, 0, vdata, 0, k);
+  lastFaces = faces.length;
+  return { n: k / STRIDE, np: faces.length };
+}
+
+function resize() {
+  const r = cv.getBoundingClientRect();
+  DPR = Math.min(2, devicePixelRatio || 1);
+  const px = Math.max(64, Math.round(r.width * DPR));
+  if (cv.width !== px) { cv.width = cv.height = px; }
+}
+
+function render() {
+  resize();
+  const faces = slice();
+  const { n, np } = build(faces);
+  const d = smooth(dream);
+  const mixW = 1 - d;
+  document.documentElement.style.setProperty('--mix', mixW.toFixed(3));
+  const bg = lerp3(lerp3(BG, WASH_D, 0.07), lerp3(BG, WASH_W, 0.07), mixW);
+  gl.viewport(0, 0, cv.width, cv.height);
+  gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.disable(gl.BLEND);
+  gl.enable(gl.CULL_FACE); gl.cullFace(gl.BACK);
+  gl.useProgram(P.p); gl.bindVertexArray(vao);
+  gl.uniformMatrix4fv(P.U.uView, false, VIEW);
+  gl.uniformMatrix4fv(P.U.uProj, false, PROJ);
+  gl.uniform3fv(P.U.uCam, CAM);
+  gl.uniform4fv(P.U.uPl, pl);
+  gl.uniform1i(P.U.uNP, np);
+  gl.uniform1fv(P.U.uPw, pw);
+  gl.uniform3fv(P.U.uBg, bg);
+  gl.uniform1f(P.U.uDream, d);
+  gl.uniform1f(P.U.uCore, 0.50 + 0.95 * d);
+  gl.uniform1f(P.U.uRough, 0.45 - 0.12 * d);
+  gl.uniform3fv(P.U.uCoreC, [0, 0.04 + 0.1 * d, 0]);
+  gl.drawArrays(gl.TRIANGLES, 0, n);
+}
+
+/* ───────────── 循环 ───────────── */
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const params = new URLSearchParams(location.search);
+let raf = 0, last = 0, acc = 0, visible = true, onscreen = true;
+const work = [];
+function tick(now) {
+  raf = requestAnimationFrame(tick);
+  if (!last) last = now;
+  const dt = Math.min(0.1, (now - last) / 1000);
+  last = now; acc += dt;
+  if (acc < 1 / 30 - 0.002) return;
+  const step = acc; acc = 0;
+  advance(step);
+  const t0 = performance.now();
+  render();
+  work.push(performance.now() - t0);
+  if (work.length > 240) work.shift();
+}
+function advance(step) {
+  dream += Math.sign(want - dream) * Math.min(Math.abs(want - dream), step / 2.4);
+  tau += step * speed * smooth(dream);
+  yaw += step * speed * (0.06 + 0.16 * smooth(dream));
+}
+function start() { if (!raf && visible && onscreen && !reduced) { last = 0; raf = requestAnimationFrame(tick); } }
+function stop() { cancelAnimationFrame(raf); raf = 0; }
+document.addEventListener('visibilitychange', () => { visible = !document.hidden; visible ? start() : stop(); });
+new IntersectionObserver(es => { onscreen = es[0].isIntersecting; onscreen ? start() : stop(); }).observe(cv);
+addEventListener('resize', () => { if (!raf) render(); });
+
+setInterval(() => {
+  if (!work.length) return;
+  const s = [...work].sort((a, b) => a - b);
+  const avg = s.reduce((a, b) => a + b, 0) / s.length;
+  const p95 = s[Math.floor(s.length * 0.95)];
+  document.getElementById('stat').textContent =
+    `每帧 JS+提交  平均 ${avg.toFixed(2)} ms · p95 ${p95.toFixed(2)} ms\n` +
+    `画布          ${cv.clientWidth}² css · ${cv.width}² 位图 (DPR ${DPR})\n` +
+    `当前面数      ${lastFaces}\n` +
+    `运行状态      ${raf ? '播放' : '暂停'}`;
+}, 500);
+
+/* ───────────── 交互 ───────────── */
+function setWant(w) {
+  want = w;
+  document.getElementById('toWake').setAttribute('aria-pressed', w === 0);
+  document.getElementById('toDream').setAttribute('aria-pressed', w === 1);
+  if (reduced) { dream = w; render(); }
+}
+document.getElementById('toWake').onclick = () => setWant(0);
+document.getElementById('toDream').onclick = () => setWant(1);
+let hold = 0;
+addEventListener('keydown', e => {
+  if (e.code !== 'Space' || !e.shiftKey || e.repeat) return;
+  e.preventDefault();
+  hold = setTimeout(() => setWant(want ? 0 : 1), 1000);
+});
+addEventListener('keyup', e => { if (e.code === 'Space') clearTimeout(hold); });
+const sp = document.getElementById('speed');
+sp.oninput = () => { speed = +sp.value; document.getElementById('speedV').textContent = speed.toFixed(1) + '×'; };
+document.getElementById('ctx').onchange = e => { document.body.classList.toggle('noctx', !e.target.checked); render(); };
+
+/* 截图用：?d=0..1 &tau= &yaw= &noctx &freeze；?seq 把内部时钟交给 window.__step */
+if (params.has('d')) { dream = +params.get('d'); want = dream > 0.5 ? 1 : 0; setWant(want); }
+if (params.has('tau')) tau = +params.get('tau');
+if (params.has('yaw')) yaw = +params.get('yaw');
+if (params.has('noctx')) { document.body.classList.add('noctx'); document.getElementById('ctx').checked = false; }
+/* 逐帧推进并回报与上一帧的像素差（平均 / 最大），用来查换形时的跳面 */
+let prevPx = null;
+window.__step = (dt) => {
+  advance(dt); render();
+  const w = cv.width, h = cv.height, px = new Uint8Array(w * h * 4);
+  gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
+  let sum = 0, big = 0;
+  if (prevPx && prevPx.length === px.length) {
+    for (let i = 0; i < px.length; i += 4) {
+      const dd = Math.abs(px[i] - prevPx[i]) + Math.abs(px[i + 1] - prevPx[i + 1]) + Math.abs(px[i + 2] - prevPx[i + 2]);
+      sum += dd; if (dd > 90) big++;
+    }
+  }
+  prevPx = px;
+  return { faces: lastFaces, mean: sum / (w * h * 3), big: big / (w * h) };
+};
+window.__areas = () => slice().map(f => f.area);
+/* 基准：连续画 n 帧（梦里换形），每帧读 1 像素逼 GPU 做完，回报平均 / p95 毫秒与渲染器 */
+window.__bench = (n, d) => {
+  dream = want = d; const px = new Uint8Array(4), t = [];
+  for (let i = 0; i < n; i++) {
+    const t0 = performance.now();
+    advance(1 / 30); render(); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    t.push(performance.now() - t0);
+  }
+  t.sort((a, b) => a - b);
+  const ext = gl.getExtension('WEBGL_debug_renderer_info');
+  return { px: cv.width, avg: t.reduce((a, b) => a + b, 0) / n, p95: t[Math.floor(n * 0.95)],
+    gpu: ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : '?' };
+};
+window.__state = () => ({ dream, tau, yaw, faces: lastFaces });
+render();
+if (!params.has('freeze') && !params.has('seq')) start();
+</script>
+</body>
+</html>

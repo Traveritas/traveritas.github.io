@@ -42,6 +42,8 @@ type Msg =
       dark: number;
       reveal: number;
       dot: [number, number] | null;
+      /** 振幅倍率（关于页退场收平用），缺省 1 */
+      amp?: number;
     }
   | { type: 'size'; W: number; H: number; dpr: number }
   | { type: 'mix'; d: number; colors: Colors }
@@ -351,7 +353,7 @@ self.onmessage = (e: MessageEvent<Msg>) => {
     colors = m.colors;
     render(ph, true);
   } else if (m.type === 'spine') {
-    spine = m.xy ? makeSpine(m.xy) : null;
+    spine = m.xy ? makeSpine(m.xy, m.amp ?? 1) : null;
     spineVer++;
     dark = m.dark;
     reveal = m.reveal;

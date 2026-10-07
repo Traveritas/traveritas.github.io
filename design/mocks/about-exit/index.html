@@ -1,0 +1,555 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>关于页退场 · 故事板 A</title>
+<style>
+  /* ─────────────────────────────────────────────────────────────
+     方案 A：线成为切面。关于页正文读完后整页钉住，继续下滑只推进 --p（0→1），往回滚即倒放。
+     仪器退 → 方块由外向内熄 → 正文逐字散（自下而上）→ 页脚 → 脑电线收平、转平、落到中线
+     → 圆光描出 → 晶体从一个点长出来（切面从顶点方向转回胞方向，同时往体内推进）→ 刻度由内向外。
+     复刻的是关于页的层：方块场、脑电线、导览轨、正文、页脚，都是假的，只为看节奏。
+     ───────────────────────────────────────────────────────────── */
+  :root {
+    --bg: #f0f3f6; --fg: #232830; --fg-soft: #56606d; --fg-faint: #858f9d;
+    --line: rgba(35, 40, 48, 0.12); --amber: #d9a05b;
+    --p: 0;
+  }
+  * { box-sizing: border-box; }
+  html { background: var(--bg); }
+  body { margin: 0; color: var(--fg); font: 16px/2 'Noto Serif SC', 'Songti SC', serif; background:
+    linear-gradient(rgba(85, 98, 112, .07), rgba(85, 98, 112, .07)), var(--bg); }
+
+  /* ── 常驻层（站点里是全站组件） ── */
+  .field { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
+  .field i { position: absolute; border: 1px solid rgba(35, 40, 48, .07); background: rgba(35, 40, 48, .035);
+    opacity: var(--o, 1); transition: opacity .25s linear; }
+  #eeg { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
+  .rail { position: fixed; left: 26px; top: 22vh; bottom: 22vh; width: 1px; background: var(--line); z-index: 2; }
+  .rail b { position: absolute; left: -3px; width: 7px; height: 7px; border: 1px solid var(--fg-faint); transform: rotate(45deg); background: var(--bg); }
+  .rail b.on { border-color: var(--amber); }
+  .rail::after { content: ''; position: absolute; left: 0; top: 0; width: 1px; height: 64%; background: var(--amber); opacity: .7; }
+
+  /* ── 文档流 ── */
+  .site-header { position: relative; z-index: 3; max-width: 1100px; margin: 0 auto; padding: 22px 24px; display: flex; justify-content: space-between;
+    font: 13px/1 'Noto Serif SC', serif; letter-spacing: .08em; }
+  .site-header nav { display: flex; gap: 1.6em; color: var(--fg-soft); }
+  .runway { position: relative; }
+  .sheet { position: sticky; z-index: 3; min-height: 100svh; display: flex; flex-direction: column; }
+  .prose { max-width: 42rem; margin: 0 auto; padding: 8vh 24px 6vh; flex: 1; }
+  .prose h1 { font-weight: 500; font-size: clamp(30px, 3.4vw, 42px); letter-spacing: .1em; margin: 0 0 1.6em; }
+  .prose p { margin: 0 0 1.5em; color: var(--fg); }
+  .prose p.lead { font-size: 1.12em; }
+  .c { opacity: calc(1 - var(--k, 0)); filter: blur(calc(var(--k, 0) * 3px));
+    display: inline-block; transform: translateY(calc(var(--k, 0) * -0.35em)); }
+  .foot { max-width: 1100px; width: 100%; margin: 0 auto; padding: 18px 24px 26px; border-top: 1px solid var(--line);
+    display: flex; gap: 2.4em; font: 12px/1 ui-monospace, Consolas, monospace; color: var(--fg-soft); letter-spacing: .08em; }
+
+  /* ── 晶体页（站点里是关于页末尾的整屏舞台） ── */
+  .stage { position: fixed; inset: 0; pointer-events: none; z-index: 4; }
+  .stage svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+  .crystal { position: absolute; left: 50%; top: 50%; width: clamp(240px, 42vmin, 440px); aspect-ratio: 1; transform: translate(-50%, -50%); }
+  .crystal canvas { width: 100%; height: 100%; display: block; }
+  .tag { position: absolute; left: 50%; top: calc(50% + clamp(240px, 42vmin, 440px) * .56); transform: translateX(-50%);
+    font: 10px/1 ui-monospace, Consolas, monospace; letter-spacing: .5em; color: var(--fg-faint); padding-left: .5em; }
+
+  /* ── 调试面板 ── */
+  .ctl { position: fixed; right: 14px; bottom: 14px; z-index: 9; width: 290px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 4px;
+    background: rgba(250, 248, 250, .9); font: 12px/1.6 system-ui, 'Microsoft YaHei', sans-serif; color: var(--fg-soft); }
+  .ctl .row { display: flex; gap: 8px; align-items: center; }
+  .ctl input[type=range] { flex: 1; accent-color: var(--amber); }
+  .ctl button { font: inherit; border: 1px solid var(--line); background: #fff; padding: 3px 10px; border-radius: 3px; cursor: pointer; }
+  .ctl .ph { font: 11px/1.5 ui-monospace, Consolas, monospace; white-space: pre; margin-top: 6px; }
+  .ctl .hint { margin-top: 4px; }
+  body.clean .ctl { display: none; }
+</style>
+</head>
+<body>
+<div class="field" id="field" aria-hidden="true"></div>
+<canvas id="eeg" aria-hidden="true"></canvas>
+<div class="rail" id="rail" aria-hidden="true"><b style="top:8%" class="on"></b><b style="top:34%" class="on"></b><b style="top:61%" class="on"></b><b style="top:88%"></b></div>
+
+<header class="site-header" id="hdr"><span>Traveritas</span><nav><span>随笔</span><span>瞬间</span><span>项目</span><span>关于</span></nav></header>
+
+<div class="runway" id="runway">
+  <div class="sheet" id="sheet">
+    <article class="prose" id="prose">
+      <h1 data-t>关于</h1>
+      <p class="lead" data-t>在被叫出名字之前，世界是完整的。</p>
+      <p data-t>留下安静的骨架。几道极细的线，磨砂的冷灰与微温。空白很大，字停在原处。世界不必时刻确凿。</p>
+      <p data-t>晨光照在纸面上。纸比夜浅一档。低饱和的微温，介质的折射，未经催促的呼吸。世界随时可能消失，又随时可能重新被记起。</p>
+      <p data-t>（正文占位：关于页重做后的内容会在这里。这一段只为看文字自下而上散去的节奏，长度大约是两三行。）</p>
+      <p data-t>（正文占位：最后一段。读到这里，页面钉住，继续往下滑，世界开始退场。）</p>
+    </article>
+    <footer class="foot" id="foot"><span>Traveritas的个人网站</span><span id="clock">06:31</span><span>RSS</span></footer>
+  </div>
+</div>
+
+<div class="stage" aria-hidden="true">
+  <svg id="ornament" viewBox="0 0 100 100" preserveAspectRatio="none"></svg>
+  <div class="crystal"><canvas id="hero"></canvas></div>
+  <div class="tag" id="tag">NEXUS</div>
+</div>
+
+<div class="ctl">
+  <div class="row"><span>进度</span><input id="pr" type="range" min="0" max="1" step="0.001" value="0"><span id="pv">0.00</span></div>
+  <div class="row" style="margin-top:6px"><button id="play">从头播放</button><button id="back">倒放</button><span id="mode"></span></div>
+  <div class="ph" id="ph"></div>
+  <div class="hint">也可以直接滚动。读完正文后页面钉住，继续下滑推进演出。</div>
+</div>
+
+<script>
+'use strict';
+const params = new URLSearchParams(location.search);
+if (params.has('clean')) document.body.classList.add('clean');
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const smooth = x => x * x * (3 - 2 * x);
+const seg = (p, a, b) => clamp((p - a) / (b - a), 0, 1); // p 在 [a,b] 内的进度
+const lerp = (a, b, t) => a + (b - a) * t;
+
+/* ═════════ 时间轴（全部以 p 表示，一处改节奏） ═════════ */
+const T = {
+  rail:    [0.00, 0.10],
+  field:   [0.03, 0.36],   // 方块由外向内
+  text:    [0.10, 0.46],   // 正文自下而上逐字
+  title:   [0.40, 0.52],
+  foot:    [0.44, 0.54],
+  calm:    [0.34, 0.62],   // 脑电线收平
+  level:   [0.40, 0.64],   // 转平、落到中线
+  halo:    [0.56, 0.78],
+  grow:    [0.64, 0.92],   // 晶体从一个点长出来
+  ticks:   [0.80, 0.96],
+  tag:     [0.92, 1.00],
+};
+
+/* ═════════ 方块场 ═════════ */
+const field = document.getElementById('field');
+const blocks = [];
+(function makeField() {
+  let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const clusters = [[.12, .18], [.30, .10], [.78, .16], [.86, .44], [.70, .78], [.20, .70], [.40, .88], [.92, .86]];
+  for (const [cx, cy] of clusters) {
+    const n = 4 + Math.floor(rnd() * 4), s = 3 + rnd() * 2.6;
+    for (let i = 0; i < n; i++) {
+      const x = cx + (Math.floor(rnd() * 3) - 1) * s / 100 * 1.04, y = cy + (Math.floor(rnd() * 3) - 1) * s / 100 * 1.04 * 1.6;
+      const el = document.createElement('i');
+      el.style.cssText = `left:${x * 100}vw;top:${y * 100}vh;width:${s}vw;height:${s}vw`;
+      field.appendChild(el);
+      blocks.push({ el, d: Math.hypot(x + s / 200 - .5, (y + s / 200 * 1.6 - .5) * .62) });
+    }
+  }
+  // 由外向内：按到中心的距离排名，远的先熄
+  const sorted = [...blocks].sort((a, b) => b.d - a.d);
+  sorted.forEach((b, i) => (b.rank = i / Math.max(1, sorted.length - 1)));
+})();
+
+/* ═════════ 正文逐字 ═════════ */
+const paras = [...document.querySelectorAll('[data-t]')];
+const chars = [];
+(function splitText() {
+  let seed = 11; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  paras.forEach((el, pi) => {
+    const txt = el.textContent; el.textContent = '';
+    for (const ch of txt) {
+      const s = document.createElement('span'); s.className = 'c'; s.textContent = ch;
+      el.appendChild(s); chars.push({ el: s, pi, r: rnd() });
+    }
+  });
+})();
+const bodyParas = paras.length - 1; // 第 0 段是标题
+
+/* ═════════ 脑电线 ═════════ */
+const eeg = document.getElementById('eeg'), ex = eeg.getContext('2d');
+function sizeEeg() { const d = Math.min(2, devicePixelRatio || 1); eeg.width = innerWidth * d; eeg.height = innerHeight * d; ex.setTransform(d, 0, 0, d, 0, 0); }
+addEventListener('resize', sizeEeg); sizeEeg();
+// 一段固定的「脑电」：几道正弦叠加 + 少量锯齿，按 x 取值；calm 把它压平
+function wave(u, t) {
+  return Math.sin(u * 23 + t * 0.9) * .45 + Math.sin(u * 61 - t * 1.7) * .25 + Math.sin(u * 137 + t * 2.3) * .14
+    + (Math.sin(u * 410) > .93 ? (Math.sin(u * 1300) * .9) : 0);
+}
+function drawEeg(p, t) {
+  const W = innerWidth, H = innerHeight;
+  ex.clearRect(0, 0, W, H);
+  const calm = smooth(seg(p, ...T.calm)), lv = smooth(seg(p, ...T.level));
+  const amp = lerp(15, 0, calm);
+  const ang = lerp(14, 0, lv) * Math.PI / 180;         // 全站缝线角 14°（向右下）
+  const cy = lerp(H * .40, H * .5, lv);
+  const fadeEnds = lv;                                   // 落定时两端渐隐
+  const grad = ex.createLinearGradient(0, 0, W, 0);
+  const a = .55;
+  grad.addColorStop(0, `rgba(58,64,78,${a * (1 - fadeEnds)})`);
+  grad.addColorStop(.18, `rgba(58,64,78,${a})`);
+  grad.addColorStop(.82, `rgba(58,64,78,${a})`);
+  grad.addColorStop(1, `rgba(58,64,78,${a * (1 - fadeEnds)})`);
+  ex.strokeStyle = grad; ex.lineWidth = 1;
+  ex.beginPath();
+  // 波幅收尽后只画一笔直线：几百段折线在近乎水平时会被抗锯齿描出一串细点
+  const N = amp < 0.05 ? 1 : 420, ca = Math.cos(ang), sa = Math.sin(ang), L = W * 1.25;
+  for (let i = 0; i <= N; i++) {
+    const u = i / N, x0 = (u - .5) * L, y0 = -amp * wave(u, t);
+    const x = W / 2 + x0 * ca - y0 * sa, y = cy + x0 * sa + y0 * ca;
+    i ? ex.lineTo(x, y) : ex.moveTo(x, y);
+  }
+  ex.stroke();
+  // 琥珀伴线（站点里脑电线旁那道细暖线），先于主线消失
+  const comp = 1 - seg(p, .2, .45);
+  if (comp > 0) {
+    ex.strokeStyle = `rgba(194,163,130,${.5 * comp})`;
+    ex.beginPath();
+    for (let i = 0; i <= N; i++) {
+      const u = i / N, x0 = (u - .5) * L, y0 = -amp * wave(u + .003, t) + 6;
+      const x = W / 2 + x0 * ca - y0 * sa, y = cy + x0 * sa + y0 * ca;
+      i ? ex.lineTo(x, y) : ex.moveTo(x, y);
+    }
+    ex.stroke();
+  }
+}
+
+/* ═════════ 圆光与刻度（SVG，viewBox 按视口重设） ═════════ */
+const orn = document.getElementById('ornament');
+const NS = 'http://www.w3.org/2000/svg';
+let halo, ticks = [];
+function buildOrnament() {
+  const W = innerWidth, H = innerHeight;
+  orn.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  orn.innerHTML = '';
+  const size = Math.min(440, Math.max(240, Math.min(W, H) * .42));
+  const R = size * .5;
+  halo = document.createElementNS(NS, 'circle');
+  halo.setAttribute('cx', W / 2); halo.setAttribute('cy', H / 2); halo.setAttribute('r', R);
+  halo.setAttribute('fill', 'none'); halo.setAttribute('stroke', 'rgba(90,80,110,.32)'); halo.setAttribute('stroke-width', '1');
+  halo.setAttribute('pathLength', '1'); halo.setAttribute('stroke-dasharray', '1 1');
+  halo.setAttribute('transform', `rotate(180 ${W / 2} ${H / 2})`); // 从左侧与线的交点起笔
+  orn.appendChild(halo);
+  ticks = [];
+  const gap = Math.max(14, W * .016), start = R + gap * 1.6;
+  for (let side of [-1, 1]) for (let i = 0; i < 12; i++) {
+    const x = W / 2 + side * (start + i * gap);
+    if (x < 8 || x > W - 8) continue;
+    const h = i % 3 === 2 ? 7 : 3.5;
+    const t = document.createElementNS(NS, 'line');
+    t.setAttribute('x1', x); t.setAttribute('x2', x); t.setAttribute('y1', H / 2 - h); t.setAttribute('y2', H / 2 + h);
+    t.setAttribute('stroke', 'rgba(90,80,110,.45)'); t.setAttribute('stroke-width', '1');
+    orn.appendChild(t); ticks.push({ el: t, i, fade: 1 - i / 14 });
+  }
+}
+addEventListener('resize', () => { buildOrnament(); apply(); });
+buildOrnament();
+
+/* ═════════ 晶体（与 design/mocks/nexus-slice 同一套光学；多了「从一个点长出来」与折进晶体的切面线） ═════════ */
+const HALF = [];
+for (let i = 0; i < 4; i++) for (const s of [1, -1]) { const a = [0, 0, 0, 0]; a[i] = s; HALF.push([a, 1]); }
+for (let m = 0; m < 16; m++) HALF.push([[m & 1 ? -1 : 1, m & 2 ? -1 : 1, m & 4 ? -1 : 1, m & 8 ? -1 : 1], 2]);
+const dot4 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3];
+function rot4(M, i, j, th) { const c = Math.cos(th), s = Math.sin(th); for (const col of M) { const xi = col[i], xj = col[j]; col[i] = c * xi - s * xj; col[j] = s * xi + c * xj; } }
+const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+const mul = (a, k) => [a[0] * k, a[1] * k, a[2] * k];
+const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const len = a => Math.hypot(a[0], a[1], a[2]);
+const norm = a => mul(a, 1 / len(a));
+function section(n, E, h) {
+  const planes = [];
+  for (const [a, b] of HALF) {
+    const p = [dot4(a, E[0]), dot4(a, E[1]), dot4(a, E[2])], l = len(p);
+    if (l < 1e-6) continue;
+    planes.push({ n: mul(p, 1 / l), d: (b - h * dot4(a, n)) / l });
+  }
+  const faces = [];
+  for (let k = 0; k < planes.length; k++) {
+    const P = planes[k], helper = Math.abs(P.n[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0];
+    const u = norm(cross(helper, P.n)), v = cross(P.n, u), o = mul(P.n, P.d), R = 8;
+    let poly = [add(o, add(mul(u, -R), mul(v, -R))), add(o, add(mul(u, R), mul(v, -R))), add(o, add(mul(u, R), mul(v, R))), add(o, add(mul(u, -R), mul(v, R)))];
+    for (let j = 0; j < planes.length && poly.length >= 3; j++) {
+      if (j === k) continue;
+      const Q = planes[j], out = [];
+      for (let i = 0; i < poly.length; i++) {
+        const A = poly[i], B = poly[(i + 1) % poly.length], da = dot(Q.n, A) - Q.d, db = dot(Q.n, B) - Q.d;
+        if (da <= 1e-9) out.push(A);
+        if ((da <= 1e-9) !== (db <= 1e-9)) out.push(add(A, mul(sub(B, A), da / (da - db))));
+      }
+      poly = out;
+    }
+    if (poly.length < 3) continue;
+    let area = 0;
+    for (let i = 1; i + 1 < poly.length; i++) area += len(cross(sub(poly[i], poly[0]), sub(poly[i + 1], poly[0])));
+    if (area < 1e-9) continue;
+    faces.push({ n: P.n, d: P.d, pts: poly, area: area / 2 });
+  }
+  return faces;
+}
+
+const cv = document.getElementById('hero');
+const gl = cv.getContext('webgl2', { antialias: true, premultipliedAlpha: true, alpha: true });
+const MAXP = 24;
+const VS = `#version 300 es
+layout(location=0) in vec3 aPos; layout(location=1) in vec3 aNor;
+uniform mat4 uView, uProj; out vec3 vW; out vec3 vN;
+void main(){ vW = aPos; vN = aNor; gl_Position = uProj * uView * vec4(aPos, 1.); }`;
+const FS = `#version 300 es
+precision highp float;
+#define MAXP ${MAXP}
+in vec3 vW; in vec3 vN;
+uniform vec3 uCam; uniform vec4 uPl[MAXP]; uniform int uNP; uniform float uPw[MAXP];
+uniform float uDream; uniform float uCore; uniform vec3 uCoreC; uniform float uRough;
+uniform float uLine;        // 切面线：画在晶体后方的环境里，透过晶体看到的是被折弯、错位的那一段
+uniform float uLineY;       // 线在环境里的仰角（取自相机看向晶体中心的方向）
+out vec4 o;
+vec3 env(vec3 d, float r){
+  float w = 1.0 + 3.0 * r, y = d.y;
+  vec3 top = vec3(0.90, 0.895, 0.97), hor = vec3(1.0, 0.975, 0.965), low = vec3(0.78, 0.745, 0.80);
+  top = mix(top, vec3(0.94, 0.90, 0.95), uDream);
+  vec3 c = y > 0.0 ? mix(hor, top, smoothstep(0.0, 0.65 * w, y)) : mix(hor, low, smoothstep(0.0, 0.5 * w, -y));
+  c += vec3(0.12, 0.10, 0.09) * exp(-pow(y / (0.06 * w), 2.0));
+  c *= mix(1.0, 0.92, smoothstep(0.15, 0.95, d.z));
+  float k = 1.0 - r * 0.6;
+  c *= 1.0 - 0.30 * k * smoothstep(1.0 - 0.20 * w, 0.97, dot(d, normalize(vec3(-0.95, 0.05, -0.30))));
+  c *= 1.0 - 0.15 * k * smoothstep(1.0 - 0.25 * w, 0.97, dot(d, normalize(vec3(0.85, -0.25, 0.45))));
+  float key = smoothstep(1.0 - 0.10 * w, 0.975, dot(d, normalize(vec3(-0.50, 0.70, 0.50))));
+  c += vec3(1.0, 0.99, 0.97) * 0.75 * k * key;
+  c += vec3(1.0, 0.94, 0.96) * 0.30 * k * smoothstep(1.0 - 0.07 * w, 0.99, dot(d, normalize(vec3(0.75, 0.25, -0.60))));
+  // 切面线：只在晶体背后那半边（d.z < 0），细、偏丁香灰；粗糙时化开变淡
+  float lw = 0.0035 * (1.0 + 4.0 * r);
+  float ln = exp(-pow((y - uLineY) / lw, 2.0)) * smoothstep(0.1, -0.3, d.z) / (1.0 + 3.0 * r);
+  c = mix(c, vec3(0.36, 0.34, 0.42), clamp(ln * uLine * 0.75, 0.0, 1.0));
+  return c;
+}
+float exitT(vec3 P, vec3 T, out int ni){
+  float tm = 1e9; ni = -1;
+  for (int i = 0; i < MAXP; i++) { if (i >= uNP) break;
+    float dn = dot(uPl[i].xyz, T);
+    if (dn > 1e-5) { float t = (uPl[i].w - dot(uPl[i].xyz, P)) / dn; if (t < tm) { tm = t; ni = i; } } }
+  return max(tm, 0.0);
+}
+float edgeDist(vec3 P, vec3 N, out vec3 nb){
+  float best = 1e9; nb = N;
+  for (int i = 0; i < MAXP; i++) { if (i >= uNP) break;
+    vec3 n = uPl[i].xyz; float c = dot(n, N); if (c > 0.9995) continue;
+    float e = (uPl[i].w - dot(n, P)) / sqrt(max(1e-4, 1.0 - c * c)) / max(uPw[i], 1e-3);
+    if (e < best) { best = e; nb = n; } }
+  return best;
+}
+float glowSeg(vec3 A, vec3 B){
+  vec3 ab = B - A; float t = clamp(dot(uCoreC - A, ab) / max(dot(ab, ab), 1e-6), 0.0, 1.0);
+  vec3 q = A + ab * t - uCoreC; return exp(-dot(q, q) / 0.12) * length(ab);
+}
+void main(){
+  vec3 N = normalize(vN), I = normalize(vW - uCam), V = -I;
+  vec3 nb; float e = edgeDist(vW, N, nb);
+  float tb = 1.0 - smoothstep(0.0, 0.028, e);
+  vec3 Nb = normalize(mix(N, normalize(N + nb), tb * tb));
+  float ndv = clamp(dot(Nb, V), 0.0, 1.0);
+  float F = 0.04 + 0.96 * pow(1.0 - ndv, 5.0);
+  vec3 refl = env(reflect(I, Nb), 0.0);
+  float ior = 1.52; vec3 T = refract(I, Nb, 1.0 / ior); vec3 P = vW;
+  float L = 0.0, g = 0.0, inner = 0.0; vec3 trans = vec3(0.0); bool done = false;
+  float disp = mix(0.006, 0.018, uDream);
+  for (int b = 0; b < 4; b++) {
+    int ni; float t = exitT(P, T, ni); vec3 Q = P + T * t;
+    L += t; g += glowSeg(P, Q);
+    if (ni < 0) break;
+    vec3 Ne = uPl[ni].xyz;
+    if (b == 0) { vec3 dm; inner = exp(-pow(edgeDist(Q, Ne, dm) / 0.010, 2.0)); }
+    vec3 Tg = refract(T, -Ne, ior);
+    if (dot(Tg, Tg) > 0.0) {
+      vec3 Tr = refract(T, -Ne, ior - disp), Tb = refract(T, -Ne, ior + disp);
+      if (dot(Tr, Tr) == 0.0) Tr = Tg; if (dot(Tb, Tb) == 0.0) Tb = Tg;
+      float Fe = 0.04 + 0.96 * pow(1.0 - clamp(dot(Ne, Tg), 0.0, 1.0), 5.0);
+      trans = vec3(env(Tr, uRough).r, env(Tg, uRough).g, env(Tb, uRough).b) * (1.0 - Fe);
+      done = true; break;
+    }
+    T = reflect(T, -Ne); P = Q + T * 1e-4;
+  }
+  if (!done) trans = env(T, uRough) * 0.85;
+  vec3 k = mix(vec3(0.060, 0.064, 0.012), vec3(0.030, 0.058, 0.030), uDream);
+  trans *= exp(-k * L) * 1.03; trans *= 1.0 - inner * 0.16;
+  float gc = 1.0 - exp(-g * uCore);
+  vec3 glow = mix(vec3(1.0, 0.975, 0.955), vec3(1.0, 0.955, 0.965), uDream);
+  trans = mix(trans, glow * 1.05, gc * 0.55);
+  vec3 film = 0.5 + 0.5 * cos(6.2832 * (vec3(0.0, 0.33, 0.67) + 1.8 * (1.0 - ndv)));
+  refl *= mix(vec3(1.0), film, 0.16);
+  vec3 col = mix(trans, refl, F);
+  vec3 Lk = normalize(vec3(-0.50, 0.70, 0.50));
+  col += vec3(1.0) * pow(max(dot(Nb, normalize(Lk + V)), 0.0), 260.0) * (0.9 + 0.6 * tb);
+  o = vec4(col, 1.0);
+}`;
+function prog(vs, fs) {
+  const p = gl.createProgram();
+  for (const [t, s] of [[gl.VERTEX_SHADER, vs], [gl.FRAGMENT_SHADER, fs]]) {
+    const sh = gl.createShader(t); gl.shaderSource(sh, s); gl.compileShader(sh);
+    if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(sh));
+    gl.attachShader(p, sh);
+  }
+  gl.linkProgram(p);
+  const U = {};
+  for (let i = 0, n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS); i < n; i++) {
+    const name = gl.getActiveUniform(p, i).name.replace(/\[0\]$/, ''); U[name] = gl.getUniformLocation(p, name);
+  }
+  return { p, U };
+}
+const P = prog(VS, FS);
+const STRIDE = 6, vdata = new Float32Array(24 * 12 * 3 * STRIDE), pl = new Float32Array(MAXP * 4), pw = new Float32Array(MAXP);
+const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
+const vbo = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+gl.bufferData(gl.ARRAY_BUFFER, vdata.byteLength, gl.DYNAMIC_DRAW);
+gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, STRIDE * 4, 0);
+gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 3, gl.FLOAT, false, STRIDE * 4, 12);
+function persp(fov, asp, n, f) { const t = 1 / Math.tan(fov / 2); return [t / asp, 0, 0, 0, 0, t, 0, 0, 0, 0, (f + n) / (n - f), -1, 0, 0, 2 * f * n / (n - f), 0]; }
+function lookAt(e, c, up) { const z = norm(sub(e, c)), x = norm(cross(up, z)), y = cross(z, x); return [x[0], y[0], z[0], 0, x[1], y[1], z[1], 0, x[2], y[2], z[2], 0, -dot(x, e), -dot(y, e), -dot(z, e), 1]; }
+const CAM = [0, 0.55, 6.2], VIEW = lookAt(CAM, [0, 0, 0], [0, 1, 0]), PROJ = persp(0.62, 1, 0.1, 50);
+const LINE_Y = -CAM[1] / Math.hypot(CAM[1], CAM[2]); // 相机看向晶体中心的仰角
+
+let yaw = 0.4, dreamD = 0;
+const SCALE_FINAL = (() => { // 醒面八面体（h = 0.9）按体积归一时的缩放；长出来的过程沿用它，大小就是真实截面的大小
+  const f = section([1, 0, 0, 0], [[0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]], 0.9);
+  return volInv(f, centroid(f));
+})();
+function centroid(faces) {
+  let c = [0, 0, 0], w = 0;
+  for (const f of faces) { let fc = [0, 0, 0]; for (const p of f.pts) fc = add(fc, p); c = add(c, mul(fc, f.area / f.pts.length)); w += f.area; }
+  return mul(c, 1 / Math.max(1e-9, w));
+}
+function volInv(faces, c) { let v = 0; for (const f of faces) v += f.area * Math.abs(dot(f.n, sub(f.pts[0], c))) / 3; return Math.cbrt((4 / 3) / (v || 1)); }
+
+/**
+ * g：长出来的进度 0..1。
+ * 切面法向从顶点方向 (1,1,0,0)/√2 转回胞方向 e₁，偏移从「刚好擦到那个顶点」推进到 0.9：
+ * 截面从一个点出发，经由一枚小立方体（24 胞体的顶点图形），连续地长成醒面的八面体。
+ */
+function slice(g) {
+  const e = smooth(g);
+  const M = [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]];
+  const th = (1 - e) * Math.PI / 4;
+  rot4(M, 0, 1, th);
+  const n = M[0], support = Math.abs(n[0]) + Math.abs(n[1]); // 24 胞体顶点是 (±1,±1,0,0) 的排列：支撑函数 = 两个最大分量之和
+  const h = support * lerp(1, 0.9, Math.pow(e, 0.7));
+  return section(M[0], [M[1], M[2], M[3]], h);
+}
+function build(faces, inv) {
+  const c = centroid(faces);
+  const s = 1.1, sy = 1.28;
+  const cy = Math.cos(yaw), sw = Math.sin(yaw);
+  const R = v => [cy * v[0] - sw * v[2], v[1], sw * v[0] + cy * v[2]];
+  const toW = p => R([p[0] * s, p[1] * s * sy, p[2] * s]);
+  let k = 0;
+  faces.forEach((f, fi) => {
+    const nl = R([f.n[0] / s, f.n[1] / (s * sy), f.n[2] / s]), L = len(nl), nw = mul(nl, 1 / L);
+    pl.set([nw[0], nw[1], nw[2], (f.d - dot(f.n, c)) * inv / L], fi * 4);
+    pw[fi] = smooth(Math.min(1, f.area * inv * inv / 0.03));
+    const pts = f.pts.map(p => toW(mul(sub(p, c), inv)));
+    for (let i = 1; i + 1 < pts.length; i++) for (const p of [pts[0], pts[i], pts[i + 1]]) { vdata.set([p[0], p[1], p[2], nw[0], nw[1], nw[2]], k); k += STRIDE; }
+  });
+  gl.bindBuffer(gl.ARRAY_BUFFER, vbo); gl.bufferSubData(gl.ARRAY_BUFFER, 0, vdata, 0, k);
+  return k / STRIDE;
+}
+function drawCrystal(g, lineVis) {
+  const px = Math.min(900, Math.round(cv.clientWidth * Math.min(2, devicePixelRatio || 1)));
+  if (cv.width !== px) cv.width = cv.height = px;
+  gl.viewport(0, 0, cv.width, cv.height); gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
+  if (g <= 0.001) return;
+  const faces = slice(g);
+  if (faces.length < 4) return;
+  const n = build(faces, SCALE_FINAL);
+  gl.enable(gl.CULL_FACE); gl.cullFace(gl.BACK);
+  gl.useProgram(P.p); gl.bindVertexArray(vao);
+  gl.uniformMatrix4fv(P.U.uView, false, VIEW); gl.uniformMatrix4fv(P.U.uProj, false, PROJ);
+  gl.uniform3fv(P.U.uCam, CAM); gl.uniform4fv(P.U.uPl, pl); gl.uniform1i(P.U.uNP, faces.length); gl.uniform1fv(P.U.uPw, pw);
+  gl.uniform1f(P.U.uDream, dreamD); gl.uniform1f(P.U.uCore, 0.5 + 0.95 * dreamD);
+  gl.uniform3fv(P.U.uCoreC, [0, 0.04, 0]); gl.uniform1f(P.U.uRough, 0.45);
+  gl.uniform1f(P.U.uLine, lineVis); gl.uniform1f(P.U.uLineY, LINE_Y);
+  gl.drawArrays(gl.TRIANGLES, 0, n);
+}
+
+/* ═════════ 滚动 → p ═════════ */
+const runway = document.getElementById('runway'), sheet = document.getElementById('sheet');
+const RUNWAY = 2.6; // 钉住后再滑多少屏走完演出
+function layout() {
+  const h = sheet.offsetHeight;
+  sheet.style.top = Math.min(0, innerHeight - h) + 'px';     // 读到页尾时钉住
+  runway.style.height = (h + innerHeight * RUNWAY) + 'px';
+}
+function pinStart() { return runway.offsetTop + sheet.offsetHeight - innerHeight; }
+function progress() { return clamp((scrollY - pinStart()) / (innerHeight * RUNWAY), 0, 1); }
+addEventListener('resize', () => { layout(); apply(); });
+layout();
+
+let pOverride = null; // 截图 / 拖杆
+function apply() {
+  const p = pOverride ?? progress();
+  document.documentElement.style.setProperty('--p', p.toFixed(4));
+  // 仪器
+  document.getElementById('rail').style.opacity = 1 - smooth(seg(p, ...T.rail));
+  // 方块：由外向内，每块有自己的一小段
+  for (const b of blocks) {
+    const a = T.field[0] + b.rank * (T.field[1] - T.field[0] - 0.06);
+    b.el.style.setProperty('--o', (1 - smooth(seg(p, a, a + 0.06))).toFixed(3));
+  }
+  // 正文：段落自下而上，段内逐字随机
+  const [t0, t1] = T.text;
+  for (const c of chars) {
+    let k;
+    if (c.pi === 0) k = seg(p, T.title[0] + c.r * .05, T.title[0] + c.r * .05 + .06);
+    else {
+      const order = (bodyParas - c.pi) / Math.max(1, bodyParas - 1); // 最后一段先走
+      const a = t0 + order * (t1 - t0 - 0.1) + c.r * 0.06;
+      k = seg(p, a, a + 0.04);
+    }
+    c.el.style.setProperty('--k', smooth(k).toFixed(3));
+  }
+  document.getElementById('foot').style.opacity = 1 - smooth(seg(p, ...T.foot));
+  document.getElementById('hdr').style.opacity = 1 - smooth(seg(p, ...T.foot));
+  // 圆光
+  const hp = smooth(seg(p, ...T.halo));
+  if (halo) { halo.setAttribute('stroke-dashoffset', (1 - hp).toFixed(4)); halo.style.opacity = hp > 0 ? 1 : 0; }
+  // 刻度：由内向外
+  for (const t of ticks) {
+    const a = T.ticks[0] + t.i / 12 * (T.ticks[1] - T.ticks[0] - 0.04);
+    t.el.style.opacity = (smooth(seg(p, a, a + 0.04)) * t.fade).toFixed(3);
+  }
+  document.getElementById('tag').style.opacity = smooth(seg(p, ...T.tag));
+  lastP = p;
+  document.getElementById('pr').value = p;
+  document.getElementById('pv').textContent = p.toFixed(2);
+  document.getElementById('ph').textContent = phaseText(p);
+}
+function phaseText(p) {
+  return Object.entries(T).map(([k, [a, b]]) => `${(p >= b ? '■' : p > a ? '▣' : '□')} ${k.padEnd(6)} ${a.toFixed(2)}–${b.toFixed(2)}`).join('\n');
+}
+
+/* ═════════ 帧：脑电线与晶体要持续画（线在动、晶体在转） ═════════ */
+let lastP = 0, t = 0, lastTs = 0;
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+function frame(ts) {
+  requestAnimationFrame(frame);
+  const dt = lastTs ? Math.min(.1, (ts - lastTs) / 1000) : 0; lastTs = ts;
+  if (!params.has('freeze')) { t += dt; yaw += dt * 0.06; }
+  if (play) stepPlay(dt);
+  drawEeg(lastP, t);
+  const g = seg(lastP, ...T.grow);
+  drawCrystal(g, smooth(seg(lastP, ...T.level)));
+}
+addEventListener('scroll', () => { if (!play) pOverride = null; apply(); }, { passive: true });
+
+/* ═════════ 调试：拖杆、自动播放 ═════════ */
+let play = 0; // +1 正放 / −1 倒放
+const PLAY_S = 9;
+function stepPlay(dt) {
+  const p = clamp((pOverride ?? lastP) + play * dt / PLAY_S, 0, 1);
+  scrollTo(0, pinStart() + p * innerHeight * RUNWAY);
+  pOverride = p; apply();
+  if (p <= 0 || p >= 1) play = 0;
+}
+document.getElementById('pr').oninput = e => { play = 0; const p = +e.target.value; scrollTo(0, pinStart() + p * innerHeight * RUNWAY); pOverride = p; apply(); };
+document.getElementById('play').onclick = () => { pOverride = 0; scrollTo(0, pinStart()); play = 1; };
+document.getElementById('back').onclick = () => { pOverride = 1; play = -1; };
+
+// 截图：?p=0.5&freeze&clean
+if (params.has('p')) { pOverride = +params.get('p'); }
+window.__setP = (p) => { pOverride = p; apply(); drawEeg(p, t); drawCrystal(seg(p, ...T.grow), smooth(seg(p, ...T.level))); };
+apply();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

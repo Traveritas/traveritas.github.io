@@ -88,6 +88,37 @@
     );
   }
 
+  /* 关于页退场（about-exit.ts）：正文列的消隐随 --exit-floor 0→1 合拢（线要穿过画面中央），
+     落成切面线后两端随 --exit-edge 渐隐。三个变量的初值与上面的消隐逐字相同，
+     所以演出没开始时这条规则与上面那条画出来一样 */
+  :global(html[data-exit-on]) .eeg-group {
+    --ef: rgb(0 0 0 / var(--exit-floor, 0));
+    --ee: rgb(0 0 0 / calc(1 - var(--exit-edge, 0)));
+    --ew: calc(var(--exit-edge, 0) * 24%);
+    -webkit-mask-image: linear-gradient(
+      to right,
+      var(--ee) 0,
+      black var(--ew),
+      black calc(50% - var(--mask-half, 21rem) - 7rem),
+      var(--ef) calc(50% - var(--mask-half, 21rem)),
+      var(--ef) calc(50% + var(--mask-half, 21rem)),
+      black calc(50% + var(--mask-half, 21rem) + 7rem),
+      black calc(100% - var(--ew)),
+      var(--ee) 100%
+    );
+    mask-image: linear-gradient(
+      to right,
+      var(--ee) 0,
+      black var(--ew),
+      black calc(50% - var(--mask-half, 21rem) - 7rem),
+      var(--ef) calc(50% - var(--mask-half, 21rem)),
+      var(--ef) calc(50% + var(--mask-half, 21rem)),
+      black calc(50% + var(--mask-half, 21rem) + 7rem),
+      black calc(100% - var(--ew)),
+      var(--ee) 100%
+    );
+  }
+
   .eeg {
     position: absolute;
     inset: 0;
@@ -194,7 +225,7 @@
         });
       };
       onEegSpine((st) => {
-        spine = st.xy ? makeSpine(st.xy) : null;
+        spine = st.xy ? makeSpine(st.xy, st.amp) : null;
         spineVer++;
         tickDraw(lastPh);
       });
@@ -285,7 +316,7 @@
         worker.postMessage({ type: 'hidden', hidden: document.hidden }),
       );
       onEegSpine((st) =>
-        worker.postMessage({ type: 'spine', xy: st.xy, dark: st.dark, reveal: st.reveal, dot: st.dot }),
+        worker.postMessage({ type: 'spine', xy: st.xy, dark: st.dark, reveal: st.reveal, dot: st.dot, amp: st.amp }),
       );
     }
   }

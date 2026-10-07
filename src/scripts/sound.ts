@@ -70,6 +70,7 @@ interface Stored {
 /* ── 运行时 ─────────────────────────────────────────── */
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null; // 进出场
+let scene: GainNode | null = null; // 页内演出（关于页退场）压下的量，见 setSoundScene
 let headroom: GainNode | null = null; // 交叉余量 × 悬停
 let bedGain: GainNode | null = null; // bed 生命周期
 let gOpen: GainNode | null = null;
@@ -192,8 +193,21 @@ function buildGraph() {
   bedGain.connect(headroom);
   gOpen.connect(headroom);
   headroom.connect(master);
-  master.connect(ctx.destination);
+  scene = ctx.createGain();
+  scene.gain.value = sceneHub.level;
+  master.connect(scene);
+  scene.connect(ctx.destination);
 }
+
+/* ── 页内演出的压声（关于页退场：世界退去，声音一起退到无） ──────────
+   与进出场的 master 分开一级：演出中途开关声音、或跑完再打开，都不会把它冲掉。
+   挂在 globalThis 上：演出脚本只写一个数，不必把整个声音模块打进自己的包里。 */
+const SCENE_TAU = 0.12;
+const G = globalThis as typeof globalThis & { __xmScene?: { level: number; apply: (() => void) | null } };
+const sceneHub = (G.__xmScene ??= { level: 1, apply: null });
+sceneHub.apply = () => {
+  if (ctx && scene) scene.gain.setTargetAtTime(sceneHub.level, now(), SCENE_TAU);
+};
 
 /* ── 混合（等功率）+ 余量 + 悬停 ───────────────────── */
 function applyMix(m: number, tau = MIX_TAU) {
@@ -519,6 +533,7 @@ export function initSound(): void {
         gains: FORMS.map((f) => +(chain[f]?.gain.gain.value ?? 0).toFixed(3)),
         head: +(headroom?.gain.value ?? 0).toFixed(3),
         master: +(master?.gain.value ?? 0).toFixed(4),
+        scene: +(scene?.gain.value ?? 1).toFixed(3),
         pageGain: +pageGain.toFixed(4),
         bed: +(bedGain?.gain.value ?? 0).toFixed(3),
         open: +(gOpen?.gain.value ?? 0).toFixed(3),

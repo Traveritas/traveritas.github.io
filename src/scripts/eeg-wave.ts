@@ -73,13 +73,15 @@ export interface Spine {
   xy: Float32Array; // x0,y0,x1,y1,…（视口 px）
   L: Float32Array; // 累计弧长
   len: number;
+  /** 振幅倍率 0..1（关于页退场把线收平：波幅、残影分离与游走一起乘它；1 ＝ 原样） */
+  amp: number;
 }
 
-export function makeSpine(xy: Float32Array): Spine {
+export function makeSpine(xy: Float32Array, amp = 1): Spine {
   const n = xy.length / 2;
   const L = new Float32Array(n);
   for (let i = 1; i < n; i++) L[i] = L[i - 1] + Math.hypot(xy[2 * i] - xy[2 * i - 2], xy[2 * i + 1] - xy[2 * i - 1]);
-  return { xy, L, len: L[n - 1] };
+  return { xy, L, len: L[n - 1], amp };
 }
 
 /** beat：拍长（秒），与 CSS 同源（.eeg-group 上的 --fld-beat） */
@@ -162,9 +164,9 @@ export function createEegWave(beat: number) {
     const lvl = STEP_LV[Math.min(2, Math.floor(((ph % 3) / 3) * 3))];
     const q = v.smooth ? 0 : v.q * lvl * Math.max(0, Math.min(1, (d - 0.1) / 0.9));
     const hold = v.smooth ? 0 : step * d;
-    const A = AMP * (1 + (GAIN_D * v.gain - 1) * d);
+    const A = AMP * (1 + (GAIN_D * v.gain - 1) * d) * sp.amp;
     const phv = ph - v.beats * BEAT * d;
-    const dy = v.dy * d + walk;
+    const dy = (v.dy * d + walk) * sp.amp;
     const full = hold >= step - 0.6;
     const { xy, L, len } = sp;
     const last = L.length - 1;

@@ -1,12 +1,288 @@
 ---
-/* 关于页：清空待重做（旧版见 git 历史） */
+/* ─────────────────────────────────────────────────────────────
+   关于页（重做中；旧版见 git 历史）
+   正文 → 晶体页。正文读完后整页钉住，继续下滑是退场演出（src/scripts/about-exit.ts）：
+   页上的东西逐个退去，天色漫上来，脑电线收平、转平，落成切面线（地平线），晶体从一个点长出来，
+   线下的水面亮起碎光，线上的切片列由内向外显现。
+   默认排法（无脚本 / 减动效）就是文档流：正文之后一屏静止的晶体页，线由 CSS 画，切片列构建时已画好。
+   演出开着时（html[data-exit-on]）：.about-sheet 与 .about-stage 都改为 sticky，
+   线换成全站的脑电线（CSS 画的那条收起），天 / 水面 / 切片 / NEXUS 由脚本按进度显现。
+   ⚠ 下面的正文是测试用的占位文字，用来调演出节奏，正式内容写好后整段替换。
+   ───────────────────────────────────────────────────────────── */
 import BaseLayout from '../layouts/BaseLayout.astro';
+import NexusSlice from '../components/about/NexusSlice.astro';
+import { SLICES, VIEW, slicePaths } from '../scripts/about-slices';
+
+// 切片列：构建时按醒面画好线框（梦里由 about-decor.ts 接着画）
+const slices = SLICES.map((s, k) => ({ s, k, p: slicePaths(s) }));
+const VB = `${-VIEW / 2} ${-VIEW / 2} ${VIEW} ${VIEW}`;
 ---
 
 <BaseLayout title="关于 — Traveritas" description="关于 Traveritas" maskLines={true} bgm="reading">
-  <div class="container page-body">
-    <header class="page-head">
-      <h1 data-morph data-true="关于" data-dream="此身">关于</h1>
-    </header>
+  <div class="about-run">
+    <div class="about-sky" aria-hidden="true"></div>
+    <div class="about-sheet container page-body">
+      <header class="page-head">
+        <h1 data-morph data-true="关于" data-dream="此身">关于</h1>
+      </header>
+      <div class="about-prose">
+        <p class="lead">（测试文字）这一页正在重写。下面几段只用来撑出正文的长度，看退场演出的节奏。</p>
+        <p>
+          第一段：正常阅读时，这些字应该安静地停在原处，和站里其他阅读页一样。读到正文末尾、页脚还没出现的时候，页面会停住不动，继续往下滑，世界开始退场。
+        </p>
+        <p>
+          第二段：最先退去的是仪器——那条斜着的缝线和顶部的进度线。接着是背后的方块，从画面边缘开始，一簇一簇往中间熄掉。
+        </p>
+        <p>
+          第三段：然后是文字。从最后一段开始，自下而上，每一段里的字按随机的先后变虚、淡去。这一段里放一个<a href="/articles/">站内链接</a>，看拆字时链接是否完好。
+        </p>
+        <p>
+          第四段：文字退完以后，只剩下那根线。它的起伏慢慢收平，从十四度转到水平，停在画面中央，成为一条切面线。
+        </p>
+        <p>第五段：圆光从线的左端交点起笔绕一圈，晶体从一个点长出来，刻度由内向外亮起。往回滚，一切倒放。</p>
+      </div>
+    </div>
+
+    <div class="about-stage" aria-hidden="true">
+      <canvas class="about-water"></canvas>
+      <div class="about-slices">
+      {
+        slices.map(({ s, k, p }) => (
+          <svg
+            class="about-slice"
+            data-k={k}
+            data-i={s.i}
+            viewBox={VB}
+            style={`--side:${s.side};--o:${s.o.toFixed(4)};--w:${s.w.toFixed(4)};--a:${s.a.toFixed(3)}`}
+          >
+            <path class="bk" d={p.back} />
+            <path class="fr" d={p.front} />
+          </svg>
+        ))
+      }
+      </div>
+      <div class="about-crystal">
+        <NexusSlice />
+      </div>
+      <p class="about-tag">NEXUS</p>
+    </div>
   </div>
 </BaseLayout>
+
+<script>
+  import { initAboutExit } from '../scripts/about-exit';
+  import { initAboutDecor } from '../scripts/about-decor';
+  initAboutDecor();
+  initAboutExit();
+</script>
+
+<style>
+  /* ── 正文 ── */
+  .about-prose p {
+    margin: 0 0 1.5em;
+    line-height: 2;
+  }
+
+  .about-prose .lead {
+    font-size: 1.08em;
+  }
+
+  /* ── 天：晶体折射出来的那个世界（nexus-slice.ts 的 env()）铺到整屏 ──
+     色值按 env() 沿屏幕纵向逐点算出（以 42vmin 的晶体、相机俯角 5° 估）：上方淡丁香，
+     切面线略上方一道近白的地平亮带，下方偏紫的雾。晶体透过去看到的与身后一致，像嵌在空气里。
+     刚醒那一刻的天色；梦里天顶偏粉（与 env() 的 uDream 同步）。
+     只有上端渐隐进页面底色；下面的水色一直铺下去，接住页脚（--sky-water），不再退回浅底。 */
+  .about-sky,
+  .about-stage {
+    --sky-wake: linear-gradient(
+      rgb(230 228 247) 0%,
+      rgb(237 234 247) 15%,
+      rgb(249 244 246) 30%,
+      rgb(255 255 255) 40%,
+      rgb(255 255 253) 48%,
+      rgb(254 247 245) 50%,
+      rgb(246 239 239) 53%,
+      rgb(230 222 227) 60%,
+      rgb(208 199 211) 70%,
+      rgb(199 190 204) 85%
+    );
+    --sky-dream: linear-gradient(rgb(240 230 242) 0%, rgb(244 235 243) 15%, rgb(251 244 245) 30%, transparent 40%);
+    --sky-water: rgb(199 190 204);
+    --sky-mask: linear-gradient(transparent, #000 9svh);
+  }
+
+  .about-sky {
+    display: none;
+  }
+
+  /* 页脚落在水面上：同一种水色，去掉与舞台之间的空隙；分隔线换成一道浅浅的水纹 */
+  :global(.site-footer) {
+    margin-top: 0;
+    background: rgb(199 190 204);
+    border-top-color: rgb(255 255 255 / 0.38);
+  }
+
+  /* ── 晶体页（默认：文档流里的一屏，静止） ── */
+  .about-stage {
+    --size: clamp(240px, 42vmin, 440px);
+    position: relative;
+    height: max(100svh, calc(var(--size) + 12rem));
+    overflow: hidden;
+    pointer-events: none;
+  }
+
+  /* 默认排法：天就是舞台自己的底；梦面一层叠在上方按醒度淡入 */
+  .about-stage {
+    background: var(--sky-wake), var(--sky-water);
+    mask-image: var(--sky-mask);
+  }
+
+  .about-stage::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: var(--sky-dream);
+    opacity: calc(1 - var(--reality-mix, 1));
+  }
+
+  /* 切面线：默认由 CSS 画（两端渐隐）；演出开着时换成全站的脑电线 */
+  .about-stage::before {
+    content: '';
+    position: absolute;
+    left: 6%;
+    right: 6%;
+    top: 50%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(58, 64, 78, 0.5) 22%, rgba(58, 64, 78, 0.5) 78%, transparent);
+  }
+
+  .about-crystal {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: var(--size);
+    aspect-ratio: 1;
+    transform: translate(-50%, -50%);
+  }
+
+  /* 水面：切面线以下半屏；碎光与水纹由 about-decor.ts 画 */
+  .about-water {
+    position: absolute;
+    left: 0;
+    top: 50%;
+    width: 100%;
+    height: 50%;
+    opacity: var(--water, 1);
+  }
+
+  /* 切片列：同一枚 24 胞体在别处的切面，沿线排开（about-slices.ts）。位置与大小都按 --size 算 */
+  /* 两端渐隐（与线的两端一致）：窄屏时最外几枚落在屏外，不会被硬切 */
+  .about-slices {
+    position: absolute;
+    inset: 0;
+    mask-image: linear-gradient(90deg, transparent 1%, #000 16%, #000 84%, transparent 99%);
+  }
+
+  .about-slice {
+    position: absolute;
+    top: 50%;
+    left: calc(50% + var(--side) * var(--o) * var(--size));
+    width: calc(var(--w) * var(--size));
+    aspect-ratio: 1;
+    overflow: visible;
+    transform: translate(-50%, -50%);
+  }
+
+  .about-slice path {
+    fill: none;
+    stroke: rgb(90 80 110 / calc(var(--a) * 0.35));
+    stroke-width: 0.8px;
+    stroke-linejoin: round;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .about-slice path.fr {
+    fill: rgb(255 255 255 / calc(var(--a) * 0.35));
+    stroke: rgb(90 80 110 / var(--a));
+    stroke-width: 0.9px;
+  }
+
+  .about-tag {
+    position: absolute;
+    left: 50%;
+    top: calc(50% + var(--size) * 0.56);
+    margin: 0;
+    padding-left: 0.5em;
+    transform: translateX(-50%);
+    font: 10px/1 var(--font-mono);
+    letter-spacing: 0.5em;
+    color: var(--fg-faint);
+  }
+
+  /* ── 演出开着（about-exit.ts 打上 html[data-exit-on]） ── */
+  :global(html[data-exit-on]) .about-sheet {
+    position: sticky;
+    min-height: 100svh;
+  }
+
+  :global(html[data-exit-on]) .about-stage {
+    position: sticky;
+    top: 0;
+    height: 100svh;
+    margin-top: -100svh;
+  }
+
+  :global(html[data-exit-on]) .about-stage::before {
+    display: none;
+  }
+
+  :global(html[data-exit-on]) .about-water {
+    opacity: var(--water, 0);
+  }
+
+  /* 演出时：天是一层独立的 fixed 底（z −4：压在洗染之上、方块与脑电线之下），
+     舞台自己透明；不透明度 --exit-sky、位移 --sky-y 由脚本写（跑道走完随舞台一起上移） */
+  :global(html[data-exit-on]) .about-stage {
+    background: none;
+    mask-image: none;
+  }
+
+  :global(html[data-exit-on]) .about-stage::after {
+    display: none;
+  }
+
+  :global(html[data-exit-on]) .about-sky {
+    display: block;
+    position: fixed;
+    inset: 0 0 -100svh;
+    z-index: -4;
+    pointer-events: none;
+    background: var(--sky-wake) top / 100% 100svh no-repeat, var(--sky-water);
+    mask-image: var(--sky-mask);
+    opacity: var(--exit-sky, 0);
+    transform: translateY(var(--sky-y, 0px));
+  }
+
+  :global(html[data-exit-on]) .about-sky::after {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto;
+    height: 100svh;
+    background: var(--sky-dream);
+    opacity: calc(1 - var(--reality-mix, 1));
+  }
+
+  :global(html[data-exit-on]) .about-slice,
+  :global(html[data-exit-on]) .about-tag {
+    opacity: 0;
+  }
+
+  /* 逐字：阈值 --a 写在每个字上，进度 --xt 写在 .about-prose 上 —— 每帧只改一个变量 */
+  .about-prose :global(.xc) {
+    --k: clamp(0, (var(--xt, 0) - var(--a)) * 25, 1);
+    opacity: calc(1 - var(--k));
+    /* 散开时带一层随 k 变浓的虚影；k = 0 时影子全透明，不加粗正文 */
+    text-shadow: 0 0 calc(var(--k) * 6px) color-mix(in srgb, currentColor calc(var(--k) * 70%), transparent);
+  }
+</style>

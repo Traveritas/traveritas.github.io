@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>晶体页装饰对照</title>
+<!--
+  关于页晶体页（演出走完的那一屏）的装饰方案对照。
+  天色与站内 .about-sky 同值；晶体是从实站截下的静帧（醒 / 梦各一张），这里只比较周围放什么。
+  ?set=素|现状|水面|切片|碎片|百合|组合  &dream=1  —— 截图脚本：design/.shot-nexus-stage.cjs
+-->
+<style>
+  :root { --mix: 1; --size: clamp(240px, 42vmin, 440px); --ink: 90 80 110; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { overflow: hidden; background: #f0f3f6; font: 13px/1.6 system-ui, sans-serif; color: #3a404e; }
+
+  .stage { position: fixed; inset: 0; overflow: hidden; }
+  .sky { position: absolute; inset: 0;
+    background: linear-gradient(rgb(230 228 247) 0%, rgb(237 234 247) 15%, rgb(249 244 246) 30%, rgb(255 255 255) 40%,
+      rgb(255 255 253) 48%, rgb(254 247 245) 50%, rgb(246 239 239) 53%, rgb(230 222 227) 60%, rgb(208 199 211) 70%, rgb(199 190 204) 85%);
+    mask-image: linear-gradient(transparent, #000 9%, #000 88%, transparent); }
+  .sky::after { content: ''; position: absolute; inset: 0; opacity: calc(1 - var(--mix));
+    background: linear-gradient(rgb(240 230 242) 0%, rgb(244 235 243) 15%, rgb(251 244 245) 30%, transparent 40%); }
+
+  .line { position: absolute; left: 0; right: 0; top: 50%; height: 1px;
+    background: linear-gradient(90deg, transparent, rgb(var(--ink) / .42) 18%, rgb(var(--ink) / .42) 82%, transparent); }
+
+  canvas.water { position: absolute; left: 0; top: 50%; width: 100%; height: 50%; }
+
+  .center { position: absolute; left: 50%; top: 50%; width: var(--size); aspect-ratio: 1; transform: translate(-50%, -50%); }
+  .center > * { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .crystal { z-index: 3; }
+  .crystal img { position: absolute; inset: 0; width: 100%; height: 100%; transition: opacity .8s; }
+  .crystal .dr { opacity: calc(1 - var(--mix)); }
+  .crystal .wk { opacity: var(--mix); }
+  .halo { overflow: visible; }
+  .halo circle { fill: none; stroke: rgb(var(--ink) / .32); }
+  svg.lily { overflow: visible; z-index: 1; inset: -45%; width: 190%; height: 190%; }
+  svg.lily path { fill: url(#petal); stroke: rgb(var(--ink) / .3); stroke-width: .8; vector-effect: non-scaling-stroke; }
+
+  .ticks i { position: absolute; top: 50%; width: 1px; height: 7px; transform: translateY(-50%); background: rgb(var(--ink) / .45); }
+  .ticks i.l { height: 14px; }
+
+  svg.slices { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+  svg.slices path { fill: none; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+
+  .shards { position: absolute; inset: 0; }
+  .shards svg { position: absolute; overflow: visible; }
+
+  .tag { position: absolute; left: 50%; top: calc(50% + var(--size) * .56); margin: 0; padding-left: .5em; transform: translateX(-50%);
+    font: 10px/1 ui-monospace, monospace; letter-spacing: .5em; color: rgb(80 86 100 / .6); z-index: 4; }
+
+  [hidden] { display: none !important; }
+
+  /* 面板 */
+  .panel { position: fixed; right: 14px; top: 14px; z-index: 10; width: 210px; padding: 12px 14px; border-radius: 6px;
+    background: rgb(255 255 255 / .72); backdrop-filter: blur(10px); border: 1px solid rgb(var(--ink) / .14); }
+  .panel h2 { margin: 0 0 6px; font-size: 12px; font-weight: 600; }
+  .panel .row { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px; }
+  .panel button { font: inherit; font-size: 12px; padding: 2px 8px; border: 1px solid rgb(var(--ink) / .2); background: #fff; border-radius: 3px; cursor: pointer; }
+  .panel button.on { background: #3a404e; color: #fff; }
+  .panel label { display: block; font-size: 12px; }
+  .panel p { margin: 6px 0 0; font-size: 11px; color: #6a7080; }
+  body.clean .panel { display: none; }
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="sky"></div>
+  <canvas class="water" data-k="water" hidden></canvas>
+  <div class="line"></div>
+  <div class="ticks" data-k="ticks"></div>
+  <svg class="slices" data-k="slices" hidden></svg>
+  <div class="shards" data-k="shards" hidden></div>
+  <div class="center">
+    <svg class="lily" data-k="lily" viewBox="-50 -50 100 100" hidden>
+      <defs>
+        <radialGradient id="petal" cx="0" cy="0" r="50" gradientUnits="userSpaceOnUse">
+          <stop offset=".2" stop-color="#fff" stop-opacity=".6" />
+          <stop offset="1" stop-color="rgb(232 224 244)" stop-opacity=".12" />
+        </radialGradient>
+      </defs>
+      <g class="petals"></g>
+    </svg>
+    <svg class="halo" data-k="halo" viewBox="0 0 100 100"><circle cx="50" cy="50" r="49.5" /></svg>
+    <div class="crystal"><img class="wk" src="wake.png" alt="" /><img class="dr" src="dream.png" alt="" /></div>
+  </div>
+  <p class="tag">NEXUS</p>
+</div>
+
+<div class="panel">
+  <h2>方案</h2>
+  <div class="row" id="sets"></div>
+  <h2>叠加</h2>
+  <div id="toggles"></div>
+  <h2 style="margin-top:10px">醒梦</h2>
+  <div class="row"><button id="wake" class="on">醒</button><button id="dream">梦</button></div>
+  <p>晶体是实站静帧；动的只有周围的装饰。</p>
+</div>
+
+<script>
+/* ── 方案表 ── */
+const SETS = {
+  素: [],
+  现状: ['halo', 'ticks'],
+  水面: ['water'],
+  切片: ['slices'],
+  碎片: ['shards'],
+  百合: ['lily'],
+  组合: ['water', 'slices'],
+};
+const KEYS = { halo: '圆光', ticks: '刻度', water: '水面微光', slices: '切片列', shards: '悬浮碎片', lily: '百合花被' };
+const els = {};
+document.querySelectorAll('[data-k]').forEach((e) => (els[e.dataset.k] = e));
+const on = new Set();
+function setOn(k, v) { v ? on.add(k) : on.delete(k); els[k].toggleAttribute("hidden", !v); paint(); }
+function paint() {
+  document.querySelectorAll('#toggles input').forEach((i) => (i.checked = on.has(i.value)));
+  document.querySelectorAll('#sets button').forEach((b) => b.classList.toggle('on', [...on].sort().join() === [...SETS[b.textContent]].sort().join()));
+}
+function useSet(name) { for (const k in KEYS) setOn(k, SETS[name].includes(k)); }
+for (const name in SETS) { const b = document.createElement('button'); b.textContent = name; b.onclick = () => useSet(name); sets.append(b); }
+for (const k in KEYS) {
+  const l = document.createElement('label');
+  l.innerHTML = `<input type="checkbox" value="${k}"> ${KEYS[k]}`;
+  l.firstChild.onchange = (e) => setOn(k, e.target.checked);
+  toggles.append(l);
+}
+
+/* ── 醒梦（梦里的东西才动） ── */
+let mix = 1, mixTarget = 1;
+function setDream(d) { mixTarget = d ? 0 : 1; wake.classList.toggle('on', !d); dream.classList.toggle('on', d); }
+wake.onclick = () => setDream(false);
+dream.onclick = () => setDream(true);
+
+const size = () => document.querySelector('.center').getBoundingClientRect().width;
+const smooth = (x) => x * x * (3 - 2 * x);
+
+/* ── 刻度（现状） ── */
+function buildTicks() {
+  const t = els.ticks; t.innerHTML = '';
+  const W = innerWidth, s = size(), gap = Math.max(14, W * 0.016);
+  for (const side of [-1, 1]) for (let i = 0; i < 12; i++) {
+    const e = document.createElement('i');
+    if (i % 3 === 2) e.className = 'l';
+    e.style.left = W / 2 + side * (s / 2 + gap * 1.6 + i * gap) + 'px';
+    e.style.opacity = 1 - i / 14;
+    t.append(e);
+  }
+}
+
+/* ── 百合花被：六片，长短、开角都带抖动；梦里极慢地转、微微张合 ── */
+const PETALS = [0, 1, 2, 3, 4, 5].map((i) => ({
+  a: (i / 6) * Math.PI * 2 - Math.PI / 2 + [0.05, -0.08, 0.1, -0.04, 0.07, -0.1][i],
+  L: [47, 41, 45, 43, 48, 40][i],
+  w: [9.5, 8, 10, 8.5, 9, 7.5][i],
+  curl: [1, -1, 1, 1, -1, 1][i] * [3, 2.4, 3.4, 2, 2.8, 3][i],
+}));
+function petalPath(p, open) {
+  const L = p.L * (0.94 + 0.06 * open), w = p.w * 0.5, c = p.curl * 1.3;
+  // 局部坐标：沿 +x 伸出；基部在 r=12（藏在晶体后面），尖端外翻
+  const r0 = 12;
+  return `M ${r0} 0 C ${r0 + L * 0.3} ${-w}, ${L * 0.72} ${-w * 0.9}, ${L * 0.92} ${-w * 0.25 + c * 0.3}
+          Q ${L} ${c * 0.6}, ${L * 0.97} ${c}
+          Q ${L * 0.9} ${w * 0.35 + c * 0.4}, ${L * 0.7} ${w * 0.75}
+          C ${L * 0.4} ${w * 0.95}, ${r0 + 6} ${w * 0.6}, ${r0} 0 Z`;
+}
+function drawLily(t, d) {
+  const g = els.lily.querySelector('.petals');
+  const rot = d * t * 2.2; // 度
+  const open = 0.5 + 0.5 * Math.sin(t * 0.4) * d;
+  g.setAttribute('transform', `rotate(${rot.toFixed(2)})`);
+  g.innerHTML = PETALS.map((p) => `<path d="${petalPath(p, open)}" transform="rotate(${(p.a * 180 / Math.PI).toFixed(2)})"/>`).join('');
+}
+
+/* ── 切片列：同一枚 24 胞体在别处的切面，沿线排开、往外渐小渐淡 ──
+   左边是它「长出来」之前（点 → 小立方 → 八面体），右边是它梦里会换成的形（截角、立方八面体……） */
+const HALF = [];
+for (let i = 0; i < 4; i++) for (const s of [1, -1]) { const a = [0, 0, 0, 0]; a[i] = s; HALF.push([a, 1]); }
+for (let m = 0; m < 16; m++) HALF.push([[m & 1 ? -1 : 1, m & 2 ? -1 : 1, m & 4 ? -1 : 1, m & 8 ? -1 : 1], 2]);
+const dot4 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3];
+const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+const mul = (a, k) => [a[0] * k, a[1] * k, a[2] * k], dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const len = (a) => Math.hypot(a[0], a[1], a[2]), norm = (a) => mul(a, 1 / len(a));
+function rot4(M, i, j, th) { const c = Math.cos(th), s = Math.sin(th); for (const col of M) { const xi = col[i], xj = col[j]; col[i] = c * xi - s * xj; col[j] = s * xi + c * xj; } }
+function section(n, E, h) {
+  const planes = [];
+  for (const [a, b] of HALF) { const p = [dot4(a, E[0]), dot4(a, E[1]), dot4(a, E[2])]; const l = len(p); if (l < 1e-6) continue; planes.push({ n: mul(p, 1 / l), d: (b - h * dot4(a, n)) / l }); }
+  const faces = [];
+  for (let k = 0; k < planes.length; k++) {
+    const P = planes[k], helper = Math.abs(P.n[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0];
+    const u = norm(cross(helper, P.n)), v = cross(P.n, u), o = mul(P.n, P.d), R = 8;
+    let poly = [add(o, add(mul(u, -R), mul(v, -R))), add(o, add(mul(u, R), mul(v, -R))), add(o, add(mul(u, R), mul(v, R))), add(o, add(mul(u, -R), mul(v, R)))];
+    for (let j = 0; j < planes.length && poly.length >= 3; j++) {
+      if (j === k) continue; const Q = planes[j], out = [];
+      for (let i = 0; i < poly.length; i++) { const A = poly[i], B = poly[(i + 1) % poly.length]; const da = dot(Q.n, A) - Q.d, db = dot(Q.n, B) - Q.d;
+        if (da <= 1e-9) out.push(A); if ((da <= 1e-9) !== (db <= 1e-9)) out.push(add(A, mul(sub(B, A), da / (da - db)))); }
+      poly = out;
+    }
+    if (poly.length < 3) continue;
+    let area = 0; for (let i = 1; i + 1 < poly.length; i++) area += len(cross(sub(poly[i], poly[0]), sub(poly[i + 1], poly[0])));
+    if (area < 1e-5) continue;
+    faces.push({ n: P.n, pts: poly });
+  }
+  return faces;
+}
+function sliceAt(e, tau, d) {
+  const M = [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]];
+  if (e < 1) rot4(M, 0, 1, ((1 - e) * Math.PI) / 4);
+  const a = d * e;
+  rot4(M, 0, 1, a * (0.55 * Math.sin(tau * 0.21) + 0.25 * Math.sin(tau * 0.083 + 1.3)));
+  rot4(M, 0, 2, a * (0.45 * Math.sin(tau * 0.157 + 2.1)));
+  rot4(M, 0, 3, a * (0.35 * Math.sin(tau * 0.119 + 0.6)));
+  rot4(M, 1, 2, a * tau * 0.05);
+  let h = 0.9 - d * (0.38 + 0.3 * Math.sin(tau * 0.097 + 0.4));
+  if (e < 1) { const m = M[0].map(Math.abs).sort((x, y) => y - x); h = h + (m[0] + m[1] - h) * (1 - Math.pow(e, 0.7)); }
+  return section(M[0], [M[1], M[2], M[3]], h);
+}
+// 投影：与晶体同一套姿态（拉高 1.28、偏航 yaw、略俯视）
+function project(faces, yaw, scale, cx, cy) {
+  let c = [0, 0, 0], n = 0;
+  for (const f of faces) for (const p of f.pts) { c = add(c, p); n++; }
+  c = mul(c, 1 / n);
+  const cyw = Math.cos(yaw), syw = Math.sin(yaw), pit = 0.09, cp = Math.cos(pit), sp = Math.sin(pit);
+  const T = (p) => { let [x, y, z] = sub(p, c); y *= 1.28; const X = cyw * x - syw * z, Z = syw * x + cyw * z; const Y = cp * y - sp * Z, Z2 = sp * y + cp * Z; return [cx + X * scale, cy - Y * scale, Z2]; };
+  const front = [], back = [];
+  for (const f of faces) {
+    const nn = f.n; const nX = cyw * nn[0] - syw * nn[2], nZ = syw * nn[0] + cyw * nn[2]; const nZ2 = sp * nn[1] * 1 + cp * nZ;
+    const pts = f.pts.map(T);
+    const d = 'M' + pts.map((p) => p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join('L') + 'Z';
+    (nZ2 > 0 ? front : back).push(d);
+  }
+  return { front: front.join(''), back: back.join('') };
+}
+// 每枚切片：方向（-1 左 / 1 右）、第几枚、长出度 e、四维时刻 tau、梦度 d
+const SLICES = [
+  ...[0.12, 0.3, 0.5, 0.72, 0.9].map((e, i) => ({ side: -1, i: 4 - i, e, tau: 0, d: 0 })),
+  ...[3, 9, 15, 22, 30].map((tau, i) => ({ side: 1, i, e: 1, tau, d: 0.55 + 0.1 * i })),
+];
+function drawSlices(t, d) {
+  const W = innerWidth, H = innerHeight, s = size(), svg = els.slices;
+  const gap0 = s / 2 + s * 0.22, base = s * 0.22;
+  let html = '', x = 0;
+  for (const side of [-1, 1]) {
+    let cx = W / 2 + side * gap0;
+    for (let k = 0; k < 5; k++) {
+      const sl = SLICES.find((q) => q.side === side && q.i === k);
+      const k0 = Math.pow(0.84, k), sc = base * k0;
+      cx += side * sc * 0.9;
+      const faces = sliceAt(sl.e, sl.tau + d * t * 0.6, Math.min(1, sl.d + d * 0.3));
+      if (faces.length >= 4) {
+        const P = project(faces, 0.4 + t * 0.05 * (0.3 + d) + k * 0.5 * side, sc * 0.48 * (sl.e < 1 ? 1 : 1), cx, H / 2);
+        const a = 0.62 * Math.pow(0.72, k);
+        html += `<path d="${P.back}" stroke="rgb(90 80 110 / ${(a * 0.35).toFixed(3)})" stroke-width=".8"/>`;
+        html += `<path d="${P.front}" stroke="rgb(90 80 110 / ${a.toFixed(3)})" stroke-width=".9" fill="rgb(255 255 255 / ${(a * 0.35).toFixed(3)})"/>`;
+      }
+      cx += side * sc * 0.9 + side * Math.max(10, s * 0.05) * k0;
+    }
+  }
+  svg.innerHTML = html;
+}
+
+/* ── 水面微光：地平线下的一片静水；晶体正下方一道碎光的光路，往近处散开；
+   另有几条极淡的长水纹，越近越疏（透视）。醒时几乎不动，梦里闪得勤一些 ── */
+const wcv = els.water, wctx = wcv.getContext('2d');
+let rnd = 7; const R = () => (rnd = (rnd * 16807) % 2147483647) / 2147483647;
+const GLINTS = Array.from({ length: 260 }, () => ({ v: Math.pow(R(), 1.6), u: (R() + R() + R() - 1.5) / 1.5, ph: R() * 6.28, sp: 0.4 + R() * 1.4, l: 0.5 + R() }));
+const RIPPLES = Array.from({ length: 9 }, (_, i) => ({ v: Math.pow((i + 1) / 10, 1.7), x0: R() * 0.3, x1: 0.7 + R() * 0.3, ph: R() * 6 }));
+function drawWater(t, d) {
+  const dpr = Math.min(2, devicePixelRatio || 1), W = innerWidth, H = innerHeight / 2;
+  if (wcv.width !== W * dpr) { wcv.width = W * dpr; wcv.height = H * dpr; }
+  wctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  wctx.clearRect(0, 0, W, H);
+  const s = size();
+  // 水纹：细、长、淡；颜色是天顶那一点丁香，像天倒映在纹路上
+  for (const r of RIPPLES) {
+    const y = 8 + r.v * (H - 8) + Math.sin(t * 0.5 + r.ph) * 0.6 * (1 + 2 * d);
+    const g = wctx.createLinearGradient(W * r.x0, 0, W * r.x1, 0);
+    g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.5, `rgba(255,255,255,${(0.6 - r.v * 0.25).toFixed(3)})`); g.addColorStop(1, 'rgba(255,255,255,0)');
+    wctx.fillStyle = g; wctx.fillRect(W * r.x0, y, W * (r.x1 - r.x0), 1 + r.v);
+  }
+  // 光路
+  wctx.globalCompositeOperation = 'lighter';
+  for (const g of GLINTS) {
+    const y = 6 + g.v * (H - 20);
+    const spread = s * (0.12 + 0.9 * g.v);
+    const x = W / 2 + g.u * spread;
+    const tw = 0.5 + 0.5 * Math.sin(t * g.sp * (0.35 + 1.4 * d) + g.ph);
+    const a = Math.pow(tw, 2) * (0.95 - 0.5 * g.v) * (1 - Math.abs(g.u) * 0.55);
+    if (a < 0.01) continue;
+    const L = (3 + 14 * g.v) * g.l;
+    wctx.fillStyle = `rgba(255,252,250,${a.toFixed(3)})`;
+    wctx.fillRect(x - L / 2, y, L, 1 + g.v);
+  }
+  wctx.globalCompositeOperation = 'source-over';
+}
+
+/* ── 悬浮碎片：几枚磨砂玻璃的薄片，远近不一（远的小、虚、淡），醒时静止，梦里缓缓漂、转 ── */
+const SHARDS = [
+  [-0.36, -0.22, 1.0], [-0.27, 0.18, 0.55], [-0.43, 0.05, 0.35], [0.31, -0.25, 0.7], [0.4, 0.14, 0.45],
+  [0.24, 0.27, 0.3], [-0.15, -0.36, 0.28], [0.12, -0.38, 0.4], [-0.47, -0.3, 0.22],
+].map(([x, y, z], i) => {
+  const n = 3 + (i % 3 === 0 ? 1 : 0), pts = [];
+  for (let k = 0; k < n; k++) { const a = (k / n) * 6.28 + R() * 0.9; const r = 0.6 + R() * 0.4; pts.push([Math.cos(a) * r, Math.sin(a) * r * (0.5 + R() * 0.6)]); }
+  return { x, y, z, pts, rot: R() * 360, ph: R() * 6.28 };
+});
+function buildShards() {
+  const box = els.shards; box.innerHTML = '';
+  SHARDS.forEach((sh, i) => {
+    const s = 22 + 64 * sh.z;
+    const pts = sh.pts.map(([x, y]) => `${(x * 50).toFixed(1)},${(y * 50).toFixed(1)}`).join(' ');
+    box.insertAdjacentHTML('beforeend', `<svg viewBox="-50 -50 100 100" style="width:${s}px;height:${s}px;filter:blur(${((1 - sh.z) * 1.6).toFixed(2)}px);opacity:${(0.35 + 0.65 * sh.z).toFixed(2)}">
+      <defs><linearGradient id="sg${i}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".95"/><stop offset="1" stop-color="rgb(214 206 232)" stop-opacity=".55"/></linearGradient></defs>
+      <polygon points="${pts}" fill="url(#sg${i})" stroke="rgb(255 255 255 / .9)" stroke-width="2.5" vector-effect="non-scaling-stroke" style="filter:drop-shadow(0 2px 3px rgb(90 80 110 / .18))"/></svg>`);
+  });
+}
+function drawShards(t, d) {
+  const W = innerWidth, H = innerHeight;
+  [...els.shards.children].forEach((e, i) => {
+    const sh = SHARDS[i], k = 0.6 + sh.z;
+    const x = W / 2 + sh.x * Math.min(W, 1.6 * H) + Math.sin(t * 0.13 * k + sh.ph) * 14 * d * k;
+    const y = H / 2 + sh.y * H + Math.sin(t * 0.21 * k + sh.ph * 2) * 4 + Math.sin(t * 0.09 * k + sh.ph) * 10 * d * k;
+    e.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%) rotate(${(sh.rot + t * 4 * d * k).toFixed(1)}deg)`;
+  });
+}
+
+/* ── 帧 ── */
+let t = 0, last = 0;
+function frame(ts) {
+  const dt = last ? Math.min(0.1, (ts - last) / 1000) : 0; last = ts;
+  mix += Math.sign(mixTarget - mix) * Math.min(Math.abs(mixTarget - mix), dt / 1.2);
+  document.documentElement.style.setProperty('--mix', mix.toFixed(3));
+  const d = smooth(1 - mix);
+  t += dt;
+  if (on.has('water')) drawWater(t, d);
+  if (on.has('lily')) drawLily(t, d);
+  if (on.has('slices')) drawSlices(t, d);
+  if (on.has('shards')) drawShards(t, d);
+  requestAnimationFrame(frame);
+}
+function relayout() { buildTicks(); }
+addEventListener('resize', relayout);
+relayout(); buildShards();
+
+const q = new URLSearchParams(location.search);
+useSet(SETS[q.get('set')] ? q.get('set') : '现状');
+if (q.get('dream') === '1') { setDream(true); mix = 0; }
+if (q.has('clean')) document.body.classList.add('clean');
+window.__t = (v) => (t = v);
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
