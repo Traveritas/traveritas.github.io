@@ -10,6 +10,7 @@
    只写变量与少量内联样式，且一律写在**消费元素自己**身上：
      .seam-wrap / .hairline 的 --exit-chrome，#site-eeg-group 的 --exit-floor / --exit-edge，
      .about-sky 的 --exit-sky / --sky-y，.about-stage 的 --water / --grow，
+     .about-crystal 的 opacity（g 为 0 时整枚收掉），
      逐字各 span 自己的 --k（只写这一帧变了的那些），方块簇的 opacity 只在变了时写。
      ★ 不写根节点：自定义属性是继承的，往 <html> 写一次就把整棵文档树标记为待重算 ——
      实测单帧样式重算 42ms（构块场 194 块与逐字 328 字全在里面），退场段因此掉到 27fps、
@@ -89,6 +90,7 @@ export function initAboutExit() {
   const tag = stage.querySelector<HTMLElement>('.about-tag');
   const sky = run.querySelector<HTMLElement>('.about-sky');
   const crystal = stage.querySelector<NexusEl>('.nexus-slice');
+  const crystalBox = stage.querySelector<HTMLElement>('.about-crystal');
   const ctl = crystal ? (crystal.nexus ??= { grow: 1, line: 0 }) : null;
   if (ctl) ctl.grow = 0;
 
@@ -249,6 +251,10 @@ export function initAboutExit() {
     const g = seg(p, T.grow);
     if (ctl) ctl.grow = g;
     stage!.style.setProperty('--grow', smooth(g).toFixed(3)); // 静帧图（画布没起来时）跟着淡入
+    // 晶体：g 为 0 时整枚收掉（与切片、NEXUS 字同法），一过 0 就整枚亮起。
+    // 不能只让 nexus-slice 自己「画布空着就等于不在」：它的首帧可能早于本脚本，
+    // 那时 grow 还是默认的 1，整枚晶体已经进了画布，清缓冲不保证从屏幕上收掉。
+    if (crystalBox) crystalBox.style.opacity = g > 0 ? '1' : '0';
   }
 
   layout();
