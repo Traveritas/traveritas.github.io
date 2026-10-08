@@ -6,9 +6,13 @@
      → 晶体从一个点长出来（nexus-slice.ts 的 grow）→ 线下水面亮起碎光 → 线上切片由内向外 → NEXUS。
    钉住：.about-sheet 与 .about-stage 都是 sticky，共用 .about-run 这一段跑道（正文高 + RUNWAY 屏），
    跑道走完两者一起滚走、页脚接上；线跟着舞台中心一起走。
-   只写变量与少量内联样式：
-     根节点 --exit-chrome / --exit-floor / --exit-edge（缝线、进度线、脑电消隐读它们，见各组件）；
-     .about-prose 的 --xt（逐字的阈值在各字的 --a 上，CSS 里算）；方块簇的 opacity 只在变了时写。
+   只写变量与少量内联样式，且一律写在**消费元素自己**身上：
+     .seam-wrap / .hairline 的 --exit-chrome，#site-eeg-group 的 --exit-floor / --exit-edge，
+     .about-sky 的 --exit-sky / --sky-y，.about-stage 的 --water / --grow，
+     逐字各 span 自己的 --k（只写这一帧变了的那些），方块簇的 opacity 只在变了时写。
+     ★ 不写根节点：自定义属性是继承的，往 <html> 写一次就把整棵文档树标记为待重算 ——
+     实测单帧样式重算 42ms（构块场 194 块与逐字 328 字全在里面），退场段因此掉到 27fps、
+     并成串出现 50–90ms 长任务；改写在消费元素上之后同一次写入只值 0.1ms。
    减动效 / 无脚本：不开演出，正文之后就是静止的晶体页（about.astro 的默认排法）。
    ───────────────────────────────────────────────────────────── */
 
@@ -50,6 +54,13 @@ const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
 const smooth = (x: number) => x * x * (3 - 2 * x);
 const seg = (p: number, [a, b]: readonly [number, number]) => clamp((p - a) / (b - a), 0, 1);
 
+/** 一个逐字：自己的阈值 a（p 走到这里开始散）与上一帧写下的 k（0 实 → 1 散） */
+interface Char {
+  el: HTMLElement;
+  a: number;
+  k: number;
+}
+
 export function initAboutExit() {
   const run = document.querySelector<HTMLElement>('.about-run');
   const sheet = run?.querySelector<HTMLElement>('.about-sheet');
@@ -58,6 +69,15 @@ export function initAboutExit() {
 
   const root = document.documentElement;
   root.setAttribute('data-exit-on', '');
+
+  /* 退场的三个变量写在**各自的消费元素**上，不写根节点（见文件头）。
+     消费方只有三处：.seam-wrap 与 .hairline 读 --exit-chrome（见各组件），
+     #site-eeg-group 读 --exit-floor / --exit-edge（Eeg.astro 的中央消隐合拢与两端渐隐）。 */
+  const chromeEls = [
+    document.querySelector<HTMLElement>('.seam-wrap'),
+    document.querySelector<HTMLElement>('.hairline'),
+  ];
+  const eegGroup = document.getElementById('site-eeg-group');
 
   const header = document.querySelector<HTMLElement>('.site-header');
   const title = sheet.querySelector<HTMLElement>('.page-head');
@@ -70,8 +90,12 @@ export function initAboutExit() {
   const ctl = crystal ? (crystal.nexus ??= { grow: 1, line: 0 }) : null;
   if (ctl) ctl.grow = 0;
 
-  /* ── 正文逐字：文本节点拆成一字一个 span，阈值 --a 按段落自下而上 + 段内随机 ── */
+  /* ── 正文逐字：文本节点拆成一字一个 span，阈值 a 按段落自下而上 + 段内随机 ──
+     阈值只留在 JS 侧的这张表里，不再挂到字上：每帧由 apply 按 p 算出 k，
+     只写真正在变的那些字（见那里的逐字段）。 */
+  let chars: Char[] | null = null;
   if (prose) {
+    const list: Char[] = [];
     const blocks = [...prose.children] as HTMLElement[];
     let seed = 11;
     const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
@@ -92,12 +116,13 @@ export function initAboutExit() {
           const s = document.createElement('span');
           s.className = 'xc';
           s.textContent = ch;
-          s.style.setProperty('--a', (base + rnd() * 0.06).toFixed(3));
           frag.append(s);
+          list.push({ el: s, a: +(base + rnd() * 0.06).toFixed(3), k: 0 });
         }
         tn.replaceWith(frag);
       }
     });
+    chars = list;
   }
 
   /* ── 钉住的几何 ── */
@@ -167,10 +192,11 @@ export function initAboutExit() {
     lastP = p;
 
     setSoundScene(+((1 - smooth(seg(p, T.music))) ** 2).toFixed(3)); // 平方：听感上匀着退
-    root.style.setProperty('--exit-chrome', smooth(seg(p, T.chrome)).toFixed(3));
+    const kChrome = smooth(seg(p, T.chrome)).toFixed(3);
+    for (const el of chromeEls) el?.style.setProperty('--exit-chrome', kChrome);
     sky?.style.setProperty('--exit-sky', smooth(seg(p, T.sky)).toFixed(3));
-    root.style.setProperty('--exit-floor', smooth(seg(p, T.floor)).toFixed(3));
-    root.style.setProperty('--exit-edge', smooth(seg(p, T.level)).toFixed(3));
+    eegGroup?.style.setProperty('--exit-floor', smooth(seg(p, T.floor)).toFixed(3));
+    eegGroup?.style.setProperty('--exit-edge', smooth(seg(p, T.level)).toFixed(3));
 
     // 方块簇
     if (p > 0) {
@@ -186,8 +212,17 @@ export function initAboutExit() {
       }
     } else releaseClusters();
 
-    // 文字
-    prose?.style.setProperty('--xt', p.toFixed(4));
+    // 文字：k 的斜率是 25（一个字约两三帧走完），任一时刻在过渡的只有三四十个 ——
+    // 写全部 328 个等于每帧多花 13ms 的样式重算，所以只写这一帧真的变了的
+    if (chars) {
+      for (const c of chars) {
+        const k = clamp((p - c.a) * 25, 0, 1);
+        if (Math.abs(k - c.k) > 0.004) {
+          c.el.style.setProperty('--k', k.toFixed(3));
+          c.k = k;
+        }
+      }
+    }
     const tk = smooth(seg(p, T.title));
     if (title) {
       title.style.opacity = tk ? String(1 - tk) : '';
