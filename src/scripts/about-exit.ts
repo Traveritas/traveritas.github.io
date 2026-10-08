@@ -4,8 +4,9 @@
      仪器（缝线、顶部进度线）退、背景音乐开始淡出 → 方块场由外向内一簇簇熄 → 正文自下而上逐字散去 → 标题、页头
      → 脑电线收平、从 14° 转平（经 eeg-spine 的骨架通道，线始终是全站那一根）
      → 晶体从一个点长出来（nexus-slice.ts 的 grow）→ 线下水面亮起碎光 → 线上切片由内向外 → NEXUS。
-   钉住：.about-sheet 与 .about-stage 都是 sticky，共用 .about-run 这一段跑道（正文高 + RUNWAY 屏），
-   跑道走完两者一起滚走、页脚接上；线跟着舞台中心一起走。
+   钉住：.about-sheet 与 .about-stage 都是 sticky，共用 .about-run 这一段跑道
+   （正文高 + RUNWAY 屏演出 + HOLD 屏留驻），跑道走完两者一起滚走、页脚接上；线跟着舞台中心一起走。
+   演出走完（p 到 1）后的 HOLD 屏里进度不再推进、舞台也不上移：晶体页定住，多滑这一段才落到页脚。
    只写变量与少量内联样式，且一律写在**消费元素自己**身上：
      .seam-wrap / .hairline 的 --exit-chrome，#site-eeg-group 的 --exit-floor / --exit-edge，
      .about-sky 的 --exit-sky / --sky-y，.about-stage 的 --water / --grow，
@@ -39,6 +40,7 @@ const T = {
   tag: [0.92, 1.0],
 } as const;
 const RUNWAY = 2.6; // 钉住后再滑多少屏走完演出
+const HOLD = 1.6; // 演出走完后再钉住多少屏：晶体页定住，之后才滚向页脚
 const SEAM_DEG = 14;
 
 /** 背景音乐的页内压声（sound.ts 挂在 globalThis 上的那一份；声音没开时只记下数） */
@@ -128,12 +130,14 @@ export function initAboutExit() {
   /* ── 钉住的几何 ── */
   let sheetH = 0;
   let pinStart = 0;
+  let pinEnd = 0; // 演出 + 留驻都走完、舞台开始随页面上移的那一刻
   function layout() {
     sheetH = sheet!.offsetHeight;
     const H = innerHeight;
     sheet!.style.top = Math.min(0, H - sheetH) + 'px';
-    run!.style.height = sheetH + H * RUNWAY + 'px';
+    run!.style.height = sheetH + H * (RUNWAY + HOLD) + 'px';
     pinStart = run!.getBoundingClientRect().top + scrollY + sheetH - H;
+    pinEnd = pinStart + H * (RUNWAY + HOLD);
   }
 
   /* ── 方块簇：进入演出时按到画面中心的距离排一次名，远的先熄 ── */
@@ -163,8 +167,8 @@ export function initAboutExit() {
     const H = innerHeight,
       W = innerWidth;
     const p = clamp((scrollY - pinStart) / (H * RUNWAY), 0, 1);
-    // 舞台中心：钉住期间在视口正中，跑道走完后随舞台一起上移（按滚动算，不读布局）
-    const cy = H / 2 - Math.max(0, scrollY - (pinStart + H * RUNWAY));
+    // 舞台中心：钉住期间（含走完后的 HOLD 段）在视口正中，跑道走完后随舞台一起上移（按滚动算，不读布局）
+    const cy = H / 2 - Math.max(0, scrollY - pinEnd);
 
     // 线：p > 0 才接管骨架；回到 0 交还给默认的 14° 直线（与没有演出时逐字一致）
     if (p > 0) {
