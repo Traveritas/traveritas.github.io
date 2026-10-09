@@ -5,7 +5,8 @@
    · 几何：24 个半空间投到切面上逐面裁剪，每帧不到 0.1ms。着色全在片元里：切面永远是凸体，
      每个像素沿折射光线求出射面（至多三次体内全反射），光程决定丁香色吸收的深浅，光核按光线离它的距离积分。
    · 醒梦跟随入梦检验的醒度（reality.ts 的 wakeMix），自身再平滑一道，换面不跳。
-   · NEXUS 还没做：门不响应悬停与点击。
+   · 门（nexus-door.ts）：悬停时缓缓停转（hover）；点下去后 enter 0→1：
+     画布挪到 body 上铺满整屏（离轴投影，晶体留在原处原大），镜头推进晶体，光核漫开、化白。
    · 关于页退场（about-exit.ts）经 .nexus-slice 元素上的 nexus 属性（NexusCtl）驱动两件事：
      grow —— 晶体「从一个点长出来」（切面从顶点方向转回胞方向、同时往体内推进；0 时什么也不画）；
      line —— 脑电线落成的切面线，也写进环境里，透过晶体看到的是被折弯、错位的那一段。
@@ -25,6 +26,12 @@ export interface NexusCtl {
   grow: number;
   /** 切面线在晶体背后的可见度 0..1 */
   line: number;
+  /** 门：悬停 0/1（本脚本自己平滑） */
+  hover?: number;
+  /** 门：进入的进度 0..1（nexus-door.ts 逐帧写，写完调 draw） */
+  enter?: number;
+  /** 本脚本装上：按当前状态立即画一帧（画布没起来时不装） */
+  draw?: () => void;
 }
 export type NexusEl = HTMLElement & { nexus?: NexusCtl };
 
@@ -50,6 +57,7 @@ uniform vec3 uCoreC;
 uniform float uRough;       // 体内磨砂度
 uniform float uLine;        // 切面线可见度（关于页退场）
 uniform float uLineY;       // 切面线在环境里的仰角（相机看向晶体中心的方向）
+uniform float uEnter;       // 门：进入的进度 0..1
 out vec4 o;
 
 // 环境：淡丁香天顶、近白地平亮带、偏紫的下半球；左上柔光箱与左侧暗卡给轮廓，右后一盏很淡的粉白小灯
@@ -134,7 +142,7 @@ void main(){
   float L = 0.0, g = 0.0, inner = 0.0;
   vec3 trans = vec3(0.0);
   bool done = false;
-  float disp = mix(0.006, 0.018, uDream);
+  float disp = mix(0.006, 0.018, uDream) * (1.0 + 3.0 * uEnter);
   for (int b = 0; b < 4; b++) {
     int ni;
     float t = exitT(P, T, ni);
@@ -169,7 +177,7 @@ void main(){
   // 光核：沿光程积分后饱和，一团近白的微温
   float gc = 1.0 - exp(-g * uCore);
   vec3 glow = mix(vec3(1.0, 0.975, 0.955), vec3(1.0, 0.955, 0.965), uDream);
-  trans = mix(trans, glow * 1.05, gc * 0.55);
+  trans = mix(trans, glow * 1.05, gc * mix(0.55, 0.95, uEnter));
 
   // 薄膜虹彩，只上在反射里
   vec3 film = 0.5 + 0.5 * cos(6.2832 * (vec3(0.0, 0.33, 0.67) + 1.8 * (1.0 - ndv)));
@@ -178,6 +186,7 @@ void main(){
   vec3 Lk = normalize(vec3(-0.50, 0.70, 0.50));
   float spec = pow(max(dot(Nb, normalize(Lk + V)), 0.0), 260.0);
   col += vec3(1.0) * spec * (0.9 + 0.6 * tb);
+  col = mix(col, glow * 1.05, smoothstep(0.55, 1.0, uEnter));
   o = vec4(col, 1.0);
 }`;
 
@@ -194,7 +203,12 @@ function lookAt(e: V3, c: V3, up: V3) {
 const CAM: V3 = [0, 0.55, 6.2];
 const VIEW = lookAt(CAM, [0, 0, 0], [0, 1, 0]);
 const PROJ = persp(0.62, 1, 0.1, 50);
+function frustum(l: number, r: number, b: number, t: number, n: number, f: number) {
+  return [(2 * n) / (r - l), 0, 0, 0, 0, (2 * n) / (t - b), 0, 0, (r + l) / (r - l), (t + b) / (t - b), (f + n) / (n - f), -1, 0, 0, (2 * f * n) / (n - f), 0];
+}
 const MAX_PX = 900;
+const FULL_PX = 1600; // 铺满整屏时位图长边上限（只撑一秒的进门）
+const DOLLY = 0.2; // 进门推到底时相机离晶体中心的距离比（6.2 → 1.25，还在体外）
 const LINE_Y = -CAM[1] / Math.hypot(CAM[1], CAM[2]);
 
 export function initNexusSlice() {
@@ -229,7 +243,7 @@ export function initNexusSlice() {
   gl.linkProgram(prog);
   if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) return;
   const U: Record<string, WebGLUniformLocation | null> = {};
-  for (const name of ['uView', 'uProj', 'uCam', 'uPl', 'uNP', 'uPw', 'uDream', 'uCore', 'uCoreC', 'uRough', 'uLine', 'uLineY'])
+  for (const name of ['uView', 'uProj', 'uCam', 'uPl', 'uNP', 'uPw', 'uDream', 'uCore', 'uCoreC', 'uRough', 'uLine', 'uLineY', 'uEnter'])
     U[name] = gl.getUniformLocation(prog, name);
 
   const STRIDE = 6;
@@ -250,6 +264,8 @@ export function initNexusSlice() {
   let dream = 1 - wakeMix(); // 0 醒 · 1 梦（自身平滑后的值）
   let tau = 0; // 四维转动的内在时钟：只在梦里走
   let yaw = 0.4;
+  let hv = 0; // 悬停（平滑后）
+  let heldFrame = false; // 悬停停稳后已画过那一帧
 
   /** e：长出来的进度（已缓动），1 ＝ 常态（形状见 cell24.ts 的 sliceAt） */
   const slice = (e = 1) => sliceAt(e, tau, smooth(dream));
@@ -298,10 +314,36 @@ export function initNexusSlice() {
     return k / STRIDE;
   }
 
+  /* 进门：画布挪到 body 上铺满整屏；记下原来那一格的屏幕位置，离轴投影让晶体留在原处原大 */
+  let full: { cx: number; cy: number; w: number } | null = null;
+  function setFull(on: boolean) {
+    if (on === !!full) return;
+    if (on) {
+      const r = root!.getBoundingClientRect();
+      full = { cx: r.left + r.width / 2, cy: r.top + r.height / 2, w: r.width };
+      cv!.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;z-index:1000;opacity:1;pointer-events:none';
+      document.body.append(cv!);
+    } else {
+      full = null;
+      cv!.style.cssText = '';
+      root!.append(cv!);
+    }
+  }
+
   function resize() {
+    if (full) {
+      const k = Math.min(2, devicePixelRatio || 1, FULL_PX / Math.max(innerWidth, innerHeight));
+      const w = Math.round(innerWidth * k),
+        h = Math.round(innerHeight * k);
+      if (cv!.width !== w || cv!.height !== h) {
+        cv!.width = w;
+        cv!.height = h;
+      }
+      return;
+    }
     const w = cv!.clientWidth;
     const px = Math.max(64, Math.min(MAX_PX, Math.round(w * Math.min(2, devicePixelRatio || 1))));
-    if (cv!.width !== px) cv!.width = cv!.height = px;
+    if (cv!.width !== px || cv!.height !== px) cv!.width = cv!.height = px;
   }
 
   function volInvOf(faces: Face[]) {
@@ -321,6 +363,8 @@ export function initNexusSlice() {
 
   let drewEmpty = false;
   function render() {
+    const en = Math.max(0, Math.min(1, ctl.enter ?? 0));
+    setFull(en > 0);
     resize();
     const e = smooth(Math.max(0, Math.min(1, ctl.grow)));
     const faces = e > 0.002 ? slice(e) : [];
@@ -338,18 +382,26 @@ export function initNexusSlice() {
     gl.cullFace(gl.BACK);
     gl.useProgram(prog);
     gl.bindVertexArray(vao);
-    gl.uniformMatrix4fv(U.uView, false, VIEW);
-    gl.uniformMatrix4fv(U.uProj, false, PROJ);
-    gl.uniform3fv(U.uCam, CAM);
+    // 进门：沿视线推近（先慢后快，像被吸进去），投影换成整屏的离轴截锥
+    const cam = en > 0 ? mul(CAM, 1 - (1 - DOLLY) * en ** 1.6) : CAM;
+    let proj = PROJ;
+    if (full) {
+      const u = (2 * 0.1 * Math.tan(0.31)) / full.w; // 每 CSS 像素在近平面上的长度
+      proj = frustum(-full.cx * u, (innerWidth - full.cx) * u, (full.cy - innerHeight) * u, full.cy * u, 0.1, 50);
+    }
+    gl.uniformMatrix4fv(U.uView, false, en > 0 ? lookAt(cam, [0, 0, 0], [0, 1, 0]) : VIEW);
+    gl.uniformMatrix4fv(U.uProj, false, proj);
+    gl.uniform3fv(U.uCam, cam);
     gl.uniform4fv(U.uPl, pl);
     gl.uniform1i(U.uNP, faces.length);
     gl.uniform1fv(U.uPw, pw);
     gl.uniform1f(U.uDream, d);
-    gl.uniform1f(U.uCore, 0.5 + 0.95 * d);
+    gl.uniform1f(U.uCore, 0.5 + 0.95 * d + 3 * en);
     gl.uniform3fv(U.uCoreC, [0, 0.04 + 0.1 * d, 0]);
     gl.uniform1f(U.uRough, 0.45 - 0.12 * d);
     gl.uniform1f(U.uLine, ctl.line);
     gl.uniform1f(U.uLineY, LINE_Y);
+    gl.uniform1f(U.uEnter, en);
     gl.drawArrays(gl.TRIANGLES, 0, n);
   }
 
@@ -368,6 +420,9 @@ export function initNexusSlice() {
     render();
     root.classList.add('is-live'); // 画布接管，静帧图退场
     ready = true;
+    ctl.draw = () => {
+      if (!lost) render();
+    };
     sync();
   });
 
@@ -377,12 +432,21 @@ export function initNexusSlice() {
     const target = 1 - wakeMix();
     dream += Math.sign(target - dream) * Math.min(Math.abs(target - dream), dt / 1.2);
     const d = smooth(dream);
-    tau += dt * d;
-    yaw += dt * (0.06 + 0.16 * d);
+    // 悬停：自转与四维转动一起缓缓停下（约 0.7s），移开再缓缓转起来
+    const ht = ctl.hover ?? 0;
+    hv += Math.sign(ht - hv) * Math.min(Math.abs(ht - hv), dt / 0.7);
+    const spin = 1 - smooth(hv);
+    tau += dt * d * spin;
+    yaw += dt * (0.06 + 0.16 * d) * spin;
     acc += dt;
+    if ((ctl.enter ?? 0) > 0) return; // 进门由 nexus-door.ts 逐帧调 draw
+    // 停稳了且醒度没在变：画面不会再变，不画
+    const held = spin === 0 && dream === target && ctl.grow >= 1;
+    if (held && heldFrame) return;
+    heldFrame = held;
     if (ctl.grow <= 0.002 && drewEmpty) return; // 还没长出来：不画
     // 醒面静置 15fps 足够；长出来的过程跟着滚动走，要满 30fps
-    if (d < 0.02 && ctl.grow >= 1 && acc < 1 / 15 - 0.004) return;
+    if (d < 0.02 && ctl.grow >= 1 && hv === ht && acc < 1 / 15 - 0.004) return;
     acc = 0;
     render();
   }
@@ -413,6 +477,8 @@ export function initNexusSlice() {
   // 丢了 GPU 上下文就退回静帧图，不再重建
   cv.addEventListener('webglcontextlost', () => {
     lost = true;
+    ctl.draw = undefined;
+    setFull(false);
     root.classList.remove('is-live');
     sync();
   });

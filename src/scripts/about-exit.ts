@@ -254,7 +254,11 @@ export function initAboutExit() {
     // 晶体：g 为 0 时整枚收掉（与切片、NEXUS 字同法），一过 0 就整枚亮起。
     // 不能只让 nexus-slice 自己「画布空着就等于不在」：它的首帧可能早于本脚本，
     // 那时 grow 还是默认的 1，整枚晶体已经进了画布，清缓冲不保证从屏幕上收掉。
-    if (crystalBox) crystalBox.style.opacity = g > 0 ? '1' : '0';
+    if (crystalBox) {
+      crystalBox.style.opacity = g > 0 ? '1' : '0';
+      // 晶体也是通往 NEXUS 的门：NEXUS 字出现时才开（之前它隐身盖在正文上，不能挡点击、不能被 Tab 到）
+      crystalBox.inert = p < T.tag[0];
+    }
   }
 
   layout();

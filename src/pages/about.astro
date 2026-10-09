@@ -43,9 +43,9 @@ const VB = `${-VIEW / 2} ${-VIEW / 2} ${VIEW} ${VIEW}`;
       </div>
     </div>
 
-    <div class="about-stage" aria-hidden="true">
-      <canvas class="about-water"></canvas>
-      <div class="about-slices">
+    <div class="about-stage">
+      <canvas class="about-water" aria-hidden="true"></canvas>
+      <div class="about-slices" aria-hidden="true">
       {
         slices.map(({ s, k, p }) => (
           <svg
@@ -61,10 +61,10 @@ const VB = `${-VIEW / 2} ${-VIEW / 2} ${VIEW} ${VIEW}`;
         ))
       }
       </div>
-      <div class="about-crystal">
+      <a class="about-crystal" href="/nexus/?from=blog">
         <NexusSlice />
-      </div>
-      <p class="about-tag">NEXUS</p>
+        <span class="about-tag">NEXUS</span>
+      </a>
     </div>
   </div>
 </BaseLayout>
@@ -72,8 +72,10 @@ const VB = `${-VIEW / 2} ${-VIEW / 2} ${VIEW} ${VIEW}`;
 <script>
   import { initAboutExit } from '../scripts/about-exit';
   import { initAboutDecor } from '../scripts/about-decor';
+  import { initNexusDoor } from '../scripts/nexus-door';
   initAboutDecor();
   initAboutExit();
+  initNexusDoor();
 </script>
 
 <style>
@@ -166,6 +168,43 @@ const VB = `${-VIEW / 2} ${-VIEW / 2} ${VIEW} ${VIEW}`;
     transform: translate(-50%, -50%);
   }
 
+  /* 晶体与 NEXUS 字是同一个链接：通往 NEXUS 的门（点下去的演出见 nexus-door.ts） */
+  a.about-crystal {
+    display: block;
+    pointer-events: auto;
+    color: inherit;
+    text-decoration: none;
+    outline: none;
+  }
+
+  a.about-crystal[inert] {
+    pointer-events: none;
+  }
+
+  /* 悬停 / 聚焦：晶体微微浮起（投影留在原地、收小变淡）；停转由 nexus-slice.ts 接 */
+  a.about-crystal :global(.nexus-slice),
+  a.about-crystal :global(.ns-shade) {
+    transition:
+      transform 1.2s cubic-bezier(0.2, 0.7, 0.2, 1),
+      opacity 1.2s ease;
+  }
+
+  a.about-crystal:is(:hover, :focus-visible) :global(.nexus-slice) {
+    transform: translateY(calc(var(--size) * -0.035));
+  }
+
+  a.about-crystal:is(:hover, :focus-visible) :global(.ns-shade) {
+    transform: translateY(calc(var(--size) * 0.035)) scale(0.82);
+    opacity: 0.55;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    a.about-crystal:is(:hover, :focus-visible) :global(.nexus-slice),
+    a.about-crystal:is(:hover, :focus-visible) :global(.ns-shade) {
+      transform: none;
+    }
+  }
+
   /* 水面：切面线以下半屏；碎光与水纹由 about-decor.ts 画 */
   .about-water {
     position: absolute;
@@ -208,16 +247,26 @@ const VB = `${-VIEW / 2} ${-VIEW / 2} ${VIEW} ${VIEW}`;
     stroke-width: 0.9px;
   }
 
+  /* 晶体上方；悬停 / 键盘聚焦时由淡转实、字距略张 */
   .about-tag {
     position: absolute;
     left: 50%;
-    top: calc(50% + var(--size) * 0.56);
-    margin: 0;
+    bottom: calc(100% + var(--size) * 0.06);
     padding-left: 0.5em;
     transform: translateX(-50%);
     font: 10px/1 var(--font-mono);
     letter-spacing: 0.5em;
+    white-space: nowrap;
     color: var(--fg-faint);
+    transition:
+      color 0.6s ease,
+      letter-spacing 0.6s ease;
+  }
+
+  a.about-crystal:hover .about-tag,
+  a.about-crystal:focus-visible .about-tag {
+    color: var(--fg);
+    letter-spacing: 0.62em;
   }
 
   /* ── 演出开着（about-exit.ts 打上 html[data-exit-on]） ── */
