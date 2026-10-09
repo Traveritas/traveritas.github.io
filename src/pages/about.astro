@@ -19,6 +19,27 @@ const VB = `${-VIEW / 2} ${-VIEW / 2} ${VIEW} ${VIEW}`;
 ---
 
 <BaseLayout title="关于 — Traveritas" description="关于 Traveritas" maskLines={true} bgm="reading">
+  <Fragment slot="head">
+    <script is:inline>
+      // 退场演出把 .about-sheet / .about-stage 切成 sticky 并加负外边距（about.astro 的样式）。
+      // 这个布局模式必须在**首次绘制前**落定：等客户端脚本跑起来再切，整页会重排一次
+      // （手机 CLS 实测 0.598，见性能评估 02）。减动效与无脚本时不开演出，保持文档流的静止晶体页。
+      try {
+        if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+          document.documentElement.setAttribute('data-exit-on', '');
+        }
+      } catch (e) {}
+      // 兜底：模块脚本若整个加载失败（不是抛错，try/catch 接不到），演出就没起来。
+      // load 在模块脚本执行完之后才触发，此时还没有 data-exit-ready 就说明它没跑成，
+      // 把布局模式摘掉，退回文档流的静止晶体页，正文始终完整。
+      addEventListener('load', function () {
+        if (!document.documentElement.hasAttribute('data-exit-ready')) {
+          document.documentElement.removeAttribute('data-exit-on');
+        }
+      });
+    </script>
+  </Fragment>
+
   <div class="about-run">
     <div class="about-sky" aria-hidden="true"></div>
     <div class="about-sheet container page-body">
@@ -73,9 +94,21 @@ const VB = `${-VIEW / 2} ${-VIEW / 2} ${VIEW} ${VIEW}`;
   import { initAboutExit } from '../scripts/about-exit';
   import { initAboutDecor } from '../scripts/about-decor';
   import { initNexusDoor } from '../scripts/nexus-door';
-  initAboutDecor();
-  initAboutExit();
-  initNexusDoor();
+
+  // 布局模式已在 <head> 的首帧脚本里落定；这里初始化失败就把属性摘掉，
+  // 退回文档流的静止晶体页，正文始终完整可读（性能评估 02 的兜底要求）。
+  try {
+    initAboutDecor();
+    initAboutExit();
+  } catch (err) {
+    document.documentElement.removeAttribute('data-exit-on');
+    console.error('[about] 退场演出初始化失败，已退回默认排法', err);
+  }
+  try {
+    initNexusDoor();
+  } catch (err) {
+    console.error('[about] 晶体门初始化失败', err);
+  }
 </script>
 
 <style>

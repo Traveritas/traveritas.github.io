@@ -17,8 +17,19 @@ interface Props {
 const { images, anchor } = Astro.props;
 const list = normalize(images);
 const n = list.length;
+
+/* 大图：截图 / 线条图这类 PNG 直接用原图——无损，且实测更小。
+   4 张 Nexus 截图：原 PNG 共 179KiB，转 WebP@1800 反而 441KiB（约 2.5 倍，性能评估 11）。
+   照片类（非 PNG）仍走 WebP 压缩；只有原图明显过大（超过 2560px）的 PNG 才退回 WebP。 */
+const MAX_PNG = 2560;
 const full = await Promise.all(
-  list.map((im) => getImage({ src: im.src, width: Math.min(im.src.width, 1800), format: 'webp' }))
+  list.map(async (im) => {
+    if (im.src.format === 'png' && im.src.width <= MAX_PNG) {
+      return { src: im.src.src, width: im.src.width, height: im.src.height };
+    }
+    const r = await getImage({ src: im.src, width: Math.min(im.src.width, 1800), format: 'webp' });
+    return { src: r.src, width: r.attributes.width, height: r.attributes.height };
+  })
 );
 ---
 
@@ -26,7 +37,7 @@ const full = await Promise.all(
   list.map((im, i) => (
     <div class="g-box" id={boxId(anchor, i)} role="dialog" aria-label={`配图 ${i + 1} / ${n}`}>
       <a class="g-close" href={`#${anchor}`} aria-label="关闭" />
-      <img src={full[i].src} alt={im.alt} width={full[i].attributes.width} height={full[i].attributes.height} loading="lazy" decoding="async" />
+      <img src={full[i].src} alt={im.alt} width={full[i].width} height={full[i].height} loading="lazy" decoding="async" />
       {n > 1 && (
         <span class="g-nav mono">
           {i > 0 ? <a href={`#${boxId(anchor, i - 1)}`} aria-label="上一张">‹</a> : <span />}

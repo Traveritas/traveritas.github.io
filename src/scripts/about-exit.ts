@@ -16,6 +16,8 @@
      实测单帧样式重算 42ms（构块场 194 块与逐字 328 字全在里面），退场段因此掉到 27fps、
      并成串出现 50–90ms 长任务；改写在消费元素上之后同一次写入只值 0.1ms。
    减动效 / 无脚本：不开演出，正文之后就是静止的晶体页（about.astro 的默认排法）。
+   布局模式由 about.astro 的 <head> 首帧脚本先落定（等这里再切会整页重排，性能评估 02）；
+   本模块只在结构不全或抛错时把属性摘掉，退回默认排法。
    ───────────────────────────────────────────────────────────── */
 
 import { setEegSpine } from './eeg-spine';
@@ -68,10 +70,16 @@ export function initAboutExit() {
   const run = document.querySelector<HTMLElement>('.about-run');
   const sheet = run?.querySelector<HTMLElement>('.about-sheet');
   const stage = run?.querySelector<DecorEl>('.about-stage');
-  if (!run || !sheet || !stage || reducedMotion()) return;
+  // 减动效：头部脚本本就没打 data-exit-on，保持文档流的静止晶体页
+  if (reducedMotion()) return;
+  // 结构不全：把头部脚本已打上的布局模式摘掉，退回默认排法
+  if (!run || !sheet || !stage) {
+    document.documentElement.removeAttribute('data-exit-on');
+    return;
+  }
 
   const root = document.documentElement;
-  root.setAttribute('data-exit-on', '');
+  root.setAttribute('data-exit-on', ''); // 头部脚本通常已打过，这里幂等兜底
 
   /* 退场的三个变量写在**各自的消费元素**上，不写根节点（见文件头）。
      消费方只有三处：.seam-wrap 与 .hairline 读 --exit-chrome（见各组件），
@@ -283,5 +291,8 @@ export function initAboutExit() {
     lastP = -1;
     apply();
   });
+
+  // 演出已就位：页面 head 里的兜底脚本据此判断模块是否跑成（加载失败时摘掉布局模式）
+  root.setAttribute('data-exit-ready', '');
 }
 
