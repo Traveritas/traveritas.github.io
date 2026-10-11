@@ -11,6 +11,7 @@
    ───────────────────────────────────────────────────────────── */
 import BaseLayout from '../layouts/BaseLayout.astro';
 import NexusSlice from '../components/about/NexusSlice.astro';
+import NexusMark from '../components/NexusMark.astro';
 import { SLICES, VIEW, slicePaths } from '../scripts/about-slices';
 
 // 切片列：构建时按醒面画好线框（梦里由 about-decor.ts 接着画）
@@ -27,6 +28,8 @@ const VB = `${-VIEW / 2} ${-VIEW / 2} ${VIEW} ${VIEW}`;
       try {
         if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
           document.documentElement.setAttribute('data-exit-on', '');
+          // 从主页的门进来：直接落在晶体页（about-exit.ts 落定前正文不露面）
+          if (location.hash === '#nexus') document.documentElement.setAttribute('data-arrive', '');
         }
       } catch (e) {}
       // 兜底：模块脚本若整个加载失败（不是抛错，try/catch 接不到），演出就没起来。
@@ -35,6 +38,7 @@ const VB = `${-VIEW / 2} ${-VIEW / 2} ${VIEW} ${VIEW}`;
       addEventListener('load', function () {
         if (!document.documentElement.hasAttribute('data-exit-ready')) {
           document.documentElement.removeAttribute('data-exit-on');
+          document.documentElement.removeAttribute('data-arrive');
         }
       });
     </script>
@@ -64,7 +68,7 @@ const VB = `${-VIEW / 2} ${-VIEW / 2} ${VIEW} ${VIEW}`;
       </div>
     </div>
 
-    <div class="about-stage">
+    <div class="about-stage" id="nexus">
       <canvas class="about-water" aria-hidden="true"></canvas>
       <div class="about-slices" aria-hidden="true">
       {
@@ -84,7 +88,7 @@ const VB = `${-VIEW / 2} ${-VIEW / 2} ${VIEW} ${VIEW}`;
       </div>
       <a class="about-crystal" href="/nexus/?from=blog">
         <NexusSlice />
-        <span class="about-tag">NEXUS</span>
+        <span class="about-tag"><NexusMark /></span>
       </a>
     </div>
   </div>
@@ -102,6 +106,7 @@ const VB = `${-VIEW / 2} ${-VIEW / 2} ${VIEW} ${VIEW}`;
     initAboutExit();
   } catch (err) {
     document.documentElement.removeAttribute('data-exit-on');
+    document.documentElement.removeAttribute('data-arrive');
     console.error('[about] 退场演出初始化失败，已退回默认排法', err);
   }
   try {
@@ -280,26 +285,30 @@ const VB = `${-VIEW / 2} ${-VIEW / 2} ${VIEW} ${VIEW}`;
     stroke-width: 0.9px;
   }
 
-  /* 晶体上方；悬停 / 键盘聚焦时由淡转实、字距略张 */
+  /* 晶体上方；字是 NEXUS 站标题的像素字（NexusMark）。悬停 / 键盘聚焦时由淡转实、字距略张 */
   .about-tag {
+    --nx-px: 2px;
     position: absolute;
     left: 50%;
     bottom: calc(100% + var(--size) * 0.06);
-    padding-left: 0.5em;
     transform: translateX(-50%);
-    font: 10px/1 var(--font-mono);
-    letter-spacing: 0.5em;
-    white-space: nowrap;
+    line-height: 0;
     color: var(--fg-faint);
-    transition:
-      color 0.6s ease,
-      letter-spacing 0.6s ease;
+    transition: color 0.6s ease;
+  }
+
+  .about-tag :global(.nx-mark) {
+    gap: 4px;
+    transition: gap 0.6s ease;
   }
 
   a.about-crystal:hover .about-tag,
   a.about-crystal:focus-visible .about-tag {
     color: var(--fg);
-    letter-spacing: 0.62em;
+  }
+
+  a.about-crystal:is(:hover, :focus-visible) .about-tag :global(.nx-mark) {
+    gap: 6px;
   }
 
   /* ── 演出开着（about-exit.ts 打上 html[data-exit-on]） ── */
@@ -367,6 +376,12 @@ const VB = `${-VIEW / 2} ${-VIEW / 2} ${VIEW} ${VIEW}`;
      收在 .about-crystal 这一层：静帧图与画布一起收，脚本一写 opacity 就即时生效。 */
   :global(html[data-exit-on]) .about-crystal {
     opacity: 0;
+  }
+
+  /* 从主页的门进来（/about/#nexus）：落到晶体页之前，正文与页头先不露面（about-exit.ts 落定后摘掉） */
+  :global(html[data-arrive]) .about-sheet,
+  :global(html[data-arrive] .site-header) {
+    visibility: hidden;
   }
 
   /* 逐字：k（0 实 → 1 散）由 about-exit.ts 按进度直接写在每个字自己身上，只写变了的那些。
