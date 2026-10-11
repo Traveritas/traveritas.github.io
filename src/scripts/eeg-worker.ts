@@ -36,12 +36,11 @@ type Msg =
   | {
       /* 主页：线沿一条视口坐标里的骨架走（xy ＝ null 回到过中心的 14° 直线）。
          dark ＝ 背景明暗（0 亮 1 暗，暗场里主波往浅处混）；reveal ＝ 开屏「从中心往两端画出」
-         的进度（1 ＝ 画满）；dot ＝ 骨架上一粒琥珀点 [弧长比例, 不透明度]（晨醒底线末端） */
+         的进度（1 ＝ 画满） */
       type: 'spine';
       xy: Float32Array | null;
       dark: number;
       reveal: number;
-      dot: [number, number] | null;
       /** 振幅倍率（关于页退场收平用），缺省 1 */
       amp?: number;
     }
@@ -74,7 +73,6 @@ let spine: Spine | null = null;
 let spineVer = 0;
 let dark = 0;
 let reveal = 1;
-let dot: [number, number] | null = null;
 /* Worker 的 performance 时钟 → 主线程时钟（秒） */
 const clock = (ts: number) => (Number.isNaN(origin) ? ts : performance.timeOrigin + ts - origin) / 1000;
 let ph = 0;
@@ -163,14 +161,6 @@ function paint() {
     ctx.globalAlpha = 1 - smooth(Math.max(0, (reveal - 0.85) / 0.15));
     for (const sg of [-1, 1]) glow(spine.len / 2 + sg * r, 10, 0.95);
   }
-  if (spine && dot && dot[1] > 0.01) {
-    ctx.globalAlpha = dot[1];
-    const p = pointAt(spine.len * dot[0]);
-    ctx.fillStyle = colors.amber;
-    ctx.beginPath();
-    ctx.arc(p[0], p[1], 3.2, 0, Math.PI * 2);
-    ctx.fill();
-  }
 }
 
 /* ── WebGL2 端（首选）：与主页地形共用描线后端（home-linescape-gl.ts）。
@@ -257,11 +247,6 @@ function paintGl() {
       const [x, y] = pointAt(spine.len / 2 + sg * r);
       ops.push({ t: 'dot', x, y, r: 10, c: [GLOW_RGB[0], GLOW_RGB[1], GLOW_RGB[2], a], soft: true });
     }
-  }
-  if (spine && dot && dot[1] > 0.01) {
-    const [x, y] = pointAt(spine.len * dot[0]);
-    const c = rgbOf(colors.amber);
-    ops.push({ t: 'dot', x, y, r: 3.2, c: [c[0], c[1], c[2], dot[1]] });
   }
   g.draw(scene);
 }
@@ -357,7 +342,6 @@ self.onmessage = (e: MessageEvent<Msg>) => {
     spineVer++;
     dark = m.dark;
     reveal = m.reveal;
-    dot = m.dot;
     render(ph, true);
   } else if (m.type === 'hidden') {
     hidden = m.hidden;

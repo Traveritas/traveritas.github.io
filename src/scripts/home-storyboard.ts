@@ -180,7 +180,6 @@ export function initStoryboard() {
   const ps = [0, 0, 0, 0, 0];
   let lift = 0;
   let dark = 0;
-  let dawnDot = 0;
 
   const setTiles = () => {
     const H = Math.round(glyphBoxes[0]?.getBoundingClientRect().height || 400);
@@ -314,7 +313,6 @@ export function initStoryboard() {
       const ad = Math.abs(ps[3] - s.c);
       s.el.classList.toggle('on', s.el.classList.contains('on') ? ad < winFull + 0.04 : ad < winFull);
     }
-    dawnDot = cl((pos - 4.2) / 0.3);
   }
 
   /* 入场：揭幕（html.booted）后线从中心往两端画出 */
@@ -417,12 +415,11 @@ export function initStoryboard() {
       sp = makeSpine(xy);
     }
     if (!sp) return;
-    const dotF = mq.matches ? 0.78 : 0.7;
     // 同一姿态、同一入场进度、同一明暗就不再发（Worker 端自己在流动）
     const key = `${pos.toFixed(4)}|${lift.toFixed(1)}|${reveal.toFixed(3)}|${dark.toFixed(3)}|${vw}x${vh}`;
     if (key !== lastSent) {
       lastSent = key;
-      setEegSpine({ xy, dark, reveal, dot: dawnDot > 0 ? [dotF, dawnDot] : null });
+      setEegSpine({ xy, dark, reveal });
     }
 
     const heroOn = pos < 1.05;
