@@ -210,7 +210,6 @@ export function initAboutExit() {
         amp: 1 - smooth(seg(p, T.calm)),
         dark: 0,
         reveal: 1,
-        dot: null,
       });
       spineOn = true;
     } else if (spineOn) {
