@@ -85,11 +85,10 @@ const moments = allMoments.slice(0, nSlip).map((m, i) => {
   };
 });
 
+/* 晨醒底线下的几条小路（主出口「关于」是线上那粒琥珀点，见 .dawn-door） */
 const exits = [
-  { name: 'GitHub', href: 'https://github.com/Traveritas', addr: 'github.com/Traveritas', external: true },
-  { name: '本站源码', href: 'https://github.com/Traveritas/traveritas.github.io', addr: 'traveritas.github.io', external: true },
-  { name: 'RSS', href: '/rss.xml', addr: '/rss.xml', external: false },
-  { name: '关于此处 →', href: '/about/', addr: '/about/', external: false },
+  { name: 'GitHub', href: 'https://github.com/Traveritas', external: true },
+  { name: 'RSS', href: '/rss.xml', external: false },
 ];
 
 const manifesto = '在即将醒来的那一瞬，世界究竟是在成形，还是正在融化？';
@@ -355,12 +354,20 @@ const heroChars = heroLines.map((l) => [...l].map((ch) => ({ ch, i: heroI++ })))
               exits.map((x) => (
                 <a href={x.href} target={x.external ? '_blank' : undefined} rel={x.external ? 'noopener' : undefined}>
                   {x.name}
-                  <small>{x.addr}</small>
+                  {x.external && <span aria-hidden="true"> ↗</span>}
                 </a>
               ))
             }
           </div>
         </div>
+        <!-- 主出口：底线上的琥珀点（位置由 home-linescape.ts 写 --dot-x / --dot-y；无 JS 时落在默认位置） -->
+        <a class="dawn-door" href="/about/">
+          <span class="dd-mark" aria-hidden="true"><i class="dd-halo"></i><i class="dd-wave"></i><i class="dd-wave"></i><i class="dd-ring"></i><i class="dd-core"></i></span>
+          <span class="dd-label">
+            <span class="dd-name" data-morph data-true="关于" data-dream="此身">关于</span>
+            <small>存在于此 · PRESENCE</small>
+          </span>
+        </a>
       </div>
     </section>
 
@@ -1498,31 +1505,182 @@ const heroChars = heroLines.map((l) => [...l].map((ch) => ({ ch, i: heroI++ })))
   .exits {
     display: flex;
     flex-wrap: wrap;
-    gap: 12px;
+    gap: 6px 28px;
   }
   .exits a {
-    padding: 11px 18px;
-    border: 1px solid var(--line);
-    border-radius: 4px;
-    background: rgba(255, 255, 255, 0.45);
-    font-size: 14px;
-    letter-spacing: 0.1em;
-    color: var(--fg);
-    transition:
-      border-color 0.25s,
-      transform 0.25s;
-  }
-  .exits a:hover {
-    border-color: var(--amber);
-    transform: translateY(-2px);
-  }
-  .exits small {
-    display: block;
     font-family: var(--font-mono);
-    font-size: 10.5px;
+    font-size: 11.5px;
+    letter-spacing: 0.16em;
     color: var(--fg-soft);
-    margin-top: 4px;
-    letter-spacing: 0.08em;
+    transition: color 0.25s;
+  }
+  .exits a:hover,
+  .exits a:focus-visible {
+    color: var(--umber);
+  }
+
+  /* 门：线上那粒琥珀点。平时是一粒有体温的光，慢慢呼吸；靠近时亮起、漾开一圈 */
+  .dawn-door {
+    position: absolute;
+    left: var(--dot-x, 70vw);
+    top: var(--dot-y, var(--base, 55svh));
+    z-index: 2;
+    display: block;
+    width: 0;
+    height: 0;
+    color: var(--fg);
+    opacity: clamp(0, calc((var(--p) - 0.2) / 0.3), 1);
+    pointer-events: none;
+  }
+  @property --dd-drift {
+    syntax: '<length>';
+    inherits: false;
+    initial-value: 0px;
+  }
+  @keyframes dd-drift {
+    0%,
+    100% {
+      --dd-drift: 0px;
+    }
+    24% {
+      --dd-drift: 22px;
+    }
+    46% {
+      --dd-drift: 8px;
+    }
+    72% {
+      --dd-drift: -24px;
+    }
+  }
+  :root.dawn-door-on .dawn-door {
+    pointer-events: auto;
+  }
+  /* 梦面：点沿线的走向（--dot-ux / --dot-uy）慢慢左右漂，字慢半拍、少走几分地跟着；
+     --still 醒 0 梦 1，醒面里定住 */
+  .dd-mark,
+  .dd-label {
+    translate: calc(var(--dd-drift) * var(--dd-k, 1) * var(--dot-ux, 1) * var(--still))
+      calc(var(--dd-drift) * var(--dd-k, 1) * var(--dot-uy, 0) * var(--still));
+    animation: dd-drift 17s ease-in-out infinite;
+  }
+  .dd-label {
+    --dd-k: 0.6;
+    animation-delay: 1.4s;
+  }
+  .dd-mark {
+    position: absolute;
+    left: -44px;
+    top: -44px;
+    width: 88px;
+    height: 88px;
+    border-radius: 50%;
+  }
+  .dd-mark i {
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    border-radius: 50%;
+  }
+  .dd-core {
+    width: 9px;
+    height: 9px;
+    background: var(--amber);
+    box-shadow: 0 0 10px 1px color-mix(in srgb, var(--amber) 65%, transparent);
+    transition: transform 0.4s cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  .dd-halo {
+    width: 88px;
+    height: 88px;
+    background: radial-gradient(
+      circle,
+      color-mix(in srgb, var(--amber) 55%, transparent) 0%,
+      color-mix(in srgb, var(--amber) 20%, transparent) 34%,
+      transparent 70%
+    );
+    animation: dd-breathe 5.2s ease-in-out infinite;
+  }
+  .dd-ring {
+    width: 22px;
+    height: 22px;
+    border: 1px solid color-mix(in srgb, var(--amber) 55%, transparent);
+    opacity: 0;
+    transform: scale(0.4);
+    transition:
+      transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1),
+      opacity 0.7s;
+  }
+  /* 每呼吸一次，在吸满的那一刻从光点漾出一圈细纹（第二圈是更淡的回声） */
+  .dd-wave {
+    width: 14px;
+    height: 14px;
+    border: 1px solid color-mix(in srgb, var(--amber) 70%, transparent);
+    opacity: 0;
+    animation: dd-wave 5.2s cubic-bezier(0.25, 0.6, 0.3, 1) 2s infinite;
+  }
+  .dd-wave + .dd-wave {
+    border-color: color-mix(in srgb, var(--amber) 40%, transparent);
+    animation-delay: 2.55s;
+  }
+  @keyframes dd-wave {
+    0% {
+      opacity: 0;
+      transform: scale(0.5);
+    }
+    6% {
+      opacity: 1;
+    }
+    62%,
+    100% {
+      opacity: 0;
+      transform: scale(5);
+    }
+  }
+  @keyframes dd-breathe {
+    0%,
+    100% {
+      opacity: 0.55;
+      transform: scale(0.82);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.08);
+    }
+  }
+  .dd-label {
+    position: absolute;
+    left: -0.2em;
+    top: 26px;
+    display: grid;
+    gap: 6px;
+    white-space: nowrap;
+  }
+  .dd-name {
+    font-family: var(--font-display);
+    font-size: 15px;
+    letter-spacing: 0.32em;
+    transition: color 0.3s;
+  }
+  .dd-label small {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: var(--fg-soft);
+  }
+  .dawn-door:hover .dd-core,
+  .dawn-door:focus-visible .dd-core {
+    transform: scale(1.45);
+  }
+  .dawn-door:hover .dd-ring,
+  .dawn-door:focus-visible .dd-ring {
+    opacity: 1;
+    transform: scale(1.6);
+  }
+  .dawn-door:hover .dd-name,
+  .dawn-door:focus-visible .dd-name {
+    color: var(--umber);
+  }
+  .dawn-door:focus-visible {
+    outline: none;
   }
 
   /* ── 目录 ── */
@@ -1665,9 +1823,12 @@ const heroChars = heroLines.map((l) => [...l].map((ch) => ({ ch, i: heroI++ })))
     .d-head h2 {
       font-size: 1.25rem;
     }
-    .exits a {
-      padding: 9px 12px;
-      font-size: 13px;
+    .dd-name {
+      font-size: 14px;
+    }
+    .dd-label small {
+      font-size: 9.5px;
+      letter-spacing: 0.1em;
     }
     .dir .index {
       grid-template-columns: 1fr;
@@ -1676,6 +1837,15 @@ const heroChars = heroLines.map((l) => [...l].map((ch) => ({ ch, i: heroI++ })))
   }
 
   @media (prefers-reduced-motion: reduce) {
+    .dd-halo {
+      animation: none;
+      opacity: 0.8;
+    }
+    .dd-wave,
+    .dd-mark,
+    .dd-label {
+      animation: none;
+    }
     html.booted .s-hero .rise {
       animation: none;
       opacity: 1;
