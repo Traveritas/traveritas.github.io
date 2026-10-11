@@ -109,23 +109,28 @@
     flex: none;
   }
 
+  /* 高度固定为容器高（14px），起伏一律用 scaleY 表达。
+     改 height 会每帧触发布局：醒态阅读页开声后常驻开销实测约 994ms/s，
+     换成固定高 + scaleY 后约 13ms/s（性能评估 01）。 */
   .snd-str {
     display: block;
     width: 1.25px;
+    height: 14px;
     border-radius: 1px;
     background: var(--fg-faint);
     opacity: 0.65;
+    transform-origin: center;
     transition:
-      height 0.35s ease,
+      transform 0.35s ease,
       background 0.3s ease,
       opacity 0.3s ease,
       filter 0.3s ease;
   }
 
-  /* 静音常态（Off）：3 根细线平卧为 2.5px 微短点 */
-  .snd-s1 { height: 2.5px; }
-  .snd-s2 { height: 2.5px; }
-  .snd-s3 { height: 2.5px; }
+  /* 静音常态（Off）：3 根细线平卧为 2.5px 微短点（2.5 / 14 = 0.1786） */
+  .snd-s1 { transform: scaleY(0.1786); }
+  .snd-s2 { transform: scaleY(0.1786); }
+  .snd-s3 { transform: scaleY(0.1786); }
 
   /* 发声活跃态（On）：琥珀流光，按质数周期呼吸起伏 */
   :global(html[data-sound='on']) .snd-str {
@@ -148,20 +153,21 @@
     filter: blur(0.35px) drop-shadow(0 0 3px color-mix(in srgb, var(--amber) 60%, transparent));
   }
 
+  /* 振幅按 14px 折算成 scaleY：原 3.5/11.5/5、13.5/6/14、4.5/9.5/3 除以 14 */
   @keyframes snd-wave-1 {
-    0% { height: 3.5px; }
-    50% { height: 11.5px; }
-    100% { height: 5px; }
+    0% { transform: scaleY(0.25); }
+    50% { transform: scaleY(0.8214); }
+    100% { transform: scaleY(0.3571); }
   }
   @keyframes snd-wave-2 {
-    0% { height: 13.5px; }
-    50% { height: 6px; }
-    100% { height: 14px; }
+    0% { transform: scaleY(0.9643); }
+    50% { transform: scaleY(0.4286); }
+    100% { transform: scaleY(1); }
   }
   @keyframes snd-wave-3 {
-    0% { height: 4.5px; }
-    50% { height: 9.5px; }
-    100% { height: 3px; }
+    0% { transform: scaleY(0.3214); }
+    50% { transform: scaleY(0.6786); }
+    100% { transform: scaleY(0.2143); }
   }
 
   /* ── 悬停展开区域（文字与状态标签） ───────────────── */
@@ -252,7 +258,7 @@
     :global(html[data-sound='on']) .snd-s2,
     :global(html[data-sound='on']) .snd-s3 {
       animation: none;
-      height: 9px;
+      transform: scaleY(0.6429); /* 9 / 14 */
     }
   }
 </style>

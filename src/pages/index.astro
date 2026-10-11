@@ -13,6 +13,7 @@
    ───────────────────────────────────────────────────────────── */
 import BaseLayout from '../layouts/BaseLayout.astro';
 import RealityGuide from '../components/home/RealityGuide.astro';
+import NexusMark from '../components/NexusMark.astro';
 import { getCollection } from 'astro:content';
 import { fmtDate } from '../lib/format';
 
@@ -113,7 +114,7 @@ const pins = [
     dream: '闪念',
     subWake: '02:08 · 异相 ↓',
     subDream: '02:08 · 悬停 ↓',
-    at: [0.55, 0.79, 0.66, 0.69],
+    at: [0.55, 0.79, 0.62, 0.75],
   },
   {
     key: 'projects',
@@ -206,6 +207,8 @@ const heroChars = heroLines.map((l) => [...l].map((ch) => ({ ch, i: heroI++ })))
   <canvas class="ls-canvas" id="ls-canvas" aria-hidden="true"></canvas>
   <!-- 圆区主体 · 晶苞：离线渲染的逐帧位图，按醒梦播放（src/scripts/home-bud.ts） -->
   <canvas class="ls-bud" id="ls-bud" aria-hidden="true"></canvas>
+  <!-- 晶苞也是门：直达关于页的晶体那一屏。晶体下方一枚 NEXUS 字框，悬停 / 聚焦时取景角合拢、字由虚到清（NEXUS 站「现实的字」的对焦） -->
+  <a class="ls-door" href="/about/#nexus"><span class="ls-door-box"><NexusMark /></span></a>
 
   <div class="home">
     <!-- ═══ 场 0 · 23:07 入夜：线景 —— 那一根线是地平线，地平线下是它自己的一整片回声 ═══ -->
@@ -806,6 +809,100 @@ const heroChars = heroLines.map((l) => [...l].map((ch) => ({ ch, i: heroI++ })))
     }
     to {
       translate: 0 calc(-1.2% * var(--still, 0));
+    }
+  }
+
+  /* ── 晶苞也是门（→ 关于页的晶体那一屏）：一块透明的命中区盖在圆心，1.6R 见方 ——
+     不占满整枚晶苞，圆外的空白仍留给长按入梦。字框挂在晶体下方（圆底再往下一点），同属这个链接：
+     NEXUS 站「现实的字」的样子 —— 四角一副发丝细的取景角、一圈光晕、字是那边标题的像素字。
+     平时不显现；悬停 / 聚焦时从虚处浮出：取景角合上来、字由虚到清、字距收拢（对焦）。
+     与晶苞同一份几何（--sx / --sy / --sr），收拢时一起退场、不再能点 ── */
+  .ls-door {
+    --s: calc(1.6 * var(--sr, 0px));
+    --ink: #3a3350;
+    --halo: #fbf9f7;
+    position: fixed;
+    z-index: 1;
+    left: calc(var(--sx, -999px) - var(--s) / 2);
+    top: calc(var(--sy, -999px) - var(--s) / 2);
+    width: var(--s);
+    height: var(--s);
+    color: var(--ink);
+    text-decoration: none;
+    outline: none;
+    visibility: hidden;
+  }
+  html.ls-placed .ls-door {
+    visibility: visible;
+  }
+  html.ls-folded .ls-door {
+    visibility: hidden;
+  }
+  .ls-door-box {
+    --nx-px: 2px;
+    position: absolute;
+    left: 50%;
+    top: calc(50% + 1.12 * var(--sr, 0px));
+    padding: 10px 18px;
+    translate: -50% 0;
+    opacity: 0;
+    filter: blur(3px) drop-shadow(0 0 5px var(--halo)) drop-shadow(0 0 12px var(--halo));
+    transition:
+      opacity 0.5s ease,
+      filter 0.7s ease;
+  }
+  .ls-door-box .nx-mark {
+    gap: 6px;
+    transition: gap 0.9s cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  .ls-door-box::before {
+    content: '';
+    position: absolute;
+    inset: -8px;
+    --c: linear-gradient(var(--ink), var(--ink));
+    background:
+      var(--c) left top / 7px 1px no-repeat,
+      var(--c) left top / 1px 7px no-repeat,
+      var(--c) right top / 7px 1px no-repeat,
+      var(--c) right top / 1px 7px no-repeat,
+      var(--c) left bottom / 7px 1px no-repeat,
+      var(--c) left bottom / 1px 7px no-repeat,
+      var(--c) right bottom / 7px 1px no-repeat,
+      var(--c) right bottom / 1px 7px no-repeat;
+    opacity: 0.4;
+    transition:
+      inset 0.9s cubic-bezier(0.2, 0.7, 0.2, 1),
+      opacity 0.5s ease;
+  }
+  .ls-door:is(:hover, :focus-visible) .ls-door-box {
+    opacity: 0.92;
+    filter: blur(0) drop-shadow(0 0 5px var(--halo)) drop-shadow(0 0 12px var(--halo));
+  }
+  .ls-door:is(:hover, :focus-visible) .ls-door-box .nx-mark {
+    gap: 2px;
+  }
+  .ls-door:is(:hover, :focus-visible) .ls-door-box::before {
+    inset: 0;
+    opacity: 0.6;
+  }
+  /* 没有悬停的设备：字框常驻在半对焦的样子，否则这扇门无从发现 */
+  @media (hover: none) {
+    .ls-door-box {
+      opacity: 0.7;
+      filter: blur(0.4px) drop-shadow(0 0 5px var(--halo));
+    }
+    .ls-door-box .nx-mark {
+      gap: 3px;
+    }
+    .ls-door-box::before {
+      inset: -3px;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ls-door-box,
+    .ls-door-box .nx-mark,
+    .ls-door-box::before {
+      transition: none;
     }
   }
 

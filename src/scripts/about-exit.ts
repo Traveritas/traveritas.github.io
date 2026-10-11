@@ -15,7 +15,11 @@
      ★ 不写根节点：自定义属性是继承的，往 <html> 写一次就把整棵文档树标记为待重算 ——
      实测单帧样式重算 42ms（构块场 194 块与逐字 328 字全在里面），退场段因此掉到 27fps、
      并成串出现 50–90ms 长任务；改写在消费元素上之后同一次写入只值 0.1ms。
-   减动效 / 无脚本：不开演出，正文之后就是静止的晶体页（about.astro 的默认排法）。
+   从主页的门进来（/about/#nexus，头部脚本打上 html[data-arrive]）：直接落在演出走完的那一刻，
+     并把最后一段（晶体长出来 → 水面 → 切片 → NEXUS）重放一遍；往回滚照常倒放。
+   减动效 / 无脚本：不开演出，正文之后就是静止的晶体页（about.astro 的默认排法），#nexus 是它的锚点。
+   布局模式由 about.astro 的 <head> 首帧脚本先落定（等这里再切会整页重排，性能评估 02）；
+   本模块只在结构不全或抛错时把属性摘掉，退回默认排法。
    ───────────────────────────────────────────────────────────── */
 
 import { setEegSpine } from './eeg-spine';
@@ -43,6 +47,7 @@ const T = {
 const RUNWAY = 2.6; // 钉住后再滑多少屏走完演出
 const HOLD = 1.6; // 演出走完后再钉住多少屏：晶体页定住，之后才滚向页脚
 const SEAM_DEG = 14;
+const ARRIVE_MS = 2600; // 从主页的门进来时，重放最后一段的时长
 
 /** 背景音乐的页内压声（sound.ts 挂在 globalThis 上的那一份；声音没开时只记下数） */
 function setSoundScene(level: number) {
@@ -68,10 +73,17 @@ export function initAboutExit() {
   const run = document.querySelector<HTMLElement>('.about-run');
   const sheet = run?.querySelector<HTMLElement>('.about-sheet');
   const stage = run?.querySelector<DecorEl>('.about-stage');
-  if (!run || !sheet || !stage || reducedMotion()) return;
+  // 减动效：头部脚本本就没打 data-exit-on，保持文档流的静止晶体页
+  if (reducedMotion()) return;
+  // 结构不全：把头部脚本已打上的布局模式摘掉，退回默认排法
+  if (!run || !sheet || !stage) {
+    document.documentElement.removeAttribute('data-exit-on');
+    document.documentElement.removeAttribute('data-arrive');
+    return;
+  }
 
   const root = document.documentElement;
-  root.setAttribute('data-exit-on', '');
+  root.setAttribute('data-exit-on', ''); // 头部脚本通常已打过，这里幂等兜底
 
   /* 退场的三个变量写在**各自的消费元素**上，不写根节点（见文件头）。
      消费方只有三处：.seam-wrap 与 .hairline 读 --exit-chrome（见各组件），
@@ -162,13 +174,27 @@ export function initAboutExit() {
     clusters = null;
   }
 
+  /* ── 从主页的门进来：进度先封顶在晶体刚要长出来的那一刻，再缓缓放开到 1 ──
+     落点是演出刚走完（HOLD 段起点）。用户自己动之前，版面变了（字体换上、浏览器补跳锚点）就再落一次 */
+  let cap = root.hasAttribute('data-arrive') ? T.grow[0] : 1;
+  let holdLanding = cap < 1;
+  const land = () => {
+    if (holdLanding) scrollTo(0, pinStart + innerHeight * (RUNWAY + 0.02));
+  };
+  if (holdLanding) {
+    const stop = () => (holdLanding = false);
+    for (const ev of ['wheel', 'touchstart', 'keydown', 'pointerdown'])
+      addEventListener(ev, stop, { once: true, passive: true });
+    addEventListener('load', land, { once: true });
+  }
+
   /* ── 应用一个进度 ── */
   let spineOn = false;
   let lastP = -1;
   function apply() {
     const H = innerHeight,
       W = innerWidth;
-    const p = clamp((scrollY - pinStart) / (H * RUNWAY), 0, 1);
+    const p = Math.min(cap, clamp((scrollY - pinStart) / (H * RUNWAY), 0, 1));
     // 舞台中心：钉住期间（含走完后的 HOLD 段）在视口正中，跑道走完后随舞台一起上移（按滚动算，不读布局）
     const cy = H / 2 - Math.max(0, scrollY - pinEnd);
 
@@ -262,26 +288,45 @@ export function initAboutExit() {
   }
 
   layout();
+  land();
   apply();
+  if (cap < 1) {
+    root.removeAttribute('data-arrive'); // 进度已在封顶处：正文都已散尽、页头已退，可以摘掉遮挡
+    const c0 = cap;
+    const t0 = performance.now();
+    const step = (now: number) => {
+      const t = clamp((now - t0) / ARRIVE_MS, 0, 1);
+      cap = c0 + (1 - c0) * smooth(t);
+      apply();
+      if (t < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
   onScrollRaf(() => {
     if (sheetH !== sheet.offsetHeight) layout();
     apply();
   });
   addEventListener('resize', () => {
     layout();
+    land();
     lastP = -1;
     apply();
   });
   new ResizeObserver(() => {
     layout();
+    land();
     lastP = -1;
     apply();
   }).observe(sheet);
   // 字体换上后正文会变高：上面的 ResizeObserver 接得住；这里只是兜底
   document.fonts?.ready.then(() => {
     layout();
+    land();
     lastP = -1;
     apply();
   });
+
+  // 演出已就位：页面 head 里的兜底脚本据此判断模块是否跑成（加载失败时摘掉布局模式）
+  root.setAttribute('data-exit-ready', '');
 }
 
