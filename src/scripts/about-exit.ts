@@ -1,7 +1,7 @@
 /* ─────────────────────────────────────────────────────────────
    关于页 · 退场演出（方案 A「线成为切面」；故事板：design/mocks/about-exit/）
    正文读完后整页钉住，继续下滑只推进进度 p（0→1），往回滚即倒放：
-     仪器（缝线、顶部进度线）退、背景音乐开始淡出 → 方块场由外向内一簇簇熄 → 正文自下而上逐字散去 → 标题、页头
+     仪器（缝线、顶部进度线）退、背景音乐开始淡出 → 正文自下而上逐字散去 → 标题、页头
      → 脑电线收平、从 14° 转平（经 eeg-spine 的骨架通道，线始终是全站那一根）
      → 晶体从一个点长出来（nexus-slice.ts 的 grow）→ 线下水面亮起碎光 → 线上切片由内向外 → NEXUS。
    钉住：.about-sheet 与 .about-stage 都是 sticky，共用 .about-run 这一段跑道
@@ -11,9 +11,9 @@
      .seam-wrap / .hairline 的 --exit-chrome，#site-eeg-group 的 --exit-floor / --exit-edge，
      .about-sky 的 --exit-sky / --sky-y，.about-stage 的 --water / --grow，
      .about-crystal 的 opacity（g 为 0 时整枚收掉），
-     逐字各 span 自己的 --k（只写这一帧变了的那些），方块簇的 opacity 只在变了时写。
+     逐字各 span 自己的 --k（只写这一帧变了的那些）。
      ★ 不写根节点：自定义属性是继承的，往 <html> 写一次就把整棵文档树标记为待重算 ——
-     实测单帧样式重算 42ms（构块场 194 块与逐字 328 字全在里面），退场段因此掉到 27fps、
+     实测单帧样式重算 42ms（当时的背景方块 194 块与逐字 328 字全在里面），退场段因此掉到 27fps、
      并成串出现 50–90ms 长任务；改写在消费元素上之后同一次写入只值 0.1ms。
    减动效 / 无脚本：不开演出，正文之后就是静止的晶体页（about.astro 的默认排法）。
    ───────────────────────────────────────────────────────────── */
@@ -28,7 +28,6 @@ const T = {
   chrome: [0.0, 0.1],
   music: [0.04, 0.6], // 背景音乐随世界一起退到无
   sky: [0.2, 0.6], // 天色漫上来（about.astro 的 .about-sky）
-  field: [0.03, 0.36], // 方块簇由外向内
   text: [0.1, 0.46], // 正文自下而上逐字
   title: [0.4, 0.52],
   head: [0.44, 0.54],
@@ -142,26 +141,6 @@ export function initAboutExit() {
     pinEnd = pinStart + H * (RUNWAY + HOLD);
   }
 
-  /* ── 方块簇：进入演出时按到画面中心的距离排一次名，远的先熄 ── */
-  let clusters: { el: HTMLElement; rank: number; last: number }[] | null = null;
-  function rankClusters() {
-    const W = innerWidth,
-      H = innerHeight;
-    const all = [...document.querySelectorAll<HTMLElement>('.fld-cl')].map((el) => {
-      const r = el.getBoundingClientRect();
-      const d = Math.hypot(r.left / W - 0.5, (r.top / H - 0.5) * 0.62);
-      return { el, d, rank: 0, last: 1 };
-    });
-    const sorted = [...all].sort((a, b) => b.d - a.d);
-    sorted.forEach((c, i) => (c.rank = i / Math.max(1, sorted.length - 1)));
-    return all;
-  }
-  function releaseClusters() {
-    if (!clusters) return;
-    for (const c of clusters) c.el.style.opacity = '';
-    clusters = null;
-  }
-
   /* ── 应用一个进度 ── */
   let spineOn = false;
   let lastP = -1;
@@ -203,20 +182,6 @@ export function initAboutExit() {
     sky?.style.setProperty('--exit-sky', smooth(seg(p, T.sky)).toFixed(3));
     eegGroup?.style.setProperty('--exit-floor', smooth(seg(p, T.floor)).toFixed(3));
     eegGroup?.style.setProperty('--exit-edge', smooth(seg(p, T.level)).toFixed(3));
-
-    // 方块簇
-    if (p > 0) {
-      clusters ??= rankClusters();
-      const [f0, f1] = T.field;
-      for (const c of clusters) {
-        const a = f0 + c.rank * (f1 - f0 - 0.06);
-        const o = 1 - smooth(clamp((p - a) / 0.06, 0, 1));
-        if (Math.abs(o - c.last) > 0.004) {
-          c.el.style.opacity = o >= 1 ? '' : o.toFixed(3);
-          c.last = o;
-        }
-      }
-    } else releaseClusters();
 
     // 文字：k 的斜率是 25（一个字约两三帧走完），任一时刻在过渡的只有三四十个 ——
     // 写全部 328 个等于每帧多花 13ms 的样式重算，所以只写这一帧真的变了的

@@ -191,7 +191,7 @@ h2 的序号由 `src/markdown/ordinal.mjs` 这个 **mdast 插件在构建期注�
 最大一帧跳变 **3px**。
 
 改法：动画常驻，振幅乘 `--still`（品牌、序号、逐字浮起三条都改；`.fld-sq` 是第 160 枚的量级，
-维持按面开关，理由见 `Constructs.astro`）。三处配套：
+维持按面开关；该层已于 2026-10-17 随背景方块一并移除）。三处配套：
 
 - **keyframes 里出现 `--still` ⇒ 动画走主线程**。这是代价，用数量卡；口径与数字
   （`design/.probe-float-ramp.cjs`，同一构建内注入旧机制做 A/B，5 次中位，读 Chrome 自己的

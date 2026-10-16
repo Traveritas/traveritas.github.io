@@ -1,6 +1,7 @@
 ---
 import '../styles/tokens.css';
 import '../styles/global.css';
+import '../styles/hours.css';
 /* Noto Serif SC 不走 @fontsource：由 scripts/fonts.mjs 按站内实际用字自切（dev / build 前自动跑），
    产物在 public/fonts/noto-serif-sc/，下面 head 里用 <link> 引。全站只有 500 / 600 两个字重：
    写 400 的正文会匹配到 500；不要再写 300 / 700 / 900，写了也只会落到这两档。 */
@@ -9,7 +10,6 @@ import '@fontsource/silkscreen/400.css';
 import SiteHeader from '../components/SiteHeader.astro';
 import SiteFooter from '../components/SiteFooter.astro';
 import Seam from '../components/chrome/Seam.astro';
-import Constructs from '../components/chrome/Constructs.astro';
 import Eeg from '../components/chrome/Eeg.astro';
 import Rail from '../components/chrome/Rail.astro';
 import Gauge, { type Props as GaugeProps } from '../components/chrome/Gauge.astro';
@@ -29,16 +29,13 @@ interface Props {
   noindex?: boolean;
   /* none：不画 14° 发丝线（主页故事板：脑电线自己就是那条缝） */
   seam?: 'default' | 'faint' | 'broken' | 'none';
-  /* 构块场的挂法：through = z −2（默认，画在千层纸之上）；
-     below = z −3（被首页千层纸遮住，滚过首屏才出现） */
-  constructs?: 'through' | 'below' | 'none';
   /* 全页微温环境渐变叠加层（冷雾灰/薄暮灰紫/暖杏微温，视口固定 GPU 独立合成）：
      渲染 .page-ambient，样式在 global.css「全页微温环境微光叠加层」。
      随笔 / 项目（目录与阅读页）及瞬间页开启。 */
   ambient?: boolean;
   /* 阅读/长文页面中央线条消隐蒙版：正文列避让 14° 发丝线与脑电波（保留背景方块） */
   maskLines?: boolean;
-  /* 构块场在正文列里退到约三成（配合 maskLines）：true = 目录页 container-wide 列宽；
+  /* 缝线 / 脑电的中央消隐列按本页正文列放宽（配合 maskLines）：true = 目录页 container-wide 列宽；
      'narrow' = .container 列宽另加页边日期（瞬间） */
   fieldVeil?: boolean | 'narrow';
   /* 环境声的页面级电平。reading = 长文与关于这类阅读页：整支曲子退到阅读用负增益
@@ -62,7 +59,6 @@ const {
   type = 'website',
   noindex = false,
   seam = 'faint',
-  constructs = 'through',
   ambient = false,
   maskLines = type === 'article',
   fieldVeil = false,
@@ -90,10 +86,22 @@ const deriveDreamTitle = (wake: string): string => {
 const resolvedDreamTitle = dreamTitle ?? deriveDreamTitle(title);
 
 const canonical = Astro.site && !noindex ? new URL(Astro.url.pathname, Astro.site).href : undefined;
+
+// 版块＝时辰：主页把站点讲成一夜，每个版块页沿用主页给它的那一段夜色（色板在 styles/hours.css）。
+// tone 决定玻璃与强调墨走浅色还是深色那一套
+const HOURS: [prefix: string, hour: string, tone: 'light' | 'dark'][] = [
+  ['/articles', 'shallow', 'light'], // 浅梦 23:19 — 01:11
+  ['/tags', 'shallow', 'light'],
+  ['/projects', 'deep', 'dark'], // 深眠 01:11 — 02:08
+  ['/moments', 'rem', 'dark'], // 异相 02:08 — 04:59
+  ['/about', 'dawn', 'light'], // 晨光 06:31
+];
+const path = Astro.url.pathname;
+const [, hour, tone] = HOURS.find(([p]) => path.startsWith(p)) ?? ['', path === '/' ? 'home' : 'none', 'light'];
 ---
 
 <!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-hour={hour} data-tone={tone}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -149,8 +157,6 @@ const canonical = Astro.site && !noindex ? new URL(Astro.url.pathname, Astro.sit
     {boot && <BootVeil always={boot === 'always'} />}
     <Hairline />
     {seam !== 'none' && <Seam variant={seam} />}
-    {/* 构块场与脑电同为 z −2，DOM 在前 ⇒ 脑电压在它上面 */}
-    {constructs !== 'none' && <Constructs layer={constructs} />}
     <Eeg />
     {rail && <Rail {...rail} />}
     {gauge && <Gauge {...gauge} />}
