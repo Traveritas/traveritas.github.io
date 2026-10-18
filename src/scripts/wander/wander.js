@@ -1544,6 +1544,7 @@ export async function initWander(host) {
   /* 键盘：V 切视图；1 2 3 场景 / 栏；/ 检索；漫游里方向键平移、+ - 推拉；检索里方向键在窗之间走 */
   addEventListener('keydown', (e) => {
     if (reader.isOpen || e.altKey || e.ctrlKey || e.metaKey) return;
+    if (e.target instanceof Element && e.target.closest('input, textarea, [contenteditable]')) return;
     if (mode === 'home') {
       const ae = document.activeElement;
       if (ae && ae !== document.body && ae.closest && ae.closest('a,button,[data-w-head]')) return;
@@ -1595,13 +1596,24 @@ export async function initWander(host) {
   const firstHit = () => [...GE.values()].filter((v) => v.el && v.match).sort((a, b) => a.k - b.k || a.order - b.order)[0];
   const exploreTarget = () => (mouse.inside ? SC[regionAt(mouse.x, mouse.y)] : scene);
 
-  /* ══ 检索（界面先拿掉了，等工具区接上；__w.setQuery 仍可用） ══ */
+  /* ══ 检索：输入在左下角工具栏的「寻找」（Toolstar.astro）里，经 xm:find 事件传过来 ══ */
   function setQuery(s) {
     query = s.trim().toLowerCase();
     for (const v of GE.values()) v.match = matches(v.it);
     root.classList.toggle('w-filtering', !!query);
     for (const sc of scroll) sc.target = 0;
+    const hits = [...GE.values()].filter((v) => v.match).length;
+    dispatchEvent(new CustomEvent('xm:found', { detail: { query, hits, total: GE.size } }));
   }
+  /* 有字要找时先转到检索那一种看法（主页 / 漫游里筛了也看不出来），再筛 */
+  function find(q) {
+    if (q && !reader.isOpen) {
+      if (mode === 'home') homeToGrid(scene);
+      else if (mode === 'explore') toGrid();
+    }
+    setQuery(q);
+  }
+  addEventListener('xm:find', (e) => find(e.detail?.query ?? ''));
 
   /* ══ 外框 ══ */
   const tabs = [...host.querySelectorAll('.w-scenes button')];
@@ -1743,6 +1755,10 @@ export async function initWander(host) {
   }
   root.classList.add('w-ready');
   requestAnimationFrame(tick);
+
+  /* 从别的页带着要找的字（?q=）进来：直接筛上 */
+  const q0 = new URLSearchParams(location.search).get('q');
+  if (q0) find(q0);
 
   /* 地址带着一则瞬间（/moments/#<id>）进来：直接把它打开 */
   const hashId = decodeURIComponent(location.hash.slice(1));

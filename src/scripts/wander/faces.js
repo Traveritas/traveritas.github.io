@@ -44,7 +44,8 @@ function items(D) {
       it.id = `${s}-${i}`;
       it.i = i;
       it.title = it.ref.title;
-      it.text = [it.ref.title, it.ref.desc || '', (it.ref.tags || []).join(' '), it.ref.text || '', it.kind === 'img' ? it.ref.images[it.k - 1].alt || '' : ''].join(' ').toLowerCase();
+      // 「年-月」也进检索文本：工具栏的年月圈拿它当一个词筛（2026-10）
+      it.text = [it.ref.title, it.ref.desc || '', (it.ref.tags || []).join(' '), (it.ref.date || '').slice(0, 7), it.ref.text || '', it.kind === 'img' ? it.ref.images[it.k - 1].alt || '' : ''].join(' ').toLowerCase();
     });
   }
   return all;

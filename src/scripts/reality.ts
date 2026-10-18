@@ -7,6 +7,7 @@
    · 中途松手：半径按同一个级别函数收回去（也是一级一级解析回来），停在原面；松了又按，从头来。
    · 短按（≤170ms）＝点击，完全静默。
    · 键盘：焦点不在交互件时按住 Shift＋空格 等价，圈心在视口中央略偏上。
+   · 工具栏（Toolstar）的「面」：flipFrom(x, y) 从那颗图标起圈，不用按住，一路塌满闩锁。
    · 画面由「圈的渲染者」负责：默认是 ring.ts 的一张覆盖全屏的像素画布（普通页面）；
      自己有画面的页（漫游 / 检索那片空间）用 setRingRenderer 接过去，在自己的着色器与窗里画。
      这里只给圈的几何：圈心、半径、退级（shift）与要去的那一面。
@@ -101,6 +102,20 @@ export function forceReality(target: Reality) {
   setTint(c);
 }
 
+/** 从某一点直接换面（工具栏的「面」）：和长按同一个圈，只是不用按住、跳过静默判定窗，
+    一路塌满并闩锁。手势进行中不抢占；减弱动效时瞬时切换。 */
+export function flipFrom(x: number, y: number) {
+  if (!body || src !== null || mode !== 'idle') return;
+  if (RM) {
+    px = x;
+    py = y;
+    toggleInstant();
+    return;
+  }
+  beginHold(x, y, 'tool');
+  holdT0 -= CLICK_MS;
+}
+
 function notifyReality(r: Reality) {
   for (const fn of realityListeners) fn(r);
   if (typeof window !== 'undefined') {
@@ -118,7 +133,7 @@ function store(r: Reality) {
 let reality: Reality = 'wake';
 let mode: Mode = 'idle';
 let dir: 'go' | 'back' = 'go';
-let src: 'ptr' | 'kb' | null = null;
+let src: 'ptr' | 'kb' | 'tool' | null = null;
 let pid = -1;
 let p = 0; // 半径进度 0..1（r = rEnd · p）
 let c = 1; // 醒度 0..1（1 = 醒）
@@ -241,7 +256,7 @@ function restoreDuals() {
 }
 
 /* ---------- 状态机 ---------- */
-function beginHold(x: number, y: number, fromSrc: 'ptr' | 'kb') {
+function beginHold(x: number, y: number, fromSrc: 'ptr' | 'kb' | 'tool') {
   if (mode === 'freeze') return; // 正在解析回来：这一拍不接新的按压
   if (mode === 'retract') finishRetract();
   if (mode !== 'idle') return;
@@ -515,6 +530,8 @@ export function initReality() {
   let stored: string | null = null;
   try {
     stored = sessionStorage.getItem(STORE_KEY);
+    // 设置里关掉「记住面」：每一页都从头入梦，不沿用上一页落定的那一面
+    if (localStorage.getItem('xm-keep-face') === 'off') stored = null;
   } catch {
     /* ignore */
   }

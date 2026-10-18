@@ -2,7 +2,8 @@
    页内导览轨（Gauge.astro）：随笔 / 瞬间 / 项目三个目录页 + 阅读页。
    · 静息：发丝线 + 琥珀游标（滚动百分比）+ 节点刻度；
    · 浮起：悬停 / 聚焦 / 拖动时显出节点名，轨可点按跳转、拖动擦过；
-   · 展开：点按游标（不拖动）或浮起时游标旁的「展开」，侧面玻璃薄片——目录页寻找 / 标签 / 年月，阅读页目录 / 字号 / 行距。
+   · 展开（只剩目录页）：点按游标（不拖动）或浮起时游标旁的「展开」，侧面玻璃薄片——寻找 / 标签 / 年月。
+     阅读页的目录 / 字号 / 行距搬进了左下角工具栏的「本页」（Toolstar.astro），这里只剩进度轨。
    节点全部从页面 DOM 里取：目录页认 [data-g-node]（只标年份，条目不上轨），
    阅读页认正文 h2 / h3；筛选对象是 [data-g-item]（data-tags 以 | 分隔，data-ym = 2026-09）。
    ───────────────────────────────────────────────────────────── */
@@ -41,8 +42,8 @@ export function initGauge() {
   const probe = root.querySelector<HTMLElement>('.g-probe')!;
   const fill = root.querySelector<HTMLElement>('.g-fill')!;
   const body = root.querySelector<HTMLElement>('.g-body')!;
-  const opener = root.querySelector<HTMLButtonElement>('.g-open')!;
-  const panel = root.querySelector<HTMLElement>('.g-panel')!;
+  const opener = root.querySelector<HTMLButtonElement>('.g-open');
+  const panel = root.querySelector<HTMLElement>('.g-panel');
 
   /* ── 节点 ── */
   const sel = kind === 'reading' ? 'article.prose .md h2, article.prose .md h3' : '[data-g-node]';
@@ -142,7 +143,7 @@ export function initGauge() {
     if (!dragging && e.type === 'pointerup') {
       // 点在游标上 ＝ 开合薄片；点在轨上别处 ＝ 跳过去
       const pr = probe.getBoundingClientRect();
-      if (Math.abs(e.clientY - (pr.top + pr.height / 2)) <= 8) setOpen(!open);
+      if (panel && Math.abs(e.clientY - (pr.top + pr.height / 2)) <= 8) setOpen(!open);
       else scrollTo({ top: targetAt(e.clientY), behavior: smooth() });
     }
     downY = null;
@@ -168,13 +169,14 @@ export function initGauge() {
     scrollTo({ top: clamp(top, 0, max), behavior: smooth() });
   });
 
-  /* ── 展开薄片 ── */
+  /* ── 展开薄片（只有目录页有） ── */
+  if (!opener || !panel) return;
   function setOpen(v: boolean) {
     open = v;
     root!.classList.toggle('is-open', v);
-    opener.setAttribute('aria-expanded', String(v));
-    opener.textContent = v ? '收起' : '展开';
-    panel.inert = !v;
+    opener!.setAttribute('aria-expanded', String(v));
+    opener!.textContent = v ? '收起' : '展开';
+    panel!.inert = !v;
   }
   opener.addEventListener('click', () => setOpen(!open));
   addEventListener('keydown', (e) => {
@@ -188,61 +190,7 @@ export function initGauge() {
   });
 
   const go = (top: number) => scrollTo({ top, behavior: smooth() });
-
-  if (kind === 'reading') initReading(panel, nodes, go, setOpen);
-  else initIndex(root, panel, nodes, go);
-}
-
-/* ── 阅读页：目录 + 字号 / 行距 ── */
-function initReading(
-  panel: HTMLElement,
-  nodes: GNode[],
-  go: (top: number) => void,
-  setOpen: (v: boolean) => void,
-) {
-  const toc = panel.querySelector<HTMLElement>('.g-toc');
-  if (toc) {
-    if (!nodes.length) toc.closest('.g-sec')?.remove();
-    for (const n of nodes) {
-      const a = document.createElement('a');
-      a.className = n.major ? 'g-toc-item' : 'g-toc-item is-sub';
-      a.href = n.el.id ? `#${n.el.id}` : '#';
-      a.textContent = n.label;
-      a.addEventListener('click', (e) => {
-        e.preventDefault();
-        go(n.land);
-        setOpen(false);
-      });
-      n.toc = a;
-      toc.append(a);
-    }
-  }
-
-  const html = document.documentElement;
-  for (const seg of panel.querySelectorAll<HTMLElement>('.g-seg[data-key]')) {
-    const key = seg.dataset.key!; // size | lead
-    const attr = key === 'size' ? 'readSize' : 'readLead';
-    const btns = [...seg.querySelectorAll<HTMLButtonElement>('button[data-v]')];
-    const paint = () => {
-      const v = html.dataset[attr] || 'm';
-      for (const b of btns) b.setAttribute('aria-pressed', String(b.dataset.v === v));
-    };
-    for (const b of btns) {
-      b.addEventListener('click', () => {
-        const v = b.dataset.v!;
-        if (v === 'm') delete html.dataset[attr];
-        else html.dataset[attr] = v;
-        try {
-          if (v === 'm') localStorage.removeItem(`xm-read-${key}`);
-          else localStorage.setItem(`xm-read-${key}`, v);
-        } catch {
-          /* 存不下就只管本页 */
-        }
-        paint();
-      });
-    }
-    paint();
-  }
+  initIndex(root, panel, nodes, go);
 }
 
 /* ── 目录页：寻找 / 标签 / 年月 ── */

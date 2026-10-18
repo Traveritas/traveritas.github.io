@@ -1,0 +1,643 @@
+---
+/* ─────────────────────────────────────────────────────────────
+   工具栏 · 星与同心轨道（全站常驻，左下角；原型与对照见 design/mocks/tool-star/）
+   · 一颗三轴正交六芒星（±x ±y ±z 六支，正等轴视角下投影成六芒星）只是开关：
+     醒面静止，梦面慢慢自转；开合时转 90°（立方对称，转完同形）。
+   · 点开：工具落在绕星的内圈轨道上——先是点了就切的两件（换面 / 环境声），隔一道空，
+     再是会往外展开的四件（去处 / 寻找 / 本页（只在阅读页）/ 设置），这四件外侧各带一道小刻，指向它要展开去的那一圈。
+     展开的在更外的轨道上放射排开，可滚轮 / 拖动转，去处与标签那两圈首尾相接；寻找另有一圈年月。
+   · 圆弧说不好的退回平直薄片，贴在轨道上方：寻找的输入框、本页的目录与字号 / 行距。
+   · 接的都是现成的机制：面 → reality.ts 的 flipFrom（同一个塌缩圈，从图标起）；
+     声 → sound.ts 认 [data-sound-toggle]；光标 → cursor.ts 认 [data-cursor-toggle]；
+     寻找 → 漫游空间（wander.js）的 xm:find / xm:found，别的页回车带 ?q= 去目录；
+     字号 / 行距 → html[data-read-size / data-read-lead] 与 localStorage（预排版的那段脚本在 Gauge.astro）。
+   · 轨道上的条目都写在这里的标记里（双面文案要在 morph 初始化时就在），位置由 toolstar.ts 逐帧写。
+   · 无 JS 时整件不出现（BaseLayout 的 noscript）。
+   ───────────────────────────────────────────────────────────── */
+import { getCollection } from 'astro:content';
+
+interface Props {
+  /* 阅读页（随笔 / 项目正文）：多一件「本页」 */
+  reading?: boolean;
+}
+const { reading = false } = Astro.props;
+
+const pub = ({ data }: { data: { draft?: boolean } }) => !data.draft;
+const entries = [
+  ...(await getCollection('articles', pub)),
+  ...(await getCollection('moments', pub)),
+  ...(await getCollection('projects', pub)),
+];
+// 标签按用得多少排：常用的先转到眼前
+const freq = new Map<string, number>();
+for (const e of entries) for (const t of ('tags' in e.data ? e.data.tags : []) ?? []) freq.set(t, (freq.get(t) ?? 0) + 1);
+const tags = [...freq].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([t]) => t);
+// 年月：新的在上；漫游空间的检索文本里也写着同样的「2026-10」（wander/faces.js）
+const pad = (n: number) => String(n).padStart(2, '0');
+const months = [...new Set(entries.map((e) => `${e.data.date.getFullYear()}-${pad(e.data.date.getMonth() + 1)}`))].sort().reverse();
+
+const path = Astro.url.pathname;
+const here = (href: string) => (href === '/' ? path === '/' : path.startsWith(href));
+const DESTS: { href: string; wake: string; dream?: string; ext?: boolean }[] = [
+  { href: '/', wake: '主页' },
+  { href: '/articles/', wake: '随笔', dream: '断章' },
+  { href: '/moments/', wake: '瞬间', dream: '闪念' },
+  { href: '/projects/', wake: '项目', dream: '造物' },
+  { href: '/gate/', wake: 'NEXUS' },
+  { href: 'https://github.com/Traveritas', wake: 'GitHub', ext: true },
+  { href: '/rss.xml', wake: 'RSS', ext: true },
+];
+
+/* 图标：同一种 1.25px 线，取形于星的轴线与导览轨的刻度 */
+const ICON: Record<string, string> = {
+  go: '<path class="ts-fill" d="M12 4.5 18.5 8.25 12 12 5.5 8.25Z"/><path d="M12 4.5 18.5 8.25V15.75L12 19.5 5.5 15.75V8.25Z M5.5 8.25 12 12 18.5 8.25 M12 12V19.5"/>',
+  find: '<circle cx="10.5" cy="10.5" r="5.5"/><path d="M14.6 14.6 19.5 19.5"/>',
+  page: '<path d="M7 4V20 M7 7.5H16 M7 11.5H12.5 M7 15.5H17.5"/>',
+  // 一枚圆被那条 14° 的发丝线劈开，一半薄薄地亮着（梦面左右翻过来）
+  face: '<path class="ts-fill ts-fill--face" d="M13.69 5.21A7 7 0 0 1 10.31 18.79Z"/><circle cx="12" cy="12" r="7"/><path d="M14.3 2.8 9.7 21.2"/>',
+  sound: '<line x1="7" y1="6" x2="7" y2="18"/><line x1="12" y1="6" x2="12" y2="18"/><line x1="17" y1="6" x2="17" y2="18"/>',
+  set: '<path d="M4 7H20 M4 12H20 M4 17H20"/><circle class="ts-knob" cx="9" cy="7" r="1.9"/><circle class="ts-knob" cx="15.5" cy="12" r="1.9"/><circle class="ts-knob" cx="11" cy="17" r="1.9"/>',
+};
+/* 先是点了就切的两件，再是会展开的四件（toolstar.ts 在这两组之间留一道空） */
+const TOOLS: { id: string; wake: string; dream?: string; en: string; panel?: boolean }[] = [
+  // 文案沿用原先首屏那枚指引（RealityGuide）：说的是按下去会去哪一面
+  { id: 'face', wake: '重归夜色', dream: '唤醒世界', en: 'FACE' },
+  { id: 'sound', wake: '环境声', dream: '回响', en: 'SOUND' },
+  { id: 'go', wake: '去处', en: 'GO', panel: true },
+  { id: 'find', wake: '寻找', en: 'FIND', panel: true },
+  ...(reading ? [{ id: 'page', wake: '本页', en: 'PAGE', panel: true }] : []),
+  { id: 'set', wake: '设置', en: 'PREFS', panel: true },
+];
+---
+
+<div class="ts" id="ts" data-reading={reading ? '' : undefined}>
+  <div class="ts-orbit" aria-hidden="false">
+    <svg class="ts-tracks" aria-hidden="true"></svg>
+
+    <div class="ts-ring" data-ring="tools" role="toolbar" aria-label="工具" hidden>
+      {
+        TOOLS.map((t) => (
+          <button
+            class:list={['ts-item ts-tool', { 'ts-tool--opens': t.panel }]}
+            type="button"
+            data-t={t.id}
+            data-nofx
+            aria-label={t.id === 'face' ? '换面' : t.wake}
+            aria-expanded={t.panel ? 'false' : undefined}
+            aria-pressed={t.id === 'sound' ? 'false' : undefined}
+            data-sound-toggle={t.id === 'sound' ? '' : undefined}
+          >
+            <svg class={`ts-ico ts-ico-${t.id}`} viewBox="0 0 24 24" aria-hidden="true" set:html={ICON[t.id]} />
+            <span class="ts-lab">
+              {t.dream ? (
+                <span data-morph data-true={t.wake} data-dream={t.dream}>{t.wake}</span>
+              ) : (
+                t.wake
+              )}
+              <small>{t.en}</small>
+            </span>
+          </button>
+        ))
+      }
+    </div>
+
+    <nav class="ts-ring" data-ring="go" data-loop aria-label="去处" hidden>
+      {
+        DESTS.map((d) => (
+          <a
+            class="ts-item ts-ray"
+            href={d.href}
+            data-nofx
+            aria-current={!d.ext && here(d.href) ? 'page' : undefined}
+            rel={d.href.startsWith('http') ? 'noreferrer' : undefined}
+          >
+            {d.dream ? <span data-morph data-true={d.wake} data-dream={d.dream}>{d.wake}</span> : d.wake}
+            {d.ext && <small>↗</small>}
+          </a>
+        ))
+      }
+    </nav>
+
+    <div class="ts-ring" data-ring="tags" data-loop role="group" aria-label="标签" hidden>
+      {
+        tags.map((t) => (
+          <button class="ts-item ts-ray" type="button" data-word={t} data-nofx aria-pressed="false">
+            {t}
+          </button>
+        ))
+      }
+    </div>
+
+    <div class="ts-ring" data-ring="months" role="group" aria-label="年月" hidden>
+      {
+        months.map((m) => (
+          <button class="ts-item ts-ray ts-ray--sm" type="button" data-word={m} data-nofx aria-pressed="false">
+            {m.replace('-', ' · ')}
+          </button>
+        ))
+      }
+    </div>
+
+    <div class="ts-ring" data-ring="set" role="group" aria-label="设置" hidden>
+      <button class="ts-item ts-ray ts-opt" type="button" data-cursor-toggle data-nofx aria-pressed="false">
+        光标 · <b class="ts-v-off">自绘</b><b class="ts-v-on">系统</b>
+      </button>
+      <button class="ts-item ts-ray ts-opt" type="button" data-keep-face data-nofx aria-pressed="true">
+        记住面 · <b class="ts-v-on">开</b><b class="ts-v-off">关</b>
+      </button>
+    </div>
+  </div>
+
+  <section class="ts-sheet ts-sheet--bar" data-sheet="find" aria-label="寻找" hidden>
+    <input
+      class="ts-field"
+      type="search"
+      placeholder="标题、正文、标签里的字"
+      autocomplete="off"
+      spellcheck="false"
+      aria-label="寻找"
+    />
+    <p class="ts-count mono" aria-live="polite"></p>
+  </section>
+
+  {
+    reading && (
+      <section class="ts-sheet" data-sheet="page" aria-label="本页" hidden>
+        <p class="ts-h mono">目录 · CONTENTS</p>
+        <ol class="ts-toc" />
+        <div class="ts-sec">
+          <div class="ts-set">
+            <span>字号</span>
+            <span class="ts-seg" data-key="size">
+              <button type="button" data-v="s">小</button>
+              <button type="button" data-v="m">中</button>
+              <button type="button" data-v="l">大</button>
+            </span>
+          </div>
+          <div class="ts-set">
+            <span>行距</span>
+            <span class="ts-seg" data-key="lead">
+              <button type="button" data-v="m">常</button>
+              <button type="button" data-v="l">疏</button>
+            </span>
+          </div>
+        </div>
+      </section>
+    )
+  }
+
+  <button class="ts-star" type="button" data-nofx aria-expanded="false" aria-label="工具">
+    <svg viewBox="-20 -20 40 40" aria-hidden="true"><g class="ts-star-g"></g></svg>
+  </button>
+</div>
+
+<script>
+  import { initToolstar } from '../../scripts/toolstar';
+  initToolstar();
+</script>
+
+<!-- 轨道上的条目是运行时摆的，样式一律 .ts / .ts- 前缀自守 -->
+<style is:global>
+  .ts {
+    --ts-glass: color-mix(in srgb, var(--bg) 72%, transparent);
+    --ts-edge: rgb(255 255 255 / 0.7);
+    --ts-hi: rgb(255 255 255 / 0.6);
+    --ts-sh: rgb(38 44 51 / 0.22);
+    font-family: var(--font-body);
+  }
+  html[data-tone='dark'][data-hour] .ts {
+    --ts-edge: rgb(var(--frost) / calc(var(--frost-edge-a) * 0.82));
+    --ts-hi: rgb(255 255 255 / var(--frost-hi-a));
+    --ts-sh: rgb(var(--frost-sh) / calc(var(--frost-sh-a) * 1.67));
+  }
+
+  /* ── 星 ── */
+  .ts-star {
+    position: fixed;
+    left: 22px;
+    bottom: 22px;
+    z-index: 61;
+    width: 48px;
+    height: 48px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 50%;
+    /* 收着时垫一小片玻璃：压在任何一种夜色上都看得见 */
+    background: var(--ts-glass);
+    border-color: var(--ts-edge);
+    -webkit-backdrop-filter: blur(12px) saturate(1.08);
+    backdrop-filter: blur(12px) saturate(1.08);
+    box-shadow: 0 6px 18px -8px var(--ts-sh);
+    display: grid;
+    place-items: center;
+    color: var(--fg-soft);
+    cursor: pointer;
+    transition:
+      color 0.3s,
+      background-color 0.3s,
+      border-color 0.3s,
+      box-shadow 0.3s;
+  }
+  /* 开着时星落在圆盘上，自己那片玻璃退掉 */
+  .ts-star[aria-expanded='true'] {
+    background-color: transparent;
+    border-color: transparent;
+    box-shadow: none;
+  }
+  .ts-star:hover,
+  .ts-star[aria-expanded='true'] {
+    color: var(--fg);
+  }
+  .ts-star svg {
+    width: 40px;
+    height: 40px;
+    overflow: visible;
+    /* 星每帧重画：点在某一支上时，按下与松开落在两个不同的节点上，click 就不成立 */
+    pointer-events: none;
+  }
+  .ts-star .ts-hub {
+    fill: var(--amber);
+  }
+  .ts-star:focus-visible,
+  .ts-item:focus-visible,
+  .ts-seg button:focus-visible {
+    outline: 1.5px solid var(--amber);
+    outline-offset: 3px;
+  }
+
+  /* ── 轨道层 ── */
+  .ts-orbit {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    pointer-events: none;
+  }
+  /* 以星为圆心的一块磨砂玻璃圆盘，半径跟着最外一圈走：
+     漫游空间里每一栏底色都不同（主页整片靛夜），轨道上的字得落在同一种材质上才读得清 */
+  .ts-orbit::before {
+    content: '';
+    position: absolute;
+    left: calc(var(--ts-cx, 46px) - var(--ts-sr, 0px));
+    top: calc(var(--ts-cy, 100vh) - var(--ts-sr, 0px));
+    width: calc(var(--ts-sr, 0px) * 2);
+    height: calc(var(--ts-sr, 0px) * 2);
+    border-radius: 50%;
+    background: var(--ts-glass);
+    border: 1px solid var(--ts-edge);
+    -webkit-backdrop-filter: blur(18px) saturate(1.08);
+    backdrop-filter: blur(18px) saturate(1.08);
+    box-shadow:
+      inset 0 1px 1px var(--ts-hi),
+      0 18px 42px -18px var(--ts-sh);
+    opacity: 0;
+    transition:
+      opacity 0.35s,
+      left 0.45s cubic-bezier(0.16, 1, 0.3, 1),
+      top 0.45s cubic-bezier(0.16, 1, 0.3, 1),
+      width 0.45s cubic-bezier(0.16, 1, 0.3, 1),
+      height 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .ts-orbit.is-veiled::before {
+    opacity: 1;
+  }
+  .ts-tracks {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+  .ts-tracks .ts-trk {
+    fill: none;
+    stroke: var(--fg);
+    stroke-opacity: 0.1;
+    stroke-width: 1;
+  }
+  .ts-tracks .ts-trk.is-dash {
+    stroke-dasharray: 1 5;
+    stroke-opacity: 0.22;
+  }
+  .ts-tracks .ts-band {
+    fill: none;
+    stroke: transparent;
+    stroke-width: 46;
+    pointer-events: stroke;
+    cursor: grab;
+  }
+  .ts-ring[hidden] {
+    display: none;
+  }
+  .ts-item {
+    position: absolute;
+    left: 0;
+    top: 0;
+    pointer-events: auto;
+    touch-action: none;
+    will-change: transform, opacity;
+    opacity: 0;
+    visibility: hidden;
+  }
+
+  /* 工具 */
+  .ts-tool {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    display: grid;
+    place-items: center;
+    color: var(--fg-soft);
+    cursor: pointer;
+    transition: color 0.2s, background-color 0.2s;
+  }
+  .ts-tool:hover {
+    color: var(--fg);
+    background: color-mix(in srgb, var(--fg) 6%, transparent);
+  }
+  .ts-tool[aria-expanded='true'] {
+    color: var(--amber);
+  }
+  .ts-ico {
+    width: 22px;
+    height: 22px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.25;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    overflow: visible;
+  }
+  .ts-ico .ts-fill {
+    fill: currentColor;
+    fill-opacity: 0.2;
+    stroke: none;
+  }
+  .ts-ico .ts-fill--face {
+    fill-opacity: 0.32;
+  }
+  /* 会往外展开的工具：外侧一道小刻，指向它要展开去的那一圈（--ts-a 是它在轨道上的角度，逐帧写） */
+  .ts-tool--opens::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 5px;
+    height: 1.25px;
+    margin-top: -0.625px;
+    background: currentColor;
+    opacity: 0.5;
+    transform-origin: 0 50%;
+    transform: rotate(calc(var(--ts-a, 0) * -1deg)) translateX(17px);
+  }
+  .ts-ico .ts-knob {
+    fill: var(--bg);
+  }
+  body[data-reality='dream'] .ts-ico-face {
+    transform: scaleX(-1);
+    transform-origin: 12px 12px;
+  }
+  /* 环境声：静音时三根弦平卧成点，响时起伏（与原先的微章同一个意思） */
+  .ts-ico-sound line {
+    transform-box: fill-box;
+    transform-origin: center;
+    transform: scaleY(0.12);
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  html[data-sound='on'] .ts-ico-sound line {
+    animation: ts-str 1.7s ease-in-out infinite alternate;
+  }
+  html[data-sound='on'] .ts-ico-sound line:nth-child(2) {
+    animation-duration: 1.3s;
+  }
+  html[data-sound='on'] .ts-ico-sound line:nth-child(3) {
+    animation-duration: 2.3s;
+  }
+  html[data-sound='on'] .ts-tool[data-t='sound'] {
+    color: var(--amber);
+  }
+  @keyframes ts-str {
+    from {
+      transform: scaleY(0.35);
+    }
+    to {
+      transform: scaleY(1);
+    }
+  }
+  /* 名字沿半径往外浮出，字保持横排，垫一片玻璃：不压在相邻的图标上，外圈展开着时也读得清。
+     先沿半径推出 24px，再按角度挪锚点——0° 时贴着左侧中点，90° 时贴着底边中点 */
+  .ts-lab {
+    --c: cos(calc(var(--ts-a, 0) * 1deg));
+    --s: sin(calc(var(--ts-a, 0) * 1deg));
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    z-index: 1;
+    /* 横向锚点不往左过 -20%：星贴着屏幕左缘，近 90° 那几件居中摆会被左边裁掉 */
+    transform: translate(calc(var(--c) * 24px), calc(var(--s) * -24px))
+      translate(calc(-50% + max(var(--c), 0.6) * 50%), calc(-50% - var(--s) * 50%));
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: var(--ts-glass);
+    border: 1px solid var(--ts-edge);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    white-space: nowrap;
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    color: var(--fg-soft);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+  }
+  .ts-lab small {
+    font: 10px var(--font-mono);
+    letter-spacing: 0.1em;
+    color: var(--fg-faint);
+    margin-left: 0.5em;
+  }
+  .ts-tool:hover .ts-lab,
+  .ts-tool:focus-visible .ts-lab {
+    opacity: 1;
+  }
+
+  /* 放射排开的条目：从轨道上的那一点沿半径往外读 */
+  .ts-ray {
+    transform-origin: 0 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 4px 6px 0;
+    border: 0;
+    background: none;
+    white-space: nowrap;
+    font: 15px/1.2 var(--font-display);
+    color: var(--fg-soft);
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .ts-ray::before {
+    content: '';
+    flex: none;
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: 0.5;
+  }
+  .ts-ray:hover {
+    color: var(--fg);
+  }
+  .ts-ray[aria-current='page'],
+  .ts-ray[data-word][aria-pressed='true'] {
+    color: var(--amber);
+  }
+  .ts-ray[aria-current='page']::before,
+  .ts-ray[data-word][aria-pressed='true']::before {
+    opacity: 1;
+    width: 5px;
+    height: 5px;
+  }
+  .ts-ray--sm {
+    font: 12px/1.2 var(--font-mono);
+  }
+  .ts-ray small {
+    font: 10px var(--font-mono);
+    color: var(--fg-faint);
+  }
+  .ts-opt b {
+    font-weight: 400;
+    color: var(--amber);
+  }
+  .ts-opt[aria-pressed='true'] .ts-v-off,
+  .ts-opt[aria-pressed='false'] .ts-v-on {
+    display: none;
+  }
+
+  /* ── 平直薄片 ── */
+  .ts-sheet {
+    position: fixed;
+    left: 20px;
+    z-index: 61;
+    width: min(18rem, calc(100vw - 40px));
+    max-height: min(60vh, 30rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: none;
+    padding: 1.05rem 1.2rem 1.15rem;
+    border-radius: 6px;
+    background: var(--ts-glass);
+    border: 1px solid var(--ts-edge);
+    -webkit-backdrop-filter: blur(18px) saturate(1.08);
+    backdrop-filter: blur(18px) saturate(1.08);
+    box-shadow:
+      inset 0 1px 1px var(--ts-hi),
+      0 18px 42px -18px var(--ts-sh);
+    color: var(--fg);
+    opacity: 0;
+    translate: 0 10px;
+    transition:
+      opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+      translate 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .ts-sheet.is-on {
+    opacity: 1;
+    translate: 0 0;
+  }
+  .ts-sheet--bar {
+    width: min(20rem, calc(100vw - 40px));
+    padding: 0.65rem 1rem 0.55rem;
+  }
+  .ts-field {
+    width: 100%;
+    padding: 0.4rem 0;
+    border: 0;
+    border-bottom: 1px solid var(--line);
+    border-radius: 0;
+    background: transparent;
+    font: 15px var(--font-display);
+    color: var(--fg);
+    outline: none;
+  }
+  .ts-field:focus {
+    border-bottom-color: var(--amber);
+  }
+  .ts-count {
+    margin: 0.45rem 0 0;
+    min-height: 1.2em;
+    font-size: 11px;
+    color: var(--fg-faint);
+  }
+  .ts-h {
+    margin: 0 0 0.6rem;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    color: var(--fg-faint);
+  }
+  .ts-toc {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .ts-toc a {
+    display: block;
+    padding: 0.32rem 0;
+    font: 0.92rem/1.45 var(--font-display);
+    color: var(--fg-soft);
+    text-decoration: none;
+  }
+  .ts-toc a.is-sub {
+    padding-left: 1em;
+    font-size: 0.85rem;
+  }
+  .ts-toc a:hover,
+  .ts-toc a.is-current {
+    color: var(--fg);
+  }
+  .ts-toc a.is-current::before {
+    content: '—';
+    color: var(--amber);
+    margin-right: 0.4em;
+  }
+  .ts-sec {
+    margin-top: 0.9rem;
+    padding-top: 0.8rem;
+    border-top: 1px solid var(--line);
+  }
+  .ts-set {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.3rem 0;
+    font-size: 13px;
+    color: var(--fg-soft);
+  }
+  .ts-seg {
+    display: flex;
+    gap: 4px;
+  }
+  .ts-seg button {
+    padding: 2px 9px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: none;
+    font-size: 12px;
+    color: var(--fg-soft);
+    cursor: pointer;
+  }
+  .ts-seg button[aria-pressed='true'] {
+    color: var(--amber);
+    border-color: color-mix(in srgb, var(--amber) 60%, transparent);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ts-ico-sound line {
+      animation: none !important;
+    }
+    .ts-sheet,
+    .ts-orbit::before {
+      transition: none;
+    }
+  }
+</style>
