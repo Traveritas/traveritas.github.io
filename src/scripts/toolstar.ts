@@ -54,6 +54,8 @@ class Ring {
   hideT = 0;
   /** 第几项之后多空 0.7 格（-1 = 不空） */
   gapAfter: number;
+  /** 条目从轨道往外伸出的最长距离（放射的字有多长；显形时量） */
+  extent = 20;
 
   constructor(el: HTMLElement, R: number, step: number, start?: number, gapAfter = -1) {
     this.gapAfter = gapAfter;
@@ -148,6 +150,7 @@ class Ring {
   show(rm: boolean) {
     clearTimeout(this.hideT);
     this.el.hidden = false;
+    this.measure();
     this.alphaTo = 1;
     this.target = 0;
     if (this.alpha === 0) this.offset = rm ? 0 : -50;
@@ -167,6 +170,12 @@ class Ring {
       },
       rm ? 0 : 420,
     );
+  }
+
+  /** 量放射条目的长度（宽度不受 transform 影响；隐藏时量不到，所以在显形时量） */
+  measure() {
+    if (!this.originals[0]?.classList.contains('ts-ray')) return;
+    this.extent = Math.max(0, ...this.originals.map((el) => el.offsetWidth));
   }
 
   get visible() {
@@ -305,20 +314,23 @@ export function initToolstar() {
       return el;
     };
     add({ class: 'ts-trk is-dash', cx: C.x, cy: C.y, r: 30 });
-    let outer = 0;
     for (const ring of Object.values(rings)) {
       if (!ring.visible) continue;
       add({ class: 'ts-trk', cx: C.x, cy: C.y, r: ring.R });
       const band = add({ class: 'ts-band', cx: C.x, cy: C.y, r: ring.R, 'data-nofx': '' });
       bindTurn(band as unknown as HTMLElement, ring);
-      if (ring !== rings.tools) outer = Math.max(outer, ring.R);
     }
-    // 圆盘：只开了工具圈时刚好托住那一圈；外圈展开时托住放射出去的字（约 110px 长）
-    const disc = outer ? outer + 124 * scaleK() : rings.tools.R + 34;
-    orbit.style.setProperty('--ts-sr', `${disc.toFixed(1)}px`);
+    orbit.style.setProperty('--ts-sr', `${discR().toFixed(1)}px`);
     orbit.style.setProperty('--ts-cx', `${C.x}px`);
     orbit.style.setProperty('--ts-cy', `${C.y}px`);
     orbit.classList.add('is-veiled');
+  }
+
+  /** 圆盘半径：只开了工具圈时刚好托住那一圈；外圈展开时托住放射出去的最长那几个字 */
+  function discR() {
+    let outer = 0;
+    for (const ring of Object.values(rings)) if (ring !== rings.tools && ring.visible) outer = Math.max(outer, ring.R + ring.extent);
+    return outer ? outer + 24 : rings.tools.R + 34;
   }
 
   /* ── 转圈：指针绕星心转过的角度直接加到 offset 上；动了就不算点击 ── */
@@ -390,11 +402,20 @@ export function initToolstar() {
     star.setAttribute('aria-expanded', String(open));
     for (const b of toolBtns) if (b.hasAttribute('aria-expanded')) b.setAttribute('aria-expanded', String(open && tool === b.dataset.t));
     const want = new Set<keyof typeof rings>(open ? ['tools', ...(tool ? OUTER[tool] : [])] : []);
+    // 年月圈跟着标签圈最长的那枚往外让：标签长了不压上去
+    if (want.has('months')) {
+      if (!rings.tags.visible) rings.tags.show(RM);
+      const R0 = (rings.tags.R + rings.tags.extent + 26) / scaleK();
+      if (Math.abs(R0 - rings.months.R0) > 0.5) {
+        rings.months.R0 = R0;
+        rings.months.layout();
+      }
+    }
     for (const [name, ring] of Object.entries(rings) as [keyof typeof rings, Ring][]) {
       if (want.has(name) && !ring.visible) ring.show(RM);
       else if (!want.has(name) && ring.visible) ring.hide(RM);
     }
-    showSheet(findSheet, open && tool === 'find', rings.months.R + 124 * scaleK() + 14);
+    showSheet(findSheet, open && tool === 'find', discR() + 14);
     if (pageSheet) showSheet(pageSheet, open && tool === 'page', rings.tools.R + 34 + 14);
     drawTracks();
     kick();
@@ -428,6 +449,9 @@ export function initToolstar() {
       const t = b.dataset.t!;
       if (t === 'face') {
         const r = b.getBoundingClientRect();
+        b.classList.add('is-turning'); // 图标里那道线点下去就开始转，换面落定时摘掉（见 onRealityChange）
+        clearTimeout(turnT);
+        turnT = window.setTimeout(() => b.classList.remove('is-turning'), 2400);
         flipFrom(r.left + r.width / 2, r.top + r.height / 2);
         return;
       }
@@ -466,8 +490,10 @@ export function initToolstar() {
     }, 120);
   });
 
+  let turnT = 0;
   onRealityChange((r) => {
     reality = r;
+    root.querySelector('.ts-tool[data-t="face"]')?.classList.remove('is-turning');
     kick();
   });
 
