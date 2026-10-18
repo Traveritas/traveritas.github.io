@@ -16,14 +16,25 @@
  窗本身是最简的窗（faces.js）；悬停是朝指针的倾斜 + 跟着指针走的一点反光。
  点开是那扇窗自己长大（reader.js）。
 
- 挂在随笔 / 瞬间 / 项目三个目录页上（WanderIndex.astro）：三个地址是同一页，只是进来时落在哪一栏。
+ 主页（home）——这片空间还没分开的样子。三种夜色只是一池池浮在主页的靛夜里；三个场景的窗混在一起，
+   镜头一直很慢地往前推，窗一扇扇从景深里浮上来、经过焦平面（那一刻是清楚的、可以点开）、再从身边糊过去。
+   一根 14° 的线过屏幕中心，三个栏头挂在线下。往下走（滚轮 / 上划 / ↓ / 点栏头）：
+   那根线转过 90°、劈成两条缝滑到栏界上，池子被缝收拢成三栏，窗落进格子——就是检索。
+   点左上的名字回来：窗沉回景深，两条缝合拢、转回去，又是一根线。
+
+ 挂在主页与随笔 / 瞬间 / 项目三个目录页上（WanderIndex.astro）：四个地址是同一页，只是进来时落在哪里。
+ 入梦检验的塌缩圈在这里由自己画（setRingRenderer）：圈里的光粗成像素、窗退到更糊的档位。
  ───────────────────────────────────────────────────────────── */
 import { createLight } from './light.js';
 import { createWeather } from './weather.js';
 import { Faces } from './faces.js';
 import { createReader, prefetch } from './reader.js';
+import { createInk } from './ink.js';
+import { onRealityChange, setRingRenderer } from '../reality';
+import { setEegSpine } from '../eeg-spine';
 
 const PATH = { essay: '/articles/', moment: '/moments/', project: '/projects/' };
+const HOME = '/';
 
 export async function initWander(host) {
   const root = document.documentElement;
@@ -139,9 +150,10 @@ export async function initWander(host) {
   /* ══ 状态 ══ */
   const pickScene = (s) => (SC.includes(s) ? s : 'essay');
   let scene = pickScene(host.dataset.scene);
-  /* 初次进来是检索（要找东西的人不必先学会怎么逛）；之后记住上次用的那种 */
+  /* 主页地址进来是主页；目录地址第一次进来是检索（要找东西的人不必先学会怎么逛），之后记住上次用的那种 */
   let mode = 'grid';
-  {
+  if (host.dataset.scene === 'home') mode = 'home';
+  else {
     let v = null;
     try { v = localStorage.getItem('wander.view'); } catch {}
     if (v === 'explore') mode = 'explore';
@@ -171,30 +183,65 @@ export async function initWander(host) {
      规格：'L' 推出前方（左 / 上）、'R' 推出后方（右 / 下）、数字 k = 检索视图里第 k 条栏界。 */
   const SPEC_EX = { essay: ['R', 'R'], moment: ['L', 'R'], project: ['L', 'L'] };
   const SPEC_GRID = [1, 2];
+  /* 主页：两条缝叠在屏幕中心，并且转了 90°（宽屏）——于是它们是同一根过中心、向右下倾 14° 的线。
+     窄屏的缝本来就是横的、向右下倾，不用转，只是叠在中心。 */
+  const SPEC_HOME = ['H', 'H'];
+  const homeRot = () => (geo.horz ? 0 : Math.PI / 2);
+  const CALM = 420; // 主页 → 检索：脑电线先收平的那一段（ms）
   let seamFrom = null;
-  let seamTo = mode === 'grid' ? SPEC_GRID : SPEC_EX[scene];
+  let seamTo = mode === 'grid' ? SPEC_GRID : mode === 'home' ? SPEC_HOME : SPEC_EX[scene];
   let seamT0 = 0;
   let seamDur = 0;
+  /* 缝的转角（0 = 平常的方向）与「分开了多少」（split：0 = 主页的池，1 = 按缝分成的栏）跟缝走同一条时间线 */
+  let rotFrom = 0;
+  let rotTo = 0;
+  let splitFrom = 1;
+  let splitTo = mode === 'home' ? 0 : 1;
   function specPx(sp) {
     const half = geo.horz ? (vw / 2) * TAN : (vh / 2) * TAN;
     if (sp === 'L') return -half - 40;
     if (sp === 'R') return (geo.horz ? vh : vw) + half + 40;
+    if (sp === 'H') return geo.horz ? vh / 2 : vw / 2;
     return seamGrid(sp);
   }
+  const seamE = (t) => (!seamFrom || !seamDur ? 1 : inOut(clamp((t - seamT0) / seamDur, 0, 1)));
   function seamsAt(t) {
     const to = seamTo.map(specPx);
     if (!seamFrom || !seamDur) return to;
-    const e = inOut(clamp((t - seamT0) / seamDur, 0, 1));
+    const e = seamE(t);
     return [lerp(seamFrom[0], to[0], e), lerp(seamFrom[1], to[1], e)];
   }
-  function setSeams(spec, dur) {
+  /* 转角走得比位置晚一点、收得早一点：先劈开、再转正——反过来也一样 */
+  const rotAt = (t) => lerp(rotFrom, rotTo, inOut(clamp((seamE(t) - 0.08) / 0.8, 0, 1)));
+  const splitAt = (t) => lerp(splitFrom, splitTo, seamE(t));
+  function setSeams(spec, dur, rot = 0, split = 1, delay = 0) {
     const t = now();
     seamFrom = seamsAt(t);
+    rotFrom = rotAt(t);
+    splitFrom = splitAt(t);
     seamTo = spec;
-    seamT0 = t;
+    rotTo = rot;
+    splitTo = split;
+    seamT0 = t + delay;
     seamDur = RM ? 0 : dur;
   }
   let seams = [0, 0];
+  let rot = 0;
+  let split = splitTo;
+  /* 给着色器的缝：每条一个支点 + 共用的单位法向（指向后一区）；支点在视口 px */
+  function seamGeom() {
+    let nx = geo.horz ? -TAN : 1;
+    let ny = geo.horz ? 1 : TAN;
+    const nl = Math.hypot(nx, ny);
+    nx /= nl;
+    ny /= nl;
+    const c = Math.cos(rot);
+    const s = Math.sin(rot);
+    const n = [nx * c - ny * s, nx * s + ny * c];
+    const p = seams.map((v) => (geo.horz ? [vw / 2, v] : [v, vh / 2]));
+    return { p, n };
+  }
+  const flatSeams = () => Math.abs(rot) < 0.004;
   const lineX = (s, y) => s + (vh / 2 - y) * TAN; // 竖缝在 y 处的 x
   const lineY = (s, x) => s + (x - vw / 2) * TAN; // 横缝在 x 处的 y
   /* 第 k 区在「沿缝的坐标」t 处（竖缝：y；横缝：x）的前后边界 */
@@ -322,10 +369,11 @@ export async function initWander(host) {
       v._lod = -1;
       v._t = v._a = v._z = "";
     }
-    if (v.lod !== v._lod) {
-      v._lod = v.lod;
-      el.style.backgroundImage = `url(${v.it.lod[v.lod]})`;
-      el.dataset.lod = v.lod;
+    const lod = ringOn ? Math.max(v.lod, ringLod(v.x, v.y)) : v.lod;
+    if (lod !== v._lod) {
+      v._lod = lod;
+      el.style.backgroundImage = `url(${v.it.lod[lod]})`;
+      el.dataset.lod = lod;
     }
     const tilt = Math.abs(v.rx) + Math.abs(v.ry) > 0.02 ? ` perspective(1000px) rotateX(${v.rx.toFixed(2)}deg) rotateY(${v.ry.toFixed(2)}deg)` : '';
     const tr = `translate3d(${(v.x - w / 2).toFixed(1)}px,${(v.y - h / 2).toFixed(1)}px,0) scale(${Math.max(0.01, v.s).toFixed(4)})${tilt}`;
@@ -341,6 +389,32 @@ export async function initWander(host) {
     if (z !== v._z) { el.style.zIndex = z; v._z = z; }
   }
   const rectOf = (v) => ({ left: v.x - (v.it.w * v.s) / 2, top: v.y - (v.it.h * v.s) / 2, width: v.it.w * v.s, height: v.it.h * v.s });
+
+  /* ══ 入梦检验的塌缩圈：由这里画（reality.ts 只给几何） ══
+     光在着色器里按块粗上去；窗按它中心所在那一块的级别退档（级别 2 / 3 / 4 → 失焦第 1 / 2 / 3 档），
+     圈走过去，窗就一扇扇糊成像素，解析回来时再一档档变清楚。 */
+  const ring = { on: false, x: 0, y: 0, r: 0, step: 72, levels: 4, shift: 0 };
+  let ringOn = false;
+  const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => (v + 0.5) / 16);
+  function ringLod(x, y) {
+    const bx = Math.floor(x / 40);
+    const by = Math.floor(y / 40);
+    const d = Math.hypot(bx * 40 + 20 - ring.x, by * 40 + 20 - ring.y);
+    const L = clamp(Math.floor(Math.min((ring.r - d) / ring.step, 4) + BAYER[(by & 3) * 4 + (bx & 3)] - ring.shift), 0, 4);
+    return L >= 4 ? 3 : L >= 3 ? 2 : L >= 2 ? 1 : 0;
+  }
+  setRingRenderer((r) => {
+    Object.assign(ring, r);
+    ringOn = r.on && r.r > 0;
+    if (ringOn) face = faceTo; // 闩锁那一刻整屏都盖着：调色板直接换过去
+  });
+  /* 醒 / 梦：0 = 梦，1 = 醒。光的调色板按它混；流光的快慢也跟着（醒静梦动） */
+  let face = 0;
+  let faceTo = 0;
+  onRealityChange((r) => {
+    faceTo = r === 'wake' ? 1 : 0;
+    if (ringOn) face = faceTo;
+  });
 
   /* 弹簧：位置与缩放 */
   function spring(v, tx, ty, ts, k, zeta, dt) {
@@ -499,9 +573,10 @@ export async function initWander(host) {
   }
   function syncExplore(t) {
     frame++;
-    if (mode !== 'explore') return;
-    syncScene(scene, t);
-    if (wipeFrom) syncScene(wipeFrom, t);
+    if (mode === 'explore') {
+      syncScene(scene, t);
+      if (wipeFrom) syncScene(wipeFrom, t);
+    } else return;
     for (const rec of [...recs.values()]) if (rec.seen !== frame && !rec.fl && !(reading && reading.v === rec)) releaseRec(rec);
   }
   function stepExplore(t, dt) {
@@ -700,6 +775,14 @@ export async function initWander(host) {
         const ww = regionW[k] * colSG[k];
         x = colX(k, y + 12, ww, 24) - ww / 2;
       }
+      // 主页：挂在那根线下面；分开的过程中从线上滑到各自的栏顶
+      if (split < 0.999) {
+        const [hx, hy] = homeHead(k);
+        const e = split;
+        x = lerp(hx, x, e);
+        y = lerp(hy, y, e);
+        fade = lerp(1, fade, e);
+      }
       const el = headEls[k];
       const tr = `translate3d(${x.toFixed(1)}px,${y.toFixed(1)}px,0)`;
       if (el._t !== tr) { el.style.transform = tr; el._t = tr; }
@@ -710,8 +793,95 @@ export async function initWander(host) {
       if (el._c !== ct) { el.querySelector('.ct').textContent = ct; el._c = ct; }
     });
   }
+  /* ══ 主页 ══ */
+  const homeLineY = (x) => vh / 2 + (x - vw / 2) * TAN; // 主页那根线：过中心、向右下倾 14°
+  const HOME_HX = [0.33, 0.52, 0.71];
+  function homeHead(k) {
+    if (geo.horz) {
+      // 窄屏：三行叠在线下的左边；线往右下倾，按栏头右端那里的线高往下放，免得字压在线上
+      const x = 22;
+      return [x, homeLineY(Math.min(vw, x + 300)) + 30 + k * 46];
+    }
+    // 栏头约 200px 宽，线在这段里还要往下走：按右端那里的线高挂，字整行都在线下
+    const x = vw * HOME_HX[k];
+    return [x, homeLineY(x + 210) + 16];
+  }
+  const homeEl = host.querySelector('#w-home');
+  const eegGroup = document.getElementById('site-eeg-group');
+  let eegAmp = mode === 'home' ? 1 : 0;
+  let eegKey = '';
+  let revealT0 = now() + 300;
+  const homeLines = [...host.querySelectorAll('.w-home-ln')];
+  const homeBrand = host.querySelector('.w-home-brand');
+  const chromeBrand = host.querySelector('.w-brand');
+  let brandFly = null; // { dx, dy, s }：大字标飞到左上角小字标的那一段位移与缩放（按需量一次）
+  function measureBrand() {
+    homeBrand.style.transform = '';
+    const a = homeBrand.getBoundingClientRect();
+    const b = chromeBrand.getBoundingClientRect();
+    const s = b.height / Math.max(1, a.height);
+    brandFly = { dx: b.left - a.left, dy: b.bottom - a.bottom, s };
+  }
+  function placeHome() {
+    if (!homeEl) return;
+    const h = 1 - split; // 1 = 主页
+    // 两条缝的线：主页时叠成一根，分开的过程中跟着缝转、滑开，然后淡掉（检索里不画分界线）
+    const g = seamGeom();
+    const ang = Math.atan2(g.n[0], -g.n[1]); // 线的方向 ⟂ 法向
+    // 主页静着时那根线是全站的脑电线（Eeg.astro，沿我们给的骨架走）；往下走时它先收平，
+    // 平了以后换成这里两根直的（就是两条缝），再转、再劈开。回来时反过来：合拢、转回去，再起伏
+    const eo = eegGroup ? clamp(eegAmp * 3, 0, 1) : 0;
+    if (eegGroup) {
+      const o = (eo * h).toFixed(3);
+      if (eegGroup._o !== o) { eegGroup.style.opacity = o; eegGroup._o = o; }
+      const half = Math.hypot(vw, vh) / 2 + 60;
+      const dx = Math.cos(Math.atan(TAN)) * half;
+      const dy = Math.sin(Math.atan(TAN)) * half;
+      const reveal = clamp((now() - revealT0) / 2200, 0, 1);
+      const key = `${eegAmp.toFixed(3)}|${reveal.toFixed(3)}|${vw}|${vh}`;
+      if (key !== eegKey && (eo > 0 || eegKey === '')) {
+        eegKey = key;
+        setEegSpine({ xy: new Float32Array([vw / 2 - dx, vh / 2 - dy, vw / 2 + dx, vh / 2 + dy]), amp: eegAmp, dark: 1, reveal: reveal * (2 - reveal), dot: null });
+      }
+    }
+    const op = clamp(h * 1.6 - 0.15, 0, 1) * (1 - eo);
+    homeLines.forEach((ln, i) => {
+      const [x, y] = g.p[i];
+      const tr = `translate3d(${x.toFixed(1)}px,${y.toFixed(1)}px,0) rotate(${ang.toFixed(4)}rad)`;
+      if (ln._t !== tr) { ln.style.transform = tr; ln._t = tr; }
+      const o = op.toFixed(3);
+      if (ln._o !== o) { ln.style.opacity = o; ln._o = o; }
+    });
+    const vis = h > 0.002;
+    if (homeEl._vis !== vis) { homeEl.style.visibility = vis ? '' : 'hidden'; homeEl._vis = vis; }
+    // 栏头在主页上是入口（可以 Tab 到、回车进去），检索里只是栏名
+    const on = h > 0.5;
+    if (homeEl._on !== on) {
+      homeEl._on = on;
+      headEls.forEach((el) => {
+        el.tabIndex = on ? 0 : -1;
+        if (on) el.setAttribute('role', 'link');
+        else el.removeAttribute('role');
+      });
+    }
+    const ho = clamp(h * 1.8 - 0.8, 0, 1).toFixed(3); // 主页的其余字：先退
+    if (homeEl._o !== ho) { homeEl.style.setProperty('--home', ho); homeEl._o = ho; }
+    // 字标：主页的大字飞成左上角的小字
+    if (h > 0.002 && h < 0.998) {
+      if (!brandFly) measureBrand();
+      const e = 1 - h;
+      const tr = `translate(${(brandFly.dx * e).toFixed(1)}px,${(brandFly.dy * e).toFixed(1)}px) scale(${lerp(1, brandFly.s, e).toFixed(4)})`;
+      if (homeBrand._t !== tr) { homeBrand.style.transform = tr; homeBrand._t = tr; }
+    } else if (homeBrand._t) {
+      homeBrand.style.transform = '';
+      homeBrand._t = '';
+      brandFly = null;
+    }
+    root.classList.toggle('w-brand-small', h < 0.02);
+  }
+
   function placeClips(t) {
-    const on = t < clipOn;
+    const on = t < clipOn && flatSeams(); // 缝还在转（主页 ↔ 检索）时不裁：多边形是按平常的角度算的
     SC.forEach((s, k) => {
       const sp = spaces[s];
       let cp = 'none';
@@ -730,7 +900,7 @@ export async function initWander(host) {
     for (const el of inkEls) {
       const r = el.getBoundingClientRect();
       if (!r.width) continue;
-      const s = SC[regionAt(r.left + r.width / 2, r.top + r.height / 2)];
+      const s = split < 0.5 ? 'home' : SC[regionAt(r.left + r.width / 2, r.top + r.height / 2)];
       if (el.dataset.ink !== s) el.dataset.ink = s;
     }
   }
@@ -800,7 +970,9 @@ export async function initWander(host) {
     },
   });
 
-  const T0 = now();
+  let lightT = 0;
+  const bias = [0, 0, 0];
+  let homeHot = -1;
   function tick(ts) {
     const dt = Math.min(0.05, ((ts - clock.last) * clock.speed) / 1000);
     clock.t += (ts - clock.last) * clock.speed;
@@ -818,7 +990,12 @@ export async function initWander(host) {
       cam.z = lerp(camFly.from.z, camFly.to.z, e);
       zT = cam.z;
       if (p >= 1) camFly = null;
-    } else if (mode === 'explore') {
+    } else if (mode === 'explore' || mode === 'home') {
+      // 主页：镜头很慢地往前推（背景的流光跟着往深处走）
+      if (mode === 'home' && !RM && !reading && !drag) {
+        zT += dt * 0.03;
+        cam.x += dt * 6;
+      }
       if (!drag && (vel.x || vel.y)) {
         cam.x += vel.x * dt * 1000;
         cam.y += vel.y * dt * 1000;
@@ -845,6 +1022,14 @@ export async function initWander(host) {
     }
 
     seams = seamsAt(t);
+    rot = rotAt(t);
+    split = splitAt(t);
+    face += (faceTo - face) * (RM ? 1 : 1 - Math.exp(-dt / 0.3));
+    lightT += dt * lerp(1, 0.55, face);
+    for (let k = 0; k < 3; k++) bias[k] += ((k === homeHot ? 1 : 0) - bias[k]) * (1 - Math.exp(-dt / 0.35));
+    // 脑电线的起伏：主页完全合拢时起来（0.7s），离开主页时在 CALM 里收平
+    if (mode === 'home' && split < 0.001) eegAmp = Math.min(1, eegAmp + (RM ? 1 : dt / 0.7));
+    else eegAmp = Math.max(0, eegAmp - (RM ? 1 : dt / (CALM / 1000)));
     stepScroll(dt);
     gridLayout();
     syncExplore(t);
@@ -858,16 +1043,20 @@ export async function initWander(host) {
     placeClips(t);
 
     placeHeads();
+    placeHome();
     if (frame % 6 === 0) placeInk();
 
     const pan = background(dt);
-    if (light) light.draw({ t: (t - T0) / 1000, pan, zoom: cam.z, mouse, dim, seams, horz: geo.horz, lift });
+    if (light) light.draw({ t: lightT, pan, zoom: cam.z, mouse, dim, seam: seamGeom(), split, bias, lift, ring: ringOn ? ring : null, face });
+    if (ink) ink.step(frame);
     const regions = {};
     const show = {};
     const cams = {};
+    // 天气只下在分好的栏里：主页（还没分开）与缝还在转的那一段不下，分开以后随 split 淡进来
+    const flat = flatSeams();
     SC.forEach((s, k) => {
-      regions[s] = empty(k) ? null : polygon(k);
-      show[s] = 1 - 0.4 * dim;
+      regions[s] = !flat || empty(k) ? null : polygon(k);
+      show[s] = (1 - 0.4 * dim) * split * split;
       cams[s] = weatherCam(k, dt);
     });
     weather.draw({ t, G, vw, vh, zoom: cam.z, cams, regions, show, RM });
@@ -1030,8 +1219,94 @@ export async function initWander(host) {
     }
   }
 
+  /* ══ 主页 → 检索 ══
+     那根线转过 90°、劈成两条缝滑到栏界上（宽屏；窄屏的缝本来就是横的，只是从中心分开），池子被缝收拢成三栏。
+     三个场景的每一条，从它此刻在空间里最清楚、最靠中间的那一份起飞，一路对焦落进格子；
+     视野里没有它的，从深处浮上来；其余的副本沉回景深。S：地址落到哪一栏（窄屏时也滚到那一段）。 */
+  function homeToGrid(S, push = true) {
+    if (mode !== 'home' || now() < busy || reading) return;
+    const t = now();
+    setHot(null);
+    homeHot = -1;
+    vel.x = vel.y = pend.x = pend.y = 0;
+    zT = cam.z;
+    camFly = null;
+    mode = 'grid';
+    scene = S;
+    root.dataset.wview = 'grid';
+    root.dataset.wscene = S;
+    syncTabs();
+    enterClass();
+    try { localStorage.setItem('wander.view', 'grid'); } catch {}
+    if (push) try { history.pushState({ wnav: 1 }, '', PATH[S]); } catch {}
+    for (const sc of scroll) { sc.pos = sc.target = 0; sc.vel = 0; }
+    gridLayout();
+    if (geo.horz && KX[S]) {
+      scroll[0].pos = scroll[0].target = clamp(geo.headY[KX[S]] + scroll[0].pos - geo.HEAD + 10, 0, scroll[0].max);
+      gridLayout();
+    }
+    measureBrand();
+    // 先让脑电线收平（CALM），平了以后才转、才劈开
+    const calm = RM ? 0 : CALM;
+    setSeams(SPEC_GRID, RM ? 0 : 1250, 0, 1, calm);
+    busy = t + calm + 1450;
+    clipOn = 0;
+    freeScene = null;
+
+    // 主页上没有窗：每一条从景深里（屏幕中心方向、很小、全糊）浮上来，一路对焦落进格子
+    for (const s of SC)
+      for (const it of ALL[s]) {
+        const v = GE.get(it.id);
+        v.el = makeEl(s);
+        Object.assign(v, { x: vw / 2 + (v.slot.x - vw / 2) * 0.5, y: vh / 2 + (v.slot.y - vh / 2) * 0.5, s: v.slot.s * 0.4, a: 0, lod: 3, rx: 0, ry: 0, _lod: -1, _t: '', _a: '', _z: '' });
+        v.on = true;
+        v.z = 3000 - v.order;
+        asGrid(v);
+        fly(v, slotTo(v), { dur: 1000, delay: calm + 280 + Math.min(10, v.order) * 55 + KX[s] * 60, ease: outQuart });
+      }
+  }
+
+  /* ══ 检索 / 漫游 → 主页 ══
+     窗沉回景深；两条缝合拢、转回去，又是一根线；池子从栏里散开；栏头滑回线下，左上的小字长回大字。 */
+  function toHome(push = true) {
+    if (mode === 'home' || now() < busy) return;
+    if (reading) return;
+    const t = now();
+    setHot(null);
+    if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
+    if (mode === 'explore') camMem[scene] = { x: cam.x, y: cam.y, z: cam.z };
+    const sink = (v, z) => {
+      const g = Object.assign(visBase(v.it), { el: v.el, x: v.x, y: v.y, s: v.s, a: v.a, lod: v.lod, _lod: v._lod, z });
+      v.el = null;
+      const ox = g.x;
+      const oy = g.y;
+      const os = g.s;
+      ghost(g, () => ({ x: vw / 2 + (ox - vw / 2) * 0.55, y: vh / 2 + (oy - vh / 2) * 0.55, s: os * 0.4, a: 0, lod: 3 }), { dur: 700 + hash(v.it.id, 'h') * 260, delay: hash(v.it.id, 'd') * 160, ease: inOut });
+    };
+    for (const v of GE.values()) {
+      v.on = false;
+      if (v.el && !v.fl) sink(v, 100);
+    }
+    for (const r of [...recs.values()]) {
+      recs.delete(r.key);
+      if (r.el) sink(r, 50);
+    }
+    mode = 'home';
+    root.dataset.wview = 'home';
+    root.dataset.wscene = 'home';
+    if (push) try { history.pushState({ wnav: 1 }, '', HOME); } catch {}
+    measureBrand();
+    setSeams(SPEC_HOME, RM ? 0 : 1250, homeRot(), 0);
+    busy = t + 1300;
+    clipOn = 0;
+    freeScene = null;
+    const born = t + 650; // 主页的窗等旧的沉下去一些再浮上来
+    for (const s of SC) enterT[s] = born;
+  }
+
   /* ══ 漫游里换场景：缝扫过屏幕 ══ */
   function setScene(S) {
+    if (mode === 'home') return homeToGrid(S);
     if (S === scene || now() < busy || reading) return;
     if (mode === 'grid') return focusRegion(KX[S]);
     const t = now();
@@ -1074,7 +1349,7 @@ export async function initWander(host) {
     const v = el && elVis.get(el);
     if (!v || v.fl) return setHot(null);
     // 漫游里只对够清楚的那几档开放（粗块上做倾斜没有意义）
-    if (mode === 'explore' && !v.clear) return setHot(null);
+    if ((mode === 'explore' || mode === 'home') && !v.clear) return setHot(null);
     setHot(v);
     sheen();
   });
@@ -1116,7 +1391,7 @@ export async function initWander(host) {
           w.el.style.visibility = 'hidden';
         }
         // 窗正在被推开 / 回位：落点取它回位后的样子
-        if (mode === 'explore' && w.l != null) {
+        if ((mode === 'explore' || mode === 'home') && w.l != null) {
           const keep = readFx;
           readFx = 0;
           const tg = target(w, now());
@@ -1141,7 +1416,7 @@ export async function initWander(host) {
     const el = e.target.closest && e.target.closest('.w-card');
     const v = el && elVis.get(el);
     if (!v || v.fl) return;
-    if (mode === 'explore') {
+    if (mode === 'explore' || mode === 'home') {
       if (v.clear && !camFly) openVis(v);
       else flyTo(v);
     } else openVis(v);
@@ -1196,7 +1471,7 @@ export async function initWander(host) {
     if (drag.moved) {
       const dx = e.clientX - drag.lx;
       const dy = e.clientY - drag.ly;
-      if (mode === 'explore') {
+      if (mode === 'explore' || mode === 'home') {
         cam.x -= dx / G;
         cam.y -= dy / G;
       } else if (drag.axis === 'y') {
@@ -1221,7 +1496,10 @@ export async function initWander(host) {
       const b = drag.s[drag.s.length - 1];
       const dt = Math.max(16, b.t - a.t);
       const fresh = e.timeStamp - b.t < 60;
-      if (mode === 'explore') {
+      if (mode === 'home' && drag.axis === 'y' && drag.sy - e.clientY > 70) {
+        // 主页上划：往下走，进检索
+        homeToGrid(homePick(drag.sx));
+      } else if (mode === 'explore' || mode === 'home') {
         if (!RM && fresh) { vel.x = -(b.x - a.x) / dt / G; vel.y = -(b.y - a.y) / dt / G; }
       } else if (drag.axis === 'y') {
         const sc = scrollOf(drag.k);
@@ -1243,6 +1521,11 @@ export async function initWander(host) {
     let dx = e.deltaX;
     if (e.deltaMode === 1) { dy *= 32; dx *= 32; }
     if (e.shiftKey && !dx) { dx = dy; dy = 0; }
+    if (mode === 'home') {
+      // 主页：往下滚就是往下走——进检索（攒够一点再走，触控板的细碎滚动不至于一碰就走）
+      if (dy > 0) { homeWheel += dy; if (homeWheel > 60) { homeWheel = 0; homeToGrid(homePick(e.clientX)); } }
+      return;
+    }
     if (mode === 'grid') {
       const sc = scrollOf(regionAt(e.clientX, e.clientY));
       sc.vel = 0;
@@ -1256,6 +1539,13 @@ export async function initWander(host) {
   /* 键盘：V 切视图；1 2 3 场景 / 栏；/ 检索；漫游里方向键平移、+ - 推拉；检索里方向键在窗之间走 */
   addEventListener('keydown', (e) => {
     if (reader.isOpen || e.altKey || e.ctrlKey || e.metaKey) return;
+    if (mode === 'home') {
+      const ae = document.activeElement;
+      if (ae && ae !== document.body && ae.closest && ae.closest('a,button,[data-w-head]')) return;
+      if ({ 1: 1, 2: 1, 3: 1 }[e.key]) homeToGrid(SC[+e.key - 1]);
+      else if (['ArrowDown', 'PageDown', 'Enter', 'v', 'V'].includes(e.key) || (e.key === ' ' && !e.shiftKey)) { e.preventDefault(); homeToGrid(scene); }
+      return;
+    }
     if (e.key === 'v' || e.key === 'V') { mode === 'grid' ? toExplore(exploreTarget()) : toGrid(); return; }
     if ({ 1: 1, 2: 1, 3: 1 }[e.key]) { setScene(SC[+e.key - 1]); return; }
     if (mode === 'explore') {
@@ -1313,6 +1603,49 @@ export async function initWander(host) {
   function syncTabs() { tabs.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.scene === scene))); }
   tabs.forEach((b) => b.addEventListener('click', () => setScene(b.dataset.scene)));
   host.querySelectorAll('.w-views button').forEach((b) => b.addEventListener('click', () => (b.dataset.view === 'grid' ? toGrid() : toExplore(lastCol >= 0 ? SC[lastCol] : scene))));
+  /* 主页：从哪里往下走，就落到哪一栏（池子本来就偏在它将来那一栏的方向） */
+  let homeWheel = 0;
+  const homePick = (x) => (geo.horz ? 'essay' : SC[clamp(Math.floor((x / vw) * 3), 0, 2)]);
+  /* 栏头：主页上是三个入口（悬停时那种夜色的池子涨起来、那个场景的窗亮起来）；点了就往下走、落进那一栏 */
+  headEls.forEach((el, k) => {
+    el.addEventListener('click', () => { if (mode === 'home') homeToGrid(SC[k]); });
+    el.addEventListener('keydown', (e) => {
+      if (mode === 'home' && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); homeToGrid(SC[k]); }
+    });
+    el.addEventListener('pointerenter', () => { if (mode === 'home') homeHot = k; });
+    el.addEventListener('pointerleave', () => { if (homeHot === k) homeHot = -1; });
+    el.addEventListener('focus', () => { if (mode === 'home') homeHot = k; });
+    el.addEventListener('blur', () => { if (homeHot === k) homeHot = -1; });
+  });
+  /* 左上的名字：回主页（同一页里走回去，不换页） */
+  chromeBrand.addEventListener('click', (e) => {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button) return;
+    e.preventDefault();
+    if (reader.isOpen) return;
+    toHome();
+  });
+  /* 后退 / 前进：主页 ↔ 目录地址之间按地址走（阅读层自己的历史由 reader.js 收） */
+  addEventListener('popstate', () => {
+    if (reader.isOpen) return;
+    const p = location.pathname;
+    if (p === HOME) {
+      if (mode !== 'home') { busy = 0; toHome(false); }
+    } else if (mode === 'home') {
+      const S = SC.find((s) => PATH[s] === p);
+      if (S) { busy = 0; homeToGrid(S, false); }
+    }
+  });
+  /* 主页角落的时刻：分钟一跳 */
+  const clockEl = host.querySelector('#w-clock');
+  function tickClock() {
+    if (!clockEl) return;
+    const d = new Date();
+    const p2 = (n) => String(n).padStart(2, '0');
+    clockEl.textContent = `${p2(d.getHours())}:${p2(d.getMinutes())} · ${d.getFullYear()}.${p2(d.getMonth() + 1)}.${p2(d.getDate())}`;
+    clockEl.dateTime = d.toISOString();
+    setTimeout(tickClock, 60000 - (d.getSeconds() * 1000 + d.getMilliseconds()) + 20);
+  }
+  tickClock();
   /* 栏头只在「刚切进检索」时晚一拍浮出（等窗落位）；读完回来时立刻回来 */
   let enterTimer = 0;
   function enterClass() {
@@ -1323,7 +1656,7 @@ export async function initWander(host) {
   /* 地址跟着看法走：漫游时是那个场景自己的目录地址；检索不改（三个地址都是这一页） */
   function syncURL() {
     if (reader.isOpen) return;
-    const want = mode === 'explore' ? PATH[scene] : location.pathname;
+    const want = mode === 'home' ? HOME : mode === 'explore' ? PATH[scene] : location.pathname === HOME ? PATH[scene] : location.pathname;
     if (location.pathname !== want || location.hash) try { history.replaceState(null, '', want); } catch {}
   }
   function remember() {
@@ -1339,13 +1672,44 @@ export async function initWander(host) {
     if (light) light.resize();
     weather.resize();
     seamFrom = null;
+    if (mode === 'home') rotTo = rotFrom = homeRot();
+    brandFly = null;
   });
 
+  /* ══ 字随底换墨（ink.js）：浮在流光上的字按底下的明暗换墨。没有 WebGL（流光退回 CSS 渐变）时不接，字用原来的颜色 ══ */
+  const ink = light ? createInk(host.querySelector('#w-light')) : null;
+  if (ink) {
+    const q = (sel) => host.querySelector(sel);
+    const AMBER = { light: [226, 186, 146], dark: [118, 84, 58] };
+    ink.add(q('.w-home-brand'));
+    ink.add(q('.w-home-kicker span'), { a: 0.72 });
+    ink.add(q('.w-home-gate span'), { a: 0.85 });
+    ink.add(q('.w-home-clock time'), { a: 0.62 });
+    host.querySelectorAll('.w-home-exits a').forEach((a) => ink.add(a, { a: 0.62 }));
+    ink.add(q('.w-home-hint span'), { a: 0.62 });
+    ink.add(chromeBrand);
+    for (const el of headEls) {
+      ink.add(el.querySelector('b'));
+      ink.add(el.querySelector('.no'), { a: 0.6 });
+      ink.add(el.querySelector('i'), { a: 0.6 });
+      ink.add(el.querySelector('.ct'), AMBER);
+    }
+  }
+
   /* ══ 起步 ══ */
-  root.dataset.wscene = scene;
+  root.dataset.wscene = mode === 'home' ? 'home' : scene;
   root.dataset.wview = mode;
   syncTabs();
+  if (mode === 'home') {
+    rotFrom = rotTo = homeRot();
+    splitFrom = splitTo = 0;
+    const born = now() + 250;
+    for (const s of SC) enterT[s] = born;
+  }
+  face = faceTo;
   seams = seamsAt(now());
+  rot = rotAt(now());
+  split = splitAt(now());
   gridLayout();
   if (mode === 'grid' && geo.horz && KX[scene]) {
     // 窄屏是一长页：从哪个目录地址进来，就停在哪一段
@@ -1380,7 +1744,8 @@ export async function initWander(host) {
     cam, recs, GE, scroll, geo, flights, ghosts,
     get mode() { return mode; }, get scene() { return scene; }, get busy() { return busy; }, get seams() { return seams; },
     get zT() { return zT; }, set zT(v) { zT = v; },
-    toGrid, toExplore, setScene, setQuery, openVis, findVis, reader, rectOf,
+    toGrid, toExplore, setScene, setQuery, openVis, findVis, reader, rectOf, toHome, homeToGrid,
+    get split() { return split; }, get rot() { return rot; }, get face() { return face; },
     clock,
     freeze() { clock.speed = 0; },
     resume() { clock.last = performance.now(); clock.speed = 1; },

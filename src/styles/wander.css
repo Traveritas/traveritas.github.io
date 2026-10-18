@@ -318,3 +318,190 @@ html.w-on .page-ambient, html.w-on .wash-backdrop { display: none; }
 @media (prefers-reduced-motion: reduce) {
   .w-host *, .w-rd * { transition: none !important; }
 }
+
+/* ══ 主页：这片空间还没分开的样子（wander.js 的 home） ══
+   一根过中心、向右下倾 14° 的线（其实是叠在一起、转了 90° 的两条缝）；名字站在线的左上方，
+   三个栏头挂在线下，NEXUS 在线的右下方。--home（1 → 0）由脚本按「分开了多少」写：往下走时这些字先退，
+   名字飞成左上角的小字，栏头滑到各自的栏顶，线跟着缝转开、淡掉。
+   线的位置：y = 50vh + (x − 50vw) · tan 14°（0.2493）——下面的 calc 都按它摆。 */
+[data-wscene='home'], [data-ink='home'] {
+  --w-bg: #0e0f1d; --w-fg: #ece8f2; --w-soft: #b7b3c8; --w-faint: #827f98; --w-ink: #d6b28c; --w-chrome: #e6e2ee;
+  --w-glass: 22 22 40; --w-glass-a: 0.56; --w-edge: 214 206 236; --w-edge-a: 0.24; --w-sheen: 220 214 240; --w-sheen-a: 0.3;
+  --w-panel-a: 0.9;
+}
+.w-home {
+  --home: 1;
+  --hx: 8vw;
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  color: #ece8f2;
+}
+.w-home-ln {
+  position: absolute;
+  left: -150vmax;
+  top: 0;
+  width: 300vmax;
+  height: 1px;
+  will-change: transform, opacity;
+}
+/* 上亮下暗的发丝线；两头早早淡掉。主页静着时这里是脑电线（Eeg.astro），这两根只在收平之后、转开与劈开的那一段出现 */
+.w-home-ln::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 22%, rgb(236 230 244 / 0.62) 38%, rgb(236 230 244 / 0.62) 62%, transparent 78%);
+  box-shadow: 0 1px 0 rgb(4 4 12 / 0.4);
+}
+/* 脑电群在这片空间里：压在流光之上、窗之下（全站默认是 z −2，会被流光整个盖住）；
+   不要正文列的中央消隐（线要穿过画面中央）；显隐由 wander.js 写 opacity */
+html.w-on .eeg-group {
+  z-index: 1;
+  opacity: 0;
+  -webkit-mask-image: none !important;
+  mask-image: none !important;
+}
+
+.w-home-title {
+  position: absolute;
+  left: var(--hx);
+  bottom: calc(50vh + (50vw - var(--hx)) * 0.2493 + 22px);
+}
+.w-home-kicker {
+  margin: 0 0 1.05rem 0.2em;
+  font: 500 13px/1 var(--font-display);
+  letter-spacing: 0.62em;
+  color: #9a97b0;
+  opacity: var(--home);
+}
+.w-home-brand {
+  margin: 0;
+  font: 500 clamp(54px, 7.4vw, 128px)/0.86 var(--font-display);
+  letter-spacing: 0.035em;
+  color: #f1edf6;
+  transform-origin: 0 100%;
+  white-space: nowrap;
+  will-change: transform;
+}
+/* 进场：名字从糊里对上焦（像远处那几扇窗一样，先是一团，再清楚） */
+html.w-ready[data-wview='home'] .w-home-brand { animation: w-home-focus 1.6s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+@keyframes w-home-focus { from { filter: blur(14px); opacity: 0; } 60% { opacity: 1; } to { filter: blur(0); } }
+html.w-brand-small .w-home-brand { visibility: hidden; }
+html:not(.w-brand-small) .w-brand { opacity: 0 !important; pointer-events: none; }
+
+.w-home-gate {
+  position: absolute;
+  right: 7vw;
+  top: calc(50vh + (43vw - 120px) * 0.2493 + 34px);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 4px 8px 8px;
+  font: 400 10.5px/1 var(--font-mono);
+  letter-spacing: 0.46em;
+  color: #b7b3c8;
+  text-decoration: none;
+  opacity: var(--home);
+  pointer-events: auto;
+  transition: color 0.5s ease, letter-spacing 0.5s ease;
+}
+.w-home-gate svg { width: 13px; height: 18px; fill: rgb(236 230 244 / 0.06); stroke: currentColor; stroke-width: 0.9; stroke-linejoin: round; transition: transform 0.8s cubic-bezier(0.2, 0.7, 0.2, 1); }
+.w-home-gate svg path + path { fill: none; opacity: 0.55; }
+.w-home-gate:hover, .w-home-gate:focus-visible { color: #f1edf6; letter-spacing: 0.58em; outline: none; }
+.w-home-gate:hover svg, .w-home-gate:focus-visible svg { transform: translateY(-3px); }
+.w-home-gate:focus-visible span { border-bottom: 1px solid var(--amber); }
+
+.w-home-clock, .w-home-exits {
+  position: absolute;
+  bottom: 26px;
+  margin: 0;
+  font: 400 10px/1 var(--font-mono);
+  letter-spacing: 0.18em;
+  color: #827f98;
+  opacity: var(--home);
+}
+.w-home-clock { left: var(--hx); }
+.w-home-exits { right: 7vw; display: flex; gap: 22px; pointer-events: auto; }
+.w-home-exits a { color: inherit; text-decoration: none; transition: color 0.3s ease; }
+.w-home-exits a:hover, .w-home-exits a:focus-visible { color: #ece8f2; outline: none; }
+
+.w-home-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 22px;
+  margin: 0;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  font: 500 11px/1 var(--font-display);
+  letter-spacing: 0.6em;
+  padding-left: 0.6em;
+  color: #827f98;
+  opacity: var(--home);
+}
+.w-home-hint i { width: 1px; height: 26px; background: linear-gradient(rgb(236 230 244 / 0.5), transparent); transform-origin: top; animation: w-home-drip 2.8s cubic-bezier(0.5, 0, 0.3, 1) infinite; }
+@keyframes w-home-drip { 0% { transform: scaleY(0); opacity: 1; } 60% { transform: scaleY(1); opacity: 1; } 100% { transform: scaleY(1); opacity: 0; } }
+
+/* 栏头在主页上：三个入口，挂在线下。每个前面一粒那种夜色的点；悬停 / 聚焦时字由淡转实 */
+html[data-wview='home'] .w-rh { opacity: 1; pointer-events: auto; cursor: pointer; --w-fg: #e6e2ee; --w-faint: #8d8aa3; --w-ink: #c9b49c; }
+.w-rh { transition: opacity 0.3s ease, color 0.6s ease; outline: none; }
+.w-rh .no, .w-rh i, .w-rh .ct { transition: color 0.6s ease; }
+.w-rh b { transition: letter-spacing 0.5s ease; }
+.w-rh-in::before {
+  content: '';
+  align-self: center;
+  width: 5px;
+  height: 5px;
+  margin-right: 2px;
+  border-radius: 50%;
+  background: var(--w-dot);
+  box-shadow: 0 0 10px 1px var(--w-dot);
+  opacity: 0;
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+[data-w-head='essay'] { --w-dot: #c9d3e2; }
+[data-w-head='moment'] { --w-dot: #e3ac84; }
+[data-w-head='project'] { --w-dot: #8ccbd4; }
+html[data-wview='home'] .w-rh-in::before { opacity: 0.85; }
+html[data-wview='home'] .w-rh:is(:hover, :focus-visible) b { letter-spacing: 0.44em; }
+html[data-wview='home'] .w-rh:is(:hover, :focus-visible) .w-rh-in::before { opacity: 1; transform: scale(1.5); }
+html[data-wview='home'] .w-rh:focus-visible b { text-decoration: underline 1px var(--amber); text-underline-offset: 6px; }
+html[data-wview='home'] .w-scenes, html[data-wview='home'] .w-views { opacity: 0; pointer-events: none; }
+html[data-wview='home'] #w-stage { cursor: default; }
+
+@media (max-width: 899px) {
+  .w-home { --hx: 22px; }
+  .w-home-brand { font-size: clamp(44px, 13vw, 72px); }
+  .w-home-kicker { font-size: 12px; margin-bottom: 0.8rem; }
+  .w-home-gate { right: 18px; top: auto; bottom: 64px; }
+  .w-home-exits { right: 22px; }
+  .w-home-clock { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.w-ready[data-wview='home'] .w-home-brand, .w-home-hint i { animation: none; }
+}
+
+/* ══ 字标（brand.ts）：醒 Traveritas 静着；梦 AveritA 逐字按像素格浮动、轮转（字的浮动与琥珀灼点的 keyframes 在 SiteHeader.astro，全局）。
+   这里补上站头那几条局部规则：换面时的磨砂溶变、两面的字距 ══ */
+[data-brand] {
+  display: inline-flex;
+  align-items: baseline;
+  transition: opacity 0.18s cubic-bezier(0.2, 0.8, 0.3, 1), filter 0.18s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+[data-brand].is-morphing { opacity: 0; filter: blur(2.5px); }
+.w-home-brand.is-dream { letter-spacing: 0.05em; }
+@media (prefers-reduced-motion: reduce) {
+  [data-brand].is-morphing { opacity: 1; filter: none; }
+}
+
+/* ══ 字随底换墨（wander/ink.js 逐几帧写一条横向渐变进 background-image）══ */
+[data-ink-auto] {
+  color: transparent !important;
+  -webkit-background-clip: text;
+  background-clip: text;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+}

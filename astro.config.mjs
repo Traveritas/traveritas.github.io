@@ -54,7 +54,7 @@ export default defineConfig({
     // /new/ 是新主页预览期的旧址（现已跳转到 /）：同样不进 sitemap、robots 禁收
     // 按整段路径匹配：裸 includes('/new') 会误伤 /tags/newsletter/ 这类页面
     sitemap({
-      filter: (page) => !/^\/(styleguide|new)\//.test(new URL(page).pathname),
+      filter: (page) => !/^\/(styleguide|new|legacy)\//.test(new URL(page).pathname),
       serialize(item) {
         const d = LASTMOD.get(decodeURI(new URL(item.url).pathname));
         return d ? { ...item, lastmod: d.toISOString() } : item;
@@ -74,6 +74,7 @@ export default defineConfig({
     shikiConfig: { theme: xingmeng },
   },
   // 新主页预览期的地址：外面若还留着这个链接，跳回首页
-  redirects: { '/new': '/' },
+  // 关于页撤下（2026-10-18），换成 NEXUS 的入口 /gate/
+  redirects: { '/new': '/', '/about': '/gate/' },
   build: { format: 'directory' },
 });

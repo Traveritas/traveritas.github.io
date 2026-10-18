@@ -51,6 +51,11 @@ interface Props {
   /* 整页是一片自成一体的空间（随笔 / 瞬间 / 项目目录页的漫游 / 检索，见 components/wander/）：
      不画顶部进度线、14° 发丝线、脑电群与全页环境微光——那片空间有自己的光与缝 */
   immersive?: boolean;
+  /* 脑电群：默认跟着 immersive（自成空间的页不画）。主页与三个目录页那片空间要它——
+     主页静着时那根线就是它（由 wander.js 经 eeg-spine 驱动），离开主页时收平、换成缝 */
+  eeg?: boolean;
+  /* 只有正文这一屏：不出页头与页脚（NEXUS 的入口） */
+  bare?: boolean;
 }
 
 const {
@@ -70,6 +75,8 @@ const {
   rail,
   gauge,
   immersive = false,
+  eeg = !immersive,
+  bare = false,
 } = Astro.props;
 
 // 醒/梦双态标题推导规则（符合 AGENTS.md 核心词汇映射）
@@ -98,7 +105,8 @@ const HOURS: [prefix: string, hour: string, tone: 'light' | 'dark'][] = [
   ['/tags', 'shallow', 'light'],
   ['/projects', 'deep', 'dark'], // 深眠 01:11 — 02:08
   ['/moments', 'rem', 'dark'], // 异相 02:08 — 04:59
-  ['/about', 'dawn', 'light'], // 晨光 06:31
+  ['/gate', 'dawn', 'light'], // 晨光 06:31（NEXUS 的入口）
+  ['/legacy/thread', 'home', 'light'], // 旧主页存档
 ];
 const path = Astro.url.pathname;
 const [, hour, tone] = HOURS.find(([p]) => path.startsWith(p)) ?? ['', path === '/' ? 'home' : 'none', 'light'];
@@ -161,15 +169,15 @@ const [, hour, tone] = HOURS.find(([p]) => path.startsWith(p)) ?? ['', path === 
     {boot && <BootVeil always={boot === 'always'} />}
     {!immersive && <Hairline />}
     {seam !== 'none' && !immersive && <Seam variant={seam} />}
-    {!immersive && <Eeg />}
+    {eeg && <Eeg />}
     {rail && <Rail {...rail} />}
     {gauge && <Gauge {...gauge} />}
     <div class="page">
-      <SiteHeader />
+      {!bare && <SiteHeader />}
       <main>
         <slot />
       </main>
-      <SiteFooter />
+      {!bare && <SiteFooter />}
     </div>
     <Sound />
     <Cursor />

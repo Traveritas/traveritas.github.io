@@ -34,10 +34,12 @@ const FADE_DUR_MS = 180;
 const SETTLED = 0.02;
 const SETTLE_POLL_MS = 240;
 
+/* 页上每一处字标各自一台：站头的 .brand，以及那片空间里的 [data-brand]（左上角的小字、主页的大字） */
 export function initBrand() {
-  const brand = document.querySelector<HTMLElement>('.brand');
-  if (!brand) return;
-  const el = brand;
+  document.querySelectorAll<HTMLElement>('.brand, [data-brand]').forEach(wire);
+}
+
+function wire(el: HTMLElement) {
 
   const RM = reducedMotion();
   let step = 0;
