@@ -1,0 +1,404 @@
+/* ─────────────────────────────────────────────────────────────
+   「版块＝时辰」原型样式 —— 由 serve-hours.cjs 注入到每个页面：
+     <html data-hour="home|shallow|deep|rem|dawn|none" data-hours="a|b">
+   任务说明见同目录 BRIEF.md。只在这个文件里写，不改 src/。
+
+   两层结构：
+     0 · 外壳修正 —— 与时辰无关的四个现状问题，A、B 都生效
+     1 · 变体 A「整夜」—— 内页沿用主页那一段的夜色
+     2 · 变体 B「浅色时辰」—— 每个时辰一个浅色版，深色只留在主页
+     3 · 跟着底色走的组件 —— 消费 1 / 2 定义的那组变量，两个变体共用
+   色值表与取舍理由见 NOTES.md。
+
+   变量分工（BRIEF §5）：--bg / --bg-sunken / --fg / --fg-soft / --fg-faint / --line
+   是「可以覆盖的」；--amber / --umber / --ghost-ink / --dream / --reality-mix 由
+   reality.ts 每帧写在 <html> 的行内样式上，一律不碰 —— 需要换强调墨的地方另起
+   --hour-ink（浅色时辰它就是 --umber 本身，深色时辰才把它提亮）。
+   自起的这组变量（--hour-glow / --hour-glow-a / --frost* / --chip-bg-a /
+   --ghostno-ink / --hour-ink）只在本文件里定义与消费。
+   ───────────────────────────────────────────────────────────── */
+
+/* ══════════════════════════════════════════════════════════════
+   0 · 外壳修正（A、B 两个变体都生效）
+
+   前缀约定：本节与第 3 节的规则一律写成 html[data-hours][data-hour]。
+   注入时两个属性总是一起写（serve-hours.cjs 的 inject），而组件的作用域样式
+   最深的形如 .coverband[data-astro-cid-x] .ghostno[data-astro-cid-x]（0,4,0）——
+   只写 html[data-hours]（0,2,0）压不过它，得靠「hours.css 恰好排在 <head> 末尾」
+   才赢，那是运气不是设计。带上 data-hour 之后每条规则都稳在 (0,4,x) 之上，
+   与注入点在哪无关（实测这条正是 .coverband .ghostno 的幽灵编号先没吃到）。
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── 0.1 隐藏背景方块 ──
+   .fld-bg 是 Constructs.astro 里 z −2 的整层构块场（160 枚 .fld-sq）。
+   它按 --reality-mix 在「拼接 / 错开」之间动，是醒梦缝的仪器层；
+   内页换成某个时辰的底色以后，它既不为那个时辰服务，又会把底色搅花，
+   原型里整层撤掉。样式是 is:global 写的（权重 0,1,0），这里直接压过。 */
+html[data-hours][data-hour] .fld-bg {
+  display: none;
+}
+
+/* ── 0.2 中文不走等宽 ──
+   IBM Plex Mono 没有中文字形，--font-mono 的兜底是 generic monospace，
+   在 Windows 上落到新宋体（实测 .site-nav a 整个是 NSimSun）。
+   修法不是逐个选择器补字体，而是重写 --font-mono 自己：西文与数字仍旧命中
+   'IBM Plex Mono'（一个字都不动），中文往下落到系统黑体。
+   ⚠ --font-mono 只在 tokens.css 的 :root 里声明过一处，这里 (0,1,1) 压得过它；
+     没有任何脚本读写这个变量（styleguide 读的是计算值，而它不在此原型的路由上）。 */
+html[data-hours][data-hour] {
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, 'JetBrains Mono',
+    'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans SC',
+    monospace;
+}
+
+/* ── 0.3 手机 390px 导航不折行 ──
+   现状：.header-row 是 space-between 的 flex，品牌带 min-width: 6.8em，导航四项
+   用 0.75rem / 1.15rem 间距；390px 时容器只有 342px，导航被压到每项 19px，
+   「随笔」折成两行。
+   修法：窄屏把三处间距各收一档，并给导航项加 white-space: nowrap 兜底
+   （即使算错也不会再断字）。品牌 min-width 保留 —— 它撑的是醒「Traveritas」与
+   梦「AveritA」两个长度之间不跳的盒宽，收掉它换面时导航会横移。 */
+html[data-hours][data-hour] .site-nav a {
+  white-space: nowrap;
+}
+
+@media (max-width: 600px) {
+  html[data-hours][data-hour] .header-row {
+    gap: 0.75rem;
+  }
+
+  html[data-hours][data-hour] .site-nav {
+    gap: 0.72rem;
+  }
+
+  html[data-hours][data-hour] .site-nav a {
+    gap: 0.34rem;
+    font-size: 0.72rem;
+  }
+}
+
+/* ── 0.4 页头与内容列左缘对齐 ──
+   1440 宽时页头品牌在 x=384（.container，42rem），目录页标题在 x=272
+   （.container-wide，56rem），标签页在 x=307（.knot-head 的 padding-left 2.2rem）。
+   修法：页头与页脚跟着「本页正文列」走 —— 页面里有 .container-wide 就同宽 56rem，
+   没有（阅读页 / 404）就维持 42rem。理由与代价写在 NOTES.md「外壳修正 4」。
+   :has() 不认的老引擎整条规则作废，回落到现状，不会更差。 */
+html[data-hours][data-hour] body:has(.container-wide) .header-row,
+html[data-hours][data-hour] body:has(.container-wide) .footer-row {
+  width: min(100% - 3rem, 56rem);
+}
+
+/* 标签页的结：原来靠 padding-left 把标题推开 2.2rem，于是标题左缘与页头差 35px。
+   把结移出列外（挪进页边），标题左缘就回到列线上；窄屏空间不够，结留在列内。 */
+@media (min-width: 768px) {
+  html[data-hours][data-hour] .knot-head {
+    padding-left: 0;
+  }
+
+  html[data-hours][data-hour] .knot-head .big-knot {
+    left: -2.2rem;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   1 · 变体 A「整夜」：内页沿用主页那一段的夜色
+   源数据：src/scripts/home-storyboard.ts 的 PALETTE（每段中点附近的值）。
+   底色 / 墨 / 次墨沿用任务书给的三个数，这里补齐 --bg-sunken / --fg-faint /
+   --line / 雾光（--hour-glow）。雾光取自 PALETTE 同一段的第 4 列，
+   让内页与主页那一段的「环境微光」是同一层光。
+   ══════════════════════════════════════════════════════════════ */
+
+html[data-hours='a'][data-hour='shallow'] {
+  /* 浅梦 · 23:19 — 01:11 · bg [230,235,242]→[219,226,236] · 雾光 rgba(255,255,255,.55) */
+  --bg: rgb(225 231 239);
+  --bg-sunken: rgb(214 221 231);
+  --fg: rgb(35 40 48);
+  --fg-soft: rgb(86 96 109);
+  --fg-faint: rgb(134 144 158);
+  --line: color-mix(in srgb, var(--fg) 12%, transparent);
+  --hour-glow: 255 255 255;
+  --hour-glow-a: 0.55;
+}
+
+html[data-hours='a'][data-hour='deep'] {
+  /* 深眠 · 01:11 — 02:08 · bg [22,30,46]→[17,23,36] · 雾光 rgba(120,150,200,.16) */
+  --bg: rgb(20 27 41);
+  --bg-sunken: rgb(14 20 31);
+  --fg: rgb(230 233 239);
+  --fg-soft: rgb(154 166 184);
+  --fg-faint: rgb(108 120 138);
+  --line: color-mix(in srgb, var(--fg) 15%, transparent);
+  --hour-glow: 120 150 200;
+  --hour-glow-a: 0.18;
+}
+
+html[data-hours='a'][data-hour='rem'] {
+  /* 异相 · 02:08 — 04:59 · bg [34,29,49]→[42,36,56] · 雾光 rgba(170,140,210,.15) */
+  --bg: rgb(38 33 53);
+  --bg-sunken: rgb(30 26 43);
+  --fg: rgb(236 230 241);
+  --fg-soft: rgb(169 159 186);
+  --fg-faint: rgb(124 115 140);
+  --line: color-mix(in srgb, var(--fg) 15%, transparent);
+  --hour-glow: 170 140 210;
+  --hour-glow-a: 0.18;
+}
+
+html[data-hours='a'][data-hour='dawn'] {
+  /* 晨光 · 06:31 · bg [239,231,218]→[245,239,230] · 雾光 rgba(255,236,205,.8) */
+  --bg: rgb(242 235 224);
+  --bg-sunken: rgb(232 224 211);
+  --fg: rgb(43 38 32);
+  --fg-soft: rgb(111 100 87);
+  --fg-faint: rgb(150 138 123);
+  --line: color-mix(in srgb, var(--fg) 12%, transparent);
+  --hour-glow: 255 236 205;
+  --hour-glow-a: 0.7;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   2 · 变体 B「浅色时辰」：每个时辰的浅色版，深色只留在主页
+   约束（BRIEF §3）：底色 OKLCH L 0.94–0.97、C ≤ 0.02；色相取该时辰的色相；
+   四个底色两两一眼分得开；正文仍够深。
+   底色与 sunken 是在 OKLCH 里定的（L / C / H 写在注释里），再转成 sRGB 写成
+   rgb()；对比度与两两通道差都实测过，数值见 NOTES.md。
+   底色只差 8–24 个通道值，所以「分得开」主要靠色相 + 第 3 节的雾光一起扛。
+   ══════════════════════════════════════════════════════════════ */
+
+html[data-hours='b'][data-hour='shallow'] {
+  /* 浅梦 · 冷雾灰蓝 · 沿用现在的 --bg #f0f3f6（≈ L .962 C .006 H 245） */
+  --bg: rgb(240 243 246);
+  --bg-sunken: rgb(229 235 242);
+  --fg: rgb(35 40 48);
+  --fg-soft: rgb(86 96 109);
+  --fg-faint: rgb(133 143 157);
+  --line: color-mix(in srgb, var(--fg) 12%, transparent);
+  --hour-glow: 252 253 255;
+  --hour-glow-a: 0.42;
+}
+
+html[data-hours='b'][data-hour='deep'] {
+  /* 深眠 · 靛 · bg oklch(.945 .020 268) · sunken oklch(.915 .028 268) */
+  --bg: rgb(231 237 251);
+  --bg-sunken: rgb(219 227 246);
+  --fg: rgb(31 37 52);
+  --fg-soft: rgb(79 88 110);
+  --fg-faint: rgb(133 142 165);
+  --line: color-mix(in srgb, var(--fg) 12%, transparent);
+  --hour-glow: 222 233 255;
+  --hour-glow-a: 0.62;
+}
+
+html[data-hours='b'][data-hour='rem'] {
+  /* 异相 · 淡紫 · bg oklch(.950 .020 306) · sunken oklch(.918 .028 306) */
+  --bg: rgb(242 235 249);
+  --bg-sunken: rgb(232 224 243);
+  --fg: rgb(42 35 51);
+  --fg-soft: rgb(92 84 104);
+  --fg-faint: rgb(148 140 160);
+  --line: color-mix(in srgb, var(--fg) 12%, transparent);
+  --hour-glow: 246 232 255;
+  --hour-glow-a: 0.58;
+}
+
+html[data-hours='b'][data-hour='dawn'] {
+  /* 晨光 · 暖杏 · bg oklch(.958 .020 78) · sunken oklch(.925 .028 78) */
+  --bg: rgb(249 240 227);
+  --bg-sunken: rgb(241 228 210);
+  --fg: rgb(48 42 34);
+  --fg-soft: rgb(102 92 77);
+  --fg-faint: rgb(154 142 124);
+  --line: color-mix(in srgb, var(--fg) 12%, transparent);
+  --hour-glow: 255 242 220;
+  --hour-glow-a: 0.6;
+}
+
+/* ── 玻璃与强调墨：按「浅色时辰 / 深色时辰」各一套 ──
+   磨砂玻璃那几件（瞬间薄片 / 导览薄片 / 标签框 / 封面 / 环境声按钮）在浅底上
+   是「白色半透明」，在深底上必须换成「比底略亮的一层光」，否则一块 60% 白
+   压在深靛上就是一块白板。
+   浅色那一支把原来的字面值原样收进变量（薄片底 .6、边 .85、高光 .6、hover .68、
+   投影 38/44/51 .12、标签底 .32）—— 浅色时辰的成品与现状逐值相同，
+   只有底色与雾光换了。深色那一支是另起的一套数。 */
+html[data-hours='a'][data-hour='shallow'],
+html[data-hours='a'][data-hour='dawn'],
+html[data-hours='b'] {
+  color-scheme: light;
+  --frost: 255 255 255;
+  --frost-a: 0.6;
+  --frost-edge-a: 0.85;
+  --frost-hi-a: 0.6;
+  --frost-sh: 38 44 51;
+  --frost-sh-a: 0.12;
+  --frost-a-on: 0.68;
+  --chip-bg-a: 0.32;
+  --ghostno-ink: rgb(38 44 51 / 0.22);
+  /* 浅色时辰的强调墨就是 --umber 本身 —— 这一支不改任何现状取值 */
+  --hour-ink: var(--umber);
+}
+
+html[data-hours='a'][data-hour='deep'],
+html[data-hours='a'][data-hour='rem'] {
+  color-scheme: dark;
+  --frost: 165 180 215;
+  --frost-a: 0.1;
+  --frost-edge-a: 0.2;
+  --frost-hi-a: 0.05;
+  --frost-sh: 0 0 0;
+  --frost-sh-a: 0.45;
+  --frost-a-on: 0.17;
+  --chip-bg-a: 0.1;
+  --ghostno-ink: rgb(255 255 255 / 0.24);
+  /* 强调墨：把 --umber 提到深底上读得清的亮度。与 --umber 同源（混白 52%），
+     所以它照样跟着醒梦两态插值走；实测对深眠底 7.4、对异相底 6.7。
+     为什么另起变量：--umber 由 reality.ts 每帧写，不能覆盖。 */
+  --hour-ink: color-mix(in srgb, var(--umber) 52%, #fff);
+}
+
+html[data-hours='a'][data-hour='rem'] {
+  /* 异相底偏紫，玻璃也跟着偏紫一点 */
+  --frost: 180 162 215;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   3 · 跟着底色走的组件（两个变体共用；浅色时辰的取值与现状同值，
+       所以这些规则在浅色时辰上等于「什么都没改」）
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── 3.1 全页微温环境微光（.page-ambient）──
+   原样式是三层写死的浅色渐变（左上近白 75%），压在深底上就是一片白雾。
+   这里按时辰的雾光重铺同一套构图：左上大光池、右下小光池、142° 主光轴，
+   三层都乘 --hour-glow-a，深色时辰自然变成一层薄雾光。
+   随笔 / 项目 / 瞬间开着它（ambient），标签页与关于页没有这一层，只吃底色。 */
+html[data-hours][data-hour] .page-ambient {
+  background:
+    radial-gradient(
+      110% 85% at 10% 8%,
+      rgb(var(--hour-glow) / calc(var(--hour-glow-a) * 1.05)) 0%,
+      rgb(var(--hour-glow) / calc(var(--hour-glow-a) * 0.42)) 50%,
+      transparent 76%
+    ),
+    radial-gradient(
+      95% 80% at 90% 88%,
+      rgb(var(--hour-glow) / calc(var(--hour-glow-a) * 0.78)) 0%,
+      rgb(var(--hour-glow) / calc(var(--hour-glow-a) * 0.3)) 52%,
+      transparent 82%
+    ),
+    linear-gradient(
+      142deg in oklab,
+      rgb(var(--hour-glow) / calc(var(--hour-glow-a) * 0.72)) 0%,
+      rgb(var(--hour-glow) / calc(var(--hour-glow-a) * 0.5)) 50%,
+      rgb(var(--hour-glow) / calc(var(--hour-glow-a) * 0.66)) 100%
+    );
+}
+
+/* ── 3.2 大表面洗染（.wash-backdrop）—— 刻意不动 ──
+   它是 z −5 的 7% 醒梦洗染（梦端 #8a5a30 / 醒端 #556270），由 --reality-mix 驱动。
+   主页夜里也铺着同一层（wash-backdrop 是 BaseLayout 常驻的），所以变体 A 的
+   内页留着它才与主页那一段是同一个色；撤掉它反而比主页「少一层」。
+   变体 B 是浅底，7% 的洗染更看不出来。见 NOTES.md「发现但没处理」。 */
+
+/* ── 3.3 瞬间薄片（.sheet）──
+   原来写死 rgba(255,255,255,.6−age×.32) 与白色边、白色内高光、深投影。
+   现在底与边都按时辰的玻璃变量算，越旧越透的那条曲线（age）按原来的比例
+   缩放：底 −53%、边 −41%、投影 −58%，浅色时辰取值与现状同值。 */
+html[data-hours][data-hour] .sheet {
+  background: rgb(var(--frost) / calc(var(--frost-a) - var(--age, 0) * var(--frost-a) * 0.53));
+  border-color: rgb(var(--frost) / calc(var(--frost-edge-a) - var(--age, 0) * var(--frost-edge-a) * 0.41));
+  box-shadow:
+    inset 0 1px 1px rgb(255 255 255 / var(--frost-hi-a)),
+    0 14px 34px -16px rgb(var(--frost-sh) / calc(var(--frost-sh-a) * (1 - var(--age, 0) * 0.58)));
+}
+
+html[data-hours][data-hour] .sheet:hover,
+html[data-hours][data-hour] .sheet:target {
+  background: rgb(var(--frost) / var(--frost-a-on));
+  box-shadow:
+    inset 0 1px 1px rgb(255 255 255 / calc(var(--frost-hi-a) * 1.33)),
+    0 18px 40px -16px rgb(var(--frost-sh) / calc(var(--frost-sh-a) * 1.17));
+}
+
+/* ── 3.4 标签框（.tag-chip）──
+   框本身全由 --tag-* 变量画；唯一写死浅色的是 --tag-bg: rgba(255,255,255,.32)
+   （--tag-border 吃 --line、--tag-ink 吃 --fg-soft，都跟着时辰走）。
+   单标签的专属框（[data-tag] 里另写的那些）在 src/data/tags.ts 里没有启用，
+   现状等于默认框，这里也就不必逐个跟。 */
+html[data-hours][data-hour] .tag-chip {
+  --tag-bg: rgb(var(--frost) / var(--chip-bg-a));
+}
+
+/* ── 3.5 项目页封面（.coverband）──
+   底是写死的浅色渐变 rgba(255,255,255,.28) → rgba(225,229,234,.5)：
+   上面一档换成时辰玻璃，下面一档改吃 --bg-sunken（浅底上就等于原来那块灰，
+   深底上自然变成更深的一档）。波纹 SVG 的描边用的是缝色/梦色中间调，
+   深底上也看得见，不动；幽灵编号的描边写死深墨，深底上要翻成浅的。 */
+html[data-hours][data-hour] .coverband {
+  background: linear-gradient(
+    180deg,
+    rgb(var(--frost) / calc(var(--frost-a) * 0.47)),
+    color-mix(in srgb, var(--bg-sunken) 50%, transparent)
+  );
+}
+
+html[data-hours][data-hour] .coverband .ghostno {
+  -webkit-text-stroke: 1px var(--ghostno-ink);
+}
+
+/* ── 3.6 导览轨展开薄片（.g-panel）──
+   它的底吃 color-mix(--bg 70%)、backdrop-filter 磨砂，本来就跟着底色走；
+   要换的只有写死的白边、白色内高光与深投影。 */
+html[data-hours][data-hour] .g-panel {
+  border-color: rgb(var(--frost) / calc(var(--frost-edge-a) * 0.82));
+  box-shadow:
+    inset 0 1px 1px rgb(255 255 255 / var(--frost-hi-a)),
+    0 18px 42px -18px rgb(var(--frost-sh) / calc(var(--frost-sh-a) * 1.67));
+}
+
+/* ── 3.7 环境声按钮（.snd）──
+   底是 color-mix(--bg 75%, 白 8%)，跟着底色走；换白边、白高光与投影。 */
+html[data-hours][data-hour] .snd {
+  border-color: rgb(var(--frost) / calc(var(--frost-edge-a) * 0.24));
+  box-shadow:
+    0 6px 18px -4px rgb(var(--frost-sh) / calc(var(--frost-sh-a) * 2.5)),
+    0 0 1px 1px rgb(255 255 255 / 0.08),
+    inset 0 1px 0 rgb(255 255 255 / calc(var(--frost-hi-a) * 0.53));
+}
+
+/* ── 3.8 强调墨：--umber 系在深底上要提亮 ──
+   现状里 --umber（醒 #556270 / 梦 #765640）同时当「次强调墨」用：目录页年份、
+   瞬间年号、随笔文末小签、导览薄片小标题、正文里的链接、悬停时的标题……
+   浅底上是 5 上下的对比，深底上只剩 2.6，等于看不见。
+   浅色时辰 --hour-ink 就是 --umber 本身，下面两条在那里是空操作。 */
+html[data-hours][data-hour]
+  :is(
+    .year,
+    .s-year,
+    .wn-label,
+    .g-h,
+    .g-yr-y,
+    .g-clear,
+    .prose-meta .status,
+    .md a,
+    .g-nav a:hover,
+    .sheet-date:hover,
+    .sheet:target .sheet-date,
+    .wc-foot a:hover,
+    .wc-nav a:hover .wn-title,
+    .row-in:hover .row-title
+  ) {
+  color: var(--hour-ink);
+}
+
+/* 正文与互链里的链接：悬停色来自 global.css 的 a:hover（也是 --umber）。
+   导航与页脚另有自己的悬停色（--fg），刻意不列进来，免得把它们的悬停压掉。 */
+html[data-hours][data-hour] :is(.md a, .xfile a, .link-list a, .pj-next a):hover {
+  color: var(--hour-ink);
+}
+
+/* ── 3.9 只吃 --line / --fg / --fg-soft 的几件：核对过，不需要额外规则 ──
+   · .link-list（项目相关链接）：只画 border-top / border-bottom 与 --fg-soft 的字
+   · .file-note（项目注记）：左边一道 --amber，字 --fg-soft
+   · .pj-next（项目文末导航）、.wake-card（随笔文末）、.tag-row（随笔标签行）：
+     全是 --line 的横线与 --fg-soft 的字（小签的深墨见 3.8）
+   · 页脚：--line 的顶线 + --fg-soft 的字；关于页自己把页脚压在水色上（见 NOTES）
+   这几件在 A、B 八个时辰里都自动跟随，因此上面没有它们的规则。 */
