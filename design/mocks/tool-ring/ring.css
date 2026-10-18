@@ -1,0 +1,1042 @@
+/* ─────────────────────────────────────────────────────────────
+   罗盘环 · 那件东西
+   静息：指针旁一圈极淡的刻度环（细线）。
+   动词 合拢 / 绽开：环转、亮起刻度；按住或点开，刻度长成花瓣（花瓣玻璃）。
+   ───────────────────────────────────────────────────────────── */
+
+/* ── 光标门控：只有真实鼠标 / 未减弱动效 / 非强制颜色时才藏系统指针 ──
+   （与 src/scripts/cursor.ts 同一套门控；原型里由 ring.js 复刻） */
+html.fx-cursor-on,
+html.fx-cursor-on * {
+  cursor: none !important;
+}
+
+/* ── 凝露光核：站内已有的那一枚，1:1 钉在指针上 ── */
+#core-layer {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 240;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+html.fx-cursor-on #core-layer {
+  opacity: 1;
+}
+
+html.fx-cursor-out #core-layer {
+  opacity: 0;
+}
+
+.core {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+}
+
+.core > * {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+}
+
+.core svg {
+  position: absolute;
+  display: block;
+  overflow: visible;
+  max-width: none;
+}
+
+/* 三道发丝环（角度：16s 顺 / 27s 逆 / 41s 顺），梦面各自倾斜微扁 */
+.c-ring {
+  --s: calc(1 - var(--mix));
+}
+
+.c-ring svg {
+  left: -30px;
+  top: -30px;
+}
+
+.c-ring circle {
+  fill: none;
+  stroke: var(--ring-ink);
+  stroke-linecap: round;
+}
+
+.c-ring .gap-star {
+  fill: var(--ring-ink);
+}
+
+.c-ring.c0 {
+  --gs: 0.26;
+  --dx: 0.6px;
+  --dy: -0.5px;
+  --tilt: 14deg;
+  --flat: 0.1;
+}
+.c-ring.c1 {
+  --gs: 0.22;
+  --dx: -1.4px;
+  --dy: 0.9px;
+  --tilt: 22deg;
+  --flat: 0.14;
+}
+.c-ring.c2 {
+  --gs: 0.19;
+  --dx: 2.2px;
+  --dy: 1.4px;
+  --tilt: 8deg;
+  --flat: 0.18;
+}
+
+.c-ring.c0 circle {
+  stroke-width: 1;
+  stroke-opacity: 0.62;
+}
+.c-ring.c1 circle {
+  stroke-width: 0.9;
+  stroke-opacity: 0.44;
+}
+.c-ring.c2 circle {
+  stroke-width: 0.8;
+  stroke-opacity: 0.28;
+}
+
+.c-ring.c0 .gap-star {
+  opacity: 0.9;
+}
+.c-ring.c1 .gap-star {
+  opacity: 0.75;
+}
+.c-ring.c2 .gap-star {
+  opacity: 0.6;
+}
+
+.c-ring .ring-tilt {
+  transform: translate(calc(var(--s) * var(--dx)), calc(var(--s) * var(--dy)))
+    rotate(calc(var(--s) * var(--tilt))) scale(1, calc(1 - var(--s) * var(--flat)));
+}
+
+.c-ring .ring-spin {
+  animation: ringSpin 16s linear -3s infinite;
+}
+
+.c-ring.c1 .ring-spin {
+  animation: ringSpin 27s linear -11s infinite reverse;
+}
+
+.c-ring.c2 .ring-spin {
+  animation: ringSpin 41s linear -26s infinite;
+}
+
+@keyframes ringSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 星：四芒内凹，竖长横短 */
+.core .star svg {
+  left: -8px;
+  top: -8px;
+}
+
+.core .star-halo {
+  position: absolute;
+  left: -8px;
+  top: -8px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle closest-side,
+    color-mix(in srgb, #fff calc(var(--mix) * 100%), var(--amber)) 0,
+    transparent 100%
+  );
+  opacity: 0.5;
+}
+
+.core .s-main {
+  fill: var(--rfg);
+}
+
+.core .s-main-amber {
+  fill: color-mix(in srgb, var(--amber) 82%, var(--rfg));
+  opacity: calc(1 - var(--mix));
+}
+
+.core .s-minor {
+  fill: color-mix(in srgb, var(--amber) 70%, var(--rfg));
+  opacity: calc((1 - var(--mix)) * 0.75);
+}
+
+.core .caret {
+  opacity: 0;
+}
+
+.core .caret svg {
+  left: -12px;
+  top: -12px;
+}
+
+.core .caret path {
+  fill: none;
+  stroke: color-mix(in srgb, var(--rfg) calc(var(--mix) * 100%), var(--amber));
+  stroke-width: 1;
+  stroke-linecap: round;
+  stroke-opacity: 0.72;
+}
+
+/* 阅读态：三环向星收拢隐去，一道插入线浮出 */
+html[data-core='text'] .c-ring {
+  opacity: 0;
+}
+
+html[data-core='text'] .caret {
+  opacity: 1;
+}
+
+/* ── 环本体 ── */
+#ring {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 210;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  transition: opacity 0.5s ease;
+  /* 借所在地的光：由 ring.js 按指针底下是哪一片底子写入 */
+  --rfg: var(--fg);
+  --rsoft: var(--fg-soft);
+  --rink: var(--umber);
+  --rbg: var(--bg);
+  --edge: color-mix(in srgb, var(--rfg) 30%, transparent);
+  --edge-soft: color-mix(in srgb, var(--rfg) 15%, transparent);
+  --ring-ink: color-mix(in srgb, var(--rfg) 62%, var(--amber));
+  --glass-0: rgba(255, 255, 255, 0.2);
+  --glass-1: rgba(255, 255, 255, 0.09);
+  --glass-2: rgba(255, 255, 255, 0.03);
+}
+
+#compass {
+  position: absolute;
+  left: -170px;
+  top: -170px;
+  width: 340px;
+  height: 340px;
+  overflow: visible;
+}
+
+.c-hair {
+  fill: none;
+  stroke: color-mix(in srgb, var(--rfg) calc(11% + var(--dark, 0) * 3%), transparent);
+  stroke-width: 1;
+}
+
+.c-tick {
+  stroke: color-mix(in srgb, var(--rfg) calc(15% + var(--dark, 0) * 4%), transparent);
+  stroke-width: 1;
+  stroke-linecap: round;
+}
+
+.c-tick.is-long {
+  stroke: color-mix(in srgb, var(--rfg) calc(19% + var(--dark, 0) * 5%), transparent);
+}
+
+/* 绽开时环本身要立得住 —— 静息时它只是一圈几乎看不见的刻度 */
+#ring[data-v='1'] .c-hair {
+  stroke: color-mix(in srgb, var(--rfg) calc(24% + var(--dark, 0) * 6%), transparent);
+}
+
+#ring[data-v='1'] .c-tick {
+  stroke: color-mix(in srgb, var(--rfg) calc(30% + var(--dark, 0) * 8%), transparent);
+}
+
+#ring[data-v='1'] .c-tick.is-long {
+  stroke: color-mix(in srgb, var(--rfg) calc(38% + var(--dark, 0) * 10%), transparent);
+}
+
+.c-tick.is-hot {
+  stroke: var(--amber);
+  stroke-width: 1.4;
+}
+
+.c-prog {
+  fill: none;
+  stroke: var(--amber);
+  stroke-width: 1;
+  stroke-linecap: round;
+  opacity: 0.22;
+}
+
+#ring[data-v='1'] .c-prog,
+#ring.is-open .c-prog {
+  opacity: 0.55;
+}
+
+.c-hold {
+  fill: none;
+  stroke: var(--amber);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  opacity: 0;
+}
+
+.c-hub {
+  fill: none;
+  stroke: var(--amber);
+  stroke-width: 1;
+  opacity: 0;
+}
+
+/* ── 花瓣 ── */
+#petals {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+}
+
+/* 瓣面的玻璃渐变：色必须写在 CSS 里 —— 表现属性（stop-color="…"）不认 var()，
+   而这几层薄白要按环当刻借到的那套夜色走 */
+#petalGlass .gs0 {
+  stop-color: var(--glass-0);
+}
+
+#petalGlass .gs1 {
+  stop-color: var(--glass-1);
+}
+
+#petalGlass .gs2 {
+  stop-color: var(--glass-2);
+}
+
+.petal {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  /* 每一片瓣按自己底下的地面借光（ring.js 逐片写），所以瓣名跨过两种夜色也读得清 */
+  --edge: color-mix(in srgb, var(--rfg) 30%, transparent);
+  --edge-soft: color-mix(in srgb, var(--rfg) 16%, transparent);
+}
+
+.p-shape,
+.p-label,
+.p-hit {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  transform-origin: 0 0;
+}
+
+.p-shape {
+  will-change: transform, opacity;
+  /* 一片薄玻璃压在任何底子上都会投一点影 —— 浅底上瓣才「浮」得起来 */
+  filter: var(--petal-lift, none);
+}
+
+.p-shape svg {
+  position: absolute;
+  display: block;
+  overflow: visible;
+  max-width: none;
+}
+
+.p-fill {
+  fill: url(#petalGlass);
+  stroke: var(--edge);
+  stroke-width: 0.9;
+}
+
+.p-vein {
+  fill: none;
+  stroke: color-mix(in srgb, var(--rfg) 20%, transparent);
+  stroke-width: 0.7;
+  stroke-linecap: round;
+}
+
+.petal.is-focus .p-fill {
+  stroke: color-mix(in srgb, var(--amber) 62%, transparent);
+  stroke-width: 1.1;
+}
+
+.petal.is-focus .p-vein {
+  stroke: color-mix(in srgb, var(--amber) 26%, transparent);
+}
+
+.p-label {
+  pointer-events: none;
+}
+
+.p-in {
+  position: absolute;
+  left: 0;
+  top: 0;
+  translate: -50% -50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15em;
+  white-space: nowrap;
+}
+
+.p-in b {
+  font-family: var(--font-body);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  color: var(--rfg);
+  opacity: 0.72;
+}
+
+.p-in i {
+  font-style: normal;
+  font-size: 0.5rem;
+  letter-spacing: 0.2em;
+  color: var(--rsoft);
+  opacity: 0.6;
+}
+
+.petal.is-wide .p-in b {
+  font-size: 0.78rem;
+}
+
+.petal.is-focus .p-in b {
+  color: var(--amber);
+  opacity: 1;
+}
+
+.petal.is-focus .p-in i {
+  color: var(--rink);
+  opacity: 0.9;
+}
+
+.p-hit {
+  pointer-events: none;
+}
+
+#ring.is-open .p-hit {
+  pointer-events: auto;
+}
+
+.p-hit > i {
+  position: absolute;
+  left: 0;
+  top: 0;
+  translate: -50% -50%;
+  display: block;
+  border-radius: 50%;
+  border: 1px solid transparent;
+}
+
+.p-hit:focus-visible > i {
+  border-color: color-mix(in srgb, var(--amber) 70%, transparent);
+}
+
+/* ── 花瓣玻璃：绽开后从瓣上张开的那一片 ── */
+#panel {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 215;
+  width: max-content;
+  max-width: min(20rem, calc(100vw - 1.6rem));
+  max-height: min(56vh, 21rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  padding: 0.95rem 1.05rem 1.05rem;
+  border-radius: 4px 10px 4px 10px;
+  border: 1px solid color-mix(in srgb, var(--rfg) 22%, transparent);
+  /* 花瓣玻璃是一片接光的薄板：深底上它比底子亮一档，浅底上它比底子白一档。
+     不跟 --rbg 混 —— 那会跟底子一模一样，板子就没了。
+     板子本身给到 0.82–0.88 的不透明度：磨砂的观感靠 backdrop-filter 的余量，
+     而不是靠它撑亮度（软件渲染下 backdrop-filter 只看得见「背板根」，
+     透明的板子会在深底上被算成亮底 —— 见 NOTES） */
+  background-color: var(--panel-fill, var(--panel-a));
+  background-image: linear-gradient(155deg, var(--panel-b), transparent 62%);
+  -webkit-backdrop-filter: blur(20px) saturate(1.08);
+  backdrop-filter: blur(20px) saturate(1.08);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 30%, transparent),
+    0 20px 46px -22px rgba(8, 12, 20, 0.42);
+  color: var(--rfg);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+#panel[hidden] {
+  display: none;
+}
+
+#panel::-webkit-scrollbar {
+  width: 0;
+}
+
+#panel.is-live {
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.p-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.8rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid var(--edge-soft);
+}
+
+.p-name {
+  font-family: var(--font-body);
+  font-size: 0.74rem;
+  letter-spacing: 0.2em;
+  color: var(--rink);
+}
+
+.p-name .p-alt {
+  margin-left: 0.55em;
+  font-style: normal;
+  font-size: 0.86em;
+  letter-spacing: 0.14em;
+  opacity: 0.45;
+}
+
+.p-en {
+  font-size: 0.52rem;
+  letter-spacing: 0.22em;
+  color: var(--rsoft);
+  opacity: 0.72;
+}
+
+.p-body {
+  padding-top: 0.7rem;
+  font-size: 0.76rem;
+  line-height: 1.8;
+  color: var(--rsoft);
+}
+
+.p-note {
+  margin: 0 0 0.55rem;
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  color: var(--rsoft);
+  opacity: 0.7;
+}
+
+.p-sec + .p-sec {
+  margin-top: 0.85rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--edge-soft);
+}
+
+.p-h {
+  display: block;
+  margin: 0 0 0.5rem;
+  font-family: var(--font-body);
+  font-size: 0.58rem;
+  letter-spacing: 0.24em;
+  color: var(--rink);
+}
+
+/* 检索 */
+.p-find input {
+  width: 100%;
+  padding: 0.3rem 0 0.35rem;
+  border: 0;
+  border-bottom: 1px solid var(--edge-soft);
+  background: none;
+  color: var(--rfg);
+  font-family: var(--font-display);
+  font-size: 0.86rem;
+  outline: none;
+  transition: border-color 0.3s ease;
+}
+
+.p-find input::placeholder {
+  color: var(--rsoft);
+  opacity: 0.6;
+}
+
+.p-find input:focus {
+  border-bottom-color: color-mix(in srgb, var(--amber) 70%, transparent);
+}
+
+.p-count {
+  display: flex;
+  justify-content: space-between;
+  margin: 0.45rem 0 0;
+  font-size: 0.6rem;
+  letter-spacing: 0.14em;
+  color: var(--rsoft);
+}
+
+/* 结果与目录：同一支细目 */
+.p-list {
+  display: flex;
+  flex-direction: column;
+  margin-top: 0.5rem;
+}
+
+.p-item {
+  display: flex;
+  align-items: baseline;
+  gap: 0.55rem;
+  width: 100%;
+  padding: 0.32rem 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--rsoft);
+  text-align: left;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.p-item:hover,
+.p-item:focus-visible {
+  color: var(--rfg);
+}
+
+.p-item .t {
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.p-item .d {
+  flex: none;
+  font-size: 0.58rem;
+  letter-spacing: 0.1em;
+  color: var(--rsoft);
+  opacity: 0.62;
+}
+
+.p-item.is-sub .t {
+  font-size: 0.72rem;
+  color: var(--rsoft);
+  opacity: 0.86;
+}
+
+.p-item[aria-current='true'] {
+  color: var(--rfg);
+}
+
+.p-item[aria-current='true'] .t::before {
+  content: '';
+  display: inline-block;
+  width: 4px;
+  height: 4px;
+  margin-right: 0.45em;
+  border-radius: 50%;
+  background: var(--amber);
+  vertical-align: 0.22em;
+}
+
+/* 小签与分段 */
+.p-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.p-chip {
+  padding: 0.1rem 0.42rem 0.14rem;
+  border: 1px solid var(--edge-soft);
+  border-radius: 2px;
+  background: none;
+  font-family: var(--font-body);
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  color: var(--rsoft);
+  cursor: pointer;
+  transition:
+    color 0.2s ease,
+    border-color 0.2s ease,
+    background 0.2s ease;
+}
+
+.p-chip:hover {
+  color: var(--rfg);
+  border-color: color-mix(in srgb, var(--amber) 50%, transparent);
+}
+
+.p-chip[aria-pressed='true'] {
+  color: var(--rfg);
+  border-color: color-mix(in srgb, var(--amber) 70%, transparent);
+  background: color-mix(in srgb, var(--amber) 12%, transparent);
+}
+
+.p-set {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.p-set + .p-set {
+  margin-top: 0.42rem;
+}
+
+.p-set > span {
+  font-family: var(--font-body);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+}
+
+.p-seg {
+  display: inline-flex;
+  border: 1px solid var(--edge-soft);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.p-seg button {
+  min-width: 2.1rem;
+  padding: 0.16rem 0.5rem;
+  border: 0;
+  background: none;
+  font-family: var(--font-body);
+  font-size: 0.72rem;
+  color: var(--rsoft);
+  cursor: pointer;
+  transition:
+    color 0.2s ease,
+    background 0.2s ease;
+}
+
+.p-seg button + button {
+  border-left: 1px solid var(--edge-soft);
+}
+
+.p-seg button:hover {
+  color: var(--rfg);
+}
+
+.p-seg button[aria-pressed='true'] {
+  color: var(--rfg);
+  background: color-mix(in srgb, var(--amber) 15%, transparent);
+}
+
+/* 大动作 */
+.p-act {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.8rem;
+  width: 100%;
+  margin-top: 0.15rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--edge-soft);
+  border-radius: 3px;
+  background: linear-gradient(150deg, var(--glass-1), var(--glass-2));
+  font: inherit;
+  color: var(--rfg);
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    border-color 0.25s ease,
+    color 0.25s ease;
+}
+
+.p-act[aria-pressed='true'] {
+  border-color: color-mix(in srgb, var(--amber) 70%, transparent);
+  color: var(--amber);
+}
+
+.p-act:hover,
+.p-act:focus-visible {
+  border-color: color-mix(in srgb, var(--amber) 65%, transparent);
+  color: var(--amber);
+}
+
+.p-act .k {
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  letter-spacing: 0.16em;
+}
+
+.p-act .v {
+  font-size: 0.54rem;
+  letter-spacing: 0.2em;
+  color: var(--rsoft);
+  opacity: 0.75;
+}
+
+.p-act + .p-act {
+  margin-top: 0.35rem;
+}
+
+/* 三根微弦（声） */
+.p-strings {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 18px;
+}
+
+.p-strings i {
+  display: block;
+  width: 1.4px;
+  height: 3px;
+  border-radius: 1px;
+  background: var(--rsoft);
+  opacity: 0.7;
+  transition: height 0.35s ease, background 0.3s ease;
+}
+
+html[data-sound='on'] .p-strings i {
+  background: var(--amber);
+  opacity: 1;
+}
+
+html[data-sound='on'] .p-strings i:nth-child(1) {
+  height: 12px;
+}
+html[data-sound='on'] .p-strings i:nth-child(2) {
+  height: 7px;
+}
+html[data-sound='on'] .p-strings i:nth-child(3) {
+  height: 14px;
+}
+
+/* 刻 */
+.p-clock {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: 1.05rem;
+  letter-spacing: 0.08em;
+  color: var(--rfg);
+}
+
+.p-clock .st {
+  font-family: var(--font-body);
+  font-size: 0.68rem;
+  letter-spacing: 0.16em;
+  color: var(--rink);
+}
+
+.p-marks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem 0.5rem;
+  margin-top: 0.55rem;
+}
+
+.p-mark {
+  padding: 0.12rem 0;
+  border: 0;
+  background: none;
+  font-family: var(--font-body);
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+  color: var(--rsoft);
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.p-mark:hover,
+.p-mark:focus-visible {
+  color: var(--amber);
+}
+
+/* ── 边缘露头 ── */
+#peek {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 205;
+  width: 120px;
+  height: 120px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--rfg, var(--fg));
+  translate: 0 0;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 0.7s ease,
+    translate 0.55s cubic-bezier(0.16, 1, 0.3, 1),
+    visibility 0.7s;
+}
+
+#peek.is-here {
+  opacity: 1;
+  visibility: visible;
+}
+
+#peek.is-here:hover,
+#peek.is-here:focus-visible {
+  translate: var(--pk-in, 0 0);
+}
+
+#peek svg {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 120px;
+  height: 120px;
+  overflow: visible;
+}
+
+.pk-arc {
+  fill: none;
+  stroke: color-mix(in srgb, var(--rfg, var(--fg)) calc(20% + var(--dark, 0) * 12%), transparent);
+  stroke-width: 1;
+  stroke-linecap: round;
+}
+
+.pk-tick {
+  stroke: color-mix(in srgb, var(--rfg, var(--fg)) calc(24% + var(--dark, 0) * 12%), transparent);
+  stroke-width: 1;
+  stroke-linecap: round;
+}
+
+.pk-dot {
+  fill: var(--amber);
+  opacity: 0.75;
+}
+
+#peek.is-here .pk-arc {
+  animation: peekBreath 5.6s ease-in-out infinite;
+}
+
+@keyframes peekBreath {
+  0%,
+  100% {
+    stroke-opacity: 0.62;
+  }
+  50% {
+    stroke-opacity: 1;
+  }
+}
+
+.pk-tag {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1em;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.pk-tag b {
+  font-family: var(--font-body);
+  font-size: 0.6rem;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  color: var(--rsoft, var(--fg-soft));
+}
+
+.pk-tag i {
+  font-style: normal;
+  font-size: 0.48rem;
+  letter-spacing: 0.2em;
+  color: var(--rsoft, var(--fg-soft));
+  opacity: 0.7;
+}
+
+#peek.is-here:hover .pk-tag,
+#peek.is-here:focus-visible .pk-tag {
+  opacity: 1;
+}
+
+#peek:focus-visible {
+  outline: none;
+}
+
+#peek:focus-visible .pk-arc {
+  stroke: color-mix(in srgb, var(--amber) 70%, transparent);
+}
+
+/* ── 绽开时的一层薄幕 ── */
+#veil {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  pointer-events: none;
+  background: var(--scrim, rgba(35, 40, 48, 0.1));
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
+/* ── 提示 ── */
+.hint {
+  position: fixed;
+  left: 50%;
+  bottom: 1.15rem;
+  z-index: 90;
+  margin: 0;
+  translate: -50% 0;
+  font-family: var(--font-body);
+  font-size: 0.62rem;
+  letter-spacing: 0.16em;
+  color: var(--fg-faint);
+  white-space: nowrap;
+  pointer-events: none;
+  transition: opacity 0.6s ease;
+}
+
+.hint b {
+  color: var(--fg-soft);
+}
+
+.hint.is-gone {
+  opacity: 0;
+}
+
+/* ── 窄屏：环与花整体收一档，边缘露头改贴下缘 ── */
+@media (max-width: 620px) {
+  #panel {
+    max-width: calc(100vw - 1.2rem);
+    max-height: min(52vh, 22rem);
+  }
+
+  .p-in b {
+    font-size: 0.68rem;
+  }
+
+  .hint {
+    font-size: 0.58rem;
+    letter-spacing: 0.12em;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #core-layer,
+  #peek,
+  #veil,
+  .p-strings i,
+  .pk-tag {
+    transition: none;
+  }
+
+  .c-ring .ring-spin {
+    animation: none;
+  }
+
+  #peek.is-here .pk-arc {
+    animation: none;
+  }
+}

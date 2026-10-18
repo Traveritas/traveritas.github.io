@@ -1,0 +1,277 @@
+/* ═══════════════════════════════════════════════════════════════
+   潜影 latent · 显影 develop — 底子（画面）
+   一张已经成像的相纸。四种语境 = 四种夜色，同一批内容。
+   工具层（latent.css）另起一层，只靠浓度差存在。
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Plex Mono：fontsource 的 css 里路径是 ./files/…，与 serve.cjs 挂载的前缀对不上，
+   所以这里自己声明。中文一律不走 mono（Plex Mono 没有中文字形）。 */
+@font-face { font-family: 'IBM Plex Mono'; font-style: normal; font-weight: 400; font-display: swap;
+  src: url('/fonts/plex/ibm-plex-mono-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'IBM Plex Mono'; font-style: normal; font-weight: 500; font-display: swap;
+  src: url('/fonts/plex/ibm-plex-mono-latin-500-normal.woff2') format('woff2'); }
+@font-face { font-family: 'IBM Plex Mono'; font-style: normal; font-weight: 600; font-display: swap;
+  src: url('/fonts/plex/ibm-plex-mono-latin-600-normal.woff2') format('woff2'); }
+
+:root {
+  color-scheme: light;
+
+  --font-display: 'Noto Serif SC', 'Palatino Linotype', Palatino, Georgia, 'Songti SC', SimSun, serif;
+  --font-body: system-ui, -apple-system, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei UI',
+    'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei UI', 'Microsoft YaHei', monospace;
+
+  --measure: 34em;
+  --dim: #56606d;   /* 第二档正文：比 --soft 深，深底上比 --soft 浅 */
+  --amber: #d9a05b;
+  --seal: #a3452f;
+  --seam-angle: 14deg;
+
+  /* 潜影的两个刻度：底浓度与完全显影。浓度差是这个方案唯一允许的边界。 */
+  --dev-base: 3.5;
+  --dev-full: 100;
+
+  --ease-soft: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ── 夜色：简章第 5 节的四行 ─────────────────────────────── */
+html[data-ctx='home'] {           /* 晨光 · 主页 */
+  --bg: #0e0f1d; --bg-2: #171a2e; --fg: #ece8f2; --soft: #b7b3c8; --dim: #c9c5d8; --faint: #827f98; --anchor: #d6b28c;
+  color-scheme: dark;
+}
+html[data-ctx='grid'] {           /* 浅梦 · 随笔目录 */
+  --bg: #c6ced9; --bg-2: #d9dfe9; --fg: #232830; --soft: #56606d; --dim: #464f5b; --faint: #8a94a2; --anchor: #765640;
+}
+html[data-ctx='grid'][data-scene='project'] {   /* 深眠 · 项目 */
+  --bg: #0d1524; --bg-2: #131d30; --fg: #e6ebf1; --soft: #a6b4c6; --dim: #c2cddb; --faint: #71849c; --anchor: #c9a77e;
+  color-scheme: dark;
+}
+html[data-ctx='grid'][data-scene='moment'] {    /* 异相 · 瞬间 */
+  --bg: #1d1729; --bg-2: #262032; --fg: #f0e9f4; --soft: #bcadca; --dim: #d4c9de; --faint: #877a98; --anchor: #e0aa86;
+  color-scheme: dark;
+}
+html[data-ctx='read'] {           /* 浅梦 · 阅读 */
+  --bg: #e1e7ef; --bg-2: #edf1f7; --fg: #232830; --soft: #56606d; --dim: #464f5b; --faint: #8a94a2; --anchor: #765640;
+}
+html[data-ctx='gate'] {           /* 天光 · NEXUS 入口（接 gate.astro 的天） */
+  --bg: #d3cad6; --bg-2: #e6e2ec; --fg: #383e4e; --soft: #5d5a6c; --dim: #4c4959; --faint: #8b8898; --anchor: #7d6146;
+}
+html[data-ctx='404'] {            /* 浅梦 · 失线页 */
+  --bg: #c6ced9; --bg-2: #d9dfe9; --fg: #232830; --soft: #56606d; --dim: #464f5b; --faint: #8a94a2; --anchor: #765640;
+}
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 0.9s var(--ease-soft), color 0.9s var(--ease-soft);
+}
+
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+a { color: inherit; }
+
+/* ── 画面：天空与颗粒 ─────────────────────────────────────── */
+.field { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+
+.field-sky {
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(120% 80% at 50% 118%, color-mix(in srgb, var(--anchor) 22%, transparent), transparent 62%),
+    radial-gradient(90% 60% at 22% 8%, color-mix(in srgb, var(--fg) 8%, transparent), transparent 70%),
+    linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 58%, var(--bg) 100%);
+  transition: background 0.9s var(--ease-soft);
+}
+
+/* 相纸的颗粒：极低浓度，只在深底上看得见一点 */
+.field-grain {
+  position: absolute; inset: -20%;
+  opacity: 0.05;
+  background-image:
+    radial-gradient(circle at 17% 31%, var(--fg) 0.5px, transparent 0.6px),
+    radial-gradient(circle at 71% 63%, var(--fg) 0.5px, transparent 0.6px),
+    radial-gradient(circle at 43% 87%, var(--fg) 0.5px, transparent 0.6px);
+  background-size: 7px 7px, 11px 11px, 13px 13px;
+}
+
+html[data-ctx='gate'] .field-sky {
+  background:
+    linear-gradient(180deg,
+      rgb(230 228 247) 0%, rgb(237 234 247) 15%, rgb(249 244 246) 30%,
+      rgb(255 255 255) 40%, rgb(255 255 253) 48%, rgb(254 247 245) 50%,
+      rgb(246 239 239) 53%, rgb(230 222 227) 60%, rgb(208 199 211) 70%,
+      rgb(199 190 204) 85%, rgb(186 176 192) 100%);
+}
+html[data-ctx='gate'][data-face='dream'] .field-sky {
+  background:
+    linear-gradient(180deg,
+      rgb(240 230 242) 0%, rgb(244 235 243) 15%, rgb(251 244 245) 30%,
+      rgb(255 252 253) 40%, rgb(255 252 250) 48%, rgb(255 248 246) 50%,
+      rgb(250 240 240) 53%, rgb(238 226 231) 60%, rgb(219 205 217) 70%,
+      rgb(210 196 210) 85%, rgb(196 181 199) 100%);
+}
+
+/* ── 品牌字 ───────────────────────────────────────────────── */
+.brand {
+  position: fixed; left: 34px; top: 30px; z-index: 5;
+  display: flex; align-items: baseline; gap: 0.85rem;
+  pointer-events: none;
+}
+.brand-mark {
+  font-family: var(--font-display); font-size: 1.02rem; font-weight: 500;
+  letter-spacing: 0.1em; text-decoration: none; pointer-events: auto;
+  color: var(--fg);
+}
+.brand-line { font-size: 0.56rem; letter-spacing: 0.3em; color: var(--soft); }
+
+/* ── 舞台 ─────────────────────────────────────────────────── */
+.stage {
+  position: relative; z-index: 2;
+  transition: opacity 0.9s var(--ease-soft);
+}
+/* 显影完成：工具这一层浮到前面来，已经成像的那半张画面轻轻退后。
+   退后也是浓度差——不是蒙一层遮罩。 */
+html[data-tool='full'] .stage { opacity: 0.45; transition-duration: 1.4s; }
+/* 某一件展开之后，画面再退一档 —— 里面的字才是此刻在读的 */
+html[data-tool='full'][data-core='1'] .stage { opacity: 0.3; }
+/* 窄屏更挤，画面退得更多一点，环上的字才不压在正文上 */
+html[data-mobile='1'][data-tool='full'] .stage { opacity: 0.34; }
+
+/* 主页 ───────────────────────────────────────────────────── */
+.home { min-height: 100dvh; display: grid; place-content: center; padding: 6rem 2rem; }
+.home-q {
+  font-family: var(--font-display); font-weight: 500;
+  font-size: clamp(1.45rem, 3.4vw, 2.3rem); line-height: 1.62;
+  letter-spacing: 0.02em; max-width: 24em; margin: 0;
+}
+.home-line { margin: 1.6rem 0 0; color: var(--soft); font-size: 0.9rem; max-width: 28em; }
+.home-dream { margin: 0.5rem 0 0; color: var(--soft); font-size: 0.84rem; max-width: 28em; }
+.home-ways { display: flex; flex-wrap: wrap; gap: 1.9rem; margin-top: 3.4rem; }
+.way { text-decoration: none; display: block; }
+.way-n { font-family: var(--font-display); font-size: 1.14rem; }
+.way-b { display: block; margin-top: 0.3rem; font-size: 0.6rem; letter-spacing: 0.22em; color: var(--soft); }
+.way-c { display: block; margin-top: 0.55rem; font-size: 0.72rem; color: var(--soft); }
+.way:hover .way-n { color: var(--anchor); }
+
+/* 目录 ───────────────────────────────────────────────────── */
+.grid { max-width: 46rem; margin: 0 auto; padding: 9rem 2rem 14rem; }
+.grid-head { display: flex; align-items: baseline; gap: 0.9rem; padding-bottom: 0.9rem; }
+.grid-name { font-family: var(--font-display); font-size: 1.5rem; margin: 0; }
+.grid-badge { font-size: 0.58rem; letter-spacing: 0.24em; color: var(--soft); }
+.grid-count { margin-left: auto; font-size: 0.62rem; letter-spacing: 0.16em; color: var(--soft); }
+.grid-rule { height: 1px; background: color-mix(in srgb, var(--fg) 14%, transparent); }
+
+/* 每一条都是一小片正在显影的乳剂：--devp 由检索写 */
+.row {
+  --devp: 100%;
+  display: block; padding: 1.35rem 0 1.25rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--fg) 10%, transparent);
+  text-decoration: none;
+  transition: --devp 0.55s var(--ease-soft), opacity 0.55s var(--ease-soft);
+}
+.row-t {
+  display: block; font-family: var(--font-display); font-size: 1.16rem; line-height: 1.5;
+  color: color-mix(in srgb, var(--fg) var(--devp), var(--bg));
+  transition: color 0.55s var(--ease-soft);
+}
+.row-d {
+  display: block; margin-top: 0.4rem; font-size: 0.8rem; line-height: 1.66; max-width: 36em;
+  color: color-mix(in srgb, var(--dim) var(--devp), var(--bg));
+  transition: color 0.55s var(--ease-soft);
+}
+.row-m { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.7rem; margin-top: 0.6rem; }
+.row-date { font-size: 0.62rem; letter-spacing: 0.14em; color: color-mix(in srgb, var(--soft) var(--devp), var(--bg)); }
+.row-tag { font-size: 0.62rem; letter-spacing: 0.06em; color: color-mix(in srgb, var(--soft) var(--devp), var(--bg)); }
+.row:hover .row-t { color: var(--anchor); }
+.grid-empty { padding: 3rem 0; color: var(--soft); font-size: 0.8rem; }
+
+/* 视图 · 散：同一批条目，排得松一些、错开一些 */
+html[data-view='scatter'] .grid { max-width: 52rem; }
+html[data-view='scatter'] .row { border-bottom-color: transparent; padding: 2.1rem 0 1.6rem; }
+html[data-view='scatter'] .row:nth-child(3n + 1) { margin-left: 0; }
+html[data-view='scatter'] .row:nth-child(3n + 2) { margin-left: 13%; }
+html[data-view='scatter'] .row:nth-child(3n + 3) { margin-left: 5%; }
+html[data-view='scatter'] .row-d { max-width: 30em; }
+
+/* 阅读 ───────────────────────────────────────────────────── */
+.read { max-width: var(--measure); margin: 0 auto; padding: 9rem 2rem 16rem; }
+.read-head { margin-bottom: 3rem; }
+.read-t { font-family: var(--font-display); font-size: clamp(1.6rem, 3.4vw, 2.1rem); line-height: 1.45; margin: 0 0 0.9rem; }
+.read-meta { display: flex; flex-wrap: wrap; gap: 0.8rem; font-size: 0.62rem; letter-spacing: 0.14em; color: var(--soft); }
+.read-body { font-family: var(--font-display); font-size: var(--rs, 1rem); line-height: var(--rl, 2.05); }
+.read-body p { margin: 0 0 1.25em; text-align: justify; }
+.read-body h2 {
+  font-size: 1.16em; font-weight: 500; margin: 2.6em 0 0.9em; letter-spacing: 0.02em;
+  scroll-margin-top: 6rem;
+}
+.read-body h3 { font-size: 1em; font-weight: 600; margin: 2em 0 0.7em; color: var(--soft); scroll-margin-top: 6rem; }
+.read-body .ord { font-family: var(--font-mono); font-size: 0.66em; color: var(--amber); margin-right: 0.7em; letter-spacing: 0.1em; }
+.read-body blockquote {
+  margin: 1.8em 0; padding-left: 1.1em;
+  border-left: 1px solid color-mix(in srgb, var(--anchor) 55%, transparent);
+  color: var(--soft);
+}
+.read-body code { font-family: var(--font-mono); font-size: 0.86em; }
+.read-body pre {
+  font-family: var(--font-mono); font-size: 0.8em; line-height: 1.8;
+  padding: 1em 1.2em; overflow-x: auto;
+  border-left: 1px solid color-mix(in srgb, var(--anchor) 45%, transparent);
+  background: color-mix(in srgb, var(--fg) 4%, transparent);
+}
+.read-body ul, .read-body ol { padding-left: 1.3em; }
+.read-body li { margin-bottom: 0.5em; }
+.read-body a { text-decoration-color: color-mix(in srgb, var(--amber) 70%, transparent); text-underline-offset: 0.22em; }
+.read-body table { width: 100%; border-collapse: collapse; font-size: 0.86em; margin: 1.6em 0; }
+.read-body th, .read-body td { text-align: left; padding: 0.5em 0.6em; border-bottom: 1px solid color-mix(in srgb, var(--fg) 12%, transparent); }
+.read-body strong { font-weight: 600; }
+.read-body .float { color: color-mix(in srgb, var(--anchor) 72%, var(--fg)); }
+.read-body .sheen { color: color-mix(in srgb, var(--amber) 46%, var(--fg)); }
+.read-body .task { display: inline-block; width: 0.72em; height: 0.72em; margin-right: 0.5em;
+  border: 1px solid color-mix(in srgb, var(--fg) 40%, transparent); vertical-align: baseline; }
+.read-body .task.done { background: color-mix(in srgb, var(--amber) 70%, transparent); border-color: transparent; }
+.read-body .dual > [data-d] { display: none; }
+html[data-face='dream'] .read-body .dual > [data-w] { display: none; }
+html[data-face='dream'] .read-body .dual > [data-d] { display: inline; }
+.read-body [data-side='wake'] { display: block; }
+.read-body [data-side='dream'] { display: none; }
+html[data-face='dream'] .read-body [data-side='wake'] { display: none; }
+html[data-face='dream'] .read-body [data-side='dream'] { display: block; }
+
+/* 门 ─────────────────────────────────────────────────────── */
+.gate { min-height: 100dvh; display: grid; place-content: center; justify-items: center; gap: 1.1rem; padding: 2rem; }
+.gate-line { width: min(78vw, 620px); height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(58,64,78,.5) 22%, rgba(58,64,78,.5) 78%, transparent); }
+.gate-crystal { width: 13px; height: 13px; rotate: 45deg; background: color-mix(in srgb, var(--fg) 62%, transparent); }
+.gate-tag { font-size: 0.7rem; letter-spacing: 0.5em; color: var(--fg); }
+.gate-note { font-size: 0.7rem; letter-spacing: 0.1em; color: var(--dim); max-width: 24em; text-align: center; }
+
+/* 失线页 ─────────────────────────────────────────────────── */
+.lost { min-height: 100dvh; display: grid; place-content: center; justify-items: center; gap: 1.4rem; text-align: center; padding: 2rem; }
+.lost-beacon { width: 12px; height: 12px; border-radius: 50%; background: var(--amber);
+  box-shadow: 0 0 16px 2px color-mix(in srgb, var(--amber) 45%, transparent); }
+.lost-code { font-size: 0.62rem; letter-spacing: 0.26em; color: var(--soft); margin: 0; }
+.lost-line { font-family: var(--font-display); font-size: 1.02rem; line-height: 1.8; max-width: 26em; margin: 0; }
+.lost-back { font-size: 0.76rem; letter-spacing: 0.1em; color: var(--soft); text-decoration: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--amber) 55%, transparent); padding-bottom: 0.2em; }
+.lost-back:hover { color: var(--fg); }
+
+@media (max-width: 640px) {
+  .brand { left: 18px; top: 18px; }
+  .grid, .read { padding-left: 1.3rem; padding-right: 1.3rem; }
+  .grid { padding-top: 7rem; }
+  .read { padding-top: 7rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body, .field-sky, .row, .row-t, .row-d { transition: none; }
+}
