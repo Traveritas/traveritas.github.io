@@ -1483,7 +1483,12 @@ export async function initWander(host) {
     }
     vel.x = vel.y = 0;
     drag = { id: e.pointerId, sx: e.clientX, sy: e.clientY, lx: e.clientX, ly: e.clientY, moved: false, axis: null, k: regionAt(e.clientX, e.clientY), s: [{ t: e.timeStamp, x: e.clientX, y: e.clientY }] };
-    if (mode === 'grid') scrollOf(drag.k).vel = 0;
+    if (mode === 'grid') {
+      const sc = scrollOf(drag.k);
+      sc.vel = 0;
+      // 按下时这一栏已经在顶上：再往下拉够了就回主页（见 up）
+      drag.top = sc.pos <= 1;
+    }
     suppress = false;
   });
   addEventListener('pointermove', (e) => {
@@ -1549,6 +1554,8 @@ export async function initWander(host) {
       } else if (drag.axis === 'y') {
         const sc = scrollOf(drag.k);
         sc.drag = false;
+        // 检索：在顶上再往下拉——往上走，回主页（与主页上划进检索对称）
+        if (drag.top && e.clientY - drag.sy > 70) { sc.vel = 0; sc.target = 0; toHome(); root.classList.remove('w-dragging'); drag = null; return; }
         if (!RM && fresh) sc.vel = (-(b.y - a.y) / dt) * 1000;
       }
       root.classList.remove('w-dragging');
@@ -1573,6 +1580,14 @@ export async function initWander(host) {
     }
     if (mode === 'grid') {
       const sc = scrollOf(regionAt(e.clientX, e.clientY));
+      // 已经在顶上还往上滚：攒够一点就回主页（与主页往下滚进检索同一个手感）。
+      // 只认在顶上「重新起手」的那一下（与上一个滚动事件隔开一会儿）：滚上来时触控板的惯性冲到顶，不会顺势把人带回主页
+      const gap = e.timeStamp - lastWheel;
+      lastWheel = e.timeStamp;
+      if (dy < 0 && sc.target <= 0) {
+        if (gap > 220) topArmed = true;
+        if (topArmed) { topWheel -= dy; if (topWheel > 60) { topWheel = 0; topArmed = false; toHome(); return; } }
+      } else if (dy > 0 || sc.target > 0) { topWheel = 0; topArmed = false; }
       sc.vel = 0;
       sc.target = clamp(sc.target + dy, 0, sc.max);
       return;
@@ -1662,6 +1677,10 @@ export async function initWander(host) {
   host.querySelectorAll('.w-views button').forEach((b) => b.addEventListener('click', () => (b.dataset.view === 'grid' ? toGrid() : toExplore(lastCol >= 0 ? SC[lastCol] : scene))));
   /* 主页：从哪里往下走，就落到哪一栏（池子本来就偏在它将来那一栏的方向） */
   let homeWheel = 0;
+  /* 检索：顶上再往上滚回主页（见 wheel） */
+  let topWheel = 0;
+  let topArmed = false;
+  let lastWheel = -1e9;
   const homePick = (x) => (geo.horz ? 'essay' : SC[clamp(Math.floor((x / vw) * 3), 0, 2)]);
   /* 栏头：主页上是三个入口（悬停时那种夜色的池子涨起来、那个场景的窗亮起来）；点了就往下走、落进那一栏 */
   headEls.forEach((el, k) => {
@@ -1743,7 +1762,7 @@ export async function initWander(host) {
     ink.add(q('.w-home-kicker span'), { a: 0.72 });
     ink.add(q('.w-home-gate span'), { a: 0.85 });
     ink.add(q('.w-home-clock time'), { a: 0.62 });
-    host.querySelectorAll('.w-home-exits a').forEach((a) => ink.add(a, { a: 0.62 }));
+    host.querySelectorAll('.w-home-exits > a:not(.w-home-gate)').forEach((a) => ink.add(a, { a: 0.62 }));
     ink.add(q('.w-home-hint span'), { a: 0.62 });
     ink.add(chromeBrand);
     for (const el of headEls) {

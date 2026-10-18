@@ -276,8 +276,14 @@ export function initToolstar() {
   /* ── 帧循环 ── */
   let raf = 0;
   let lastStar = performance.now();
+  // 歇过之后重新起跑：第一帧按一帧算。否则歇着的那段时间整个记成 dt（封顶 0.1s），
+  // 一按下去星头一帧就跳过大半个 90°，看上去是抖一下而不是转过去
+  let fresh = true;
   function kick() {
-    if (!raf) raf = requestAnimationFrame(loop);
+    if (!raf) {
+      fresh = true;
+      raf = requestAnimationFrame(loop);
+    }
   }
   function loop(now: number) {
     raf = 0;
@@ -286,7 +292,9 @@ export function initToolstar() {
     // 星：开合 / 回正时每帧画；梦面里只是慢慢自转，降到约 24fps
     const dream = reality === 'dream' && !RM;
     if (Math.abs(ST.spinTo - ST.spin) > 0.05 || !dream || now - lastStar > 41) {
-      busy = drawStar(Math.min(0.1, (now - lastStar) / 1000), now) || busy;
+      const dt = fresh ? 1 / 60 : Math.min(0.1, Math.max(0, (now - lastStar) / 1000));
+      fresh = false;
+      busy = drawStar(dt, now) || busy;
       lastStar = now;
     }
     if (dream) busy = true;
