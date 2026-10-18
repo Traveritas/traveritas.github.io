@@ -14,8 +14,6 @@ export interface SpineState {
   dark: number;
   /** 开屏「从中心往两端画出」的进度，1 ＝ 画满 */
   reveal: number;
-  /** 骨架上一粒琥珀点 [弧长比例, 不透明度] */
-  dot: [number, number] | null;
   /** 振幅倍率 0..1（关于页退场：线收平成切面线）；1 ＝ 原样 */
   amp: number;
 }
@@ -29,7 +27,7 @@ interface Hub {
 
 const G = globalThis as typeof globalThis & { __eegSpine?: Hub };
 const hub: Hub = (G.__eegSpine ??= {
-  state: { xy: null, dark: 0, reveal: 1, dot: null, amp: 1 },
+  state: { xy: null, dark: 0, reveal: 1, amp: 1 },
   listeners: [],
 });
 

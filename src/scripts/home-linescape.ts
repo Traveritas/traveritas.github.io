@@ -424,13 +424,13 @@ export function initLinescape() {
     }
     if (!sp) return;
     const spLen = sp.len;
-    // 琥珀点与底线按「不含尾巴」的弧长比例取，换算到补过尾巴的骨架上
+    // 门（晨醒的琥珀点，.dawn-door）与底线按「不含尾巴」的弧长比例取，换算到补过尾巴的骨架上
     const at = (f: number) => (tail + (spLen - 2 * tail) * f) / spLen;
     const dotF = at(mq.matches ? 0.78 : 0.7);
     const key = `${pos.toFixed(4)}|${lift.toFixed(1)}|${reveal.toFixed(3)}|${dark.toFixed(3)}|${vw}x${vh}`;
     if (key !== lastSent) {
       lastSent = key;
-      setEegSpine({ xy, dark, reveal, dot: dawnDot > 0 ? [dotF, dawnDot] : null });
+      setEegSpine({ xy, dark, reveal });
     }
     /* 地形：只在开屏一带发；收拢到底（fold 1）发最后一次后 Worker 自己停下 */
     const fold = cl(pos / 0.3);
@@ -440,12 +440,26 @@ export function initLinescape() {
       terrain.postMessage({ type: 'state', xy: xy.slice(), fold, boot: t0 < 0 ? NaN : t0, anchors });
     }
     root.classList.toggle('ls-folded', fold > 0.5);
+    root.classList.toggle('dawn-door-on', dawnDot > 0.5);
     if (pos > 3.9) {
       const L = sp.L;
       const s = sp.len * at(0.72);
       let j = 1;
       while (j < L.length - 1 && L[j] < s) j++;
       setVar(root, '--base', `${(sp.xy[2 * j + 1] + lift).toFixed(1)}px`);
+      // 门（琥珀点）：同一条骨架上按弧长取点，换成舞台坐标（舞台随 lift 滚走，补回）
+      const d = sp.len * dotF;
+      let k = 1;
+      while (k < L.length - 1 && L[k] < d) k++;
+      const u = cl((d - L[k - 1]) / Math.max(1e-6, L[k] - L[k - 1]));
+      setVar(root, '--dot-x', `${lerp(sp.xy[2 * k - 2], sp.xy[2 * k], u).toFixed(1)}px`);
+      setVar(root, '--dot-y', `${(lerp(sp.xy[2 * k - 1], sp.xy[2 * k + 1], u) + lift).toFixed(1)}px`);
+      // 线在门处的走向（单位向量）：梦面里门沿它左右漂
+      const tx = sp.xy[2 * k] - sp.xy[2 * k - 2];
+      const ty = sp.xy[2 * k + 1] - sp.xy[2 * k - 1];
+      const tl = Math.hypot(tx, ty) || 1;
+      setVar(root, '--dot-ux', (tx / tl).toFixed(3));
+      setVar(root, '--dot-uy', (ty / tl).toFixed(3));
     }
     if (reveal < 1 && t0 >= 0) raf = requestAnimationFrame(frame);
   }
