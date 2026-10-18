@@ -1,0 +1,232 @@
+---
+/* ─────────────────────────────────────────────────────────────
+   NEXUS 的入口（/gate/；2026-10-18 替换关于页，/about/ 跳到这里）
+   只有一屏（没有页头页脚）：刚醒那一刻的天，一条平的切面线，线下是水，晶体立在线上，切片列沿线排开——关于页退场演出的终态，
+   现在是一整页。进门时按时间走一遍「线划开 → 水亮起 → 晶体从一个点长出来 → 切片由内向外 → NEXUS」
+   （src/scripts/gate-arrive.ts）；晶体与 NEXUS 字是同一个链接，点下去穿进切面、化白、进 NEXUS（nexus-door.ts）。
+   水面碎光与梦里切片的换形：about-decor.ts；晶体：components/about/NexusSlice.astro。
+   类名沿用 .about-*：那几支脚本按它们找元素。
+   说明文字（NEXUS 是什么、需要什么设备等）以后再加。
+   无脚本 / 减动效：没有进场，舞台就是静止的终态。
+   ───────────────────────────────────────────────────────────── */
+import BaseLayout from '../layouts/BaseLayout.astro';
+import NexusSlice from '../components/about/NexusSlice.astro';
+import { SLICES, VIEW, slicePaths } from '../scripts/about-slices';
+
+const slices = SLICES.map((s, k) => ({ s, k, p: slicePaths(s) }));
+const VB = `${-VIEW / 2} ${-VIEW / 2} ${VIEW} ${VIEW}`;
+---
+
+<BaseLayout title="NEXUS — Traveritas" description="通往 NEXUS 的门。" immersive bare bgm="reading">
+  <script is:inline>
+    if (!matchMedia('(prefers-reduced-motion: reduce)').matches) document.documentElement.classList.add('g-arrive');
+  </script>
+  <div class="about-stage">
+    <canvas class="about-water" aria-hidden="true"></canvas>
+    <div class="about-slices" aria-hidden="true">
+      {
+        slices.map(({ s, k, p }) => (
+          <svg
+            class="about-slice"
+            data-k={k}
+            data-i={s.i}
+            viewBox={VB}
+            style={`--side:${s.side};--o:${s.o.toFixed(4)};--w:${s.w.toFixed(4)};--a:${s.a.toFixed(3)}`}
+          >
+            <path class="bk" d={p.back} />
+            <path class="fr" d={p.front} />
+          </svg>
+        ))
+      }
+    </div>
+    <a class="about-crystal" href="/nexus/?from=blog">
+      <NexusSlice />
+      <span class="about-tag">NEXUS</span>
+    </a>
+  </div>
+</BaseLayout>
+
+<script>
+  import { initAboutDecor } from '../scripts/about-decor';
+  import { initNexusDoor } from '../scripts/nexus-door';
+  import { initGateArrive } from '../scripts/gate-arrive';
+  initAboutDecor();
+  initGateArrive();
+  initNexusDoor();
+</script>
+
+<style>
+  /* 只有这一屏：没有页头页脚（BaseLayout 的 bare），整页不滚 */
+  :global(html),
+  :global(body) {
+    height: 100%;
+    overflow: hidden;
+  }
+
+  /* ── 天：晶体折射出来的那个世界（nexus-slice.ts 的 env()）铺到整屏 ──
+     色值按 env() 沿屏幕纵向逐点算出：上方淡丁香，切面线略上方一道近白的地平亮带，下方偏紫的雾。
+     梦里天顶偏粉（与 env() 的 uDream 同步）。 */
+  .about-stage {
+    --size: clamp(240px, 42vmin, 440px);
+    --sky-wake: linear-gradient(
+      rgb(230 228 247) 0%,
+      rgb(237 234 247) 15%,
+      rgb(249 244 246) 30%,
+      rgb(255 255 255) 40%,
+      rgb(255 255 253) 48%,
+      rgb(254 247 245) 50%,
+      rgb(246 239 239) 53%,
+      rgb(230 222 227) 60%,
+      rgb(208 199 211) 70%,
+      rgb(199 190 204) 85%
+    );
+    --sky-dream: linear-gradient(rgb(240 230 242) 0%, rgb(244 235 243) 15%, rgb(251 244 245) 30%, transparent 40%);
+    position: relative;
+    isolation: isolate;
+    height: 100svh;
+    overflow: hidden;
+    pointer-events: none;
+    background: var(--sky-wake), rgb(199 190 204);
+  }
+
+  .about-stage::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: var(--sky-dream);
+    opacity: calc(1 - var(--reality-mix, 1));
+  }
+
+  /* 切面线：两端渐隐；进场时从中心划开（--line，gate-arrive.ts 写；没有进场时恒为 1） */
+  .about-stage::before {
+    content: '';
+    position: absolute;
+    left: 6%;
+    right: 6%;
+    top: 50%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(58, 64, 78, 0.5) 22%, rgba(58, 64, 78, 0.5) 78%, transparent);
+    transform: scaleX(var(--line, 1));
+  }
+
+  .about-crystal {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: var(--size);
+    aspect-ratio: 1;
+    transform: translate(-50%, -50%);
+  }
+
+  a.about-crystal {
+    display: block;
+    pointer-events: auto;
+    color: inherit;
+    text-decoration: none;
+    outline: none;
+  }
+
+  a.about-crystal[inert] {
+    pointer-events: none;
+  }
+
+  /* 悬停 / 聚焦：晶体微微浮起（投影留在原地、收小变淡）；停转由 nexus-slice.ts 接 */
+  a.about-crystal :global(.nexus-slice),
+  a.about-crystal :global(.ns-shade) {
+    transition:
+      transform 1.2s cubic-bezier(0.2, 0.7, 0.2, 1),
+      opacity 1.2s ease;
+  }
+
+  a.about-crystal:is(:hover, :focus-visible) :global(.nexus-slice) {
+    transform: translateY(calc(var(--size) * -0.035));
+  }
+
+  a.about-crystal:is(:hover, :focus-visible) :global(.ns-shade) {
+    transform: translateY(calc(var(--size) * 0.035)) scale(0.82);
+    opacity: 0.55;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    a.about-crystal:is(:hover, :focus-visible) :global(.nexus-slice),
+    a.about-crystal:is(:hover, :focus-visible) :global(.ns-shade) {
+      transform: none;
+    }
+  }
+
+  /* 水面：切面线以下半屏；碎光与水纹由 about-decor.ts 画 */
+  .about-water {
+    position: absolute;
+    left: 0;
+    top: 50%;
+    width: 100%;
+    height: 50%;
+    opacity: var(--water, 1);
+  }
+
+  /* 切片列：同一枚 24 胞体在别处的切面，沿线排开（about-slices.ts） */
+  .about-slices {
+    position: absolute;
+    inset: 0;
+    mask-image: linear-gradient(90deg, transparent 1%, #000 16%, #000 84%, transparent 99%);
+  }
+
+  .about-slice {
+    position: absolute;
+    top: 50%;
+    left: calc(50% + var(--side) * var(--o) * var(--size));
+    width: calc(var(--w) * var(--size));
+    aspect-ratio: 1;
+    overflow: visible;
+    transform: translate(-50%, -50%);
+  }
+
+  .about-slice path {
+    fill: none;
+    stroke: rgb(90 80 110 / calc(var(--a) * 0.35));
+    stroke-width: 0.8px;
+    stroke-linejoin: round;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .about-slice path.fr {
+    fill: rgb(255 255 255 / calc(var(--a) * 0.35));
+    stroke: rgb(90 80 110 / var(--a));
+    stroke-width: 0.9px;
+  }
+
+  .about-tag {
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + var(--size) * 0.06);
+    padding-left: 0.5em;
+    transform: translateX(-50%);
+    font: 10px/1 var(--font-mono);
+    letter-spacing: 0.5em;
+    white-space: nowrap;
+    color: var(--fg-faint);
+    transition:
+      color 0.6s ease,
+      letter-spacing 0.6s ease;
+  }
+
+  a.about-crystal:hover .about-tag,
+  a.about-crystal:focus-visible .about-tag {
+    color: var(--fg);
+    letter-spacing: 0.62em;
+  }
+
+  /* 进场（html.g-arrive，脚本起来前就由内联脚本打上）：晶体、切片、NEXUS 字、水面先收着，由 gate-arrive.ts 逐个放出来 */
+  :global(html.g-arrive) .about-crystal,
+  :global(html.g-arrive) .about-slice,
+  :global(html.g-arrive) .about-tag {
+    opacity: 0;
+  }
+
+  :global(html.g-arrive) .about-stage {
+    --line: 0;
+    --water: 0;
+    --grow: 0;
+  }
+</style>

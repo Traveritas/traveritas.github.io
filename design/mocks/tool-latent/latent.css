@@ -1,0 +1,300 @@
+/* ═══════════════════════════════════════════════════════════════
+   潜影 latent · 显影 develop
+   一件东西：一张还盖着乳剂的相纸。工具潜影在画面里。
+   动词：显影 / 褪回。
+
+   这个文件里没有一条边框、没有一个面板、没有一处玻璃。
+   工具与画面之间唯一的边界是浓度差：
+     每一处墨 = color-mix(它的本色 浓度%, 底色)
+   浓度 0 时它就是底色本身，浓度 100 时它是满墨。
+   推进靠 --spread 一个数，先后靠每件东西自己的 --d。
+   ═══════════════════════════════════════════════════════════════ */
+
+/* 三个可插值的数：
+   --spread 显影推进到哪（浓度） · --open 露出的范围（指针那一小片 → 整屏）
+   --devp   这一处此刻的浓度 */
+@property --spread { syntax: '<number>'; inherits: true; initial-value: 0; }
+@property --open { syntax: '<number>'; inherits: true; initial-value: 0; }
+@property --cdev { syntax: '<number>'; inherits: true; initial-value: 1; }
+@property --devp { syntax: '<percentage>'; inherits: true; initial-value: 100%; }
+
+.latent {
+  --spread: 0;
+  --open: 0;
+  --px: 50vw; --py: 50vh;          /* 显影的中心（指针落点 / 召唤来处） */
+  --patchR: 250px;                 /* 指针落点那一小片的半径 */
+  --diag: 1600px;                  /* 整屏对角线：--open 到 1 时铺满 */
+  --ramp: 0.45;                    /* 每件东西显影所占的那一段 */
+  --maskR: calc(var(--patchR) + var(--open) * (var(--diag) - var(--patchR)));
+
+  position: fixed; inset: 0; z-index: 40;
+  pointer-events: none;
+  /* 显影 0.8s，褪回灰 1.4s —— 两个方向不一样长 */
+  transition: --spread 0.8s var(--ease-soft), --open 0.8s var(--ease-soft);
+}
+.latent.is-retracting { transition-duration: 1.4s, 1.4s; }
+.latent.is-frozen { transition: none; }
+
+/* 每件东西的浓度：从底浓度长到满墨，按它自己的先后 */
+.latent .tk,
+.latent .node,
+.latent .core,
+.latent .trace {
+  --t: clamp(0, calc((var(--spread) - var(--d, 0)) / var(--ramp)), 1);
+  --devp: calc((var(--dev-base) + (var(--dev-full) - var(--dev-base)) * var(--t) * var(--w, 1) * var(--cdev, 1)) * 1%);
+  /* 本色 × 浓度：所有子元素都从这几个变量取墨，浓度一变整块一起褪 */
+  --ink: color-mix(in srgb, var(--fg) var(--devp), var(--bg));
+  --ink-soft: color-mix(in srgb, var(--soft) var(--devp), var(--bg));
+  --ink-faint: color-mix(in srgb, var(--soft) var(--devp), var(--bg));
+  --ink-anchor: color-mix(in srgb, var(--anchor) var(--devp), var(--bg));
+}
+
+/* ── 常驻的边缘痕：不是一条线，是一条浓度稍高的带 ─────────── */
+.trace {
+  --d: 0.34;
+  --w: 0.34;
+  --dev-base: 7.5;
+  position: absolute; right: 0; top: 0; bottom: 0; width: 96px;
+  background: linear-gradient(to left,
+    color-mix(in srgb, var(--fg) var(--devp), transparent) 0%,
+    color-mix(in srgb, var(--fg) var(--devp), transparent) 34%,
+    transparent 100%);
+  -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 24%, #000 76%, transparent 100%);
+  mask-image: linear-gradient(180deg, transparent 0%, #000 24%, #000 76%, transparent 100%);
+  animation: trace-breath 7s ease-in-out infinite;
+}
+@keyframes trace-breath { 0%, 100% { opacity: 0.72; } 50% { opacity: 1; } }
+
+/* 「这里可以」：一枚极小的琥珀微光，占的是锚点/焦点的身份 */
+.trace-dot {
+  position: absolute; right: 26px; top: 51%;
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--amber);
+  box-shadow: 0 0 10px 1px color-mix(in srgb, var(--amber) 50%, transparent);
+  opacity: 0.14;
+  animation: trace-dot 5.5s ease-in-out infinite;
+}
+@keyframes trace-dot { 0%, 100% { opacity: 0.1; } 50% { opacity: 0.34; } }
+.latent.is-edge-hot .trace-dot { opacity: 0.62; animation: none; }
+
+/* ── 那圈字与刻度 ─────────────────────────────────────────── */
+.ring { position: absolute; inset: 0; }
+.ring-field {
+  position: absolute; inset: 0;
+  -webkit-mask-image: radial-gradient(circle var(--maskR) at var(--px) var(--py),
+    rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 1) 62%, rgba(0, 0, 0, 0) 100%);
+  mask-image: radial-gradient(circle var(--maskR) at var(--px) var(--py),
+    rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 1) 62%, rgba(0, 0, 0, 0) 100%);
+}
+
+/* 刻度：六十枚，每五枚一枚字。刻度不是线，是一小段浓度。 */
+.tk {
+  --tl: 5px;
+  --w: 0.45;
+  position: absolute; width: 1px; height: var(--tl);
+  margin-left: -0.5px;
+  background: var(--ink);
+  transform-origin: 50% 0;
+  transform: rotate(var(--rot)) translateY(-100%);
+}
+.tk.is-major { --tl: 10px; --w: 1; width: 1.5px; margin-left: -0.75px; }
+.tk.is-passed { --w: 1; }
+
+/* 字：中文小标签走正文体，英文走 mono —— Plex Mono 没有中文字形 */
+.node {
+  --w: 1;
+  position: absolute;
+  display: inline-flex; align-items: baseline; gap: 0.4em;
+  padding: 0.34rem 0.55rem;
+  border: 0; background: none; font: inherit;
+  white-space: nowrap; cursor: pointer;
+  color: var(--ink);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  transition: color 0.4s var(--ease-soft);
+}
+.latent.is-live .node { pointer-events: auto; }
+.node-cn { font-family: var(--font-body); font-size: 0.7rem; letter-spacing: 0.16em; }
+.node-en { font-size: 0.54rem; letter-spacing: 0.24em; opacity: 0.72; }
+.node:hover, .node:focus-visible { color: var(--fg); outline: none; }
+.node:hover .node-cn, .node:focus-visible .node-cn, .node.is-on .node-cn { color: var(--fg); }
+.node:focus-visible { box-shadow: 0 0 0 1px color-mix(in srgb, var(--amber) 60%, transparent); }
+
+/* 刻 · 游标：环上那一枚琥珀点，位置 = 进度 */
+.cursor {
+  position: absolute; width: 6px; height: 6px; margin: -3px 0 0 -3px;
+  border-radius: 50%; background: var(--amber);
+  box-shadow: 0 0 9px 1px color-mix(in srgb, var(--amber) 50%, transparent);
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+.latent.is-live .cursor { opacity: 0.92; }
+
+/* ── 展开：字从灰里浮出来，仍然没有底、没有框 ────────────── */
+.core {
+  --d: 0.06;
+  --w: 1;
+  position: absolute; left: 50%; top: 50%;
+  width: var(--coreW, 380px); max-height: var(--coreH, 380px);
+  transform: translate(-50%, -50%);
+  overflow: auto; overscroll-behavior: contain; scrollbar-width: none;
+  color: var(--ink);
+  pointer-events: none;
+  transition: --cdev 0.55s var(--ease-soft);
+}
+.core::-webkit-scrollbar { display: none; }
+.latent.is-live .core { pointer-events: auto; }
+
+/* 窄屏：里面那块不在环心里，摊在环下面 */
+.latent[data-mobile='1'] .core {
+  top: var(--coreTop, 60%);
+  transform: translate(-50%, 0);
+}
+
+.core-h {
+  display: block; margin: 0 0 0.75rem;
+  font-family: var(--font-body);
+  font-size: 0.55rem; letter-spacing: 0.28em; color: var(--ink-anchor);
+}
+.core-line { margin: 0 0 0.85rem; font-size: 0.62rem; letter-spacing: 0.14em; color: var(--ink-soft); }
+.core-quiet { margin: 0.9rem 0 0; font-size: 0.62rem; letter-spacing: 0.1em; color: var(--ink-faint); }
+
+.core-find { display: block; }
+.core-find input {
+  width: 100%; padding: 0.4rem 0 0.5rem;
+  border: 0; border-bottom: 1px solid color-mix(in srgb, var(--fg) var(--devp), transparent);
+  background: none; font: inherit; font-family: var(--font-body); font-size: 0.92rem;
+  color: var(--fg); outline: none;
+}
+.core-find input::placeholder { color: var(--ink-faint); }
+.core-find input:focus { border-bottom-color: color-mix(in srgb, var(--amber) 70%, transparent); }
+
+.core-list { display: flex; flex-direction: column; margin-top: 0.8rem; }
+.core-item {
+  display: flex; align-items: baseline; gap: 0.6rem;
+  padding: 0.4rem 0; border: 0; background: none; font: inherit;
+  text-align: left; cursor: pointer; color: var(--ink);
+}
+.core-item + .core-item { border-top: 1px solid color-mix(in srgb, var(--fg) 8%, transparent); }
+.core-item-t {
+  font-family: var(--font-display); font-size: 0.86rem; line-height: 1.5; color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.core-item-s { margin-left: auto; font-size: 0.55rem; letter-spacing: 0.16em; color: var(--ink-faint); flex: none; }
+.core-item:hover .core-item-t { color: var(--fg); }
+.core-item.is-dim { opacity: 0.28; }
+
+.core-set { display: flex; align-items: center; justify-content: space-between; font-size: 0.78rem; color: var(--ink-soft); }
+.core-set + .core-set { margin-top: 0.5rem; }
+.core-seg { display: inline-flex; }
+.core-seg button {
+  min-width: 2.2rem; padding: 0.2rem 0.55rem;
+  border: 0; border-bottom: 1px solid transparent; background: none;
+  font: inherit; font-family: var(--font-display); font-size: 0.78rem;
+  color: var(--ink-soft); cursor: pointer;
+}
+.core-seg button:hover { color: var(--fg); }
+.core-seg button[aria-pressed='true'] { color: var(--fg); border-bottom-color: var(--amber); }
+
+.core-chips { display: flex; flex-wrap: wrap; gap: 0.42rem; }
+.core-chip {
+  display: inline-flex; align-items: baseline; gap: 0.35em;
+  padding: 0.16rem 0.5rem 0.12rem;
+  border: 0; background: none; cursor: pointer;
+  font: inherit; font-size: 0.7rem; letter-spacing: 0.06em;
+  color: var(--ink-soft);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fg) 14%, transparent);
+}
+.core-chip i { font-style: normal; font-size: 0.86em; opacity: 0.6; }
+.core-chip:hover { color: var(--fg); }
+.core-chip[aria-pressed='true'] { color: var(--fg); box-shadow: inset 0 0 0 1px var(--amber); }
+
+.core-toc { display: flex; flex-direction: column; }
+.core-toc-item {
+  display: block; padding: 0.26rem 0; border: 0; background: none; font: inherit;
+  text-align: left; cursor: pointer;
+  font-family: var(--font-display); font-size: 0.84rem; line-height: 1.55; color: var(--ink-soft);
+}
+.core-toc-item.is-sub { padding-left: 1rem; font-size: 0.78rem; }
+.core-toc-item:hover { color: var(--fg); }
+.core-toc-item[aria-current='true'] { color: var(--fg); border-left: 1px solid var(--amber); padding-left: 0.5rem; }
+
+.core-links { display: flex; flex-wrap: wrap; gap: 1.1rem; }
+.core-links a {
+  font-size: 0.8rem; color: var(--ink-soft); text-decoration: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--amber) 50%, transparent); padding-bottom: 0.15em;
+}
+.core-links a:hover { color: var(--fg); }
+
+.core-clock { font-size: 2.1rem; letter-spacing: 0.06em; color: var(--ink); line-height: 1; }
+
+/* 刻 · 把整夜的进度摊成一小排刻度，点哪一枚就落到哪一处 */
+.core-scrub { display: flex; align-items: flex-end; gap: 2px; margin-top: 1.1rem; }
+.core-scrub button {
+  width: 3px; height: 14px; padding: 0; border: 0; cursor: pointer;
+  background: var(--ink-faint); opacity: 0.5;
+}
+.core-scrub button.is-passed { background: var(--ink); opacity: 1; }
+.core-scrub button:hover { background: var(--amber); opacity: 1; }
+
+.core-scenes { display: flex; flex-direction: column; }
+.core-scene {
+  display: flex; align-items: baseline; gap: 0.7rem;
+  padding: 0.42rem 0; border: 0; background: none; font: inherit; text-align: left;
+  cursor: pointer; color: var(--ink-soft);
+}
+.core-scene + .core-scene { border-top: 1px solid color-mix(in srgb, var(--fg) 8%, transparent); }
+.core-scene-n { font-family: var(--font-display); font-size: 0.95rem; }
+.core-scene-b { font-size: 0.54rem; letter-spacing: 0.2em; color: var(--ink-faint); }
+.core-scene-c { margin-left: auto; font-size: 0.62rem; color: var(--ink-faint); }
+.core-scene:hover .core-scene-n { color: var(--fg); }
+.core-scene.is-on .core-scene-n { color: var(--fg); }
+.core-scene.is-on { box-shadow: inset 2px 0 0 var(--amber); }
+
+/* 按住换面：一圈自己显影出来的进度 */
+.core-hold { display: grid; place-items: center; gap: 0.9rem; }
+.hold-ring {
+  width: 88px; height: 88px; border-radius: 50%;
+  background: conic-gradient(var(--amber) calc(var(--hold, 0) * 1turn),
+    color-mix(in srgb, var(--fg) 12%, transparent) 0);
+  -webkit-mask: radial-gradient(circle, transparent 0 32px, #000 33px);
+  mask: radial-gradient(circle, transparent 0 32px, #000 33px);
+}
+.hold-word { font-family: var(--font-display); font-size: 1rem; color: var(--ink); }
+
+/* 声 · 电平 */
+.core-wave { display: flex; align-items: flex-end; gap: 3px; height: 30px; }
+.core-wave i { display: block; width: 2px; height: 4px; background: color-mix(in srgb, var(--fg) 26%, transparent); }
+html[data-sound='on'] .core-wave i { background: var(--amber); animation: wave 2.4s ease-in-out infinite alternate; }
+.core-wave i:nth-child(2) { animation-delay: -0.7s; }
+.core-wave i:nth-child(3) { animation-delay: -1.4s; }
+.core-wave i:nth-child(4) { animation-delay: -2.1s; }
+.core-wave i:nth-child(5) { animation-delay: -0.35s; }
+@keyframes wave { from { height: 4px; } to { height: 26px; } }
+
+/* 说给读屏的那一句（视觉上不出现） */
+.say {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+  overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0;
+}
+
+/* ── 窄屏：环缩到能放下，字只留中文 ───────────────────────── */
+@media (max-width: 640px) {
+  .node-en { display: none; }
+  .node { padding: 0.42rem 0.4rem; }
+  .node-cn { font-size: 0.66rem; letter-spacing: 0.08em; }
+  .trace { width: 54px; }
+  .trace-dot { right: 15px; }
+  .core-clock { font-size: 1.5rem; }
+  .hold-ring { width: 66px; height: 66px;
+    -webkit-mask: radial-gradient(circle, transparent 0 24px, #000 25px);
+    mask: radial-gradient(circle, transparent 0 24px, #000 25px); }
+}
+
+/* ── 减动效：动词退成直接显示 ─────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .latent, .latent.is-retracting { transition: none; }
+  .trace { animation: none; opacity: 1; }
+  .trace-dot { animation: none; opacity: 0.24; }
+  .core-wave i { animation: none; height: 12px; }
+}

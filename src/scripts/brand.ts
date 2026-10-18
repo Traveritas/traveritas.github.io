@@ -34,10 +34,16 @@ const FADE_DUR_MS = 180;
 const SETTLED = 0.02;
 const SETTLE_POLL_MS = 240;
 
+/* 那片空间里大字的「反相窗」按文本烘字形遮罩（wander/inverse.js）：换一个词就得换一张。
+   词表对外给一份，让它起步后在空闲时先烘好，梦态里每次换词就不会卡一下。 */
+export const BRAND_WORDS: string[] = [WAKE_WORD, ...CYCLE_WORDS];
+
+/* 页上每一处字标各自一台：站头的 .brand，以及那片空间里的 [data-brand]（左上角的小字、主页的大字） */
 export function initBrand() {
-  const brand = document.querySelector<HTMLElement>('.brand');
-  if (!brand) return;
-  const el = brand;
+  document.querySelectorAll<HTMLElement>('.brand, [data-brand]').forEach(wire);
+}
+
+function wire(el: HTMLElement) {
 
   const RM = reducedMotion();
   let step = 0;

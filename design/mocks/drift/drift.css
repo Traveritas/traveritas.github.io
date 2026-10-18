@@ -1,0 +1,317 @@
+/* ─────────────────────────────────────────────────────────────
+   浮游碎片 · 样式
+   ───────────────────────────────────────────────────────────── */
+@font-face { font-family: 'IBM Plex Mono'; font-weight: 400; font-display: swap; src: url('/fonts/plex/ibm-plex-mono-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'IBM Plex Mono'; font-weight: 500; font-display: swap; src: url('/fonts/plex/ibm-plex-mono-latin-500-normal.woff2') format('woff2'); }
+
+:root {
+  --font-display: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', SimSun, serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
+  --amber: #d9a05b;
+  --ease: cubic-bezier(0.32, 0.72, 0, 1);
+}
+/* 场景色：底色（无 WebGL 时的退路）、外框墨色、阅读面板 */
+html[data-scene='essay'] { --sweep: 217 160 91; --bg: #c6ced9; --bg2: #e3e6ec; --fg: #232830; --soft: #56606d; --faint: #8a94a2; --ink: #765640; --panel: 244 246 250; --panel-a: 0.92; --lit: 255 255 255; --chrome: #2b3038; }
+html[data-scene='project'] { --sweep: 150 205 218; --bg: #0d1524; --bg2: #24485a; --fg: #e6e9ef; --soft: #a2b0c2; --faint: #6f8199; --ink: #c9a77e; --panel: 22 33 50; --panel-a: 0.93; --lit: 150 205 218; --chrome: #dfe6ee; }
+html[data-scene='moment'] { --sweep: 240 186 150; --bg: #1d1729; --bg2: #6a4458; --fg: #efe8f3; --soft: #b9aac8; --faint: #857895; --ink: #e0aa86; --panel: 44 33 58; --panel-a: 0.93; --lit: 240 186 150; --chrome: #efe6f2; }
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-display);
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 0.9s ease;
+}
+
+/* 流光：低分辨率画布按像素放大 */
+#light {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+#light.no-gl { background: radial-gradient(ellipse at 30% 30%, var(--bg2), var(--bg) 70%); }
+
+#stage {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  touch-action: none;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+html.dragging #stage { cursor: grabbing; }
+#drift { position: absolute; inset: 0; transition: opacity 0.5s ease, filter 0.5s ease; }
+html.reading #drift { opacity: 0.5; }
+/* 长大 / 成页：周围碎片的让位本身是看点，别压得太暗 */
+html.reading[data-open='grow'] #drift, html.reading[data-open='page'] #drift { opacity: 0.82; }
+
+/* 一块碎片：画好的卡片图；失焦档用 pixelated 放大 */
+.frag {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 50% 50%;
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  will-change: transform, opacity;
+  cursor: pointer;
+}
+.frag:not([data-lod='0']) { image-rendering: pixelated; }
+html[data-hover='pull'] .frag.hot { filter: brightness(1.06) drop-shadow(0 0 22px rgb(var(--lit) / 0.4)); }
+html[data-hover='lean'] .frag.hot { filter: brightness(1.04); }
+
+/* 场景里的装饰：和碎片同处一层叠放上下文，才能按景深交错 */
+#deco { position: absolute; inset: 0; pointer-events: none; }
+.deco {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 50% 50%;
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  will-change: transform, opacity;
+}
+.deco:not([data-lod='0']) { image-rendering: pixelated; }
+html.reading #deco { opacity: 0.6; }
+
+/* 扫光：一道像素光带沿 14° 扫过卡面（12 步跳进），扫完边缘留一道亮线 */
+.frag::after {
+  content: '';
+  position: absolute;
+  inset: var(--m, 0px);
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(104deg, transparent 0 40%, rgb(var(--sweep) / 0.12) 40% 43%, rgb(var(--sweep) / 0.3) 43% 47%, rgb(var(--sweep) / 0.12) 47% 50%, transparent 50% 100%);
+  background-size: 320% 100%;
+  background-position: 100% 0;
+}
+html[data-hover='sweep'] .frag.hot::after {
+  opacity: 1;
+  box-shadow: inset 0 0 0 1px rgb(var(--sweep) / 0.75);
+  animation: sweep 0.72s steps(12, end) forwards;
+}
+html[data-hover='sweep'][data-look='glow'] .frag.hot::after { box-shadow: none; }
+@keyframes sweep { from { background-position: 100% 0; } to { background-position: 0% 0; } }
+
+/* 厚玻璃：后面的流光透过来、更清楚一点；外形按像素阶梯裁 */
+html[data-look='slab'] .frag {
+  -webkit-backdrop-filter: blur(1.5px) saturate(1.35) brightness(1.08) contrast(1.08);
+  backdrop-filter: blur(1.5px) saturate(1.35) brightness(1.08) contrast(1.08);
+  clip-path: polygon(9px 0, calc(100% - 9px) 0, calc(100% - 9px) 3px, calc(100% - 6px) 3px, calc(100% - 6px) 6px, calc(100% - 3px) 6px, calc(100% - 3px) 9px, 100% 9px, 100% calc(100% - 9px), calc(100% - 3px) calc(100% - 9px), calc(100% - 3px) calc(100% - 6px), calc(100% - 6px) calc(100% - 6px), calc(100% - 6px) calc(100% - 3px), calc(100% - 9px) calc(100% - 3px), calc(100% - 9px) 100%, 9px 100%, 9px calc(100% - 3px), 6px calc(100% - 3px), 6px calc(100% - 6px), 3px calc(100% - 6px), 3px calc(100% - 9px), 0 calc(100% - 9px), 0 9px, 3px 9px, 3px 6px, 6px 6px, 6px 3px, 9px 3px);
+}
+
+#veil {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: rgb(var(--panel));
+  opacity: 0;
+  z-index: 5;
+}
+
+/* ══ 聚焦：四道细线角从四方浮出来框住那一块 ══
+   屏幕空间的一层，不跟碎片一起缩放——1px 的线在近处远处都该是 1px。 */
+#focus { position: fixed; inset: 0; pointer-events: none; z-index: 6; transition: opacity 0.3s ease; }
+#focus .fc { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+#focus .fc i {
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  opacity: 0;
+  transform: translate(var(--ox, 0), var(--oy, 0));
+  transition: opacity 0.34s ease, transform 0.52s var(--ease);
+  transition-delay: var(--d, 0ms);
+  /* 细线是浅色的（像光），但随笔是近白底——给一层暗晕，两种底上都立得住 */
+  filter: drop-shadow(1px 1px 0 rgb(var(--chrome) / 0.3));
+}
+#focus .fc.on i { opacity: 1; transform: translate(0, 0); }
+#focus .fc i:nth-child(1) { left: -12px; top: -12px; border-left: 1px solid rgb(var(--lit) / 0.75); border-top: 1px solid rgb(var(--lit) / 0.75); }
+#focus .fc i:nth-child(2) { right: -12px; top: -12px; border-right: 1px solid rgb(var(--lit) / 0.75); border-top: 1px solid rgb(var(--lit) / 0.75); }
+#focus .fc i:nth-child(3) { right: -12px; bottom: -12px; border-right: 1px solid rgb(var(--lit) / 0.75); border-bottom: 1px solid rgb(var(--lit) / 0.75); }
+#focus .fc i:nth-child(4) { left: -12px; bottom: -12px; border-left: 1px solid rgb(var(--lit) / 0.75); border-bottom: 1px solid rgb(var(--lit) / 0.75); }
+html.reading #focus { opacity: 0; }
+
+/* ══ 外框 ══ */
+.chrome { position: fixed; inset: 0 0 auto; height: 0; z-index: 30; color: var(--chrome); }
+.brand {
+  position: absolute;
+  left: 28px;
+  top: 24px;
+  font: 500 16px/1 var(--font-display);
+  letter-spacing: 0.14em;
+  color: inherit;
+  text-decoration: none;
+}
+.scenes {
+  position: absolute;
+  left: 50%;
+  top: 18px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  background: rgb(var(--panel) / 0.32);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  /* 像素阶梯切角，与碎片同一种边 */
+  clip-path: polygon(6px 0, calc(100% - 6px) 0, calc(100% - 6px) 2px, calc(100% - 4px) 2px, calc(100% - 4px) 4px, calc(100% - 2px) 4px, calc(100% - 2px) 6px, 100% 6px, 100% calc(100% - 6px), calc(100% - 2px) calc(100% - 6px), calc(100% - 2px) calc(100% - 4px), calc(100% - 4px) calc(100% - 4px), calc(100% - 4px) calc(100% - 2px), calc(100% - 6px) calc(100% - 2px), calc(100% - 6px) 100%, 6px 100%, 6px calc(100% - 2px), 4px calc(100% - 2px), 4px calc(100% - 4px), 2px calc(100% - 4px), 2px calc(100% - 6px), 0 calc(100% - 6px), 0 6px, 2px 6px, 2px 4px, 4px 4px, 4px 2px, 6px 2px);
+}
+.scenes button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: 500 13px/1 var(--font-display);
+  letter-spacing: 0.3em;
+  padding: 10px 14px 10px 18px;
+  cursor: pointer;
+  opacity: 0.55;
+  transition: opacity 0.3s ease, background-color 0.3s ease;
+}
+.scenes button[aria-pressed='true'] { opacity: 1; background: rgb(var(--lit) / 0.16); }
+.scenes button:hover { opacity: 0.9; }
+.scenes button:focus-visible { outline: 1px solid var(--amber); outline-offset: -3px; }
+html.reading .scenes, html.reading .brand { opacity: 0; pointer-events: none; }
+.brand { transition: opacity 0.4s ease; }
+.scenes { transition: opacity 0.4s ease; }
+
+/* ══ 阅读层 ══ */
+.rd { position: fixed; inset: 0; z-index: 20; }
+.rd-shell {
+  position: absolute;
+  transform-origin: 0 0;
+  /* 同一套像素阶梯边，台阶大一档 */
+  clip-path: polygon(12px 0, calc(100% - 12px) 0, calc(100% - 12px) 4px, calc(100% - 8px) 4px, calc(100% - 8px) 8px, calc(100% - 4px) 8px, calc(100% - 4px) 12px, 100% 12px, 100% calc(100% - 12px), calc(100% - 4px) calc(100% - 12px), calc(100% - 4px) calc(100% - 8px), calc(100% - 8px) calc(100% - 8px), calc(100% - 8px) calc(100% - 4px), calc(100% - 12px) calc(100% - 4px), calc(100% - 12px) 100%, 12px 100%, 12px calc(100% - 4px), 8px calc(100% - 4px), 8px calc(100% - 8px), 4px calc(100% - 8px), 4px calc(100% - 12px), 0 calc(100% - 12px), 0 12px, 4px 12px, 4px 8px, 8px 8px, 8px 4px, 12px 4px);
+}
+.rd-glass {
+  position: absolute;
+  inset: 0;
+  background: rgb(var(--panel) / var(--panel-a));
+  backdrop-filter: blur(18px) saturate(1.1);
+  -webkit-backdrop-filter: blur(18px) saturate(1.1);
+  box-shadow: inset 0 2px 0 rgb(var(--lit) / 0.45); /* 只留迎光的上沿：阶梯切角会把两侧的线截成断头 */
+}
+.rd-scroll { position: absolute; inset: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--fg) 22%, transparent) transparent; }
+.rd-col { padding: 72px clamp(22px, 7%, 64px) 96px; font-size: 17px; }
+.rd-close {
+  position: absolute;
+  left: 50%;
+  top: 22px;
+  transform: translateX(-50%);
+  appearance: none;
+  border: 0;
+  padding: 9px 18px;
+  background: rgb(var(--panel) / 0.5);
+  color: var(--chrome);
+  font: 500 13px/1 var(--font-display);
+  letter-spacing: 0.3em;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+}
+.rd-close:focus-visible { outline: 1px solid var(--amber); }
+
+.rd-meta { margin: 0; display: flex; flex-wrap: wrap; gap: 6px 18px; font: 400 11px/1.6 var(--font-mono); letter-spacing: 0.16em; color: var(--faint); }
+.rd-meta .sec { color: var(--ink); letter-spacing: 0.28em; }
+.rd-title { margin: 22px 0 0; font: 500 36px/1.4 var(--font-display); letter-spacing: 0.03em; text-wrap: balance; }
+.rd-title.small { font-size: 26px; margin-top: 14px; }
+.rd-title:focus { outline: none; }
+.rd-lede { margin: 18px 0 0; font: 400 16px/1.9 var(--font-display); color: var(--soft); }
+.rd-rule { margin: 40px 0 0; height: 2px; width: 72px; border: 0; background: rgb(var(--lit) / 0.6); }
+.rd-big { margin: 30px 0 0; font: 500 22px/1.8 var(--font-display); }
+.rd-text { margin: 14px 0 0; font: 400 16px/1.9 var(--font-display); color: var(--soft); }
+.rd-text.ink { color: var(--ink); }
+.rd-note { margin: 40px 0 0; color: var(--ink); font-size: 15px; }
+.rd-links { list-style: none; padding: 0; margin: 22px 0 0; display: flex; gap: 18px; flex-wrap: wrap; font: 400 12px/1.6 var(--font-mono); letter-spacing: 0.1em; }
+.rd-links a { color: var(--ink); text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--ink) 40%, transparent); }
+.rd-fig { margin: 0 0 22px; }
+.rd-img { display: block; width: 100%; height: auto; image-rendering: auto; }
+.rd-sibs { display: flex; gap: 8px; margin: -8px 0 22px; }
+.rd-sibs button { appearance: none; border: 0; padding: 0; width: 64px; height: 42px; cursor: pointer; opacity: 0.5; background: none; }
+.rd-sibs button[aria-current='true'] { opacity: 1; outline: 2px solid rgb(var(--lit) / 0.8); outline-offset: 2px; }
+.rd-sibs img { width: 100%; height: 100%; object-fit: cover; image-rendering: pixelated; }
+
+/* 长大 / 成页：面板里钉着碎片自己的画面，宽度跟面板走 */
+.rd-card { position: absolute; z-index: 3; left: 0; top: 0; width: 100%; background-size: 100% 100%; pointer-events: none; }
+
+/* 跳焦展开：碎片的画面铺在面板上，一档档换 */
+.rd-px { position: absolute; z-index: 3; background-size: 100% 100%; image-rendering: pixelated; pointer-events: none; }
+.rd-px[data-lod='0'] { image-rendering: auto; }
+
+/* 成页：一页偏暖的纸，墨色压深 */
+.rd-page .rd-glass { background: #f2ece2; backdrop-filter: none; -webkit-backdrop-filter: none; box-shadow: inset 0 2px 0 rgb(255 255 255 / 0.8), 0 30px 60px -20px rgb(0 0 0 / 0.45); }
+.rd-page .rd-col { --fg: #2c2721; --soft: #5e554b; --faint: #978c7f; --ink: #8a5a3a; --lit: 138 90 58; color: #2c2721; }
+
+/* 正文（沿用站内阅读排版的要点） */
+.md { margin-top: 40px; font: 400 17px/2 var(--font-display); color: var(--fg); text-align: justify; text-justify: inter-ideograph; }
+.md p { margin: 0 0 1.3em; }
+.md h2 { margin: 2.4em 0 1em; font: 500 22px/1.5 var(--font-display); letter-spacing: 0.04em; text-align: left; display: flex; align-items: baseline; gap: 14px; }
+.md h2 .ord { font: 400 11px/1 var(--font-mono); letter-spacing: 0.16em; color: var(--ink); }
+.md h3 { margin: 2em 0 0.8em; font: 500 18px/1.6 var(--font-display); }
+.md strong { font-weight: 600; }
+.md code { font: 400 0.84em/1 var(--font-mono); border-bottom: 1px solid color-mix(in srgb, var(--ink) 60%, transparent); }
+.md a { color: var(--ink); text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--ink) 40%, transparent); }
+.md blockquote { margin: 1.6em 0; padding: 0.2em 0 0.2em 1.3em; border-left: 2px solid rgb(var(--lit) / 0.6); color: var(--soft); }
+.md ul, .md ol { padding-left: 1.4em; margin: 0 0 1.3em; text-align: left; }
+.md pre { margin: 1.6em 0; padding: 16px 18px; overflow-x: auto; background: color-mix(in srgb, var(--fg) 5%, transparent); font: 400 13px/1.8 var(--font-mono); text-align: left; }
+.md pre code { border: 0; }
+.md table { width: 100%; border-collapse: collapse; margin: 1.6em 0; font-size: 14px; }
+.md th, .md td { text-align: left; padding: 8px 10px 8px 0; border-bottom: 1px solid color-mix(in srgb, var(--fg) 12%, transparent); }
+.md [data-side='dream'], .md .dual [data-d], [data-d] { display: none; }
+.md img { max-width: 100%; }
+
+.nojs { position: fixed; inset: 0; display: grid; place-items: center; margin: 0; padding: 24px; text-align: center; font: 500 16px/1.8 var(--font-display); }
+
+@media (max-width: 640px) {
+  .brand { left: 18px; top: 72px; font-size: 14px; }
+  .scenes { top: 14px; }
+  .scenes button { padding: 10px 10px 10px 14px; letter-spacing: 0.22em; }
+  .rd-title { font-size: 28px; }
+  .rd-col { padding-top: 64px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+}
+
+/* ══ 变体面板（原型调试用）══ */
+#vpanel {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  z-index: 40;
+  font: 400 11px/1.4 var(--font-mono);
+  letter-spacing: 0.06em;
+  color: var(--chrome);
+  opacity: 0.55;
+  transition: opacity 0.25s ease;
+  display: flex;
+  flex-direction: column-reverse; /* 面板体在按钮上方展开 */
+  align-items: flex-end;
+}
+#vpanel:hover, #vpanel.open, #vpanel:focus-within { opacity: 0.92; }
+#vpanel .vp-toggle {
+  display: block;
+  margin-left: auto;
+  appearance: none;
+  border: 0;
+  padding: 6px 10px;
+  background: rgb(var(--panel) / 0.45);
+  backdrop-filter: blur(8px);
+  color: inherit;
+  font: inherit;
+  letter-spacing: 0.2em;
+  cursor: pointer;
+}
+#vpanel .vp-body { display: none; margin-bottom: 6px; padding: 8px 10px; background: rgb(var(--panel) / 0.78); backdrop-filter: blur(10px); }
+#vpanel.open .vp-body { display: block; }
+#vpanel .vp-row { display: flex; align-items: baseline; gap: 4px; padding: 3px 0; }
+#vpanel .vp-row > span { width: 3.4em; opacity: 0.6; font-family: var(--font-display); }
+#vpanel a { color: inherit; text-decoration: none; padding: 2px 6px; opacity: 0.6; font-family: var(--font-display); }
+#vpanel a:hover { opacity: 1; }
+#vpanel a[aria-current='true'] { opacity: 1; background: rgb(var(--lit) / 0.22); }
+html.reading #vpanel { opacity: 0; pointer-events: none; }

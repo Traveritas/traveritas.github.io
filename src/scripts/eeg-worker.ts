@@ -104,8 +104,8 @@ function pointAt(s: number): [number, number] {
 function glow(s: number, R: number, a: number) {
   const [x, y] = pointAt(s);
   const g = ctx.createRadialGradient(x, y, 0, x, y, R);
-  g.addColorStop(0, `rgba(217,160,91,${a})`);
-  g.addColorStop(1, 'rgba(217,160,91,0)');
+  g.addColorStop(0, `rgba(154,134,196,${a})`);
+  g.addColorStop(1, 'rgba(154,134,196,0)');
   ctx.fillStyle = g;
   ctx.beginPath();
   ctx.arc(x, y, R, 0, Math.PI * 2);
@@ -175,7 +175,7 @@ let mainStr: string | null = null;
 const echoStr: (string | null)[] = Array.from({ length: EEG_ECHO_COUNT }, () => null);
 const ROT_C = Math.cos((14 * Math.PI) / 180);
 const ROT_S = Math.sin((14 * Math.PI) / 180);
-const GLOW_RGB = [217, 160, 91];
+const GLOW_RGB = [154, 134, 196];
 
 /** 一串 d（只有绝对坐标的 M / L / H / V）→ 场景里的一条折线 */
 function addPath(str: string): number {

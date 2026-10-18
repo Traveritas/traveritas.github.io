@@ -1,0 +1,633 @@
+/* ─────────────────────────────────────────────────────────────
+   解析度 · 原型样式
+   层次（自下而上）：底色场画布 0 → 薄片 / 封面 / 取景角（z auto）
+   → 塌缩层画布 2 → 一切文字 .t（3）→ 控制条 10。
+   卡片与行都不建层叠上下文（不用 transform / opacity / backdrop-filter），
+   文字才能越过塌缩层，始终全分辨率。
+   ───────────────────────────────────────────────────────────── */
+
+:root {
+  --font-display: 'Noto Serif SC', 'Noto Serif JP', 'Palatino Linotype', Palatino, Georgia, 'Songti SC', serif;
+  --font-body: system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, 'Microsoft YaHei UI', monospace;
+
+  --amber: #a7b1ba;
+  --umber: #556270;
+  --ink-hi: var(--umber);
+}
+
+html[data-reality='dream'] {
+  --amber: #d9a05b;
+  --umber: #765640;
+}
+
+/* 浅梦 · 23:19 */
+html[data-hour='shallow'] {
+  color-scheme: light;
+  --bg: rgb(225 231 239);
+  --bg-sunken: rgb(214 221 231);
+  --fg: rgb(35 40 48);
+  --fg-soft: rgb(86 96 109);
+  --fg-faint: rgb(134 144 158);
+  --line: rgb(35 40 48 / 0.12);
+  --glass: rgb(255 255 255 / 0.5);
+  --glass-edge: rgb(255 255 255 / 0.85);
+  --glass-sh: 0 14px 34px -16px rgb(38 44 51 / 0.12);
+}
+
+/* 深眠 · 01:11 */
+html[data-hour='deep'] {
+  color-scheme: dark;
+  --bg: rgb(20 27 41);
+  --bg-sunken: rgb(14 20 31);
+  --fg: rgb(230 233 239);
+  --fg-soft: rgb(154 166 184);
+  --fg-faint: rgb(108 120 138);
+  --line: rgb(230 233 239 / 0.15);
+  --glass: rgb(165 180 215 / 0.1);
+  --glass-edge: rgb(165 180 215 / 0.2);
+  --glass-sh: 0 14px 34px -16px rgb(0 0 0 / 0.45);
+  --ink-hi: color-mix(in srgb, var(--umber) 52%, #fff);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--bg);
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--fg);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.7;
+  background: var(--bg);
+  overflow-x: hidden;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+/* ── 场画布 ── */
+.field,
+.field-frost,
+.veil {
+  position: fixed;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  display: block;
+}
+
+.field {
+  z-index: 0;
+  image-rendering: pixelated;
+}
+
+/* 醒的底：同一张场，换成平滑重建 + 一层轻雾（画布四周各多出 48px，模糊不露边） */
+.field-frost {
+  z-index: 0;
+  left: -48px;
+  top: -48px;
+  filter: blur(10px);
+  image-rendering: auto;
+}
+
+.veil {
+  z-index: 2;
+  image-rendering: pixelated;
+}
+
+html:not(.js) .field,
+html:not(.js) .field-frost,
+html:not(.js) .veil {
+  display: none;
+}
+
+/* 文字层：始终压在塌缩层之上，始终全分辨率 */
+.t {
+  position: relative;
+  z-index: 3;
+}
+
+/* ── 骨架 ── */
+.wrap {
+  width: min(100% - 3rem, 56rem);
+  margin-inline: auto;
+}
+
+.site-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-block: 1.6rem 0;
+}
+
+.brand {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.15rem;
+  letter-spacing: 0.02em;
+}
+
+.site-nav {
+  display: flex;
+  gap: 1.6rem;
+  font-size: 0.82rem;
+  color: var(--fg-soft);
+}
+
+.site-nav a:hover {
+  color: var(--fg);
+}
+
+.sec {
+  padding-top: clamp(3.5rem, 9vh, 6rem);
+}
+
+#projects {
+  padding-top: 3rem;
+}
+
+.page-head h1,
+.page-head .h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 2.1rem;
+  letter-spacing: 0.04em;
+  line-height: 1.4;
+}
+
+.lede {
+  margin: 0.9rem 0 0;
+  color: var(--fg-soft);
+  font-size: 1.02rem;
+}
+
+.year {
+  margin: 3.6rem 0 1.1rem;
+  font-family: var(--font-mono);
+  font-weight: 400;
+  font-size: 0.72rem;
+  letter-spacing: 0.2em;
+  color: var(--fg-soft);
+}
+
+#projects .year {
+  margin-top: 0;
+}
+
+/* ── 目录行 ── */
+.rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.row {
+  border-top: 1px solid var(--line);
+}
+
+.row:last-child {
+  border-bottom: 1px solid var(--line);
+}
+
+.row-in {
+  position: relative;
+  display: grid;
+  grid-template-columns: 3.6rem minmax(0, 1fr) auto;
+  gap: 0 1.8rem;
+  padding: 1.35rem 0;
+  align-items: start;
+  outline: none;
+}
+
+.row-date {
+  padding-top: 0.45rem;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.76rem;
+  letter-spacing: 0.1em;
+  color: var(--fg-soft);
+}
+
+.row-title {
+  display: inline-block;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.2rem;
+  line-height: 1.5;
+  letter-spacing: var(--ls, 0.03em);
+}
+
+.row-desc {
+  display: block;
+  margin-top: 0.3rem;
+  color: var(--fg-soft);
+  font-size: 0.95rem;
+  line-height: 1.8;
+  max-width: 34em;
+}
+
+.thumb {
+  width: 168px;
+  height: 104px;
+}
+
+/* ── 瞬间薄片 ── */
+.page-head.sub {
+  margin-bottom: 2.6rem;
+}
+
+.sheets {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 1.6rem;
+  align-items: start;
+}
+
+.col {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.col + .col {
+  padding-top: 4.5rem;
+}
+
+.sheet {
+  position: relative;
+  border-radius: 2px;
+  background: var(--glass);
+  border: 1px solid var(--glass-edge);
+  box-shadow: var(--glass-sh);
+  outline: none;
+}
+
+.sheet .cv {
+  display: block;
+  width: 100%;
+}
+
+.cv.square {
+  aspect-ratio: 1 / 1;
+}
+
+.cv.wide {
+  aspect-ratio: 3 / 2;
+}
+
+.grid4 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+}
+
+.grid4 .cv {
+  aspect-ratio: 3 / 2;
+}
+
+.sheet-text {
+  padding: 1.2rem 1.5rem 1.4rem;
+}
+
+.sheet-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  margin-bottom: 0.4rem;
+}
+
+.sheet-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.02rem;
+  letter-spacing: var(--ls, 0.04em);
+}
+
+.sheet-date {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  color: var(--fg-soft);
+}
+
+.sheet-body {
+  margin: 0.2rem 0 0;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  line-height: 1.95;
+}
+
+.tags {
+  display: flex;
+  gap: 0.4rem;
+  margin: 0.6rem 0 0;
+  font-size: 0.72rem;
+  color: var(--fg-soft);
+}
+
+.tags span {
+  padding: 0.05rem 0.45rem;
+  border: 1px solid var(--line);
+}
+
+.site-foot {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 7rem;
+  padding: 1.6rem 0 6rem;
+  border-top: 1px solid var(--line);
+  font-size: 0.82rem;
+  color: var(--fg-soft);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   封面：一叠预先算好的层，按 data-k 只显示其中一张
+   pixel 层 k1–k4 ＝ 2 / 4 / 8 / 16px 的格（最近邻）；
+   frost 层 k1–k3 ＝ 预先模糊好的低分辨率图（平滑放大）。
+   k0 ＝ 原图。无 JS 时没有 data-k，只有原图。
+   ───────────────────────────────────────────────────────────── */
+.cv {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  background: var(--bg-sunken);
+}
+
+.cv img {
+  position: absolute;
+  left: -4%;
+  top: -4%;
+  width: 108%;
+  height: 108%;
+  object-fit: cover;
+  display: block;
+}
+
+html.js .cv:not(.ready) img {
+  visibility: hidden;
+}
+
+.cv canvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+  visibility: hidden;
+}
+
+.cv canvas.px {
+  image-rendering: pixelated;
+}
+
+.cv canvas.fr {
+  image-rendering: auto;
+}
+
+html[data-kind='pixel'] .cv[data-k='1'] .px1,
+html[data-kind='pixel'] .cv[data-k='2'] .px2,
+html[data-kind='pixel'] .cv[data-k='3'] .px3,
+html[data-kind='pixel'] .cv[data-k='4'] .px4,
+html[data-kind='frost'] .cv[data-k='1'] .fr1,
+html[data-kind='frost'] .cv[data-k='2'] .fr2,
+html[data-kind='frost'] .cv[data-k='3'] .fr3 {
+  visibility: visible;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   对焦：data-f 3（静）→ 0（对准），一级一级跳，不补间
+   取景角张开 → 合拢；标题字距松 → 紧；角色由淡墨 → 琥珀
+   ───────────────────────────────────────────────────────────── */
+.fx {
+  --o: 10;
+  --ba: 0.22;
+  --bc: var(--fg-faint);
+  --ls: 0.08em;
+}
+
+.fx[data-f='2'] {
+  --o: 6;
+  --ba: 0.45;
+  --ls: 0.065em;
+}
+
+.fx[data-f='1'] {
+  --o: 3;
+  --ba: 0.75;
+  --bc: color-mix(in srgb, var(--amber) 55%, var(--fg-faint));
+  --ls: 0.045em;
+}
+
+.fx[data-f='0'] {
+  --o: 0;
+  --ba: 1;
+  --bc: var(--amber);
+  --ls: 0.03em;
+}
+
+html:not(.js) .fx {
+  --ls: 0.03em;
+  --ba: 0;
+}
+
+/* 对准时标题不换色（清楚就是清楚），只有取景角带一点琥珀 */
+
+.br {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  pointer-events: none;
+  opacity: var(--ba);
+  border: 0 solid var(--bc);
+  --d: calc(-6px - var(--o) * 1px);
+}
+
+.tl {
+  left: var(--d);
+  top: var(--d);
+  border-left-width: 1px;
+  border-top-width: 1px;
+}
+
+.tr {
+  right: var(--d);
+  top: var(--d);
+  border-right-width: 1px;
+  border-top-width: 1px;
+}
+
+.bl {
+  left: var(--d);
+  bottom: var(--d);
+  border-left-width: 1px;
+  border-bottom-width: 1px;
+}
+
+.br- {
+  right: var(--d);
+  bottom: var(--d);
+  border-right-width: 1px;
+  border-bottom-width: 1px;
+}
+
+/* 目录行的取景角收在行内，上下各让出 6px，不压分隔线 */
+.row-in .br {
+  --d: calc(6px - var(--o) * 1px);
+}
+
+.row-in .tl,
+.row-in .bl {
+  left: calc(-14px - var(--o) * 1px);
+}
+
+.row-in .tr,
+.row-in .br- {
+  right: calc(-14px - var(--o) * 1px);
+}
+
+/* ── 原型控制条 ── */
+.ctl {
+  position: fixed;
+  z-index: 10;
+  right: 16px;
+  bottom: 16px;
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px 9px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--fg-soft);
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+}
+
+.ctl-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.ctl-k {
+  width: 3em;
+  color: var(--fg-faint);
+}
+
+.ctl button {
+  font: inherit;
+  color: inherit;
+  padding: 2px 7px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 1px;
+  cursor: pointer;
+}
+
+.ctl button:hover {
+  color: var(--fg);
+}
+
+.ctl button[aria-pressed='true'] {
+  color: var(--fg);
+  border-color: var(--line);
+  background: color-mix(in srgb, var(--fg) 6%, transparent);
+}
+
+.ctl-replay {
+  margin-left: auto;
+}
+
+.ctl-hint {
+  margin: 2px 0 0;
+  color: var(--fg-faint);
+}
+
+html.holding,
+html.holding * {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* ── 窄屏 ── */
+@media (max-width: 760px) {
+  .site-nav {
+    gap: 1rem;
+  }
+
+  .row-in {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.3rem 1rem;
+  }
+
+  .row-date {
+    grid-column: 1 / -1;
+    padding-top: 0;
+  }
+
+  .thumb {
+    width: 88px;
+    height: 64px;
+    margin-top: 0.35rem;
+  }
+
+  .row-title {
+    font-size: 1.08rem;
+  }
+
+  .row-in .tl,
+  .row-in .bl {
+    left: calc(-10px - var(--o) * 1px);
+  }
+
+  .row-in .tr,
+  .row-in .br- {
+    right: calc(-10px - var(--o) * 1px);
+  }
+
+  .sheets {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+  }
+
+  .col {
+    display: contents;
+  }
+
+  .col + .col {
+    padding-top: 0;
+  }
+
+  .ctl {
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    padding: 7px 9px;
+    gap: 4px;
+  }
+
+  .ctl-hint {
+    display: none;
+  }
+
+  .site-foot {
+    padding-bottom: 9rem;
+  }
+}

@@ -41,7 +41,8 @@
 - **核心逻辑概览**：
   - `src/data/night.ts`：以 23:07 到 06:31 的时间轴驱动昼夜色板插值；
   - `src/scripts/reality.ts` & `src/scripts/morph.ts`：负责“入梦检验”与双声轨文字转换；
-  - `src/components/chrome/Gauge.astro` & `src/scripts/gauge.ts`：目录页 / 阅读页左侧的页内导览轨（滚动进度、节点、筛选、目录与阅读设置）；
+  - `src/components/chrome/Gauge.astro` & `src/scripts/gauge.ts`：阅读页左侧的页内导览轨（滚动进度与节点）；
+  - `src/components/chrome/Toolstar.astro` & `src/scripts/toolstar.ts`：全站左下角的工具栏——一颗三轴六芒星开关，点开是绕星的同心轨道（去处 / 寻找 / 本页 / 换面 / 环境声 / 设置），阅读页的目录与字号、行距在「本页」里；
   - `src/styles/tokens.css` & `global.css`：全站设计令牌与全局样式。
 - **修改验证**：任何代码修改后，务必在根目录运行 `npm run build`，确保 100% 静态编译通过。
 

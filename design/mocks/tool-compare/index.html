@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>工具层原型 · 四方向对照</title>
+<link rel="icon" href="data:," />
+<link rel="stylesheet" href="/fonts/noto/font.css" />
+<style>
+  @font-face { font-family: 'Plex'; src: url('/fonts/plex/ibm-plex-mono-latin-400-normal.woff2') format('woff2'); font-weight: 400; font-display: swap; }
+  :root {
+    --bg: #f0f3f6; --fg: #232830; --fg-soft: #56606d; --fg-faint: #858f9d;
+    --line: rgba(35, 40, 48, .12); --amber: #d9a05b; --umber: #765640; --dream: #c2a382;
+    --serif: 'Noto Serif SC', 'Songti SC', SimSun, serif;
+    --mono: 'Plex', ui-monospace, Consolas, 'PingFang SC', 'Microsoft YaHei UI', monospace;
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 400 15px/1.9 var(--serif);
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--umber); text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--umber) 35%, transparent); }
+  a:hover { color: var(--fg); }
+  code { font-family: var(--mono); font-size: .86em; letter-spacing: .02em; color: var(--fg-soft); }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 40px; }
+
+  /* ── 头 ── */
+  header.top { padding: 78px 0 40px; border-bottom: 1px solid var(--line); }
+  .kicker { margin: 0 0 22px; font: 400 10px/1 var(--mono); letter-spacing: .34em; color: var(--umber); }
+  h1 { margin: 0; font: 500 clamp(30px, 4vw, 44px)/1.3 var(--serif); letter-spacing: .02em; }
+  .lede { margin: 20px 0 0; max-width: 46em; font-size: 17px; color: var(--fg-soft); }
+  .lede b { font-weight: 500; color: var(--fg); }
+  .constraints { margin: 34px 0 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(15rem, 100%), 1fr)); gap: 14px 28px; }
+  .constraints li { padding-left: 14px; border-left: 1px solid var(--line); font-size: 13.5px; line-height: 1.75; color: var(--fg-soft); }
+  .constraints b { display: block; font: 500 11px/1.7 var(--mono); letter-spacing: .18em; color: var(--fg-faint); }
+
+  /* ── 一览表 ── */
+  section.matrix { padding: 44px 0 8px; }
+  .scroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th, td { text-align: left; vertical-align: top; padding: 13px 16px 13px 0; border-bottom: 1px solid var(--line); line-height: 1.7; }
+  thead th { font: 500 10.5px/1.6 var(--mono); letter-spacing: .18em; color: var(--fg-faint); padding-bottom: 10px; }
+  tbody th { font-weight: 500; color: var(--fg-soft); white-space: nowrap; }
+  tbody td { color: var(--fg-soft); }
+  tbody td b { font-weight: 500; color: var(--fg); }
+  td .nm { display: block; font: 500 15px/1.6 var(--serif); color: var(--fg); }
+  td .nm i { font: 400 10px/1 var(--mono); font-style: normal; letter-spacing: .16em; color: var(--fg-faint); margin-left: 7px; }
+
+  /* ── 方向 ── */
+  section.dir { padding: 66px 0 10px; border-top: 1px solid var(--line); margin-top: 56px; }
+  .dhead { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; }
+  .dhead .no { font: 400 11px/1 var(--mono); letter-spacing: .2em; color: var(--fg-faint); }
+  .dhead h2 { margin: 0; font: 500 27px/1.3 var(--serif); letter-spacing: .06em; }
+  .dhead h2 i { font: 400 11px/1 var(--mono); font-style: normal; letter-spacing: .2em; color: var(--fg-faint); margin-left: 10px; }
+  .dhead .verb { font: 400 13px/1.6 var(--mono); letter-spacing: .12em; color: var(--umber); }
+  .thing { margin: 18px 0 0; max-width: 44em; font-size: 16.5px; }
+  .thing b { font-weight: 500; }
+
+  .frames { margin: 30px 0 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(21rem, 100%), 1fr)); gap: 22px 22px; }
+  figure { margin: 0; }
+  figure img { display: block; width: 100%; height: auto; border: 1px solid var(--line); border-radius: 2px; background: #e7ecf1; }
+  figcaption { margin-top: 9px; font-size: 12.5px; line-height: 1.7; color: var(--fg-soft); }
+  figcaption b { display: block; font: 500 10px/1.8 var(--mono); letter-spacing: .16em; color: var(--fg-faint); }
+
+  .verdict { margin: 34px 0 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(19rem, 100%), 1fr)); gap: 22px 34px; }
+  .verdict div { padding-top: 12px; border-top: 1px solid var(--line); font-size: 13.5px; line-height: 1.8; color: var(--fg-soft); }
+  .verdict b { display: block; margin-bottom: 6px; font: 500 10.5px/1.6 var(--mono); letter-spacing: .18em; color: var(--fg-faint); }
+  .verdict .yes b { color: var(--umber); }
+  .verdict .no b { color: #a3452f; }
+
+  .links { margin: 26px 0 0; padding-top: 14px; border-top: 1px solid var(--line); font: 400 12px/1.9 var(--mono); letter-spacing: .06em; color: var(--fg-faint); }
+  .links a { border-bottom-color: var(--line); }
+  .links span + span::before { content: '·'; margin: 0 9px; color: var(--line); }
+
+  /* ── 尾 ── */
+  footer { margin-top: 76px; padding: 40px 0 90px; border-top: 1px solid var(--line); }
+  footer h2 { margin: 0 0 18px; font: 500 19px/1.5 var(--serif); letter-spacing: .04em; }
+  footer ol { margin: 0; padding-left: 1.4em; max-width: 48em; font-size: 14px; color: var(--fg-soft); }
+  footer ol li { margin-bottom: 11px; line-height: 1.8; }
+  footer ol li b { font-weight: 500; color: var(--fg); }
+  .run { margin: 30px 0 0; padding: 16px 20px; background: #e7ecf1; border-left: 2px solid var(--amber); font: 400 12.5px/2 var(--mono); color: var(--fg-soft); overflow-x: auto; }
+  .run b { color: var(--fg); font-weight: 500; }
+
+  @media (max-width: 760px) {
+    .wrap { padding: 0 20px; }
+    header.top { padding: 48px 0 30px; }
+    .frames { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+<header class="top">
+  <p class="kicker">工具层原型 · 四方向对照 · 2026-10-18</p>
+  <h1>把十二件工具收成一层</h1>
+  <p class="lede">
+    站内的十二件工具现在散在五处、五套材质、五种出现方式。这一轮试的是同一件事的四种做法：
+    <b>能不能给它们找到一件统一的东西与一个统一的动词</b>，让「工具区」在主页、目录页、阅读页、
+    NEXUS 入口上都成立。四个方案各做到底，彼此不兼容，只为并排比较。
+  </p>
+  <ul class="constraints">
+    <li><b>统一收编</b>要能取代 Gauge 的展开薄片、Sound 的微弦、Rail 的探针；原型里可自由推翻现有形态。</li>
+    <li><b>三种召唤并存</b>常驻边缘露头 · 手势 / 快捷键 · 指针跟随——同一件东西的三条路，唤出后是同一个面。</li>
+    <li><b>四种语境</b>漫游空间 · 阅读页 · NEXUS 入口 · 404 失线页，原型当场可切（<code>?ctx=</code> 加 <code>?face=</code>）。</li>
+    <li><b>十二件工具全落地</b>检索 · 视图 · 场景 · 归处 · 门 · 出口 · 面 · 声 · 目录 · 读 · 筛 · 刻。</li>
+  </ul>
+</header>
+
+<section class="matrix">
+  <div class="scroll">
+  <table>
+    <thead>
+      <tr><th></th><th>一件东西</th><th>动词</th><th>十二件工具怎么放</th><th>硬断言（脚本里跑过的）</th><th>帧 / 报告</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="nm">潜影<i>LATENT</i></span></td>
+        <td>一张还盖着乳剂的相纸</td>
+        <td>显影 / 褪回</td>
+        <td>环上十二枚字，六十枚刻度里每五枚一枚</td>
+        <td>三条路唤出的十二枚字浓度<b>逐位相同</b>；<code>latent.css</code> 里零 border / 零面板 / 零 backdrop-filter</td>
+        <td>44 帧 · <code>report.json</code> errors <b>[]</b></td>
+      </tr>
+      <tr>
+        <td><span class="nm">切面<i>THRESHOLD</i></span></td>
+        <td><code>gate.astro</code> 那根横过屏幕的平切面线</td>
+        <td>升起 / 沉回线里</td>
+        <td>线上等距十二片刻痕，一次只升起一片</td>
+        <td>三条路都是<b>同一个面</b>；「线以下不动」升起前后几何<b>完全一致</b>；390px <code>scrollWidth==innerWidth</code></td>
+        <td>41 帧 · <code>report.txt</code> 错误 <b>0</b></td>
+      </tr>
+      <tr>
+        <td><span class="nm">罗盘环<i>RING</i></span></td>
+        <td>一枚长在指针上的细环</td>
+        <td>合拢 / 绽开</td>
+        <td>十二片瓣，四片宽瓣（检索 / 筛 / 目录 / 读）加八片窄瓣</td>
+        <td>瓣名两两<b>不重叠</b>且全在屏内；指针跟随与快捷键唤出的瓣 id 序列 <b>12/12 一致</b></td>
+        <td>38 帧 · 断言在 <code>.shot.cjs</code> 内</td>
+      </tr>
+      <tr>
+        <td><span class="nm">薄玻璃窗<i>WINDOW</i></span></td>
+        <td>空间里比内容窗薄一档的一层窗</td>
+        <td>打开 / 收起</td>
+        <td>收进九扇窗（同类合并，如归处 / 门 / 出口合成一扇「去处」）</td>
+        <td>两档玻璃<b>五个数字逐条过</b>：底 0.34&lt;0.62 · 磨砂 7px&lt;16px · 边 0.18&lt;0.26 · 投影 18px&lt;62px · 圆角 2px&lt;3px</td>
+        <td>30 帧 · 断言在 <code>.shot.cjs</code> 内</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<!-- ═══ 01 潜影 ═══ -->
+<section class="dir">
+  <div class="dhead">
+    <span class="no">01</span>
+    <h2>潜影<i>LATENT</i></h2>
+    <span class="verb">显影 / 褪回</span>
+  </div>
+  <p class="thing"><b>一件东西：</b>一张还盖着乳剂的相纸。工具潜影在画面里——不占版面、没有边框、没有面板、没有玻璃。
+  整个方案压在一个式子上：<code>每一处墨 = color-mix(本色 浓度%, 底色)</code>，浓度归零时它就是底色本身。</p>
+
+  <div class="frames">
+    <figure>
+      <img src="../tool-latent/.shots/02-still-grid-essay.png" alt="浅底静置" loading="lazy" />
+      <figcaption><b>02 浅底静置</b>右缘那条痕在浅底上几乎看不见——要盯住才找得到 y≈210 与 y≈460 两小片比周围亮一点点的雾。这是这一案可发现性的下限。</figcaption>
+    </figure>
+    <figure>
+      <img src="../tool-latent/.shots/10a-pointer-patch.png" alt="指针那一小片先显影" loading="lazy" />
+      <figcaption><b>10a 指针停驻</b>落点 250px 那一小片先显影，停 380ms 长满整圈；移开约 1.4 秒褪回灰。</figcaption>
+    </figure>
+    <figure>
+      <img src="../tool-latent/.shots/20-core-hour.png" alt="阅读页显影完成" loading="lazy" />
+      <figcaption><b>20 显影完成（阅读页）</b>十二枚字、大写 23:07 与一排刻度都浮出来了，浓度差读得出「从乳剂里显出来」。<b>但工具正压在正文上</b>——这是这一案最要紧的一条。</figcaption>
+    </figure>
+    <figure>
+      <img src="../tool-latent/.shots/40-find-develop.png" alt="检索" loading="lazy" />
+      <figcaption><b>40 检索</b>匹配的显影、不匹配的退成灰到 20%，排到命中的后面——用的是空间本来的语言，不用另加解释。</figcaption>
+    </figure>
+    <figure>
+      <img src="../tool-latent/.shots/14-verb-05.png" alt="动词中途" loading="lazy" />
+      <figcaption><b>14 动词中途</b><code>--spread</code> 走到一半：先后由每件东西自己的 <code>--d = 0.55×(0.62×到落点距离 + 0.38×绕落点角度)</code> 给出，从环心唤出是顺时针扫过。</figcaption>
+    </figure>
+    <figure>
+      <img src="../tool-latent/.shots/06-still-gate.png" alt="NEXUS 语境" loading="lazy" />
+      <figcaption><b>06 NEXUS 语境</b>晨光天光那一屏：锚色从 <code>#a2805c</code> 调到 <code>#7d6146</code> 才压得住（偏离令牌，见 NOTES）。</figcaption>
+    </figure>
+  </div>
+
+  <div class="verdict">
+    <div class="yes"><b>为什么成立</b>深底浅底是同一个式子——简章里四套色只是喂不同的「本色」。检索在这个材质里天然不需要额外解释，而且 <code>latent.css</code> 里没有一处 border、面板或 backdrop-filter，可以逐行核。</div>
+    <div class="no"><b>最弱在哪</b>可发现性最差：只给一条痕加一枚微光，真机上「几乎看不见」与「看不见」只差几个百分点。更要紧的是展开之后工具与正文叠在同一块地方——用「显影完成、画面退后」到 0.45 换来可读，是让步，阅读页尤其明显。</div>
+  </div>
+
+  <p class="links">
+    <span><a href="/tool-latent/">原型 <code>?ctx=home|grid|read|gate|404</code></a></span>
+    <span><a href="../tool-latent/NOTES.md">NOTES.md</a></span>
+    <span>目录 <code>design/mocks/tool-latent/</code></span>
+    <span>端口 4640</span>
+  </p>
+</section>
+
+<!-- ═══ 02 切面 ═══ -->
+<section class="dir">
+  <div class="dhead">
+    <span class="no">02</span>
+    <h2>切面<i>THRESHOLD</i></h2>
+    <span class="verb">升起 / 沉回线里</span>
+  </div>
+  <p class="thing"><b>一件东西：</b>NEXUS 入口那根横过屏幕的平切面线，加上线上等距排开的十二片极短刻痕（一片一件工具）。
+  指针沿线扫过，那一片从线上升起、展开成一块磨砂玻璃面；线以下——正文所在的那一半——<b>不动</b>。站内既有的 14° 缝线与顶部发丝线一并接住，屏幕上是三根线。</p>
+
+  <div class="frames">
+    <figure>
+      <img src="../tool-threshold/.shots/00-notches-all.png" alt="线上十二片刻痕" loading="lazy" />
+      <figcaption><b>00 常驻露头</b>线上永远露着十二道刻痕，告诉你这里能挑——这是「边缘露头」那条路。</figcaption>
+    </figure>
+    <figure>
+      <img src="../tool-threshold/.shots/07b-path-edge-face.png" alt="边缘路径升起的面" loading="lazy" />
+      <figcaption><b>07b 边缘路径</b>刻痕被点中，那一片从线上升起成面；其余十一片刻痕原位不动。</figcaption>
+    </figure>
+    <figure>
+      <img src="../tool-threshold/.shots/02-grid-light.png" alt="浅底目录语境" loading="lazy" />
+      <figcaption><b>02 浅底目录</b>浅梦那一栏：为了让柔正文过 4.5，<code>--fg-soft</code> 从令牌的 <code>#56606d</code> 调到 <code>#4a545f</code>（这一版唯一的令牌偏离）。</figcaption>
+    </figure>
+    <figure>
+      <img src="../tool-threshold/.shots/04-gate.png" alt="NEXUS 语境" loading="lazy" />
+      <figcaption><b>04 NEXUS</b>这根线本来就是它的；带到全站之后，整站读成「同一根线在四个时刻」。晶体的避让还没有真正做。</figcaption>
+    </figure>
+    <figure>
+      <img src="../tool-threshold/.shots/10b-verb-055.png" alt="升起中途" loading="lazy" />
+      <figcaption><b>10b 升起中途</b>动词走到 0.55：面从线上升起的一半，线以下仍然一动不动。</figcaption>
+    </figure>
+    <figure>
+      <img src="../tool-threshold/.shots/03-read-light.png" alt="阅读页" loading="lazy" />
+      <figcaption><b>03 阅读页</b>线以上留出约 32% 是真留白——贴审美，但也容易被说浪费一屏。</figcaption>
+    </figure>
+  </div>
+
+  <div class="verdict">
+    <div class="yes"><b>为什么成立</b>这件东西已经被站长验收过一次（<code>gate.astro</code>），带回全站是「同一根线在四个时刻」而不是硬凑。「一次只升起一片」这条纪律让它没有退化成一根顶部工具条。</div>
+    <div class="no"><b>最弱在哪</b>面靠屏幕边时锚点会偏移：480px 宽的面要留在屏内，第 1、12 片升起时中心被夹回，削弱了「这一片长出来」的因果。正解应是靠边时改从左 / 右下角向外展开，这一版没做。</div>
+  </div>
+
+  <p class="links">
+    <span><a href="/tool-threshold/">原型</a></span>
+    <span><a href="../tool-threshold/NOTES.md">NOTES.md</a></span>
+    <span>目录 <code>design/mocks/tool-threshold/</code></span>
+    <span>端口 4641</span>
+  </p>
+</section>
+
+<!-- ═══ 03 罗盘环 ═══ -->
+<section class="dir">
+  <div class="dhead">
+    <span class="no">03</span>
+    <h2>罗盘环<i>RING</i></h2>
+    <span class="verb">合拢 / 绽开</span>
+  </div>
+  <p class="thing"><b>一件东西：</b>一枚几乎看不见的细环，长在指针上（接住站内既有的凝露光核）。
+  静息时它只是指针旁一圈极淡的十二道刻度；按住或点开，刻度一道道亮起，环绽开成花瓣状的工具列，十二件工具分列成瓣。
+  四片宽瓣给需要地盘的（检索 / 筛 / 目录 / 读，一次只开一片可滚的花瓣玻璃），八片窄瓣给一句话就完的。</p>
+
+  <div class="frames">
+    <figure>
+      <img src="../tool-ring/.shots/01-ctx-home.png" alt="静息" loading="lazy" />
+      <figcaption><b>01 静息</b>浅底发丝对比 1.22、深底 1.44。再淡就没人发现这圈环，靠「按住会亮刻度」补偿——这条线要人眼定。</figcaption>
+    </figure>
+    <figure>
+      <img src="../tool-ring/.shots/09b-path-follow-bloom.png" alt="指针跟随绽开" loading="lazy" />
+      <figcaption><b>09b 指针跟随（主路径）</b>十二片瓣绕着琥珀环心排开。瓣名两两不重叠、全在屏内，但花开在指针上，也就开在了内容上。</figcaption>
+    </figure>
+    <figure>
+      <img src="../tool-ring/.shots/07-path-edge-peek.png" alt="边缘露头" loading="lazy" />
+      <figcaption><b>07 边缘露头</b>指针停住 2.2 秒（触屏默认）环离场、贴到最近一缘露出一小段弧，点它滑进来绽开。</figcaption>
+    </figure>
+    <figure>
+      <img src="../tool-ring/.shots/26-layout-labels.png" alt="三栏交界上的花开" loading="lazy" />
+      <figcaption><b>26 三栏交界</b>花开在两种夜色的交界上——三种光并排时环还读不读得清，是这一案的边界情况。</figcaption>
+    </figure>
+    <figure>
+      <img src="../tool-ring/.shots/19-toc.png" alt="目录那片宽瓣" loading="lazy" />
+      <figcaption><b>19 宽瓣：目录</b>需要地盘的四片会开成一片可滚的花瓣玻璃，其余收拢让位——这是「不挤」的解法。</figcaption>
+    </figure>
+    <figure>
+      <img src="../tool-ring/.shots/22-m-390-rest.png" alt="手机静息" loading="lazy" />
+      <figcaption><b>22 390×844</b>移动端静息态。这一案是四个里唯一为触屏设计的（一个手势），但长按与站内 1300 / 2200ms 的换面手势有冲突。</figcaption>
+    </figure>
+  </div>
+
+  <div class="verdict">
+    <div class="yes"><b>为什么成立</b>四个方案里唯一「工具长在你手上」的一个，触屏最友好，一个手势解决；花是审美简报点名的母题，而「靠近就开、离开就合」是这个物件天生的行为，不需要额外解释。</div>
+    <div class="no"><b>最弱在哪</b>三处。静息可见度的平衡点没把握；指针停住后环离场而光核留在指针上，画面里同时有两件东西；花瓣玻璃是「第二层」——花开在指针上、面板开在瓣外，指针要多走一段，且「点下就成」与「点开才成」两种手感并存。</div>
+  </div>
+
+  <p class="links">
+    <span><a href="/tool-ring/">原型</a></span>
+    <span><a href="../tool-ring/NOTES.md">NOTES.md</a></span>
+    <span>目录 <code>design/mocks/tool-ring/</code></span>
+    <span>端口 4642</span>
+  </p>
+</section>
+
+<!-- ═══ 04 薄玻璃窗 ═══ -->
+<section class="dir">
+  <div class="dhead">
+    <span class="no">04</span>
+    <h2>薄玻璃窗<i>WINDOW</i></h2>
+    <span class="verb">打开 / 收起</span>
+  </div>
+  <p class="thing"><b>一件东西：</b>空间里<b>比内容窗薄一档的一层窗</b>。工具不是面板，而是九扇特别小的薄玻璃窗，和内容的窗漂在同一片空间里——
+  检索是一扇能打字的窗，环境声是一扇有弦的窗，目录是一扇列条目的窗，换面是一扇有闩的窗。可以拖、可以最小化成纸签。
+  这条「薄一档」是这一案唯一的立身之本：同框时必须一眼看得出是两层玻璃，否则就是重做一遍 <code>p5-floatwin</code>。</p>
+
+  <div class="frames">
+    <figure>
+      <img src="../tool-window/.shots/40-CMP-two-grades-one-frame.png" alt="两档玻璃同框" loading="lazy" />
+      <figcaption><b>40 两档同框（验收关键）</b>内容的窗与工具窗压在同一块底上：工具那摞更透、边更淡、投影更浅。五个数字逐条过：底 0.34&lt;0.62 · 磨砂 7px&lt;16px · 边 0.18&lt;0.26 · 投影 18px&lt;62px · 圆角 2px&lt;3px。<b>同时这也是它最弱的一帧</b>——工具摞盖住了左侧约 260px 的内容。</figcaption>
+    </figure>
+    <figure>
+      <img src="../tool-window/.shots/20-path-edge-1-halfopen.png" alt="边缘露头" loading="lazy" />
+      <figcaption><b>20 边缘露头</b>静置时是一扇半开的窗：<code>clip-path: inset(0 calc(100% - 76px) calc(100% - 24px) 0)</code>，只露出窗沿与标题栏一角。</figcaption>
+    </figure>
+    <figure>
+      <img src="../tool-window/.shots/09-read-toc-open.png" alt="阅读页目录" loading="lazy" />
+      <figcaption><b>09 阅读页：目录</b>那扇窗自己长开，列的是阅读页真的 h2 / h3。</figcaption>
+    </figure>
+    <figure>
+      <img src="../tool-window/.shots/06-grid-many-find-deep.png" alt="检索在深底上" loading="lazy" />
+      <figcaption><b>06 检索（深底）</b>窗里真的能打字，筛的是 <code>PLANE_DATA</code> 的真标题；深底上玻璃的层次反而比浅底更清楚。</figcaption>
+    </figure>
+    <figure>
+      <img src="../tool-window/.shots/10-gate.png" alt="NEXUS 天光" loading="lazy" />
+      <figcaption><b>10 NEXUS 天光</b>薄一档的真上限：极亮的底上玻璃几乎看不见。这一案在这里改用浅梦玻璃而非深底——理由是深底玻璃会变成一块突兀的暗板。</figcaption>
+    </figure>
+    <figure>
+      <img src="../tool-window/.shots/12-404.png" alt="失线页" loading="lazy" />
+      <figcaption><b>12 失线页</b>404 也挂着同一套窗，没有为它开特例。</figcaption>
+    </figure>
+  </div>
+
+  <div class="verdict">
+    <div class="yes"><b>为什么成立</b>落地最直接——<code>wander</code> 已经定下窗的语言、失焦档位与飞行过渡，不用另造材质；而「前层」在这个站里的字面意思本来就是「更薄的一片玻璃」。</div>
+    <div class="no"><b>最弱在哪</b>最不新：<code>p5-floatwin</code> 已经探过「窗即入口」的 OS 桌面语义，区别只在「工具 vs 入口」和「挂在线上 vs 半开贴边」，够不够得人眼判。其次是窗多了会盖内容——默认一次只开一扇加左缘一层雾兜着，并排时左边 260px 确实被盖。</div>
+  </div>
+
+  <p class="links">
+    <span><a href="/tool-window/">原型</a></span>
+    <span><a href="../tool-window/NOTES.md">NOTES.md</a></span>
+    <span>目录 <code>design/mocks/tool-window/</code></span>
+    <span>端口 4643</span>
+  </p>
+</section>
+
+<footer>
+  <h2>复核与待定</h2>
+  <ol>
+    <li><b>四份都跑通了。</b>潜影与切面各留了一份机器可读的报告（<code>report.json</code> / <code>report.txt</code>），错误数 0、七语境对比度全过；罗盘环与薄玻璃窗的断言写在各自的 <code>.shot.cjs</code> 里，没有独立报告文件，数字以脚本输出为准。四份都没有碰 <code>src/</code>，都没有 commit。</li>
+    <li><b>四条待你定的令牌偏离。</b>切面把浅底的 <code>--fg-soft</code> 调到 <code>#4a545f</code>；潜影把小字一律改走 <code>--soft</code> 并新起一个 <code>--dim</code>，gate 锚色 <code>#a2805c → #7d6146</code>；薄玻璃窗在 NEXUS 用浅梦玻璃而非深底。都是为了让某一屏达标，不是随手改的。</li>
+    <li><b>两处只有人眼能判。</b>潜影那条痕在浅底上到底在不在（<code>02</code> / <code>10d</code>）；罗盘环静息的可见度平衡点（<code>01</code> / <code>03</code> / <code>05</code>）。两者都是「再淡一点就没人发现」的边界，数值给不出答案。</li>
+    <li><b>一个四个方案都还没回答的问题：</b>工具展开时，内容让不让位。潜影是叠上去再退到 0.45，切面靠「线以下不动」，罗盘环开在指针上，薄玻璃窗靠一次只开一扇。这一条大概才是「收编」真正的难点。</li>
+  </ol>
+  <p class="run">
+    <b>一台服务把四份都挂起来：</b>node design/mocks/tool-compare/serve.cjs  →  http://localhost:4644/<br />
+    四份原型也能各开一台：tool-latent 4640 · tool-threshold 4641 · tool-ring 4642 · tool-window 4643
+  </p>
+</footer>
+
+</div>
+
+</body>
+</html>

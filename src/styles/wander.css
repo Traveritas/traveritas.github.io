@@ -1,0 +1,562 @@
+/* 三种夜色：外框、窗、阅读面板共用。挂在 html（当前场景）、.w-space / .w-rh / .w-rd（各自的场景）、[data-ink]（外框按底下那一栏取） */
+[data-wscene='essay'], [data-ink='essay'] {
+  --w-bg: #c6ced9; --w-fg: #232830; --w-soft: #56606d; --w-faint: #8a94a2; --w-ink: #4f4a66; --w-chrome: #2b3038;
+  --w-glass: 250 251 253; --w-glass-a: 0.62; --w-edge: 52 62 82; --w-edge-a: 0.24; --w-sheen: 255 255 255; --w-sheen-a: 0.5;
+  --w-shadow: 0 24px 54px -28px rgb(40 50 72 / 0.5), 0 2px 10px -5px rgb(40 50 72 / 0.22);
+  --w-shadow-hot: 0 34px 70px -30px rgb(40 50 72 / 0.56), 0 3px 12px -5px rgb(40 50 72 / 0.24);
+  --w-panel-a: 0.93;
+}
+[data-wscene='project'], [data-ink='project'] {
+  --w-bg: #0d1524; --w-fg: #e6ebf1; --w-soft: #a6b4c6; --w-faint: #71849c; --w-ink: #988bb6; --w-chrome: #dfe6ee;
+  --w-glass: 16 26 42; --w-glass-a: 0.56; --w-edge: 168 206 226; --w-edge-a: 0.24; --w-sheen: 190 225 240; --w-sheen-a: 0.34;
+  --w-shadow: 0 26px 56px -24px rgb(0 0 0 / 0.66), 0 2px 10px -4px rgb(0 0 0 / 0.42);
+  --w-shadow-hot: 0 36px 72px -26px rgb(0 0 0 / 0.72), 0 3px 12px -4px rgb(0 0 0 / 0.46), 0 0 40px -12px rgb(150 205 218 / 0.22);
+  --w-panel-a: 0.9;
+}
+[data-wscene='moment'], [data-ink='moment'] {
+  --w-bg: #1d1729; --w-fg: #f0e9f4; --w-soft: #bcadca; --w-faint: #877a98; --w-ink: #9c92c8; --w-chrome: #efe6f2;
+  --w-glass: 40 30 56; --w-glass-a: 0.54; --w-edge: 236 196 180; --w-edge-a: 0.24; --w-sheen: 250 215 200; --w-sheen-a: 0.34;
+  --w-shadow: 0 26px 56px -24px rgb(6 2 12 / 0.64), 0 2px 10px -4px rgb(6 2 12 / 0.4);
+  --w-shadow-hot: 0 36px 72px -26px rgb(6 2 12 / 0.7), 0 3px 12px -4px rgb(6 2 12 / 0.44), 0 0 40px -12px rgb(240 186 150 / 0.22);
+  --w-panel-a: 0.9;
+}
+
+
+/* ══ 层 ══ */
+#w-light, .w-wx {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  pointer-events: none;
+}
+#w-light.no-gl { background: radial-gradient(ellipse at 30% 30%, color-mix(in srgb, var(--w-bg) 70%, white), var(--w-bg) 70%); }
+#w-wx-front { z-index: 3; }
+
+
+#w-stage {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  z-index: 1;
+}
+html[data-wview='explore'] #w-stage { cursor: grab; }
+html.w-dragging #w-stage { cursor: grabbing; }
+.w-space { position: absolute; inset: 0; pointer-events: none; }
+
+/* ══ 窗 ══
+   卡面是画好的图（字、标题栏、边）；投影与背后的磨砂由这里给，只有清楚的那一档才有——
+   远处的窗只剩像素块，投影与磨砂都没有意义。 */
+.w-card {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 50% 50%;
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  border-radius: 3px;
+  will-change: transform, opacity;
+  pointer-events: auto;
+  cursor: pointer;
+  outline: none;
+}
+.w-card:not([data-lod='0']) { image-rendering: pixelated; }
+.w-card[data-lod='0'] {
+  -webkit-backdrop-filter: blur(16px) saturate(1.18) brightness(1.03);
+  backdrop-filter: blur(16px) saturate(1.18) brightness(1.03);
+  box-shadow: var(--w-shadow);
+}
+.w-card[data-lod='1'] { box-shadow: 0 18px 40px -26px rgb(0 0 0 / 0.3); }
+/* 反光：跟着指针在玻璃上走的一小片亮，另有一道沿边的亮线 */
+.w-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  background:
+    radial-gradient(circle at var(--mx, 30%) var(--my, 20%), rgb(var(--w-sheen) / calc(var(--w-sheen-a) * 0.75)), rgb(var(--w-sheen) / 0) 46%),
+    linear-gradient(rgb(var(--w-sheen) / 0), rgb(var(--w-sheen) / 0));
+  box-shadow: inset 0 0 0 1px rgb(var(--w-sheen) / calc(var(--w-sheen-a) * 0.7));
+}
+.w-card.hot::after { opacity: 1; transition-duration: 0.18s; }
+.w-card.hot[data-lod='0'] { box-shadow: var(--w-shadow-hot); }
+.w-card:focus-visible::after { opacity: 1; box-shadow: inset 0 0 0 1px rgb(var(--w-sheen) / 0.5), 0 0 0 2px var(--amber); }
+html.w-reading #w-stage .w-card { pointer-events: none; }
+/* 漫游里不够清楚的窗：点了是「走过去」，不是「打开」 */
+html[data-wview='explore'] .w-card:not(.clear) { cursor: zoom-in; }
+
+#w-veil {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: var(--w-bg);
+  transition: background-color 0.4s ease;
+  opacity: 0;
+  z-index: 4;
+}
+
+/* ══ 栏头（检索） ══ */
+#w-heads { position: fixed; inset: 0; pointer-events: none; z-index: 2; }
+.w-rh {
+  position: absolute;
+  left: 0;
+  top: 0;
+  white-space: nowrap;
+  color: var(--w-fg);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+html[data-wview='grid'] .w-rh { opacity: 1; transition: opacity 0.4s ease; pointer-events: auto; }
+/* 漫游里快速往后退、快到收回检索时：栏头从身后浮出来一点（--w-pull 由 wander.js 逐帧写，0–1） */
+html[data-wview='explore'] .w-rh { opacity: calc(var(--w-pull, 0) * 0.55); transition: none; }
+html.w-genter .w-rh { transition: opacity 0.6s ease 0.62s; }
+html.w-reading .w-rh { opacity: 0.3; transition-delay: 0s; }
+html[data-wview='grid'] #w-veil { background: #0c0f18; }
+.w-rh-in { display: flex; align-items: baseline; gap: 10px; }
+/* 序号用衬线罗马数字，与紧跟着的条数（等宽阿拉伯数字）分开，不会看串 */
+.w-rh .no { font: italic 400 13px/1 var(--font-display); letter-spacing: 0.08em; color: var(--w-faint); }
+.w-rh b { font: 600 19px/1 var(--font-display); letter-spacing: 0.34em; }
+.w-rh i { font: normal 400 9px/1 var(--font-mono); letter-spacing: 0.3em; color: var(--w-faint); }
+.w-rh .ct { font: 400 10.5px/1 var(--font-mono); letter-spacing: 0.12em; color: var(--w-ink); margin-left: 4px; }
+/* ══ 外框 ══ */
+.w-chrome { position: fixed; inset: 0 0 auto; height: 0; z-index: 30; }
+.w-chrome [data-ink] { color: var(--w-chrome); transition: color 0.4s ease, opacity 0.4s ease; }
+.w-brand {
+  position: absolute;
+  left: 28px;
+  top: 25px;
+  font: 500 16px/1 var(--font-display);
+  letter-spacing: 0.14em;
+  text-decoration: none;
+}
+.w-scenes {
+  position: absolute;
+  left: 50%;
+  top: 20px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+}
+.w-scenes button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: 500 13px/1 var(--font-display);
+  letter-spacing: 0.32em;
+  padding: 9px 8px 10px 13px;
+  cursor: pointer;
+  opacity: 0.5;
+  position: relative;
+  transition: opacity 0.3s ease;
+}
+.w-scenes button::after { content: ''; position: absolute; left: 13px; right: 12px; bottom: 2px; height: 1px; background: currentColor; transform: scaleX(0); transform-origin: left; transition: transform 0.45s var(--w-ease); }
+.w-scenes button[aria-pressed='true'] { opacity: 1; }
+.w-scenes button[aria-pressed='true']::after { transform: scaleX(1); }
+.w-scenes button:hover { opacity: 0.85; }
+.w-scenes button:focus-visible { outline: 1px solid var(--amber); outline-offset: 2px; }
+.w-scenes { transition: opacity 0.4s ease; }
+html[data-wview='grid'] .w-scenes { opacity: 0; pointer-events: none; }
+
+
+/* 视图开关 */
+.w-views {
+  position: absolute;
+  right: 22px;
+  top: 17px;
+  display: flex;
+  padding: 2px;
+  border: 1px solid rgb(var(--w-edge) / 0.28);
+  border-radius: 3px;
+  background: rgb(var(--w-glass) / 0.32);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+.w-views button {
+  appearance: none;
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
+  color: inherit;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 11px 7px 10px;
+  font: 500 12px/1 var(--font-display);
+  letter-spacing: 0.26em;
+  cursor: pointer;
+  opacity: 0.5;
+  transition: opacity 0.3s ease, background-color 0.3s ease;
+}
+.w-views svg { width: 15px; height: 12px; fill: currentColor; stroke: currentColor; stroke-width: 0; }
+.w-views button[data-view='grid'] svg { fill: none; stroke-width: 1.4; }
+.w-views button:hover { opacity: 0.85; }
+.w-views button:focus-visible { outline: 1px solid var(--amber); outline-offset: 1px; }
+html[data-wview='explore'] .w-views [data-view='explore'], html[data-wview='grid'] .w-views [data-view='grid'] { opacity: 1; background: rgb(var(--w-sheen) / calc(var(--w-sheen-a) * 0.5)); }
+html.w-reading .w-chrome > * { opacity: 0 !important; pointer-events: none; }
+
+/* ══ 阅读：长大了的窗 ══ */
+.w-rd { position: fixed; inset: 0; z-index: 20; color: var(--w-fg); }
+.w-rd-win {
+  position: absolute;
+  overflow: hidden;
+  border-radius: 3px; /* 与卡片（.w-card、faces.js 的 RAD）同一个角：长大的过程里角不跳 */
+  background: linear-gradient(115deg, rgb(var(--w-sheen) / calc(var(--w-sheen-a) * 0.5)), rgb(var(--w-sheen) / 0) 30%), rgb(var(--w-glass) / var(--w-panel-a));
+  -webkit-backdrop-filter: blur(26px) saturate(1.15);
+  backdrop-filter: blur(26px) saturate(1.15);
+  border: 1px solid rgb(var(--w-edge) / var(--w-edge-a));
+  box-shadow: 0 40px 90px -40px rgb(0 0 0 / 0.55), 0 4px 16px -8px rgb(0 0 0 / 0.3);
+  display: flex;
+  flex-direction: column;
+}
+.w-rd-face { position: absolute; z-index: 3; left: 0; top: 0; width: 100%; background-size: 100% 100%; pointer-events: none; }
+.w-rd-tb {
+  flex: none;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 8px 0 17px;
+  border-bottom: 1px solid rgb(var(--w-edge) / 0.14);
+}
+.w-rd-tb .dot { width: 9px; height: 9px; border-radius: 50%; border: 1.2px solid var(--w-fg); opacity: 0.7; flex: none; }
+.w-rd-tb b { font: 600 13px/1 var(--font-display); letter-spacing: 0.32em; }
+.w-rd-tb .en { font: 400 9px/1 var(--font-mono); letter-spacing: 0.3em; color: var(--w-faint); }
+.w-rd-tb .sp { flex: 1; }
+.w-rd-tb time { font: 400 10.5px/1 var(--font-mono); letter-spacing: 0.1em; color: var(--w-faint); margin-right: 6px; }
+.w-rd-nav { display: flex; align-items: center; gap: 2px; margin-right: 10px; font: 400 10px/1 var(--font-mono); color: var(--w-faint); letter-spacing: 0.1em; }
+.w-rd-nav button, .w-rd-min {
+  appearance: none;
+  border: 0;
+  background: none;
+  color: var(--w-fg);
+  width: 28px;
+  height: 28px;
+  border-radius: 2px;
+  cursor: pointer;
+  font: 400 15px/1 var(--font-mono);
+  opacity: 0.6;
+  position: relative;
+}
+.w-rd-nav button:disabled { opacity: 0.18; cursor: default; }
+.w-rd-nav button:not(:disabled):hover, .w-rd-min:hover { opacity: 1; background: rgb(var(--w-sheen) / calc(var(--w-sheen-a) * 0.4)); }
+.w-rd-nav button:focus-visible, .w-rd-min:focus-visible { outline: 1px solid var(--amber); opacity: 1; }
+.w-rd-min { font-size: 0; }
+.w-rd-min::after { content: ''; position: absolute; left: 8px; right: 8px; top: 13.5px; height: 1.2px; background: currentColor; }
+.w-rd-scroll { flex: 1; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--w-fg) 22%, transparent) transparent; }
+.w-rd-win { --px: clamp(22px, 6vw, 64px); }
+.w-rd-col { padding: 54px var(--px) 80px; font-size: 17px; }
+.w-rd-col:has(> .w-rd-fig) { padding-bottom: 48px; }
+
+.w-rd-title { margin: 0; font: 500 34px/1.42 var(--font-display); letter-spacing: 0.03em; text-wrap: balance; }
+.w-rd-title.small { font-size: 24px; margin-top: 4px; }
+.w-rd-title:focus { outline: none; }
+.w-rd-lede { margin: 16px 0 0; font: 400 16px/1.9 var(--font-display); color: var(--w-soft); }
+.w-rd-meta { margin: 22px 0 0; display: flex; flex-wrap: wrap; gap: 6px 18px; font: 400 11px/1.6 var(--font-mono); letter-spacing: 0.14em; color: var(--w-faint); padding-bottom: 30px; border-bottom: 1px solid rgb(var(--w-edge) / 0.14); }
+.w-rd-meta .ink { color: var(--w-ink); }
+.w-rd-fig + .w-rd-title + .w-rd-meta, .w-rd-fig + .w-rd-title.small + .w-rd-meta { border: 0; padding-bottom: 0; margin-top: 8px; }
+.w-rd-big { margin: 30px 0 0; font: 500 22px/1.8 var(--font-display); }
+.w-rd-text { margin: 14px 0 0; font: 400 16px/1.9 var(--font-display); color: var(--w-soft); }
+.w-rd-text.ink { color: var(--w-ink); }
+.w-rd-note { margin: 40px 0 0; color: var(--w-ink); font-size: 15px; }
+.w-rd-links { list-style: none; padding: 0; margin: 22px 0 0; display: flex; gap: 18px; flex-wrap: wrap; font: 400 12px/1.6 var(--font-mono); letter-spacing: 0.1em; }
+.w-rd-links a { color: var(--w-ink); text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--w-ink) 40%, transparent); }
+.w-rd-fig { margin: -54px calc(-1 * var(--px)) 26px; }
+.w-rd-img { display: block; width: 100%; height: auto; }
+/* 多图：网格 / 并排 */
+.w-rd-gal { display: grid; grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); gap: 2px; }
+.w-rd-gal .w-rd-img { aspect-ratio: 1; object-fit: cover; }
+/* 并排：flex-grow 按比例分剩余宽度、高度由 aspect-ratio 跟着走，于是同高；放不下就不长，横着滑 */
+.w-rd-row { display: flex; gap: 2px; overflow-x: auto; scroll-snap-type: x proximity; overscroll-behavior-x: contain; scrollbar-width: thin; outline: none; --rh: clamp(200px, 46vh, 420px); }
+.w-rd-row .w-rd-img { flex: var(--r) 0 calc(var(--r) * var(--rh)); min-width: 0; aspect-ratio: var(--r); height: auto; object-fit: cover; scroll-snap-align: start; }
+/* 多图：轮播（横向滚动吸附，滑动 / 触控板 / 键盘都是原生的） */
+.w-rd-car { position: relative; }
+.w-rd-track { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; aspect-ratio: var(--r); outline: none; overscroll-behavior-x: contain; }
+.w-rd-track::-webkit-scrollbar { display: none; }
+.w-rd-slide { flex: 0 0 100%; scroll-snap-align: start; }
+.w-rd-car .w-rd-img { height: 100%; object-fit: cover; }
+.w-rd-cprev, .w-rd-cnext { position: absolute; top: 50%; translate: 0 -50%; width: 34px; height: 34px; border: 0; border-radius: 50%; background: rgb(0 0 0 / 0.28); color: #fff; font: 400 20px/1 var(--font-display); cursor: pointer; opacity: 0.72; transition: opacity 0.3s; backdrop-filter: blur(6px); }
+.w-rd-cprev { left: 12px; }
+.w-rd-cnext { right: 12px; }
+.w-rd-cprev:hover, .w-rd-cnext:hover, .w-rd-cprev:focus-visible, .w-rd-cnext:focus-visible { opacity: 1; }
+.w-rd-cprev:disabled, .w-rd-cnext:disabled { opacity: 0; pointer-events: none; }
+.w-rd-dots { position: absolute; left: 0; right: 0; bottom: 12px; display: flex; justify-content: center; gap: 8px; pointer-events: none; }
+.w-rd-dots i { width: 5px; height: 5px; border-radius: 50%; background: rgb(255 255 255 / 0.5); box-shadow: 0 0 3px rgb(0 0 0 / 0.35); transition: background 0.3s, transform 0.3s; }
+.w-rd-dots i.on { background: rgb(255 255 255 / 0.95); transform: scale(1.3); }
+.w-rd-cap { border: 0; padding-bottom: 0; margin-top: 12px; }
+.w-rd-cap:has(span:empty) { display: none; }
+@media (prefers-reduced-motion: reduce) { .w-rd-cprev, .w-rd-cnext, .w-rd-dots i { transition: none; } }
+
+/* 读的正文借全站的 .md 排版；窗里按这一栏的夜色把全站的墨色令牌就地改掉，
+   于是同一套 .md 规则在浅窗、深窗里都对（令牌值取自 hours.css 的浅梦 / 深眠 / 异相） */
+.w-rd[data-wscene='essay'] { --bg: rgb(225 231 239); --bg-sunken: rgb(214 221 231); --fg: rgb(35 40 48); --fg-soft: rgb(86 96 109); --fg-faint: rgb(134 144 158); --line: color-mix(in srgb, var(--fg) 12%, transparent); }
+.w-rd[data-wscene='project'] { color-scheme: dark; --bg: rgb(20 27 41); --bg-sunken: rgb(14 20 31); --fg: rgb(230 233 239); --fg-soft: rgb(154 166 184); --fg-faint: rgb(108 120 138); --line: color-mix(in srgb, var(--fg) 15%, transparent); --frost: 165 180 215; --frost-a: 0.1; --hour-ink: color-mix(in srgb, var(--umber) 52%, #fff); }
+.w-rd[data-wscene='moment'] { color-scheme: dark; --bg: rgb(38 33 53); --bg-sunken: rgb(30 26 43); --fg: rgb(236 230 241); --fg-soft: rgb(169 159 186); --fg-faint: rgb(124 115 140); --line: color-mix(in srgb, var(--fg) 15%, transparent); --frost: 180 162 215; --frost-a: 0.1; --hour-ink: color-mix(in srgb, var(--umber) 52%, #fff); }
+.w-rd .md { margin-top: 36px; color: var(--w-fg); }
+.w-rd .prose { max-width: none; }
+.w-rd .w-rd-mdm { margin-top: 18px; }
+.w-rd[data-wscene='project'] .md a, .w-rd[data-wscene='moment'] .md a { color: var(--w-ink); }
+.w-rd .xfile { margin-top: 2.6rem; }
+.w-rd-note { margin: 2.4rem 0 0; padding-left: 1.2rem; border-left: 2px solid var(--amber); font-size: 0.85rem; line-height: 2; letter-spacing: 0.05em; color: var(--w-soft); }
+.w-rd-whole { margin: 2.6rem 0 0; font: 400 12px/1.6 var(--font-mono); letter-spacing: 0.1em; }
+.w-rd-whole a { color: var(--w-faint); text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--w-faint) 40%, transparent); }
+.w-rd-whole a:hover { color: var(--w-ink); }
+.w-rd-meta.tags { border: 0; padding-bottom: 0; margin-top: 26px; }
+/* 正文还在路上：三粒很淡的光，依次亮一下 */
+.w-rd-wait { display: flex; gap: 8px; margin: 44px 0 20px; }
+.w-rd-wait i { width: 5px; height: 5px; border-radius: 50%; background: var(--w-faint); opacity: 0.25; animation: w-wait 1.2s ease-in-out infinite; }
+.w-rd-wait i:nth-child(2) { animation-delay: 0.16s; }
+.w-rd-wait i:nth-child(3) { animation-delay: 0.32s; }
+@keyframes w-wait { 40% { opacity: 0.85; } }
+.w-vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* ══ 挂进站点 ══
+   有脚本时（html.w-on，WanderIndex.astro 里最早的一段内联脚本加上）：整页就是这片空间——
+   页面不滚，原来的目录（无脚本兜底 / 给搜索引擎的那一份）与页头页脚收起。没有脚本时这些都不生效，目录照常可读。 */
+html.w-on, html.w-on body { height: 100%; overflow: hidden; overscroll-behavior: none; }
+html.w-on .w-fallback, html.w-on .site-header, html.w-on .site-footer { display: none; }
+.w-host { display: none; }
+html.w-on .w-host { display: block; }
+html.w-on .page-ambient, html.w-on .wash-backdrop { display: none; }
+
+@media (max-width: 899px) {
+  .w-brand { left: 18px; top: 22px; font-size: 14px; }
+  .w-scenes { top: 56px; }
+  .w-scenes button { padding: 9px 6px 10px 11px; letter-spacing: 0.24em; }
+  .w-views { right: 14px; top: 14px; }
+  .w-views button { padding: 7px 9px; }
+  .w-views button span { display: none; }
+  .w-rh b { font-size: 17px; }
+  .w-rd-title { font-size: 27px; }
+  .w-rd-col { padding-top: 40px; }
+  .w-rd-fig { margin-top: -40px; }
+  .w-rd-nav .w-rd-pos { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .w-host *, .w-rd * { transition: none !important; }
+}
+
+/* ══ 主页：这片空间还没分开的样子（wander.js 的 home） ══
+   一根过中心、向右下倾 14° 的线（其实是叠在一起、转了 90° 的两条缝）；名字站在线的左上方，
+   三个栏头挂在线下，NEXUS 在线的右下方。--home（1 → 0）由脚本按「分开了多少」写：往下走时这些字先退，
+   名字飞成左上角的小字，栏头滑到各自的栏顶，线跟着缝转开、淡掉。
+   线的位置：y = 50vh + (x − 50vw) · tan 14°（0.2493）——下面的 calc 都按它摆。 */
+[data-wscene='home'], [data-ink='home'] {
+  --w-bg: #0e0f1d; --w-fg: #ece8f2; --w-soft: #b7b3c8; --w-faint: #827f98; --w-ink: #a195c1; --w-chrome: #e6e2ee;
+  --w-glass: 22 22 40; --w-glass-a: 0.56; --w-edge: 214 206 236; --w-edge-a: 0.24; --w-sheen: 220 214 240; --w-sheen-a: 0.3;
+  --w-panel-a: 0.9;
+}
+.w-home {
+  --home: 1;
+  --hx: 8vw;
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  color: #ece8f2;
+}
+.w-home-ln {
+  position: absolute;
+  left: -150vmax;
+  top: 0;
+  width: 300vmax;
+  height: 1px;
+  will-change: transform, opacity;
+}
+/* 上亮下暗的发丝线；两头早早淡掉。主页静着时这里是脑电线（Eeg.astro），这两根只在收平之后、转开与劈开的那一段出现 */
+.w-home-ln::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 22%, rgb(236 230 244 / 0.62) 38%, rgb(236 230 244 / 0.62) 62%, transparent 78%);
+  box-shadow: 0 1px 0 rgb(4 4 12 / 0.4);
+}
+/* 脑电群在这片空间里：压在流光之上、窗之下（全站默认是 z −2，会被流光整个盖住）；
+   不要正文列的中央消隐（线要穿过画面中央）；显隐由 wander.js 写 opacity */
+html.w-on .eeg-group {
+  z-index: 1;
+  opacity: 0;
+  -webkit-mask-image: none !important;
+  mask-image: none !important;
+}
+
+.w-home-title {
+  position: absolute;
+  left: var(--hx);
+  bottom: calc(50vh + (50vw - var(--hx)) * 0.2493 + 22px);
+}
+.w-home-kicker {
+  margin: 0 0 1.05rem 0.2em;
+  font: 500 13px/1 var(--font-display);
+  letter-spacing: 0.62em;
+  color: #9a97b0;
+  opacity: var(--home);
+}
+/* 大字与它上面那扇「反相窗」（wander/inverse.js）共用的盒子。
+   盒子是 transform 的落点（飞成左上角小字那一段位移与缩放都写在它身上），
+   所以那扇窗只要 inset: 0 就永远贴着字，不靠每帧量 rect 摆位。 */
+.w-home-brand-box {
+  position: relative;
+  width: fit-content;
+  transform-origin: 0 100%;
+  will-change: transform;
+}
+.w-home-brand {
+  margin: 0;
+  font: 500 clamp(54px, 7.4vw, 128px)/0.86 var(--font-display);
+  letter-spacing: 0.035em;
+  color: #f1edf6;
+  white-space: nowrap;
+}
+/* 那扇窗：一张只有大字那么大的小画布，反相 + 保住色相，再按字形遮罩。
+   拷贝只有大字这么大是这件事便宜的全部原因——挂在整屏的流光拷贝上就要每帧过滤一两百万像素 */
+.w-home-win {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transition: opacity 0.18s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+.w-home-win canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  filter: invert(1) hue-rotate(180deg);
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+}
+/* 那一层真的画起来了，字自己才让位（没起来就还是原来的墨色，不至于整块不见） */
+html.w-win .w-home-brand { color: transparent; }
+/* 换面时字标有一层磨砂溶变，那扇窗跟着一起化掉 */
+.w-home-brand-box:has(.is-morphing) .w-home-win { opacity: 0; }
+/* 进场：名字从糊里对上焦（像远处那几扇窗一样，先是一团，再清楚） */
+html.w-ready[data-wview='home'] .w-home-brand-box { animation: w-home-focus 1.6s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+@keyframes w-home-focus { from { filter: blur(14px); opacity: 0; } 60% { opacity: 1; } to { filter: blur(0); } }
+html.w-brand-small .w-home-brand-box { visibility: hidden; }
+html:not(.w-brand-small) .w-brand { opacity: 0 !important; pointer-events: none; }
+
+/* NEXUS：右下角 RSS 的右边，排在「别处」那一行里。上下负边距让它不撑高那一行（字仍和左下角的时刻对齐）；
+   字留出悬停时字距放开的宽，放开时不推动左边的 GitHub / RSS */
+.w-home-gate {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: -12px -4px -12px -2px;
+  padding: 8px 4px 8px 8px;
+  font: 400 10.5px/1 var(--font-mono);
+  letter-spacing: 0.46em;
+  color: #b7b3c8;
+  text-decoration: none;
+  transition: color 0.5s ease, letter-spacing 0.5s ease;
+}
+.w-home-gate span { min-width: calc(5 * (1ch + 0.58em)); }
+.w-home-gate svg { width: 13px; height: 18px; fill: rgb(236 230 244 / 0.06); stroke: currentColor; stroke-width: 0.9; stroke-linejoin: round; transition: transform 0.8s cubic-bezier(0.2, 0.7, 0.2, 1); }
+.w-home-gate svg path + path { fill: none; opacity: 0.55; }
+.w-home-gate:hover, .w-home-gate:focus-visible { color: #f1edf6; letter-spacing: 0.58em; outline: none; }
+.w-home-gate:hover svg, .w-home-gate:focus-visible svg { transform: translateY(-3px); }
+.w-home-gate:focus-visible span { border-bottom: 1px solid var(--amber); }
+
+.w-home-clock, .w-home-exits {
+  position: absolute;
+  bottom: 26px;
+  margin: 0;
+  font: 400 10px/1 var(--font-mono);
+  letter-spacing: 0.18em;
+  color: #827f98;
+  opacity: var(--home);
+}
+.w-home-clock { left: var(--hx); }
+.w-home-exits { right: 7vw; display: flex; align-items: center; gap: 22px; pointer-events: auto; }
+.w-home-exits a:not(.w-home-gate) { color: inherit; text-decoration: none; transition: color 0.3s ease; }
+.w-home-exits a:not(.w-home-gate):is(:hover, :focus-visible) { color: #ece8f2; outline: none; }
+
+.w-home-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 22px;
+  margin: 0;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  font: 500 11px/1 var(--font-display);
+  letter-spacing: 0.6em;
+  padding-left: 0.6em;
+  color: #827f98;
+  opacity: var(--home);
+}
+.w-home-hint i { width: 1px; height: 26px; background: linear-gradient(rgb(236 230 244 / 0.5), transparent); transform-origin: top; animation: w-home-drip 2.8s cubic-bezier(0.5, 0, 0.3, 1) infinite; }
+@keyframes w-home-drip { 0% { transform: scaleY(0); opacity: 1; } 60% { transform: scaleY(1); opacity: 1; } 100% { transform: scaleY(1); opacity: 0; } }
+
+/* 栏头在主页上：三个入口，挂在线下。每个前面一粒主题色（--amber）的点；悬停 / 聚焦时字由淡转实 */
+html[data-wview='home'] .w-rh { opacity: 1; pointer-events: auto; cursor: pointer; --w-fg: #e6e2ee; --w-faint: #8d8aa3; --w-ink: #a097b4; }
+.w-rh { transition: opacity 0.3s ease, color 0.6s ease; outline: none; }
+.w-rh .no, .w-rh i, .w-rh .ct { transition: color 0.6s ease; }
+.w-rh b { transition: letter-spacing 0.5s ease; }
+.w-rh-in::before {
+  content: '';
+  align-self: center;
+  width: 5px;
+  height: 5px;
+  margin-right: 2px;
+  border-radius: 50%;
+  background: var(--amber);
+  box-shadow: 0 0 10px 1px var(--amber);
+  opacity: 0;
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+html[data-wview='home'] .w-rh-in::before { opacity: 0.85; }
+html[data-wview='home'] .w-rh:is(:hover, :focus-visible) b { letter-spacing: 0.44em; }
+html[data-wview='home'] .w-rh:is(:hover, :focus-visible) .w-rh-in::before { opacity: 1; transform: scale(1.5); }
+html[data-wview='home'] .w-rh:focus-visible b { text-decoration: underline 1px var(--amber); text-underline-offset: 6px; }
+html[data-wview='home'] .w-scenes, html[data-wview='home'] .w-views { opacity: 0; pointer-events: none; }
+html[data-wview='home'] #w-stage { cursor: default; }
+
+@media (max-width: 899px) {
+  .w-home { --hx: 22px; }
+  .w-home-brand { font-size: clamp(44px, 13vw, 72px); }
+  .w-home-kicker { font-size: 12px; margin-bottom: 0.8rem; }
+  /* 窄屏照旧：单独站在 GitHub / RSS 那一行的上面（相对「别处」那一行定位：离屏幕右 18px、底 64px） */
+  .w-home-gate { position: absolute; right: -4px; bottom: 38px; margin: 0; }
+  .w-home-gate span { min-width: 0; }
+  .w-home-exits { right: 22px; }
+  .w-home-clock { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.w-ready[data-wview='home'] .w-home-brand-box, .w-home-hint i { animation: none; }
+  .w-home-brand-box:has(.is-morphing) .w-home-win { opacity: 1; }
+}
+
+/* ══ 字标（brand.ts）：醒 Traveritas 静着；梦 AveritA 逐字按像素格浮动、轮转（字的浮动与琥珀灼点的 keyframes 在 SiteHeader.astro，全局）。
+   这里补上站头那几条局部规则：换面时的磨砂溶变、两面的字距 ══ */
+[data-brand] {
+  display: inline-flex;
+  align-items: baseline;
+  transition: opacity 0.18s cubic-bezier(0.2, 0.8, 0.3, 1), filter 0.18s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+[data-brand].is-morphing { opacity: 0; filter: blur(2.5px); }
+.w-home-brand.is-dream { letter-spacing: 0.05em; }
+@media (prefers-reduced-motion: reduce) {
+  [data-brand].is-morphing { opacity: 1; filter: none; }
+}
+
+/* ══ 字随底换墨（wander/ink.js 逐几帧写一条横向渐变进 background-image）══ */
+[data-ink-auto] {
+  color: transparent !important;
+  -webkit-background-clip: text;
+  background-clip: text;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+}
