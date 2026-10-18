@@ -1063,7 +1063,11 @@ export async function initWander(host) {
     split = splitAt(t);
     face += (faceTo - face) * (RM ? 1 : 1 - Math.exp(-dt / 0.3));
     lightT += dt * lerp(1, 0.55, face);
-    for (let k = 0; k < 3; k++) bias[k] += ((k === homeHot ? 1 : 0) - bias[k]) * (1 - Math.exp(-dt / 0.35));
+    // 悬停的池子匀速涨满整屏（约 1.1s，着色器里再缓进缓出），离开时退得快一点（约 0.6s）
+    for (let k = 0; k < 3; k++) {
+      const up = k === homeHot;
+      bias[k] = RM ? (up ? 1 : 0) : clamp(bias[k] + (up ? dt / 1.1 : -dt / 0.6), 0, 1);
+    }
     // 脑电线的起伏：主页完全合拢时起来（0.7s），离开主页时在 CALM 里收平
     if (mode === 'home' && split < 0.001) eegAmp = Math.min(1, eegAmp + (RM ? 1 : dt / 0.7));
     else eegAmp = Math.max(0, eegAmp - (RM ? 1 : dt / (CALM / 1000)));

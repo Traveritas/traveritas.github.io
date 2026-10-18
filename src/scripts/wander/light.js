@@ -96,8 +96,11 @@ float flowV(vec2 fc, bool wind){
   vec2 oa = vec2(h21(vec2(k, 1.0)), h21(vec2(k, 7.0))) * 40.0;
   vec2 ob = vec2(h21(vec2(k + 1.0, 1.0)), h21(vec2(k + 1.0, 7.0))) * 40.0;
   float base = 0.72;
-  float a = field(uv * base * exp2(-s) + pan + oa, t);
-  float b = field(uv * base * exp2(1.0 - s) + pan * 2.0 + ob, t);
+  // 视差倍数跟着层号走（单数层 ×2、双数层 ×1），不跟着 a / b 两个槽走：推过一层时 b 原样接成新的 a，
+  // 平移不跳（原先 a 恒 ×1、b 恒 ×2，过层那一帧整片光会挪一下位置）
+  float ma = 1.0 + mod(k, 2.0);
+  float a = field(uv * base * exp2(-s) + pan * ma + oa, t);
+  float b = field(uv * base * exp2(1.0 - s) + pan * (3.0 - ma) + ob, t);
   float v = mix(a, b, smoothstep(0.0, 1.0, s));
   return clamp((v - 0.3) / 0.42, 0.0, 1.0);
 }
@@ -139,13 +142,17 @@ vec4 poolW(vec2 fc){
   float t = uTime;
   float ax = 0.5 * uRes.x / uRes.y; // 半屏宽（uv）
   vec3 w;
+  float B = uBias[0] + uBias[1] + uBias[2];
   for (int r = 0; r < 3; r++) {
     float fr = float(r);
     float cx = (fr - 1.0) * ax * 0.72;
     float prior = exp(-pow((uv.x - cx) / (ax * 0.5), 2.0));
     float n = fbm(uv * 1.15 + vec2(fr * 7.3, fr * 3.1) + vec2(t * 0.012 * (fr - 1.0), t * 0.009));
-    n += 0.16 * (prior - 0.55) + 0.1 * uBias[r];
-    w[r] = smoothstep(0.5, 0.64, n) * (0.78 + 0.22 * uBias[r]);
+    // 悬停：那一池的阈值一路降下去，边缘顺着噪声往外漫，直到铺满整屏；另两池同时退开、淡去
+    float g = smoothstep(0.0, 1.0, uBias[r]);
+    float o = B - uBias[r];
+    n += 0.16 * (prior - 0.55) * (1.0 - g) + 0.85 * g - 0.5 * o;
+    w[r] = smoothstep(0.5, 0.64, n) * (0.78 + 0.22 * g) * max(0.0, 1.0 - o);
   }
   float s = w.x + w.y + w.z;
   if (s > 1.0) w /= s;
