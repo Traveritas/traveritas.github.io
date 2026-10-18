@@ -375,19 +375,49 @@ html.w-on .eeg-group {
   color: #9a97b0;
   opacity: var(--home);
 }
+/* 大字与它上面那扇「反相窗」（wander/inverse.js）共用的盒子。
+   盒子是 transform 的落点（飞成左上角小字那一段位移与缩放都写在它身上），
+   所以那扇窗只要 inset: 0 就永远贴着字，不靠每帧量 rect 摆位。 */
+.w-home-brand-box {
+  position: relative;
+  width: fit-content;
+  transform-origin: 0 100%;
+  will-change: transform;
+}
 .w-home-brand {
   margin: 0;
   font: 500 clamp(54px, 7.4vw, 128px)/0.86 var(--font-display);
   letter-spacing: 0.035em;
   color: #f1edf6;
-  transform-origin: 0 100%;
   white-space: nowrap;
-  will-change: transform;
 }
+/* 那扇窗：一张只有大字那么大的小画布，反相 + 保住色相，再按字形遮罩。
+   拷贝只有大字这么大是这件事便宜的全部原因——挂在整屏的流光拷贝上就要每帧过滤一两百万像素 */
+.w-home-win {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transition: opacity 0.18s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+.w-home-win canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  filter: invert(1) hue-rotate(180deg);
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+}
+/* 那一层真的画起来了，字自己才让位（没起来就还是原来的墨色，不至于整块不见） */
+html.w-win .w-home-brand { color: transparent; }
+/* 换面时字标有一层磨砂溶变，那扇窗跟着一起化掉 */
+.w-home-brand-box:has(.is-morphing) .w-home-win { opacity: 0; }
 /* 进场：名字从糊里对上焦（像远处那几扇窗一样，先是一团，再清楚） */
-html.w-ready[data-wview='home'] .w-home-brand { animation: w-home-focus 1.6s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+html.w-ready[data-wview='home'] .w-home-brand-box { animation: w-home-focus 1.6s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
 @keyframes w-home-focus { from { filter: blur(14px); opacity: 0; } 60% { opacity: 1; } to { filter: blur(0); } }
-html.w-brand-small .w-home-brand { visibility: hidden; }
+html.w-brand-small .w-home-brand-box { visibility: hidden; }
 html:not(.w-brand-small) .w-brand { opacity: 0 !important; pointer-events: none; }
 
 .w-home-gate {
@@ -481,7 +511,8 @@ html[data-wview='home'] #w-stage { cursor: default; }
   .w-home-clock { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
-  html.w-ready[data-wview='home'] .w-home-brand, .w-home-hint i { animation: none; }
+  html.w-ready[data-wview='home'] .w-home-brand-box, .w-home-hint i { animation: none; }
+  .w-home-brand-box:has(.is-morphing) .w-home-win { opacity: 1; }
 }
 
 /* ══ 字标（brand.ts）：醒 Traveritas 静着；梦 AveritA 逐字按像素格浮动、轮转（字的浮动与琥珀灼点的 keyframes 在 SiteHeader.astro，全局）。

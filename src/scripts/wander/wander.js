@@ -30,8 +30,10 @@ import { createWeather } from './weather.js';
 import { Faces } from './faces.js';
 import { createReader, prefetch } from './reader.js';
 import { createInk } from './ink.js';
+import { createInverse } from './inverse';
 import { onRealityChange, setRingRenderer } from '../reality';
 import { setEegSpine } from '../eeg-spine';
+import { BRAND_WORDS } from '../brand';
 
 const PATH = { essay: '/articles/', moment: '/moments/', project: '/projects/' };
 const HOME = '/';
@@ -813,11 +815,13 @@ export async function initWander(host) {
   let revealT0 = now() + 300;
   const homeLines = [...host.querySelectorAll('.w-home-ln')];
   const homeBrand = host.querySelector('.w-home-brand');
+  const homeBrandBox = host.querySelector('.w-home-brand-box');
   const chromeBrand = host.querySelector('.w-brand');
   let brandFly = null; // { dx, dy, s }：大字标飞到左上角小字标的那一段位移与缩放（按需量一次）
   function measureBrand() {
-    homeBrand.style.transform = '';
-    const a = homeBrand.getBoundingClientRect();
+    if (!homeBrandBox) return;
+    homeBrandBox.style.transform = '';
+    const a = homeBrandBox.getBoundingClientRect();
     const b = chromeBrand.getBoundingClientRect();
     const s = b.height / Math.max(1, a.height);
     brandFly = { dx: b.left - a.left, dy: b.bottom - a.bottom, s };
@@ -866,15 +870,15 @@ export async function initWander(host) {
     }
     const ho = clamp(h * 1.8 - 0.8, 0, 1).toFixed(3); // 主页的其余字：先退
     if (homeEl._o !== ho) { homeEl.style.setProperty('--home', ho); homeEl._o = ho; }
-    // 字标：主页的大字飞成左上角的小字
-    if (h > 0.002 && h < 0.998) {
+    // 字标：主页的大字飞成左上角的小字（位移与缩放写在盒子上，那扇反相窗跟着走）
+    if (homeBrandBox && h > 0.002 && h < 0.998) {
       if (!brandFly) measureBrand();
       const e = 1 - h;
       const tr = `translate(${(brandFly.dx * e).toFixed(1)}px,${(brandFly.dy * e).toFixed(1)}px) scale(${lerp(1, brandFly.s, e).toFixed(4)})`;
-      if (homeBrand._t !== tr) { homeBrand.style.transform = tr; homeBrand._t = tr; }
-    } else if (homeBrand._t) {
-      homeBrand.style.transform = '';
-      homeBrand._t = '';
+      if (homeBrandBox._t !== tr) { homeBrandBox.style.transform = tr; homeBrandBox._t = tr; }
+    } else if (homeBrandBox?._t) {
+      homeBrandBox.style.transform = '';
+      homeBrandBox._t = '';
       brandFly = null;
     }
     root.classList.toggle('w-brand-small', h < 0.02);
@@ -1048,6 +1052,7 @@ export async function initWander(host) {
 
     const pan = background(dt);
     if (light) light.draw({ t: lightT, pan, zoom: cam.z, mouse, dim, seam: seamGeom(), split, bias, lift, ring: ringOn ? ring : null, face });
+    if (win) win.step();
     if (ink) ink.step(frame);
     const regions = {};
     const show = {};
@@ -1681,7 +1686,6 @@ export async function initWander(host) {
   if (ink) {
     const q = (sel) => host.querySelector(sel);
     const AMBER = { light: [226, 186, 146], dark: [118, 84, 58] };
-    ink.add(q('.w-home-brand'));
     ink.add(q('.w-home-kicker span'), { a: 0.72 });
     ink.add(q('.w-home-gate span'), { a: 0.85 });
     ink.add(q('.w-home-clock time'), { a: 0.62 });
@@ -1695,6 +1699,13 @@ export async function initWander(host) {
       ink.add(el.querySelector('.ct'), AMBER);
     }
   }
+
+  /* ══ 反相窗（inverse.js）：主页大字不换墨，它是那片流光的一扇窗——
+     底下那一小块流光反相、保住色相，按字形遮罩。同样要有 WebGL 才接；
+     接不上时大字用 CSS 的墨色，不至于整块不见 ══ */
+  const winCv = host.querySelector('#w-win');
+  const win = light && winCv && homeBrand ? createInverse({ light: host.querySelector('#w-light'), target: homeBrand, canvas: winCv, words: BRAND_WORDS }) : null;
+  if (win) win.warm();
 
   /* ══ 起步 ══ */
   root.dataset.wscene = mode === 'home' ? 'home' : scene;
