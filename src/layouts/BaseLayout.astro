@@ -48,6 +48,9 @@ interface Props {
   rail?: { mode: 'night' };
   /* 页内导览轨（目录页 / 阅读页）：与 rail 二选一 */
   gauge?: GaugeProps;
+  /* 整页是一片自成一体的空间（随笔 / 瞬间 / 项目目录页的漫游 / 检索，见 components/wander/）：
+     不画顶部进度线、14° 发丝线、脑电群与全页环境微光——那片空间有自己的光与缝 */
+  immersive?: boolean;
 }
 
 const {
@@ -66,6 +69,7 @@ const {
   boot = true,
   rail,
   gauge,
+  immersive = false,
 } = Astro.props;
 
 // 醒/梦双态标题推导规则（符合 AGENTS.md 核心词汇映射）
@@ -153,11 +157,11 @@ const [, hour, tone] = HOURS.find(([p]) => path.startsWith(p)) ?? ['', path === 
   >
     <div class="wash-backdrop" aria-hidden="true"></div>
     {/* wash-backdrop 全站常驻（z −5，7% 醒梦洗染）；page-ambient 只在传了 ambient 的页面出现 */}
-    {ambient && <div class="page-ambient" aria-hidden="true" />}
+    {ambient && !immersive && <div class="page-ambient" aria-hidden="true" />}
     {boot && <BootVeil always={boot === 'always'} />}
-    <Hairline />
-    {seam !== 'none' && <Seam variant={seam} />}
-    <Eeg />
+    {!immersive && <Hairline />}
+    {seam !== 'none' && !immersive && <Seam variant={seam} />}
+    {!immersive && <Eeg />}
     {rail && <Rail {...rail} />}
     {gauge && <Gauge {...gauge} />}
     <div class="page">
