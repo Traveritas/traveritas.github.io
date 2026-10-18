@@ -22,6 +22,9 @@
    那根线转过 90°、劈成两条缝滑到栏界上，池子被缝收拢成三栏，窗落进格子——就是检索。
    点左上的名字回来：窗沉回景深，两条缝合拢、转回去，又是一根线。
 
+ 两个不用找按钮的手势：检索里点某一栏的空处 → 那一栏铺满，进漫游；
+   漫游里快速往后退（滚轮 / 捏合 / -，退速够快）→ 收回检索；快到时光微微暗下去、栏头从身后浮出来一点。
+
  挂在主页与随笔 / 瞬间 / 项目三个目录页上（WanderIndex.astro）：四个地址是同一页，只是进来时落在哪里。
  入梦检验的塌缩圈在这里由自己画（setRingRenderer）：圈里的光粗成像素、窗退到更糊的档位。
  ───────────────────────────────────────────────────────────── */
@@ -364,8 +367,10 @@ export async function initWander(host) {
     if (!el) return;
     const w = v.it.w;
     const h = v.it.h;
-    if (el._it !== v.it) {
+    // _ver：同一条目被重画过（工具栏换了「多图」的排法），尺寸与各档图都要重贴
+    if (el._it !== v.it || el._ver !== v.it._ver) {
       el._it = v.it;
+      el._ver = v.it._ver;
       el.style.width = `${w}px`;
       el.style.height = `${h}px`;
       v._lod = -1;
@@ -678,6 +683,8 @@ export async function initWander(host) {
   let dwellT = 0;
   function stepColumns(dt) {
     hoverCol = mode === 'grid' && !geo.horz && mouse.inside && !reading && now() > busy && mouse.y > 64 ? regionAt(mouse.x, mouse.y) : -1;
+    // 栏里的空处可以点（进漫游）：指针给个放大的样子；窗自己的 cursor 更具体，不受影响
+    stage.style.cursor = hoverCol >= 0 && !(drag && drag.moved) ? 'zoom-in' : '';
     const here = mode === 'grid' && mouse.inside && mouse.y > 64 ? regionAt(mouse.x, mouse.y) : -1;
     if (here !== dwellCol) { dwellCol = here; dwellT = now(); }
     else if (here >= 0 && now() - dwellT > 700) lastCol = here;
@@ -984,6 +991,31 @@ export async function initWander(host) {
     if (clock.speed) step(clock.t, dt);
     requestAnimationFrame(tick);
   }
+  /* 漫游里往后退得够快（zT 减小的速度）就收回检索；慢慢往后推拉只是推拉。
+     速度 = zT 每帧增量 / dt 的指数平滑（τ 0.25s：滚轮一格一格的跳变被抹平，要连着快退约四分之一秒才算数）；
+     往前走是负的退速，会直接抵掉。PULL_V 约每秒 4.8 层（鼠标滚轮约每秒 15 格、触控板一记快划）。
+     接近时（退速过了一半）给预告：光与天气微微暗下去，三栏的栏头从身后浮出来一点。 */
+  const PULL_V = GAP * 4.8;
+  let pullV = 0;
+  let pull = 0;
+  let pullZ = zT;
+  let pullCss = '';
+  function stepPull(t, dt) {
+    const live = mode === 'explore' && !camFly && !reading && t > busy;
+    const dz = zT - pullZ;
+    pullZ = zT;
+    if (!live) pullV = 0;
+    else {
+      pullV += (-dz / Math.max(dt, 1e-3) - pullV) * (1 - Math.exp(-dt / 0.25));
+      pullV = Math.max(0, pullV);
+      if (pullV > PULL_V) { pullV = 0; toGrid(); }
+    }
+    const goal = clamp((pullV / PULL_V - 0.5) / 0.5, 0, 1);
+    pull += (goal - pull) * (RM ? 1 : 1 - Math.exp(-dt / 0.12));
+    const css = mode === 'explore' ? (RM ? 0 : pull).toFixed(2) : '';
+    if (css !== pullCss) { root.style.setProperty('--w-pull', css || '0'); pullCss = css; }
+  }
+  const pullDim = () => (RM ? 0 : 0.35 * pull);
   function step(t, dt) {
     // 镜头
     if (camFly) {
@@ -1018,6 +1050,7 @@ export async function initWander(host) {
       }
       cam.z += (zT - cam.z) * (RM ? 1 : 1 - Math.exp((-dt * 1000) / 170));
     }
+    stepPull(t, dt);
     readFx += (readGoal - readFx) * (RM ? 1 : 1 - Math.exp(-dt / 0.2));
     dim += ((reading ? 1 : 0) - dim) * (1 - Math.exp(-dt / 0.22));
     if (wipeFrom && t > busy) {
@@ -1051,7 +1084,8 @@ export async function initWander(host) {
     if (frame % 6 === 0) placeInk();
 
     const pan = background(dt);
-    if (light) light.draw({ t: lightT, pan, zoom: cam.z, mouse, dim, seam: seamGeom(), split, bias, lift, ring: ringOn ? ring : null, face });
+    const dimE = Math.max(dim, pullDim());
+    if (light) light.draw({ t: lightT, pan, zoom: cam.z, mouse, dim: dimE, seam: seamGeom(), split, bias, lift, ring: ringOn ? ring : null, face });
     if (win) win.step();
     if (ink) ink.step(frame);
     const regions = {};
@@ -1061,11 +1095,11 @@ export async function initWander(host) {
     const flat = flatSeams();
     SC.forEach((s, k) => {
       regions[s] = !flat || empty(k) ? null : polygon(k);
-      show[s] = (1 - 0.4 * dim) * split * split;
+      show[s] = (1 - 0.4 * dimE) * split * split;
       cams[s] = weatherCam(k, dt);
     });
     weather.draw({ t, G, vw, vh, zoom: cam.z, cams, regions, show, RM });
-    veil.style.opacity = (dim * 0.4).toFixed(3);
+    veil.style.opacity = (dimE * 0.4).toFixed(3);
   }
 
   /* 离场的副本（沉回景深 / 被缝扫掉）：只走完飞行，然后回收 */
@@ -1420,6 +1454,12 @@ export async function initWander(host) {
     if (suppress || reading || now() < busy) return;
     const el = e.target.closest && e.target.closest('.w-card');
     const v = el && elVis.get(el);
+    // 检索里点栏里的空处：那一栏铺满，进漫游（窄屏的横缝、栏头那一条不算）
+    if (!el && mode === 'grid' && !geo.horz && e.clientY > 64) {
+      const k = regionAt(e.clientX, e.clientY);
+      if (k >= 0) toExplore(SC[k]);
+      return;
+    }
     if (!v || v.fl) return;
     if (mode === 'explore' || mode === 'home') {
       if (v.clear && !camFly) openVis(v);
@@ -1692,12 +1732,14 @@ export async function initWander(host) {
     if (mode === 'home') rotTo = rotFrom = homeRot();
     brandFly = null;
   });
+  /* 工具栏换了「多图」的排法：多图瞬间就地重画；检索每帧重排，漫游的位置按旧高度算的也无妨（只差一点错落） */
+  addEventListener('xm-multi', () => { Faces.repaintMulti(ALL); });
 
   /* ══ 字随底换墨（ink.js）：浮在流光上的字按底下的明暗换墨。没有 WebGL（流光退回 CSS 渐变）时不接，字用原来的颜色 ══ */
   const ink = light ? createInk(host.querySelector('#w-light')) : null;
   if (ink) {
     const q = (sel) => host.querySelector(sel);
-    const AMBER = { light: [226, 186, 146], dark: [118, 84, 58] };
+    const AMBER = { light: [189, 176, 217], dark: [79, 74, 102] };
     ink.add(q('.w-home-kicker span'), { a: 0.72 });
     ink.add(q('.w-home-gate span'), { a: 0.85 });
     ink.add(q('.w-home-clock time'), { a: 0.62 });

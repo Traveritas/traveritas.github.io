@@ -18,8 +18,8 @@ const B = 2; // 基础格（CSS px）
 const BLOCK = 8; // 一块的基础格数
 const ALPHA = [0, 0.34, 0.58, 0.8, 0.93];
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => (v + 0.5) / 16);
-/* 要去的那一面的偏色（梦暖琥珀 / 醒冷灰） */
-const TINT = { dream: [217, 160, 91], wake: [150, 162, 176] } as const;
+/* 要去的那一面的偏色（梦薄暮 / 醒冷灰） */
+const TINT = { dream: [154, 134, 196], wake: [150, 162, 176] } as const;
 
 const hash = (x: number, y: number) => {
   let h = Math.imul(x, 374761393) + Math.imul(y, 668265263);

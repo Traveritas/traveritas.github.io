@@ -568,6 +568,37 @@ export function initToolstar() {
     });
   }
 
+  /* 多图瞬间怎么排：网格 / 并排 / 轮播（点一下换到下一种）。阅读窗现读；窗面由 wander.js 收到 xm-multi 就地重画 */
+  const multi = root.querySelector<HTMLButtonElement>('[data-multi]');
+  if (multi) {
+    const KINDS = [
+      ['grid', '网格'],
+      ['row', '并排'],
+      ['car', '轮播'],
+    ];
+    let cur = 0;
+    try {
+      const i = KINDS.findIndex(([k]) => k === localStorage.getItem('xm-multi'));
+      if (i > 0) cur = i;
+    } catch {
+      /* 读不到就用网格 */
+    }
+    const v = multi.querySelector('[data-multi-v]')!;
+    v.textContent = KINDS[cur][1];
+    multi.addEventListener('click', () => {
+      cur = (cur + 1) % KINDS.length;
+      try {
+        if (cur) localStorage.setItem('xm-multi', KINDS[cur][0]);
+        else localStorage.removeItem('xm-multi');
+      } catch {
+        /* 存不下就算了 */
+      }
+      v.textContent = KINDS[cur][1];
+      // 漫游 / 检索里的窗就地重画（wander.js 接）
+      dispatchEvent(new CustomEvent('xm-multi'));
+    });
+  }
+
   /* ── 本页：目录 + 字号 / 行距（只在阅读页） ── */
   const tocLinks: { a: HTMLAnchorElement; el: HTMLElement }[] = [];
   function markToc() {

@@ -18,6 +18,7 @@ const paras = (s) => (s || '').split(/\n\s*\n/).map((x) => x.trim()).filter(Bool
 const EASE_OPEN = 'cubic-bezier(0.32, 0.72, 0, 1)';
 const EASE_CLOSE = 'cubic-bezier(0.5, 0, 0.2, 1)';
 const ext = (h) => (/^https?:/.test(h) ? ' target="_blank" rel="noopener"' : '');
+import { Faces } from './faces.js';
 const LABEL = { essay: ['随笔', 'ESSAY', '断章'], project: ['项目', 'PROJECT', '造物'], moment: ['瞬间', 'MOMENT', '闪念'] };
 
 /* ── 正文取材：同一个地址只取一次 ── */
@@ -44,6 +45,57 @@ export function prefetch(it) {
   return cache.get(href);
 }
 
+/* 一则瞬间的全部配图，按「多图」设置排：grid 网格 / row 并排（≤3 张，更多退回网格）/ car 轮播（原生横向滚动吸附 = 可滑，另有 ‹ › 与圆点） */
+function gallery(a) {
+  const ims = a.images;
+  const img = (im, i) => `<img class="w-rd-img" src="${esc(im.l)}" alt="${esc(im.alt)}" width="${im.w}" height="${im.h}"${i ? ' loading="lazy"' : ''}>`;
+  if (ims.length < 2) return `<figure class="w-rd-fig">${img(ims[0], 0)}</figure>`;
+  const mode = Faces.multi();
+  if (mode === 'car') {
+    const r = Math.min(Math.max(ims[0].w / ims[0].h, 0.8), 1.6).toFixed(3);
+    return `<figure class="w-rd-fig w-rd-car" role="group" aria-roledescription="轮播" aria-label="配图" style="--r:${r}">
+      <div class="w-rd-track" tabindex="0">${ims.map((im, i) => `<div class="w-rd-slide" role="group" aria-label="${i + 1} / ${ims.length}">${img(im, i)}</div>`).join('')}</div>
+      <button type="button" class="w-rd-cprev" aria-label="上一张" disabled>‹</button><button type="button" class="w-rd-cnext" aria-label="下一张">›</button>
+      <div class="w-rd-dots" aria-hidden="true">${ims.map((_, i) => `<i${i ? '' : ' class="on"'}></i>`).join('')}</div>
+    </figure>
+    <p class="w-rd-meta w-rd-cap"><span>${esc(ims[0].alt)}</span></p>`;
+  }
+  // 并排：一行、各自的比例同高；放得下就按比例分满一行，放不下就横着滑
+  if (mode === 'row') return `<figure class="w-rd-fig w-rd-row" tabindex="0">${ims.map((im, i) => img(im, i).replace('<img ', `<img style="--r:${(im.w / im.h).toFixed(3)}" `)).join('')}</figure>`;
+  const cols = ims.length >= 5 ? 3 : 2;
+  return `<figure class="w-rd-fig w-rd-gal" style="--cols:${cols}">${ims.map((im, i) => img(im, i)).join('')}</figure>`;
+}
+/* 轮播的控制：滚动即换页（滑动、触控板、键盘都走它），按钮与圆点只是替它滚 */
+function wireCarousel(col) {
+  const car = col.querySelector('.w-rd-car');
+  if (!car) return;
+  const track = car.querySelector('.w-rd-track');
+  const dots = [...car.querySelectorAll('.w-rd-dots i')];
+  const prev = car.querySelector('.w-rd-cprev');
+  const next = car.querySelector('.w-rd-cnext');
+  const cap = col.querySelector('.w-rd-cap span');
+  const alts = [...car.querySelectorAll('img')].map((x) => x.alt);
+  const n = dots.length;
+  const idx = () => Math.max(0, Math.min(n - 1, Math.round(track.scrollLeft / track.clientWidth)));
+  const paint = () => {
+    const i = idx();
+    dots.forEach((d, k) => d.classList.toggle('on', k === i));
+    prev.disabled = i === 0;
+    next.disabled = i === n - 1;
+    if (cap) cap.textContent = alts[i] || '';
+  };
+  const go = (i) => track.scrollTo({ left: Math.max(0, Math.min(n - 1, i)) * track.clientWidth, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
+  track.addEventListener('scroll', paint, { passive: true });
+  prev.addEventListener('click', () => go(idx() - 1));
+  next.addEventListener('click', () => go(idx() + 1));
+  car.__step = (d) => {
+    const i = idx() + d;
+    if (i < 0 || i > n - 1) return false;
+    go(i);
+    return true;
+  };
+}
+
 function head(it) {
   const a = it.ref;
   if (it.kind === 'article')
@@ -64,9 +116,8 @@ function body(it) {
       <p class="w-rd-whole"><a href="${esc(a.href)}">在单独的一页里读 ↗</a></p>`;
   const text = a.html ? `<div class="md w-rd-mdm">${a.html}</div>` : paras(a.text).map((p) => `<p class="w-rd-text">${esc(p)}</p>`).join('');
   if (it.kind === 'img') {
-    const im = a.images[it.k - 1];
-    return `<figure class="w-rd-fig"><img class="w-rd-img" src="${esc(im.l)}" alt="${esc(im.alt)}" width="${im.w}" height="${im.h}"></figure>
-      ${a.title ? `<h1 class="w-rd-title small" tabindex="-1">${esc(a.title)}</h1>` : '<h1 class="w-rd-title small w-vh" tabindex="-1">瞬间</h1>'}${a.images.length > 1 && im.alt ? `<p class="w-rd-meta"><span>${esc(im.alt)}</span></p>` : ''}
+    return `${gallery(a)}
+      ${a.title ? `<h1 class="w-rd-title small" tabindex="-1">${esc(a.title)}</h1>` : '<h1 class="w-rd-title small w-vh" tabindex="-1">瞬间</h1>'}
       ${text}${a.tags.length ? `<p class="w-rd-meta tags"><span class="ink">${a.tags.map(esc).join(' · ')}</span></p>` : ''}`;
   }
   return `${a.title ? `<h1 class="w-rd-title" tabindex="-1">${esc(a.title)}</h1>` : '<h1 class="w-rd-title w-vh" tabindex="-1">瞬间</h1>'}${text}
@@ -102,7 +153,7 @@ export function createReader({ onOpen, onNav, onClosing, onClosed, onBody }) {
     const [cn, en, dream] = LABEL[it.scene];
     const list = cur ? cur.list : [];
     const n = list.indexOf(it);
-    const right = it.kind === 'img' && it.ref.images.length > 1 ? `${dot(it.ref.date)} · ${it.k}/${it.ref.images.length}` : dot(it.ref.date);
+    const right = it.kind === 'img' && it.ref.images.length > 1 ? `${dot(it.ref.date)} · ${it.ref.images.length} 张` : dot(it.ref.date);
     // 窗是后来插进页面的，全站的双态换面不认识它：按此刻是醒是梦先写对
   const face = document.body.dataset.reality === 'dream' ? dream : cn;
   return `<i class="dot" aria-hidden="true"></i><b data-morph data-true="${cn}" data-dream="${dream}">${face}</b><span class="en">${en}</span><span class="sp"></span>
@@ -154,6 +205,7 @@ export function createReader({ onOpen, onNav, onClosing, onClosed, onBody }) {
     cur = { el, win, face, tb, col, it, opts, list: opts.list || [it], pushed: !opts.fromURL };
     tb.innerHTML = titleBar(it);
     col.innerHTML = body(it);
+    wireCarousel(col);
     face.style.backgroundImage = `url(${it.lod[0]})`;
     face.style.aspectRatio = `${it.w} / ${it.h}`;
     document.documentElement.classList.add('w-reading');
@@ -201,6 +253,7 @@ export function createReader({ onOpen, onNav, onClosing, onClosed, onBody }) {
       el.dataset.wscene = next.scene;
       tb.innerHTML = titleBar(next);
       col.innerHTML = body(next);
+      wireCarousel(col);
       cur.face.style.backgroundImage = `url(${next.lod[0]})`;
       cur.face.style.aspectRatio = `${next.w} / ${next.h}`;
       scroll.scrollTop = 0;
@@ -258,8 +311,13 @@ export function createReader({ onOpen, onNav, onClosing, onClosed, onBody }) {
   addEventListener('keydown', (e) => {
     if (!cur) return;
     if (e.key === 'Escape') { e.preventDefault(); requestClose(); }
-    else if (e.key === 'ArrowLeft' && !e.altKey) { e.preventDefault(); nav(-1); }
-    else if (e.key === 'ArrowRight' && !e.altKey) { e.preventDefault(); nav(1); }
+    else if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !e.altKey) {
+      e.preventDefault();
+      const d = e.key === 'ArrowLeft' ? -1 : 1;
+      // 轮播先在图间走，走到头了再翻到相邻一条
+      const car = cur.col.querySelector('.w-rd-car');
+      if (!(car && car.__step && car.__step(d))) nav(d);
+    }
   });
 
   return { open, close: requestClose, get isOpen() { return !!cur; }, get it() { return cur && cur.it; } };

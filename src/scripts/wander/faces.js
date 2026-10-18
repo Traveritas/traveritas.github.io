@@ -27,25 +27,67 @@ const dot = (d) => d.slice(0, 10).replace(/-/g, '.');
 const paras = (s) => (s || '').split(/\n\s*\n/).map((x) => x.trim()).filter(Boolean);
 const rgba = ([r, g, b], a) => `rgba(${r}, ${g}, ${b}, ${a})`;
 
+/* ══ 多图瞬间的排法（工具栏「多图」，存在 localStorage 的 xm-multi）══
+   grid 网格：2 列（≥5 张 3 列）方格裁切；row 并排：一行、各自的比例，放不下就溢出右缘；car 轮播：窗面上只摆第一张 + 圆点。
+   改了设置（工具栏发 xm-multi 事件）由 repaintMulti 就地重画多图的窗；阅读窗每次现读。 */
+const MULTI = ['grid', 'row', 'car'];
+function multi() {
+  try {
+    const v = localStorage.getItem('xm-multi');
+    return MULTI.includes(v) ? v : 'grid';
+  } catch {
+    return 'grid';
+  }
+}
+const GAP = 2;
+/* 图区的几何：{ mode, ih（图区高）, cells: [{x, y, w, h}] }，相对图区左上；单图 / 轮播只有一格 */
+function picLayout(images, w, mode) {
+  const n = images.length;
+  const iw = w - 2;
+  if (n === 1 || mode === 'car') {
+    // 单图照旧不裁；轮播各张共用一个框，按第一张定、收在一个范围里
+    const r = images[0].h / images[0].w;
+    const ih = Math.round(n === 1 ? w * r : Math.min(Math.max(iw * r, iw * 0.62), iw * 1.2));
+    return { mode: n === 1 ? 'one' : 'car', ih, cells: [{ x: 0, y: 0, w: iw, h: ih }] };
+  }
+  if (mode === 'row') {
+    // 并排：一行，各张保持自己的比例、同一高度；放得下就正好铺满一行，放不下就从右缘溢出去（读的时候横着滑）
+    const rs = images.map((im) => im.w / im.h);
+    const fit = (iw - GAP * (n - 1)) / rs.reduce((a, b) => a + b, 0);
+    const ih = Math.round(Math.max(fit, iw * 0.5));
+    let x = 0;
+    const cells = rs.map((r) => { const c = { x, y: 0, w: ih * r, h: ih }; x += ih * r + GAP; return c; });
+    return { mode: 'row', ih, cells };
+  }
+  const cols = n >= 5 ? 3 : 2;
+  const cw = (iw - GAP * (cols - 1)) / cols;
+  const rows = Math.ceil(n / cols);
+  const ih = Math.round(rows * cw + GAP * (rows - 1));
+  return { mode: 'grid', ih, cells: images.map((_, i) => ({ x: (i % cols) * (cw + GAP), y: Math.floor(i / cols) * (cw + GAP), w: cw, h: cw })) };
+}
+
 /* ══ 条目 ══ */
 function items(D) {
   const essay = D.articles.map((a) => ({ scene: 'essay', kind: 'article', ref: a, w: 420, h: 250 }));
   const project = D.projects.map((p) => ({ scene: 'project', kind: 'project', ref: p, w: 440, h: 262 }));
   const moment = [];
   for (const m of D.moments) {
-    if (m.images.length) m.images.forEach((im, k) => moment.push({ scene: 'moment', kind: 'img', ref: m, k: k + 1, w: 340, h: TB + Math.round((340 * im.h) / im.w) + 44 }));
-    else moment.push({ scene: 'moment', kind: 'note', ref: m, w: 330, h: 206 });
+    // 一则瞬间 = 一扇窗，所有配图都在里面
+    if (m.images.length) {
+      const pl = picLayout(m.images, 340, multi());
+      moment.push({ scene: 'moment', kind: 'img', ref: m, w: 340, h: TB + pl.ih + 44, _pl: pl });
+    } else moment.push({ scene: 'moment', kind: 'note', ref: m, w: 330, h: 206 });
   }
   const all = { essay, moment, project };
   for (const s in all) {
-    // 检索视图按日期倒排；多图瞬间按原顺序挨着
-    all[s].sort((a, b) => (b.ref.date > a.ref.date ? 1 : b.ref.date < a.ref.date ? -1 : (a.k || 0) - (b.k || 0)));
+    // 检索视图按日期倒排
+    all[s].sort((a, b) => (b.ref.date > a.ref.date ? 1 : b.ref.date < a.ref.date ? -1 : 0));
     all[s].forEach((it, i) => {
       it.id = `${s}-${i}`;
       it.i = i;
       it.title = it.ref.title;
       // 「年-月」也进检索文本：工具栏的年月圈拿它当一个词筛（2026-10）
-      it.text = [it.ref.title, it.ref.desc || '', (it.ref.tags || []).join(' '), (it.ref.date || '').slice(0, 7), it.ref.text || '', it.kind === 'img' ? it.ref.images[it.k - 1].alt || '' : ''].join(' ').toLowerCase();
+      it.text = [it.ref.title, it.ref.desc || '', (it.ref.tags || []).join(' '), (it.ref.date || '').slice(0, 7), it.ref.text || '', (it.ref.images || []).map((im) => im.alt || '').join(' ')].join(' ').toLowerCase();
     });
   }
   return all;
@@ -224,23 +266,49 @@ async function content(ctx, it, c) {
     // 底：标签（项目是链接）
     chips(ctx, c, labels, pad, chipY, w - pad);
   } else if (it.kind === 'img') {
-    const im = a.images[it.k - 1];
-    titleBar(ctx, it, c, dot(a.date), a.images.length > 1 ? `${it.k} / ${a.images.length}` : '');
-    const pic = await loadImage(im.m);
-    const ih = h - TB - 44;
-    if (pic) {
+    const n = a.images.length;
+    const pl = it._pl;
+    titleBar(ctx, it, c, dot(a.date), n > 1 ? (pl.mode === 'car' ? `1 / ${n}` : `${n} 张`) : '');
+    const ih = pl.ih;
+    const pics = await Promise.all(a.images.slice(0, pl.cells.length).map((im) => loadImage(im.m)));
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(1, TB + 1, w - 2, ih);
+    ctx.clip();
+    pl.cells.forEach((cell, i) => {
+      const pic = pics[i];
+      if (!pic) return;
+      const x0 = 1 + cell.x;
+      const y0 = TB + 1 + cell.y;
       ctx.save();
       ctx.beginPath();
-      ctx.rect(1, TB + 1, w - 2, ih);
+      ctx.rect(x0, y0, cell.w, cell.h);
       ctx.clip();
-      const sc = Math.max((w - 2) / pic.width, ih / pic.height);
+      const sc = Math.max(cell.w / pic.width, cell.h / pic.height);
       const pw = pic.width * sc;
       const ph = pic.height * sc;
-      ctx.drawImage(pic, 1 + (w - 2 - pw) / 2, TB + 1 + (ih - ph) / 2, pw, ph);
+      ctx.drawImage(pic, x0 + (cell.w - pw) / 2, y0 + (cell.h - ph) / 2, pw, ph);
       ctx.restore();
-      ctx.fillStyle = c.hair;
-      ctx.fillRect(0, TB + 1 + ih, w, 1);
+    });
+    // 轮播：图底几粒安静的圆点，第一粒是此刻
+    if (pl.mode === 'car') {
+      const gap = 11;
+      const x0 = w / 2 - ((n - 1) * gap) / 2;
+      const y0 = TB + 1 + ih - 14;
+      // 底下垫一条淡暗的衬，浅色的图上圆点也看得见
+      rrect(ctx, x0 - 11, y0 - 7, (n - 1) * gap + 22, 14, 7);
+      ctx.fillStyle = 'rgba(24, 18, 40, 0.34)';
+      ctx.fill();
+      for (let i = 0; i < n; i++) {
+        ctx.beginPath();
+        ctx.arc(x0 + i * gap, y0, i ? 2.2 : 2.8, 0, Math.PI * 2);
+        ctx.fillStyle = i ? 'rgba(255, 255, 255, 0.5)' : 'rgba(255, 255, 255, 0.95)';
+        ctx.fill();
+      }
     }
+    ctx.restore();
+    ctx.fillStyle = c.hair;
+    ctx.fillRect(0, TB + 1 + ih, w, 1);
     // 图注：标题在左，第一个标签在右
     const tag = (a.tags || [])[0];
     ctx.font = `400 11px ${SERIF}`;
@@ -315,4 +383,22 @@ async function build(D) {
   return all;
 }
 
-export const Faces = { build, LODS, INK, LABEL, TB };
+/* 「多图」换了：多图瞬间按新排法重算高度、重画各档（旧的各档不放：开着的阅读窗合上时还要用它）。返回改过的条目 */
+let multiGen = 0;
+async function repaintMulti(all) {
+  const mode = multi();
+  const gen = ++multiGen;
+  const its = all.moment.filter((it) => it.kind === 'img' && it.ref.images.length > 1);
+  await Promise.all(its.map(async (it) => {
+    // 先在一份副本上画完，再一起换上：画的途中窗不会是新高度配旧图
+    const pl = picLayout(it.ref.images, it.w, mode);
+    const nt = { ...it, _pl: pl, h: TB + pl.ih + 44 };
+    await paint(nt);
+    // 连着点了几下：只认最后一次
+    if (gen !== multiGen) return nt.lod.forEach((u) => URL.revokeObjectURL(u));
+    Object.assign(it, { _pl: nt._pl, h: nt.h, lod: nt.lod, _ver: (it._ver || 0) + 1 });
+  }));
+  return its;
+}
+
+export const Faces = { build, LODS, INK, LABEL, TB, multi, repaintMulti };
