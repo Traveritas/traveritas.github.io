@@ -14,11 +14,11 @@ const LODS = [6, 12, 24];
 const TB = 30; // 标题栏高
 const RAD = 3;
 
-/* 窗的墨色：浅底（随笔）与两种深底 */
+/* 窗的墨色：浅底（随笔）与两种深底。ink 与 chip 是强调色那一族（怎么推出来的见 design/accent-contrast.cjs） */
 const INK = {
-  essay: { glass: 'rgba(250, 251, 253, 0.62)', edge: 'rgba(52, 62, 82, 0.24)', hair: 'rgba(52, 62, 82, 0.13)', chip: 'rgba(118, 86, 64, 0.32)', sheen: [255, 255, 255, 0.46], fg: '#232830', soft: '#56606d', faint: '#8a94a2', ink: '#765640', dot: '#3a414c' },
-  project: { glass: 'rgba(16, 26, 42, 0.56)', edge: 'rgba(168, 206, 226, 0.24)', hair: 'rgba(168, 206, 226, 0.13)', chip: 'rgba(201, 167, 126, 0.34)', sheen: [190, 225, 240, 0.11], fg: '#e6ebf1', soft: '#a6b4c6', faint: '#71849c', ink: '#c9a77e', dot: '#cfdbe6' },
-  moment: { glass: 'rgba(40, 30, 56, 0.54)', edge: 'rgba(236, 196, 180, 0.24)', hair: 'rgba(236, 196, 180, 0.13)', chip: 'rgba(224, 170, 134, 0.34)', sheen: [250, 215, 200, 0.1], fg: '#f0e9f4', soft: '#bcadca', faint: '#877a98', ink: '#e0aa86', dot: '#e8dcec' },
+  essay: { glass: 'rgba(250, 251, 253, 0.62)', edge: 'rgba(52, 62, 82, 0.24)', hair: 'rgba(52, 62, 82, 0.13)', chip: 'rgba(79, 74, 102, 0.32)', sheen: [255, 255, 255, 0.46], fg: '#232830', soft: '#56606d', faint: '#8a94a2', ink: '#4f4a66', dot: '#3a414c' },
+  project: { glass: 'rgba(16, 26, 42, 0.56)', edge: 'rgba(168, 206, 226, 0.24)', hair: 'rgba(168, 206, 226, 0.13)', chip: 'rgba(152, 139, 182, 0.34)', sheen: [190, 225, 240, 0.11], fg: '#e6ebf1', soft: '#a6b4c6', faint: '#71849c', ink: '#988bb6', dot: '#cfdbe6' },
+  moment: { glass: 'rgba(40, 30, 56, 0.54)', edge: 'rgba(236, 196, 180, 0.24)', hair: 'rgba(236, 196, 180, 0.13)', chip: 'rgba(156, 146, 200, 0.34)', sheen: [250, 215, 200, 0.1], fg: '#f0e9f4', soft: '#bcadca', faint: '#877a98', ink: '#9c92c8', dot: '#e8dcec' },
 };
 const LABEL = { essay: ['随笔', 'ESSAY'], project: ['项目', 'PROJECT'], moment: ['瞬间', 'MOMENT'] };
 const SERIF = "'Noto Serif SC', 'Source Han Serif SC', SimSun, serif";

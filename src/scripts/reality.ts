@@ -24,10 +24,10 @@ import { createDomRing } from './ring';
 
 /* 强调色双色（醒面=醒灰冷）：梦端取 tokens 现值 */
 const ACCENT: Record<string, [number[], number[]]> = {
-  '--amber': [hexToRgb('#d9a05b'), hexToRgb('#a7b1ba')],
-  '--umber': [hexToRgb('#765640'), hexToRgb('#556270')],
-  '--ghost-ink': [hexToRgb('#b98f74'), hexToRgb('#8e9aa6')],
-  '--dream': [hexToRgb('#c2a382'), hexToRgb('#a39c92')],
+  '--amber': [hexToRgb('#9a86c4'), hexToRgb('#a7b1ba')],
+  '--umber': [hexToRgb('#4f4a66'), hexToRgb('#556270')],
+  '--ghost-ink': [hexToRgb('#817ba3'), hexToRgb('#8e9aa6')],
+  '--dream': [hexToRgb('#9389ae'), hexToRgb('#a39c92')],
 };
 const mixRgb = (a: number[], b: number[], t: number) =>
   `rgb(${Math.round(a[0] + (b[0] - a[0]) * t)},${Math.round(a[1] + (b[1] - a[1]) * t)},${Math.round(
