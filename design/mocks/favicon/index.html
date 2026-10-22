@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>标签页图标 · 晶苞</title>
+<link id="fav" rel="icon" type="image/svg+xml" href="" />
+<style>
+  :root {
+    --bg: #f0f3f6;
+    --fg: #232830;
+    --fg-soft: #56606d;
+    --fg-faint: #858f9d;
+    --line: rgba(35, 40, 48, 0.12);
+    --amber: #9a86c4;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font: 14px/1.6 system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    padding: 40px 16px 80px;
+  }
+  main { max-width: 980px; margin: 0 auto; }
+  h1 { font-weight: 500; font-size: 20px; margin: 0 0 4px; letter-spacing: .04em; }
+  h2 { font-weight: 500; font-size: 15px; margin: 48px 0 12px; letter-spacing: .04em; }
+  p.note { color: var(--fg-soft); margin: 0 0 8px; max-width: 46em; }
+  .mono { font-family: 'IBM Plex Mono', Consolas, monospace; font-size: 12px; color: var(--fg-faint); }
+
+  /* 仿标签栏 */
+  .bar { border-radius: 8px 8px 0 0; padding: 6px 8px 0; display: flex; gap: 2px; overflow: hidden; }
+  .bar.light { background: #dee1e6; }
+  .bar.dark { background: #202124; }
+  .tab {
+    display: flex; align-items: center; gap: 8px;
+    width: 200px; min-width: 0; height: 34px; padding: 0 12px;
+    border-radius: 8px 8px 0 0; font-size: 12px; white-space: nowrap; overflow: hidden;
+  }
+  .tab img { width: 16px; height: 16px; flex: none; }
+  .bar.light .tab { color: #3c4043; }
+  .bar.light .tab.on { background: #fff; }
+  .bar.dark .tab { color: #bdc1c6; }
+  .bar.dark .tab.on { background: #35363a; color: #e8eaed; }
+  .bar .ghost { opacity: .6; }
+  .bars { display: grid; gap: 10px; margin-top: 8px; }
+
+  /* 尺寸格 */
+  table { border-collapse: collapse; width: 100%; margin-top: 8px; }
+  th, td { padding: 10px 8px; text-align: center; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  th { font-weight: 400; color: var(--fg-faint); font-size: 12px; }
+  td.name { text-align: left; white-space: nowrap; }
+  td.name b { font-weight: 500; display: block; }
+  td.name span { color: var(--fg-faint); font-size: 12px; }
+  .swatch { display: inline-flex; align-items: center; justify-content: center; border-radius: 6px; padding: 8px; }
+  .swatch.light { background: #fff; }
+  .swatch.dark { background: #35363a; }
+  .px16 { image-rendering: auto; }
+  .zoom { image-rendering: pixelated; }
+
+  .ctrl { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  button {
+    font: inherit; font-size: 13px; color: var(--fg); background: transparent;
+    border: 1px solid var(--line); border-radius: 999px; padding: 4px 14px; cursor: pointer;
+  }
+  button[aria-pressed="true"] { border-color: var(--amber); color: #5b4c86; background: rgba(154,134,196,.08); }
+  .wrap { overflow-x: auto; }
+  @media (max-width: 640px) { .tab { width: 150px; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>标签页图标 · 晶苞</h1>
+  <p class="note">取自首页花苞醒态第一帧（<span class="mono">public/hero-bud/wake/000.webp</span>）：上长下短的六棱双锥，中心一团暖光。三种画法 × 三种状态（醒 / 梦 / 离开）。</p>
+  <p class="note">下面的按钮会把<strong>这一页真实的标签页图标</strong>换成所选画法；切到别的标签页再切回来，可以看到「离开时淡去」的效果。</p>
+
+  <div class="ctrl" id="pick"></div>
+  <div class="ctrl" id="pickState"></div>
+
+  <h2>标签栏里</h2>
+  <div class="bars" id="bars"></div>
+
+  <h2>尺寸对照</h2>
+  <p class="note">16 栏是真实 16px；「16 放大」是同一张 16px 位图放大 4 倍，看像素落点。</p>
+  <div class="wrap"><table id="grid"></table></div>
+</main>
+
+<script>
+/* ---------- 几何（viewBox 32） ----------
+   顶点按 wake/000 的比例：上锥约占 60%，赤道略向前倾（俯视一点点） */
+const P = {
+  T: [16, 1.6], B: [16, 30.4],
+  L: [7.2, 18.4], FL: [12.0, 20.8], FR: [19.6, 20.8], R: [24.8, 18.4],
+  BL: [12.4, 16.4], BR: [19.6, 16.4],   // 背后的赤道顶点（只在玻璃版里隐约可见）
+};
+const pt = (k) => P[k].join(',');
+const poly = (ks, cls) => `<polygon class="${cls}" points="${ks.map(pt).join(' ')}"/>`;
+const line = (a, b, cls) => `<line class="${cls}" x1="${P[a][0]}" y1="${P[a][1]}" x2="${P[b][0]}" y2="${P[b][1]}"/>`;
+const OUTLINE = ['T', 'R', 'B', 'L'];
+const GC = [16, 17.6]; // 光心：略高于赤道，落在上锥底部
+
+/* ---------- 色板 ---------- */
+const PAL = {
+  light: {
+    edge: '#6f6890', edgeSoft: 'rgba(111,104,144,.35)',
+    f: ['#c4bfd8', '#dedaeb', '#aea7c8', '#b7b1cf', '#cfcae2', '#9f98bd'],
+    sil: ['#cfcae2', '#9f98bd'],
+    glow: { wake: ['#fffdf8', '#f6ead9'], dream: ['#fff6ea', '#f0bfa6'] },
+  },
+  dark: {
+    edge: '#e4e0f0', edgeSoft: 'rgba(228,224,240,.35)',
+    f: ['rgba(214,208,236,.42)', 'rgba(236,232,248,.62)', 'rgba(190,182,222,.32)',
+        'rgba(200,192,228,.30)', 'rgba(226,220,244,.48)', 'rgba(176,168,212,.24)'],
+    sil: ['#e6e2f2', '#a49dc4'],
+    glow: { wake: ['#fffdf8', '#efe2cf'], dream: ['#fff4e6', '#f2b79c'] },
+  },
+};
+
+/* ---------- 三种画法 ---------- */
+function glowDef(pal, state) {
+  const [c0, c1] = pal.glow[state === 'dream' ? 'dream' : 'wake'];
+  return `<radialGradient id="g">
+      <stop offset="0" stop-color="${c0}" stop-opacity="1"/>
+      <stop offset=".45" stop-color="${c1}" stop-opacity=".85"/>
+      <stop offset="1" stop-color="${c1}" stop-opacity="0"/></radialGradient>`;
+}
+function glow(state) {
+  if (state === 'away') return '';
+  const r = state === 'dream' ? 8 : 5.4;
+  return `<ellipse cx="${GC[0]}" cy="${GC[1]}" rx="${r}" ry="${r * 1.25}" fill="url(#g)"/>`;
+}
+
+const STYLES = {
+  // A · 棱光：六个可见棱面三档明度 + 背后赤道虚影 + 中心暖光
+  glass(pal, state) {
+    const away = state === 'away';
+    const f = pal.f;
+    return `
+      <g opacity="${away ? .32 : 1}">
+        ${poly(['T', 'L', 'FL'], 'f0')}${poly(['T', 'FL', 'FR'], 'f1')}${poly(['T', 'FR', 'R'], 'f2')}
+        ${poly(['B', 'L', 'FL'], 'f3')}${poly(['B', 'FL', 'FR'], 'f4')}${poly(['B', 'FR', 'R'], 'f5')}
+      </g>
+      <g class="soft">${line('L', 'BL', 'x')}${line('BL', 'BR', 'x')}${line('BR', 'R', 'x')}</g>
+      ${glow(state)}
+      <g class="edge" opacity="${away ? .55 : 1}">
+        <polygon class="o" points="${OUTLINE.map(pt).join(' ')}"/>
+        ${line('T', 'FL', 'i')}${line('T', 'FR', 'i')}${line('L', 'FL', 'i')}${line('FL', 'FR', 'i')}${line('FR', 'R', 'i')}
+        ${line('B', 'FL', 'i')}${line('B', 'FR', 'i')}
+      </g>
+      <style>
+        .f0{fill:${f[0]}}.f1{fill:${f[1]}}.f2{fill:${f[2]}}.f3{fill:${f[3]}}.f4{fill:${f[4]}}.f5{fill:${f[5]}}
+        .edge line,.edge polygon{stroke:${pal.edge};fill:none;stroke-linejoin:round;stroke-linecap:round}
+        .edge .o{stroke-width:1.5}.edge .i{stroke-width:.9;opacity:.75}
+        .soft line{stroke:${pal.edgeSoft};stroke-width:.7}
+      </style>`;
+  },
+  // B · 线晶：只有棱线，中心一点光。最轻、最「醒」
+  wire(pal, state) {
+    const away = state === 'away';
+    return `
+      ${glow(state)}
+      <g class="edge" opacity="${away ? .45 : 1}">
+        <polygon class="o" points="${OUTLINE.map(pt).join(' ')}"/>
+        ${line('T', 'FL', 'i')}${line('T', 'FR', 'i')}${line('L', 'FL', 'i')}${line('FL', 'FR', 'i')}${line('FR', 'R', 'i')}
+        ${line('B', 'FL', 'i')}${line('B', 'FR', 'i')}
+      </g>
+      <style>
+        .edge line,.edge polygon{stroke:${pal.edge};fill:none;stroke-linejoin:round;stroke-linecap:round}
+        .edge .o{stroke-width:1.7}.edge .i{stroke-width:1.1;opacity:.7}
+      </style>`;
+  },
+  // C · 实影：一整块竖向渐变的剪影 + 一道前棱高光 + 光。小尺寸最稳
+  solid(pal, state) {
+    const away = state === 'away';
+    const [a, b] = pal.sil;
+    return `
+      <defs><linearGradient id="s" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient></defs>
+      <polygon points="${OUTLINE.map(pt).join(' ')}" fill="url(#s)" opacity="${away ? .3 : 1}"/>
+      <polyline points="${['L', 'FL', 'FR', 'R'].map(pt).join(' ')}" fill="none"
+        stroke="${away ? pal.edgeSoft : 'rgba(255,255,255,.7)'}" stroke-width="1" stroke-linejoin="round"/>
+      ${glow(state)}
+      ${away ? `<polygon points="${OUTLINE.map(pt).join(' ')}" fill="none" stroke="${pal.edge}" stroke-width="1.3" stroke-linejoin="round" opacity=".5"/>` : ''}`;
+  },
+};
+
+function svg(style, state, scheme) {
+  const pal = PAL[scheme];
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><defs>${glowDef(pal, state)}</defs>${STYLES[style](pal, state)}</svg>`;
+}
+// 自动深浅：两套各画一份，用 media 切换（真正上线用的形式）
+function svgAuto(style, state) {
+  const strip = (s) => s.replace(/^<svg[^>]*>/, '').replace(/<\/svg>$/, '')
+    .replace(/id="g"/g, 'id="gX"').replace(/url\(#g\)/g, 'url(#gX)')
+    .replace(/id="s"/g, 'id="sX"').replace(/url\(#s\)/g, 'url(#sX)');
+  const lt = svg(style, state, 'light').replace(/^<svg[^>]*>/, '').replace(/<\/svg>$/, '');
+  const dk = strip(svg(style, state, 'dark'));
+  // 两份里各自的 <style> 选择器会互相覆盖，所以给外层分组加前缀
+  const scope = (body, cls) => body.replace(/<style>([\s\S]*?)<\/style>/g,
+    (_, css) => `<style>${css.replace(/(^|\})\s*([^{}]+)\{/g, (m, a, sel) => `${a}${sel.split(',').map(s => `.${cls} ${s.trim()}`).join(',')}{`)}</style>`);
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+    <style>.dk{display:none}@media (prefers-color-scheme: dark){.lt{display:none}.dk{display:inline}}</style>
+    <g class="lt">${scope(lt, 'lt')}</g><g class="dk">${scope(dk, 'dk')}</g></svg>`;
+}
+const uri = (s) => 'data:image/svg+xml,' + encodeURIComponent(s.replace(/\s+/g, ' '));
+
+/* ---------- 页面 ---------- */
+const NAMES = { glass: ['A · 棱光', '棱面 + 背后虚影 + 暖光'], wire: ['B · 线晶', '只有棱线 + 一点光'], solid: ['C · 实影', '渐变剪影 + 前棱高光'] };
+const STATES = { wake: '醒', dream: '梦', away: '离开' };
+let cur = { style: 'glass', state: 'wake' };
+
+function bars() {
+  const el = document.getElementById('bars');
+  el.innerHTML = ['light', 'dark'].map((sc) => `
+    <div class="bar ${sc}">
+      <div class="tab"><img src="${uri(otherIcon(sc))}" alt="">GitHub</div>
+      <div class="tab on"><img src="${uri(svg(cur.style, cur.state, sc))}" alt="">Traveritas</div>
+      <div class="tab"><img src="${uri(svg(cur.style, 'away', sc))}" alt="">Traveritas · 离开时</div>
+    </div>`).join('');
+}
+function otherIcon(sc) { // 一个邻居图标作参照
+  const c = sc === 'light' ? '#24292f' : '#e6edf3';
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><circle cx="8" cy="8" r="7.5" fill="${c}"/></svg>`;
+}
+
+function grid() {
+  const cols = ['16', '16 放大', '32', '64', '128'];
+  let h = `<tr><th></th><th></th>${cols.map(c => `<th>${c}</th>`).join('')}</tr>`;
+  for (const st of Object.keys(STYLES)) for (const s of Object.keys(STATES)) for (const sc of ['light', 'dark']) {
+    const u = uri(svg(st, s, sc));
+    h += `<tr>
+      ${s === 'wake' && sc === 'light' ? `<td class="name" rowspan="6"><b>${NAMES[st][0]}</b><span>${NAMES[st][1]}</span></td>` : ''}
+      <td class="mono">${STATES[s]} · ${sc === 'light' ? '浅' : '深'}</td>
+      <td><span class="swatch ${sc}"><img class="px16" width="16" height="16" src="${u}"></span></td>
+      <td><span class="swatch ${sc}"><canvas width="16" height="16" data-u="${u}" class="zoom" style="width:64px;height:64px"></canvas></span></td>
+      <td><span class="swatch ${sc}"><img width="32" height="32" src="${u}"></span></td>
+      <td><span class="swatch ${sc}"><img width="64" height="64" src="${u}"></span></td>
+      <td><span class="swatch ${sc}"><img width="128" height="128" src="${u}"></span></td>
+    </tr>`;
+  }
+  const t = document.getElementById('grid');
+  t.innerHTML = h;
+  t.querySelectorAll('canvas').forEach((c) => {
+    const img = new Image();
+    img.onload = () => c.getContext('2d').drawImage(img, 0, 0, 16, 16);
+    img.src = c.dataset.u;
+  });
+}
+
+/* 真实标签页图标：选中画法 + 离开时分几帧淡去 */
+const fav = document.getElementById('fav');
+function setFav(state) { fav.href = uri(svgAuto(cur.style, state)); }
+document.addEventListener('visibilitychange', () => setFav(document.hidden ? 'away' : cur.state));
+
+function controls() {
+  const mk = (id, map, key) => {
+    const el = document.getElementById(id);
+    el.innerHTML = Object.entries(map).map(([k, v]) =>
+      `<button data-k="${k}" aria-pressed="${cur[key] === k}">${Array.isArray(v) ? v[0] : v}</button>`).join('');
+    el.onclick = (e) => {
+      const b = e.target.closest('button'); if (!b) return;
+      cur[key] = b.dataset.k; render();
+    };
+  };
+  mk('pick', NAMES, 'style');
+  mk('pickState', { wake: '醒', dream: '梦' }, 'state');
+}
+function render() { controls(); bars(); setFav(cur.state); }
+render(); grid();
+</script>
+</body>
+</html>
