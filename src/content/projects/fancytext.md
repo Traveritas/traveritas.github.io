@@ -6,6 +6,8 @@ status: 𝔖𝔬 𝔉𝔞𝔫𝔠𝔶~
 links:
   - label: GitHub 仓库
     href: https://github.com/Traveritas/fancytext
+  - label: 样式包索引
+    href: https://github.com/Traveritas/fancytext-styles
 note:
   awake: 回来了，都回来了......
   dream: 喜欢搞些୨୧花里胡哨୨୧的东西
