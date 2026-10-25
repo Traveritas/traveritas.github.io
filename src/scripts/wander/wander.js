@@ -323,17 +323,23 @@ export async function initWander(host) {
   /* ══ 窗的元素 ══ */
   const pool = [];
   const elVis = new WeakMap();
+  /* 一张窗的元素同一时刻只该有一个主人（GE 里的那一条 / 漫游里的一个副本 / 正在离场的一个 ghosts）。
+     dropEl 会把它放进池里，所以它必须只收一次——收两次同一个元素就会在池里出现两遍，
+     下两回 makeEl 各弹一次，两张窗从此共用一个元素。_free 就是「已经在池里了」。 */
   function makeEl(s) {
     const el = pool.pop() || document.createElement('div');
     el.className = 'w-card';
     el.dataset.nofx = ''; // 长按窗不入梦（入梦检验只在空处）
     el.style.cssText = 'opacity:0';
     el._it = null;
+    el._free = false;
     el.removeAttribute('data-lod');
     if (el.parentNode !== spaces[s]) spaces[s].appendChild(el);
     return el;
   }
   function dropEl(el) {
+    if (el._free) return;
+    el._free = true;
     el.classList.remove('hot');
     el.style.cssText = 'opacity:0;visibility:hidden';
     el._it = null;
@@ -345,7 +351,15 @@ export async function initWander(host) {
     elVis.delete(el);
     pool.push(el);
   }
+  /* 给一条「看得见的东西」换一张新窗：旧的若还挂在它身上，先收回池里。
+     不收回的话那张旧元素就再没人认领——apply() 不再写它，它会停在屏幕上最后那一下的样子。 */
+  function ownEl(v, s) {
+    if (v.el) { releaseFlight(v); dropEl(v.el); }
+    v.el = makeEl(s);
+    return v.el;
+  }
   function asExplore(v) {
+    if (!v.el) return;
     v.el.setAttribute('aria-hidden', 'true');
     v.el.tabIndex = -1;
     v.el.removeAttribute('role');
@@ -353,6 +367,7 @@ export async function initWander(host) {
     elVis.set(v.el, v);
   }
   function asGrid(v) {
+    if (!v.el) return;
     v.el.removeAttribute('aria-hidden');
     v.el.tabIndex = 0;
     v.el.setAttribute('role', 'button');
@@ -460,6 +475,15 @@ export async function initWander(host) {
   function fly(v, to, o = {}) {
     v.fl = { t0: now() + (RM ? 0 : o.delay || 0), dur: RM ? 1 : o.dur || 800, from: null, to, done: o.done, ease: o.ease || inOut, px: v.x, py: v.y };
     flights.add(v);
+  }
+  /* 掐掉一段飞行：不再每帧接管它，也不跑 done。离场时用它——
+     正在飞的窗没人接手就会停在落点（它的落点算的是格子，不是主页）。 */
+  function releaseFlight(v) {
+    if (!v.fl) return false;
+    v.fl = null;
+    flights.delete(v);
+    v.vx = v.vy = v.vs = 0;
+    return true;
   }
   function stepFlight(v, t, dt) {
     const f = v.fl;
@@ -1157,7 +1181,7 @@ export async function initWander(host) {
         best.el = null;
       } else {
         // 视野里没有它：从深处的一个小点浮出来
-        v.el = makeEl(scene);
+        ownEl(v, scene);
         Object.assign(v, { x: vw / 2 + (hash(it.id, 'x') - 0.5) * vw * 0.5, y: vh / 2 + (hash(it.id, 'y') - 0.5) * vh * 0.4, s: G / 2.2, a: 0, lod: 3, _lod: -1, _t: '', _a: '', _z: '' });
       }
       v.on = true;
@@ -1179,7 +1203,7 @@ export async function initWander(host) {
       if (s === scene) continue;
       for (const it of ALL[s]) {
         const v = GE.get(it.id);
-        v.el = makeEl(s);
+        ownEl(v, s);
         asGrid(v);
         const o = slide(150 + v.order * 20);
         Object.assign(v, { x: v.slot.x + o.x, y: v.slot.y + o.y, s: v.slot.s * 0.94, a: 0, lod: 3, rx: 0, ry: 0, _lod: -1, _t: '', _a: '', _z: '', on: true, z: 200 - v.order });
@@ -1228,6 +1252,9 @@ export async function initWander(host) {
       if (best) {
         best.taken = true;
         dropEl(best.el);
+        // v.el 可能已经被上一次回主页收走了（沉回景深以后它是 null）：这时给它一张新的，
+        // 别把 null 交给 best——那样这扇窗就没有元素，asExplore 一拍就炸
+        if (!v.el) v.el = makeEl(S);
         Object.assign(best, { el: v.el, x: v.x, y: v.y, s: v.s, a: v.a, lod: v.lod, rx: v.rx, ry: v.ry, born: -1e9, _lod: v.lod, _t: '', _a: '', _z: '' });
         v.el = null;
         asExplore(best);
@@ -1235,7 +1262,8 @@ export async function initWander(host) {
         const r = best;
         fly(r, () => { const tg = target(r, now()); return { x: tg.x, y: tg.y, s: tg.s, a: alphaOf(tg.delta), lod: lodOf(tg.delta) }; }, { dur: 820, delay: v.order * 40, ease: inOut });
       } else {
-        // 这一份在空间里此刻看不见：沉进景深
+        // 这一份在空间里此刻看不见：沉进景深（本来就没元素就没什么可沉的）
+        if (!v.el) continue;
         const g = Object.assign(visBase(it), { el: v.el, x: v.x, y: v.y, s: v.s, a: v.a, lod: v.lod, _lod: v.lod, z: 3000 });
         v.el = null;
         const ox = g.x;
@@ -1300,7 +1328,7 @@ export async function initWander(host) {
     for (const s of SC)
       for (const it of ALL[s]) {
         const v = GE.get(it.id);
-        v.el = makeEl(s);
+        ownEl(v, s);
         Object.assign(v, { x: vw / 2 + (v.slot.x - vw / 2) * 0.5, y: vh / 2 + (v.slot.y - vh / 2) * 0.5, s: v.slot.s * 0.4, a: 0, lod: 3, rx: 0, ry: 0, _lod: -1, _t: '', _a: '', _z: '' });
         v.on = true;
         v.z = 3000 - v.order;
@@ -1328,10 +1356,14 @@ export async function initWander(host) {
     };
     for (const v of GE.values()) {
       v.on = false;
-      if (v.el && !v.fl) sink(v, 100);
+      // 还在飞的（进场 / 落格的那一段）要先掐掉飞行：它落点算的是格子，飞完就没有人再管它了，
+      // 于是这一扇会停在屏幕上一动不动。掐掉以后跟别的一样沉回景深。
+      releaseFlight(v);
+      if (v.el) sink(v, 100);
     }
     for (const r of [...recs.values()]) {
       recs.delete(r.key);
+      releaseFlight(r);
       if (r.el) sink(r, 50);
     }
     mode = 'home';
@@ -1833,7 +1865,7 @@ export async function initWander(host) {
   }
 
   window.__wander = {
-    cam, recs, GE, scroll, geo, flights, ghosts,
+    cam, recs, GE, scroll, geo, flights, ghosts, pool,
     get mode() { return mode; }, get scene() { return scene; }, get busy() { return busy; }, get seams() { return seams; },
     get zT() { return zT; }, set zT(v) { zT = v; },
     toGrid, toExplore, setScene, setQuery, openVis, findVis, reader, rectOf, toHome, homeToGrid,
