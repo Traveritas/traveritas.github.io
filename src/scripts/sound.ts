@@ -209,6 +209,55 @@ sceneHub.apply = () => {
   if (ctx && scene) scene.gain.setTargetAtTime(sceneHub.level, now(), SCENE_TAU);
 };
 
+/* ── Ave 的人声 ─────────────────────────────────────
+   借环境声同一个 AudioContext 出声：只有环境声开着（用户点过、ctx 在跑）才出声，
+   否则 Ave 只出字——不为她单独去要播放许可。她说话时环境声照常（2026-10-26 作者定：不用让开），
+   人声本身不吃阅读页退后量与页内演出压声（成片电平见 design/ave-voice/render.mjs）。 */
+const voiceBufs = new Map<string, Promise<AudioBuffer | null>>();
+let voiceSrc: AudioBufferSourceNode | null = null;
+
+/** 环境声此刻能不能让 Ave 出声 */
+export function voiceReady(): boolean {
+  return on && !!ctx && ctx.state === 'running';
+}
+
+/** 放一句人声。返回开口的 ctx 时间离现在多少毫秒（字幕据此对齐）；不能出声返回 null */
+export async function playVoice(src: string): Promise<{ delayMs: number; stop: () => void } | null> {
+  if (!voiceReady() || !ctx) return null;
+  let p = voiceBufs.get(src);
+  if (!p) {
+    const c = ctx;
+    p = fetch(src)
+      .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject()))
+      .then((b) => c.decodeAudioData(b))
+      .catch(() => null);
+    voiceBufs.set(src, p);
+  }
+  const b = await p;
+  if (!b || !voiceReady() || !ctx) return null;
+  stopVoice();
+  const s = ctx.createBufferSource();
+  s.buffer = b;
+  s.connect(ctx.destination);
+  const at = now() + 0.04;
+  s.start(at);
+  s.onended = () => {
+    if (voiceSrc === s) voiceSrc = null;
+  };
+  voiceSrc = s;
+  return { delayMs: (at - now()) * 1000, stop: () => s === voiceSrc && stopVoice() };
+}
+
+function stopVoice() {
+  if (!voiceSrc || !ctx) return;
+  try {
+    voiceSrc.stop();
+  } catch {
+    /* 已停 */
+  }
+  voiceSrc = null;
+}
+
 /* ── 混合（等功率）+ 余量 + 悬停 ───────────────────── */
 function applyMix(m: number, tau = MIX_TAU) {
   const w = chain.wake;
@@ -509,7 +558,9 @@ export function initSound(): void {
   for (const b of els) {
     b.addEventListener('click', () => {
       if (on) turnOff();
-      else void turnOn();
+      // 用户亲手打开、真的开成了：Ave 这时才有声音，叫她一声（台词 voice-hello）。
+      // 以后有了单独的 Ave 音量设置，从 0 调上去时也发同一个事件
+      else void turnOn().then(() => on && dispatchEvent(new CustomEvent('xm:ave', { detail: { name: 'voice-on' } })));
     });
   }
   document.addEventListener('visibilitychange', () => {

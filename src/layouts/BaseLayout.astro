@@ -17,6 +17,7 @@ import Hairline from '../components/chrome/Hairline.astro';
 import BootVeil from '../components/chrome/BootVeil.astro';
 import Cursor from '../components/chrome/Cursor.astro';
 import Toolstar from '../components/chrome/Toolstar.astro';
+import Ave from '../components/chrome/Ave.astro';
 
 interface Props {
   title: string;
@@ -56,6 +57,10 @@ interface Props {
   eeg?: boolean;
   /* 只有正文这一屏：不出页头与页脚（NEXUS 的入口） */
   bare?: boolean;
+  /* 右下角的 Ave（台词与出现条件在 src/data/ave-lines.ts）。默认跟着 bare：只有正文那一屏不出 */
+  ave?: boolean;
+  /* 本页是哪一篇条目（<集合>/<条目 id>）：Ave 只说它 frontmatter 里自带的那句（见 src/lib/ave-page.ts） */
+  aveEntry?: string;
 }
 
 const {
@@ -77,6 +82,8 @@ const {
   immersive = false,
   eeg = !immersive,
   bare = false,
+  ave = !bare,
+  aveEntry,
 } = Astro.props;
 
 // 醒/梦双态标题推导规则（符合 AGENTS.md 核心词汇映射）
@@ -190,6 +197,7 @@ const [, hour, tone] = HOURS.find(([p]) => path.startsWith(p)) ?? ['', path === 
       {!bare && <SiteFooter />}
     </div>
     <Toolstar reading={gauge?.kind === 'reading'} />
+    {ave && <Ave entry={aveEntry} />}
     <Cursor />
     <script>
       import { initBoot } from '../scripts/boot';
@@ -201,6 +209,7 @@ const [, hour, tone] = HOURS.find(([p]) => path.startsWith(p)) ?? ['', path === 
       import { initTitle } from '../scripts/title';
       import { initCursor } from '../scripts/cursor';
       import { initSound } from '../scripts/sound';
+      import { initAve } from '../scripts/ave';
       initBoot();
       initChrome();
       initNight();
@@ -210,6 +219,7 @@ const [, hour, tone] = HOURS.find(([p]) => path.startsWith(p)) ?? ['', path === 
       initTitle();
       initCursor();
       initSound(); // 在 initReality 之后：开启时要按当前醒度定初始混合
+      initAve(); // 在 initSound 之后：出声借环境声的 AudioContext
 
       // 进页停在页头之下（p11-h 终选）：页头恰好被遮住，上滚才露出；
       // 浏览器还原了滚动位置或带锚点进入时不干预。
