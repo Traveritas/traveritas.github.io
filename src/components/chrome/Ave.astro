@@ -61,7 +61,32 @@ const pagesJson = JSON.stringify(pages).replace(/</g, '\\u003c');
 </aside>
 
 <style is:global>
+  /* 她的色调（与头像 src/scripts/ave-flow.ts 的两套调色板同源）：醒面雾蓝、梦面薄暮紫。
+     注册成颜色，换面时才能整块平滑地过渡过去，不是一下跳 */
+  @property --ave-tint {
+    syntax: '<color>';
+    inherits: true;
+    initial-value: #a1b8cf;
+  }
+  @property --ave-hue {
+    syntax: '<color>';
+    inherits: true;
+    initial-value: #6f8bab;
+  }
+  @property --ave-deep {
+    syntax: '<color>';
+    inherits: true;
+    initial-value: #415369;
+  }
   .ave {
+    /* 灰面（整块玻璃染的那层）/ 线头与饰件 / 名牌的深片 */
+    --ave-tint: #a1b8cf;
+    --ave-hue: #6f8bab;
+    --ave-deep: #415369;
+    transition:
+      --ave-tint 1.2s ease,
+      --ave-hue 1.2s ease,
+      --ave-deep 1.2s ease;
     /* 材质：平时与工具栏薄片同一种玻璃；主页 / 漫游时跟场景（--w-*，见 wander.css），
        深色场景就是深色玻璃 + 浅字 */
     --ave-fg: var(--w-fg, var(--fg));
@@ -76,12 +101,15 @@ const pagesJson = JSON.stringify(pages).replace(/</g, '\\u003c');
     --ave-line: 1px;
     /* 线在字身底下多远（inline 的 padding-bottom，不占排版） */
     --ave-drop: 3px;
-    /* 晶面上的淡色：浅色页压暗、深色场景提亮 */
-    --ave-facet: color-mix(in srgb, var(--ave-fg) 5%, transparent);
-    --ave-facet-2: color-mix(in srgb, var(--ave-fg) 9%, transparent);
-    /* 名牌：薄暮紫深片，两种底色上都是深底浅字 */
-    --ave-chip: var(--umber);
-    --ave-chip-ink: #ece8f2;
+    /* 整块玻璃上的那层她的颜色；边环也微微偏同一个色 */
+    --ave-wash: color-mix(in srgb, var(--ave-tint) 9%, transparent);
+    --ave-edge: color-mix(in srgb, var(--ave-rim) 76%, var(--ave-tint));
+    /* 晶面上的淡色：她的颜色，比台面深半档 */
+    --ave-facet: color-mix(in srgb, var(--ave-tint) 12%, transparent);
+    --ave-facet-2: color-mix(in srgb, var(--ave-tint) 20%, transparent);
+    /* 名牌：她颜色的深片，两种底色上都是深底浅字 */
+    --ave-chip: var(--ave-deep);
+    --ave-chip-ink: color-mix(in srgb, var(--ave-tint) 18%, #fff);
     --ave-star: polygon(50% 0, 61% 39%, 100% 50%, 61% 61%, 50% 100%, 39% 61%, 0 50%, 39% 39%);
     /* 头像边长（框的折点也按它算，所以放在根上；与背景同一个 5px 像素格，取 5 的倍数） */
     --ave-size: 50px;
@@ -95,6 +123,11 @@ const pagesJson = JSON.stringify(pages).replace(/</g, '\\u003c');
     /* 头像一栏占掉一截宽度，字栏要留够一行十几个字 */
     max-width: min(24rem, calc(100vw - 112px));
     pointer-events: none;
+  }
+  body[data-reality='dream'] .ave {
+    --ave-tint: #a399c7;
+    --ave-hue: #8a7cb8;
+    --ave-deep: #4f4a66;
   }
   html[data-tone='dark'][data-hour] .ave {
     --ave-rim: rgb(var(--frost) / calc(var(--frost-edge-a) * 0.82));
@@ -156,7 +189,7 @@ const pagesJson = JSON.stringify(pages).replace(/</g, '\\u003c');
   /* 边环：外轮廓 + 内轮廓（往里 1px），evenodd 只留中间那一圈 */
   .ave-card::before {
     z-index: -1;
-    background: var(--ave-rim);
+    background: var(--ave-edge);
     clip-path: polygon(
       evenodd,
       0 9px,
@@ -183,7 +216,7 @@ const pagesJson = JSON.stringify(pages).replace(/</g, '\\u003c');
     z-index: -2;
     background:
       /* 晶柱：比台面深半档，缝是一道细边 */
-      linear-gradient(to left, var(--ave-facet-2) var(--col), var(--ave-rim) var(--col) calc(var(--col) + 1px), transparent calc(var(--col) + 1px)),
+      linear-gradient(to left, var(--ave-facet-2) var(--col), var(--ave-edge) var(--col) calc(var(--col) + 1px), transparent calc(var(--col) + 1px)),
       /* 斜切面：从坡顶往右下落的两道光 */
       linear-gradient(
         112deg,
@@ -193,6 +226,8 @@ const pagesJson = JSON.stringify(pages).replace(/</g, '\\u003c');
         var(--ave-facet-2) 78% 80%,
         transparent 80%
       ),
+      /* 她的颜色：薄薄一层铺在玻璃上 */
+      linear-gradient(var(--ave-wash), var(--ave-wash)),
       var(--ave-panel);
     -webkit-backdrop-filter: blur(16px) saturate(1.06);
     backdrop-filter: blur(16px) saturate(1.06);
@@ -213,7 +248,7 @@ const pagesJson = JSON.stringify(pages).replace(/</g, '\\u003c');
       color-mix(in srgb, var(--dream) 42%, var(--bg)) 0%,
       color-mix(in srgb, var(--umber) 52%, var(--bg)) 100%
     );
-    box-shadow: 0 0 0 1px var(--ave-rim);
+    box-shadow: 0 0 0 1px var(--ave-edge);
     isolation: isolate;
   }
   .ave-face {
@@ -242,7 +277,7 @@ const pagesJson = JSON.stringify(pages).replace(/</g, '\\u003c');
   .ave-body {
     min-width: 0;
     padding: 0.8rem 1rem 0.7rem 0.85rem;
-    border-left: 1px solid var(--ave-rim);
+    border-left: 1px solid var(--ave-edge);
   }
   /* 名牌：伸出框沿的深片，左下一枚向下的小楔口扎进框里，里面一颗空心菱饰 */
   .ave-name {
@@ -274,7 +309,7 @@ const pagesJson = JSON.stringify(pages).replace(/</g, '\\u003c');
   .ave-mark {
     width: 6px;
     height: 6px;
-    border: 1px solid color-mix(in srgb, var(--amber) 80%, #fff);
+    border: 1px solid color-mix(in srgb, var(--ave-tint) 70%, #fff);
     rotate: 45deg;
   }
   .ave-text {
@@ -298,9 +333,9 @@ const pagesJson = JSON.stringify(pages).replace(/</g, '\\u003c');
   .ave-text .c.on {
     background-size: 100% var(--ave-line);
   }
-  /* 线头：最后念到的两个字底下换成薄暮紫，加一点厚度——念完就停在句尾当句读 */
+  /* 线头：最后念到的两个字底下换成她的颜色，加一点厚度——念完就停在句尾当句读 */
   .ave-text .c.head {
-    background-image: linear-gradient(var(--amber), var(--amber));
+    background-image: linear-gradient(var(--ave-hue), var(--ave-hue));
     background-size: 100% 2px;
   }
   /* 收起：线从句首往句尾一字一字退掉，再整片淡出 */
@@ -367,7 +402,7 @@ const pagesJson = JSON.stringify(pages).replace(/</g, '\\u003c');
     bottom: 10px;
     width: 10px;
     height: 10px;
-    background: var(--amber);
+    background: var(--ave-hue);
     clip-path: var(--ave-star);
   }
   .ave-x {
