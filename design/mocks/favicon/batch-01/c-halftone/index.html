@@ -1,0 +1,871 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>favicon mockup · 半调网点（14° 网线） · c-halftone</title>
+<style>
+  :root{
+    --paper:#f0f3f6; --ink:#232830; --ink-soft:#56606d; --ink-faint:#858f9d;
+    --night:#0c0f18; --night2:#0d1524; --light:#e2e9f2;
+    --amber:#9a86c4; --line:rgba(35,40,48,.12);
+    --mono:ui-monospace,'Cascadia Mono',Consolas,'DejaVu Sans Mono',monospace;
+    --serif:'Palatino Linotype','Iowan Old Style',Palatino,Georgia,'Songti SC',serif;
+    --sans:system-ui,'Segoe UI','PingFang SC','Microsoft YaHei UI',sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.75;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1080px;margin:0 auto;padding:56px 40px 96px}
+  h1{font-family:var(--serif);font-weight:600;font-size:30px;letter-spacing:.01em;margin:0 0 6px}
+  h2{font-family:var(--serif);font-weight:600;font-size:19px;margin:0}
+  .sub{color:var(--ink-soft);margin:0}
+  .meta{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--ink-faint);text-transform:uppercase}
+  .lede{max-width:66ch;color:var(--ink-soft);margin:18px 0 0}
+  .lede b{color:var(--ink)}
+  hr{border:0;border-top:1px solid var(--line);margin:44px 0}
+  section{margin:0 0 54px}
+  .shead{display:flex;align-items:baseline;gap:14px;margin:0 0 20px}
+  .shead .n{font-family:var(--mono);font-size:11px;color:var(--ink-faint);letter-spacing:.1em}
+  .cap{font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:var(--ink-faint);margin-top:12px;line-height:1.85}
+  .note{font-size:12.5px;color:var(--ink-soft);max-width:72ch}
+  .note b{color:var(--ink)}
+
+  /* 标记组件：醒/梦两层叠放，--rm 交叉淡入淡出 */
+  .mark{position:relative;display:inline-block;width:var(--sz);height:var(--sz);line-height:0;vertical-align:middle}
+  .mark>svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+  .mark .mw{opacity:var(--rm,1)}
+  .mark .md{opacity:calc(1 - var(--rm,1))}
+  .on-paper{color:#232830}
+  .on-night{color:#e2e9f2}
+
+  .panes{display:flex;gap:22px;flex-wrap:wrap}
+  .pane{flex:1 1 320px;border-radius:14px;padding:28px 26px 22px;display:flex;flex-direction:column;align-items:center;gap:18px;min-width:300px}
+  .pane.paper{background:#f0f3f6;border:1px solid var(--line)}
+  .pane.night{background:#0c0f18;border:1px solid rgba(226,233,242,.08);color:#e2e9f2}
+  .plabel{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase}
+  .pane.paper .plabel{color:var(--ink-faint)}
+  .pane.night .plabel{color:rgba(226,233,242,.45)}
+  .duo{display:flex;gap:36px;align-items:flex-end;flex-wrap:wrap;justify-content:center}
+  .duo figure{margin:0;display:flex;flex-direction:column;align-items:center;gap:12px}
+  .duo figcaption{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em}
+
+  .band{display:flex;align-items:flex-end;gap:30px;flex-wrap:wrap;justify-content:center}
+  .cell{display:flex;flex-direction:column;align-items:center;gap:10px}
+  .cell .px{font-family:var(--mono);font-size:10px;color:var(--ink-faint);letter-spacing:.06em;white-space:nowrap}
+  .pane.night .cell .px{color:rgba(226,233,242,.4)}
+
+  .tabs{display:flex;flex-direction:column;gap:16px}
+  .tabbar{display:flex;align-items:center;border-radius:10px 10px 0 0;padding:8px 10px 0;font-size:12px;overflow:hidden}
+  .tabbar.light{background:#dee1e6}
+  .tabbar.dark{background:#202124}
+  .tab{display:flex;align-items:center;gap:8px;padding:8px 16px 9px;border-radius:8px 8px 0 0;max-width:230px;flex:0 1 auto}
+  .tabbar.light .tab{color:#5f6673}
+  .tabbar.light .tab.on{background:#f0f3f6;color:#232830}
+  .tabbar.dark .tab{color:#9aa0a6}
+  .tabbar.dark .tab.on{background:#0c0f18;color:#e2e9f2}
+  .tab .ttl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tabbar.light .tab .mark{color:#232830}
+  .tabbar.dark .tab .mark{color:#e2e9f2}
+  .tab.amber .mark{color:#9a86c4}
+  .tab.off .mark{opacity:.5}
+  .chrome-under{height:34px;border-radius:0 0 10px 10px;background:#f0f3f6;border-top:1px solid rgba(0,0,0,.06)}
+  .tabbar.dark+.chrome-under{background:#0c0f18;border-top:1px solid rgba(226,233,242,.08)}
+
+  .gate{display:flex;align-items:center;gap:34px;flex-wrap:wrap;border-radius:14px;padding:26px 30px;background:linear-gradient(120deg,#0c0f18 0%,#1d1729 100%);color:#e2e9f2}
+  .gate .gcol{display:flex;flex-direction:column;gap:8px}
+  input[type=range]{width:300px;accent-color:#9a86c4}
+  .gv{font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:rgba(226,233,242,.6)}
+  .gl{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:rgba(226,233,242,.42)}
+
+  .ctx{background:#0c0f18;border-radius:14px;overflow:hidden;border:1px solid rgba(226,233,242,.08)}
+  .ctxbar{display:flex;align-items:center;background:#1b1c21;padding:9px 12px 0;font-size:12px;color:#9aa0a6}
+  .ctxbar .tab{color:#9aa0a6}
+  .ctxbar .tab.on{background:#0c0f18;color:#e2e9f2}
+  .ctxbar .tab .mark{color:#e2e9f2}
+  .ctxbar .dots3{margin-left:auto;display:flex;gap:6px;padding-bottom:9px}
+  .ctxbar .dots3 i{width:9px;height:9px;border-radius:50%;background:#3a3c42;display:block}
+  .hero{position:relative;height:360px;overflow:hidden;
+        background:
+          radial-gradient(120% 90% at 6% 4%, rgba(226,233,242,.30) 0%, rgba(226,233,242,.09) 42%, transparent 68%),
+          radial-gradient(90% 80% at 92% 96%, rgba(29,23,41,.9) 0%, transparent 70%),
+          linear-gradient(160deg,#0d1524 0%,#0c0f18 55%,#0e0f1d 100%)}
+  .hero .dots{position:absolute;inset:0;background-image:radial-gradient(circle, rgba(226,233,242,.13) .7px, transparent .9px);background-size:4px 4px}
+  .hero .stepped{position:absolute;inset:0;width:100%;height:100%}
+  .hero .stepped path{fill:none;stroke:rgba(226,233,242,.42);stroke-width:1;vector-effect:non-scaling-stroke}
+  .hero .name{position:absolute;left:44px;top:74px;font-family:var(--serif);font-size:60px;color:rgba(226,233,242,.9);text-shadow:0 0 26px rgba(226,233,242,.18)}
+  .hero .eyebrow{position:absolute;left:46px;top:44px;font-family:var(--mono);font-size:10px;letter-spacing:.4em;color:rgba(226,233,242,.42)}
+  .hero .entry{position:absolute;display:flex;align-items:center;gap:9px;font-size:12.5px;color:rgba(226,233,242,.82)}
+  .hero .entry i{width:5px;height:5px;border-radius:50%;background:#a195c1;display:block;box-shadow:0 0 8px #a195c1}
+  .hero .entry em{font-style:normal;font-family:var(--mono);font-size:9.5px;letter-spacing:.22em;color:rgba(226,233,242,.38)}
+  .hero .star{position:absolute;left:26px;bottom:22px;width:26px;height:26px;color:rgba(226,233,242,.72)}
+  .hero .star svg{width:100%;height:100%;fill:currentColor}
+  .hero .nexus{position:absolute;right:28px;bottom:24px;font-family:var(--mono);font-size:11px;letter-spacing:.34em;color:rgba(226,233,242,.5)}
+
+  .angle{display:flex;gap:30px;align-items:center;flex-wrap:wrap}
+  .angle>svg{width:132px;height:132px;background:#fff;border:1px solid var(--line);border-radius:10px;flex:0 0 auto}
+  .files{font-family:var(--mono);font-size:11.5px;color:var(--ink-soft);line-height:2.1}
+  .files b{font-weight:600;color:var(--ink)}
+  .swatch{display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:-1px;margin-right:6px}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="mk-cw" viewBox="0 0 32 32">
+    <circle fill="currentColor" cx="10.17" cy="6.3" r="1.68"/>
+    <circle fill="currentColor" cx="14.05" cy="7.27" r="0.92"/>
+    <circle fill="currentColor" cx="17.94" cy="8.24" r="1.68"/>
+    <circle fill="currentColor" cx="21.82" cy="9.21" r="1.34"/>
+    <circle fill="currentColor" cx="25.7" cy="10.17" r="1.34"/>
+    <circle fill="currentColor" cx="9.21" cy="10.18" r="0.92"/>
+    <circle fill="currentColor" cx="16.97" cy="12.12" r="0.92"/>
+    <circle fill="currentColor" cx="20.85" cy="13.09" r="1.34"/>
+    <circle fill="currentColor" cx="24.73" cy="14.05" r="1.34"/>
+    <circle fill="currentColor" cx="8.24" cy="14.06" r="1.68"/>
+    <circle fill="currentColor" cx="12.12" cy="15.03" r="0.92"/>
+    <circle fill="currentColor" cx="16" cy="16" r="1.68"/>
+    <circle fill="currentColor" cx="19.88" cy="16.97" r="1.34"/>
+    <circle fill="currentColor" cx="23.76" cy="17.94" r="1.34"/>
+    <circle fill="currentColor" cx="7.27" cy="17.95" r="1.34"/>
+    <circle fill="currentColor" cx="11.15" cy="18.91" r="1.68"/>
+    <circle fill="currentColor" cx="15.03" cy="19.88" r="1.34"/>
+    <circle fill="currentColor" cx="18.91" cy="20.85" r="1.34"/>
+    <circle fill="currentColor" cx="22.79" cy="21.82" r="1.34"/>
+    <circle fill="currentColor" cx="6.3" cy="21.83" r="1.34"/>
+    <circle fill="currentColor" cx="10.18" cy="22.79" r="1.34"/>
+    <circle fill="currentColor" cx="14.06" cy="23.76" r="1.34"/>
+    <circle fill="currentColor" cx="17.95" cy="24.73" r="1.34"/>
+    <circle fill="currentColor" cx="21.83" cy="25.7" r="1"/>
+    <rect fill="currentColor" x="11.17" y="9.23" width="3.84" height="3.84"/>
+  </symbol>
+  <symbol id="mk-cd" viewBox="0 0 32 32">
+    <circle fill="currentColor" cx="10.17" cy="6.34" r="1.58" opacity="0.74"/>
+    <circle fill="currentColor" cx="14.23" cy="7.06" r="0.97" opacity="0.79"/>
+    <circle fill="currentColor" cx="17.77" cy="8.36" r="1.55" opacity="0.72"/>
+    <circle fill="currentColor" cx="21.91" cy="9.16" r="1.35" opacity="0.59"/>
+    <circle fill="currentColor" cx="8.98" cy="10.31" r="1" opacity="0.86"/>
+    <circle fill="currentColor" cx="16.81" cy="12.34" r="0.87" opacity="0.81"/>
+    <circle fill="currentColor" cx="20.8" cy="13" r="1.39" opacity="0.64"/>
+    <circle fill="currentColor" cx="24.85" cy="14.06" r="1.47" opacity="0.49"/>
+    <circle fill="currentColor" cx="8.41" cy="14.28" r="1.64" opacity="0.82"/>
+    <circle fill="currentColor" cx="12.32" cy="14.84" r="0.97" opacity="0.89"/>
+    <circle fill="currentColor" cx="16.16" cy="15.79" r="1.79" opacity="0.78"/>
+    <circle fill="currentColor" cx="19.73" cy="16.76" r="1.32" opacity="0.63"/>
+    <circle fill="currentColor" cx="23.83" cy="17.98" r="1.36" opacity="0.47"/>
+    <circle fill="currentColor" cx="7.15" cy="18.05" r="1.41" opacity="0.68"/>
+    <circle fill="currentColor" cx="11.18" cy="19.01" r="1.68" opacity="0.71"/>
+    <circle fill="currentColor" cx="15.16" cy="19.82" r="1.27" opacity="0.66"/>
+    <circle fill="currentColor" cx="19.07" cy="20.66" r="1.41" opacity="0.55"/>
+    <circle fill="currentColor" cx="22.86" cy="21.86" r="1.42" opacity="0.42"/>
+    <circle fill="currentColor" cx="6.08" cy="21.68" r="1.37" opacity="0.53"/>
+    <circle fill="currentColor" cx="9.99" cy="22.59" r="1.43" opacity="0.55"/>
+    <circle fill="currentColor" cx="13.85" cy="23.64" r="1.3" opacity="0.52"/>
+    <circle fill="currentColor" cx="18.12" cy="24.76" r="1.32" opacity="0.44"/>
+    <circle fill="currentColor" cx="22" cy="25.65" r="0.94" opacity="0.34"/>
+    <circle fill="#9a86c4" cx="25.63" cy="10.03" r="1.44" opacity="0.45"/>
+    <rect fill="#9a86c4" x="11.18" y="9.15" width="3.84" height="3.84"/>
+  </symbol>
+  <symbol id="mk-fw" viewBox="0 0 32 32">
+    <circle fill="currentColor" cx="16.86" cy="5.21" r="0.68"/>
+    <circle fill="currentColor" cx="18.58" cy="5.64" r="0.57"/>
+    <circle fill="currentColor" cx="20.31" cy="6.07" r="0.57"/>
+    <circle fill="currentColor" cx="22.04" cy="6.5" r="0.57"/>
+    <circle fill="currentColor" cx="11.24" cy="5.64" r="0.68"/>
+    <circle fill="currentColor" cx="12.97" cy="6.07" r="0.68"/>
+    <circle fill="currentColor" cx="14.7" cy="6.5" r="0.68"/>
+    <circle fill="currentColor" cx="16.43" cy="6.93" r="0.68"/>
+    <circle fill="currentColor" cx="18.15" cy="7.36" r="0.68"/>
+    <circle fill="currentColor" cx="19.88" cy="7.79" r="0.68"/>
+    <circle fill="currentColor" cx="21.61" cy="8.23" r="0.57"/>
+    <circle fill="currentColor" cx="23.33" cy="8.66" r="0.57"/>
+    <circle fill="currentColor" cx="25.06" cy="9.09" r="0.47"/>
+    <circle fill="currentColor" cx="10.81" cy="7.37" r="0.68"/>
+    <circle fill="currentColor" cx="12.54" cy="7.8" r="0.68"/>
+    <circle fill="currentColor" cx="14.27" cy="8.23" r="0.68"/>
+    <circle fill="currentColor" cx="16" cy="8.66" r="0.68"/>
+    <circle fill="currentColor" cx="17.72" cy="9.09" r="0.68"/>
+    <circle fill="currentColor" cx="19.45" cy="9.52" r="0.68"/>
+    <circle fill="currentColor" cx="21.18" cy="9.95" r="0.57"/>
+    <circle fill="currentColor" cx="22.9" cy="10.38" r="0.57"/>
+    <circle fill="currentColor" cx="24.63" cy="10.81" r="0.57"/>
+    <circle fill="currentColor" cx="26.36" cy="11.24" r="0.47"/>
+    <circle fill="currentColor" cx="8.66" cy="8.67" r="0.68"/>
+    <circle fill="currentColor" cx="10.38" cy="9.1" r="0.68"/>
+    <circle fill="currentColor" cx="12.11" cy="9.53" r="0.43"/>
+    <circle fill="currentColor" cx="13.84" cy="9.96" r="0.78"/>
+    <circle fill="currentColor" cx="15.56" cy="10.39" r="0.68"/>
+    <circle fill="currentColor" cx="17.29" cy="10.82" r="0.68"/>
+    <circle fill="currentColor" cx="19.02" cy="11.25" r="0.68"/>
+    <circle fill="currentColor" cx="20.75" cy="11.68" r="0.68"/>
+    <circle fill="currentColor" cx="22.47" cy="12.11" r="0.57"/>
+    <circle fill="currentColor" cx="24.2" cy="12.54" r="0.57"/>
+    <circle fill="currentColor" cx="25.93" cy="12.97" r="0.47"/>
+    <circle fill="currentColor" cx="6.5" cy="9.96" r="0.68"/>
+    <circle fill="currentColor" cx="8.23" cy="10.39" r="0.68"/>
+    <circle fill="currentColor" cx="9.95" cy="10.82" r="0.43"/>
+    <circle fill="currentColor" cx="13.41" cy="11.68" r="0.43"/>
+    <circle fill="currentColor" cx="15.13" cy="12.12" r="0.78"/>
+    <circle fill="currentColor" cx="16.86" cy="12.55" r="0.68"/>
+    <circle fill="currentColor" cx="18.59" cy="12.98" r="0.68"/>
+    <circle fill="currentColor" cx="20.32" cy="13.41" r="0.68"/>
+    <circle fill="currentColor" cx="22.04" cy="13.84" r="0.57"/>
+    <circle fill="currentColor" cx="23.77" cy="14.27" r="0.57"/>
+    <circle fill="currentColor" cx="25.5" cy="14.7" r="0.47"/>
+    <circle fill="currentColor" cx="27.22" cy="15.13" r="0.36"/>
+    <circle fill="currentColor" cx="6.07" cy="11.69" r="0.68"/>
+    <circle fill="currentColor" cx="7.79" cy="12.12" r="0.68"/>
+    <circle fill="currentColor" cx="9.52" cy="12.55" r="0.78"/>
+    <circle fill="currentColor" cx="11.25" cy="12.98" r="0.43"/>
+    <circle fill="currentColor" cx="12.98" cy="13.41" r="0.78"/>
+    <circle fill="currentColor" cx="14.7" cy="13.84" r="0.78"/>
+    <circle fill="currentColor" cx="16.43" cy="14.27" r="0.68"/>
+    <circle fill="currentColor" cx="18.16" cy="14.7" r="0.68"/>
+    <circle fill="currentColor" cx="19.88" cy="15.13" r="0.68"/>
+    <circle fill="currentColor" cx="21.61" cy="15.56" r="0.57"/>
+    <circle fill="currentColor" cx="23.34" cy="16" r="0.57"/>
+    <circle fill="currentColor" cx="25.07" cy="16.43" r="0.47"/>
+    <circle fill="currentColor" cx="26.79" cy="16.86" r="0.36"/>
+    <circle fill="currentColor" cx="5.64" cy="13.42" r="0.68"/>
+    <circle fill="currentColor" cx="7.36" cy="13.85" r="0.68"/>
+    <circle fill="currentColor" cx="9.09" cy="14.28" r="0.68"/>
+    <circle fill="currentColor" cx="10.82" cy="14.71" r="0.78"/>
+    <circle fill="currentColor" cx="12.55" cy="15.14" r="0.78"/>
+    <circle fill="currentColor" cx="14.27" cy="15.57" r="0.68"/>
+    <circle fill="currentColor" cx="16" cy="16" r="0.68"/>
+    <circle fill="currentColor" cx="17.73" cy="16.43" r="0.68"/>
+    <circle fill="currentColor" cx="19.45" cy="16.86" r="0.68"/>
+    <circle fill="currentColor" cx="21.18" cy="17.29" r="0.57"/>
+    <circle fill="currentColor" cx="22.91" cy="17.72" r="0.57"/>
+    <circle fill="currentColor" cx="24.64" cy="18.15" r="0.47"/>
+    <circle fill="currentColor" cx="26.36" cy="18.58" r="0.36"/>
+    <circle fill="currentColor" cx="5.21" cy="15.14" r="0.68"/>
+    <circle fill="currentColor" cx="6.93" cy="15.57" r="0.68"/>
+    <circle fill="currentColor" cx="8.66" cy="16" r="0.68"/>
+    <circle fill="currentColor" cx="10.39" cy="16.44" r="0.68"/>
+    <circle fill="currentColor" cx="12.12" cy="16.87" r="0.68"/>
+    <circle fill="currentColor" cx="13.84" cy="17.3" r="0.68"/>
+    <circle fill="currentColor" cx="15.57" cy="17.73" r="0.68"/>
+    <circle fill="currentColor" cx="17.3" cy="18.16" r="0.68"/>
+    <circle fill="currentColor" cx="19.02" cy="18.59" r="0.57"/>
+    <circle fill="currentColor" cx="20.75" cy="19.02" r="0.57"/>
+    <circle fill="currentColor" cx="22.48" cy="19.45" r="0.57"/>
+    <circle fill="currentColor" cx="24.21" cy="19.88" r="0.47"/>
+    <circle fill="currentColor" cx="25.93" cy="20.31" r="0.26"/>
+    <circle fill="currentColor" cx="4.78" cy="16.87" r="0.57"/>
+    <circle fill="currentColor" cx="6.5" cy="17.3" r="0.68"/>
+    <circle fill="currentColor" cx="8.23" cy="17.73" r="0.68"/>
+    <circle fill="currentColor" cx="9.96" cy="18.16" r="0.68"/>
+    <circle fill="currentColor" cx="11.68" cy="18.59" r="0.68"/>
+    <circle fill="currentColor" cx="13.41" cy="19.02" r="0.68"/>
+    <circle fill="currentColor" cx="15.14" cy="19.45" r="0.68"/>
+    <circle fill="currentColor" cx="16.87" cy="19.88" r="0.57"/>
+    <circle fill="currentColor" cx="18.59" cy="20.32" r="0.57"/>
+    <circle fill="currentColor" cx="20.32" cy="20.75" r="0.57"/>
+    <circle fill="currentColor" cx="22.05" cy="21.18" r="0.47"/>
+    <circle fill="currentColor" cx="23.77" cy="21.61" r="0.36"/>
+    <circle fill="currentColor" cx="6.07" cy="19.03" r="0.57"/>
+    <circle fill="currentColor" cx="7.8" cy="19.46" r="0.68"/>
+    <circle fill="currentColor" cx="9.53" cy="19.89" r="0.68"/>
+    <circle fill="currentColor" cx="11.25" cy="20.32" r="0.68"/>
+    <circle fill="currentColor" cx="12.98" cy="20.75" r="0.68"/>
+    <circle fill="currentColor" cx="14.71" cy="21.18" r="0.57"/>
+    <circle fill="currentColor" cx="16.44" cy="21.61" r="0.57"/>
+    <circle fill="currentColor" cx="18.16" cy="22.04" r="0.57"/>
+    <circle fill="currentColor" cx="19.89" cy="22.47" r="0.47"/>
+    <circle fill="currentColor" cx="21.62" cy="22.9" r="0.47"/>
+    <circle fill="currentColor" cx="23.34" cy="23.33" r="0.36"/>
+    <circle fill="currentColor" cx="5.64" cy="20.76" r="0.57"/>
+    <circle fill="currentColor" cx="7.37" cy="21.19" r="0.57"/>
+    <circle fill="currentColor" cx="9.1" cy="21.62" r="0.57"/>
+    <circle fill="currentColor" cx="10.82" cy="22.05" r="0.57"/>
+    <circle fill="currentColor" cx="12.55" cy="22.48" r="0.57"/>
+    <circle fill="currentColor" cx="14.28" cy="22.91" r="0.57"/>
+    <circle fill="currentColor" cx="16" cy="23.34" r="0.57"/>
+    <circle fill="currentColor" cx="17.73" cy="23.77" r="0.47"/>
+    <circle fill="currentColor" cx="19.46" cy="24.2" r="0.47"/>
+    <circle fill="currentColor" cx="21.19" cy="24.63" r="0.36"/>
+    <circle fill="currentColor" cx="8.67" cy="23.34" r="0.57"/>
+    <circle fill="currentColor" cx="10.39" cy="23.77" r="0.57"/>
+    <circle fill="currentColor" cx="12.12" cy="24.21" r="0.57"/>
+    <circle fill="currentColor" cx="13.85" cy="24.64" r="0.47"/>
+    <circle fill="currentColor" cx="15.57" cy="25.07" r="0.47"/>
+    <circle fill="currentColor" cx="17.3" cy="25.5" r="0.47"/>
+    <circle fill="currentColor" cx="19.03" cy="25.93" r="0.36"/>
+    <circle fill="currentColor" cx="20.76" cy="26.36" r="0.26"/>
+    <circle fill="currentColor" cx="9.96" cy="25.5" r="0.47"/>
+    <circle fill="currentColor" cx="11.69" cy="25.93" r="0.47"/>
+    <circle fill="currentColor" cx="13.42" cy="26.36" r="0.47"/>
+    <circle fill="currentColor" cx="15.14" cy="26.79" r="0.36"/>
+    <circle fill="currentColor" cx="16.87" cy="27.22" r="0.36"/>
+    <rect fill="currentColor" x="10.83" y="10.4" width="1.71" height="1.71"/>
+  </symbol>
+  <symbol id="mk-fd" viewBox="0 0 32 32">
+    <circle fill="currentColor" cx="16.8" cy="5.18" r="0.72" opacity="0.65"/>
+    <circle fill="currentColor" cx="18.55" cy="5.58" r="0.58" opacity="0.62"/>
+    <circle fill="currentColor" cx="20.26" cy="6.09" r="0.52" opacity="0.58"/>
+    <circle fill="currentColor" cx="21.99" cy="6.44" r="0.56" opacity="0.54"/>
+    <circle fill="currentColor" cx="11.27" cy="5.64" r="0.7" opacity="0.72"/>
+    <circle fill="currentColor" cx="13.02" cy="6.15" r="0.63" opacity="0.74"/>
+    <circle fill="currentColor" cx="14.6" cy="6.45" r="0.67" opacity="0.74"/>
+    <circle fill="currentColor" cx="16.38" cy="7.02" r="0.64" opacity="0.72"/>
+    <circle fill="currentColor" cx="18.19" cy="7.42" r="0.71" opacity="0.68"/>
+    <circle fill="currentColor" cx="19.91" cy="7.82" r="0.7" opacity="0.64"/>
+    <circle fill="currentColor" cx="21.62" cy="8.25" r="0.6" opacity="0.58"/>
+    <circle fill="currentColor" cx="23.3" cy="8.7" r="0.61" opacity="0.52"/>
+    <circle fill="currentColor" cx="25.09" cy="9.11" r="0.45" opacity="0.46"/>
+    <circle fill="currentColor" cx="10.87" cy="7.29" r="0.62" opacity="0.79"/>
+    <circle fill="currentColor" cx="12.51" cy="7.86" r="0.64" opacity="0.82"/>
+    <circle fill="currentColor" cx="14.34" cy="8.23" r="0.63" opacity="0.82"/>
+    <circle fill="currentColor" cx="15.9" cy="8.66" r="0.71" opacity="0.79"/>
+    <circle fill="currentColor" cx="17.73" cy="9.07" r="0.65" opacity="0.74"/>
+    <circle fill="currentColor" cx="19.48" cy="9.49" r="0.7" opacity="0.68"/>
+    <circle fill="currentColor" cx="21.14" cy="9.99" r="0.61" opacity="0.62"/>
+    <circle fill="currentColor" cx="22.92" cy="10.41" r="0.6" opacity="0.56"/>
+    <circle fill="currentColor" cx="24.7" cy="10.72" r="0.54" opacity="0.49"/>
+    <circle fill="currentColor" cx="26.33" cy="11.32" r="0.46" opacity="0.42"/>
+    <circle fill="currentColor" cx="8.64" cy="8.75" r="0.72" opacity="0.79"/>
+    <circle fill="currentColor" cx="10.44" cy="9.02" r="0.64" opacity="0.85"/>
+    <circle fill="currentColor" cx="12.13" cy="9.52" r="0.42" opacity="0.9"/>
+    <circle fill="currentColor" cx="13.82" cy="9.99" r="0.72" opacity="0.9"/>
+    <circle fill="currentColor" cx="15.6" cy="10.29" r="0.61" opacity="0.85"/>
+    <circle fill="currentColor" cx="17.33" cy="10.72" r="0.69" opacity="0.78"/>
+    <circle fill="currentColor" cx="19.04" cy="11.2" r="0.66" opacity="0.71"/>
+    <circle fill="currentColor" cx="20.75" cy="11.72" r="0.72" opacity="0.65"/>
+    <circle fill="currentColor" cx="22.52" cy="12.09" r="0.62" opacity="0.58"/>
+    <circle fill="currentColor" cx="24.3" cy="12.62" r="0.53" opacity="0.51"/>
+    <circle fill="currentColor" cx="25.92" cy="12.89" r="0.47" opacity="0.44"/>
+    <circle fill="currentColor" cx="6.47" cy="9.9" r="0.66" opacity="0.74"/>
+    <circle fill="currentColor" cx="8.31" cy="10.37" r="0.62" opacity="0.81"/>
+    <circle fill="currentColor" cx="9.94" cy="10.88" r="0.39" opacity="0.9"/>
+    <circle fill="currentColor" cx="13.41" cy="11.7" r="0.4" opacity="0.99"/>
+    <circle fill="currentColor" cx="15.21" cy="12.02" r="0.82" opacity="0.89"/>
+    <circle fill="currentColor" cx="16.79" cy="12.6" r="0.62" opacity="0.81"/>
+    <circle fill="currentColor" cx="18.63" cy="12.95" r="0.68" opacity="0.73"/>
+    <circle fill="currentColor" cx="20.29" cy="13.35" r="0.73" opacity="0.66"/>
+    <circle fill="currentColor" cx="22.13" cy="13.76" r="0.61" opacity="0.59"/>
+    <circle fill="currentColor" cx="23.74" cy="14.22" r="0.55" opacity="0.52"/>
+    <circle fill="currentColor" cx="25.4" cy="14.62" r="0.45" opacity="0.45"/>
+    <circle fill="currentColor" cx="27.26" cy="15.2" r="0.36" opacity="0.38"/>
+    <circle fill="currentColor" cx="6.05" cy="11.76" r="0.66" opacity="0.74"/>
+    <circle fill="currentColor" cx="7.76" cy="12.11" r="0.63" opacity="0.81"/>
+    <circle fill="currentColor" cx="9.58" cy="12.64" r="0.74" opacity="0.89"/>
+    <circle fill="currentColor" cx="11.19" cy="12.98" r="0.45" opacity="0.97"/>
+    <circle fill="currentColor" cx="12.88" cy="13.47" r="0.84" opacity="0.96"/>
+    <circle fill="currentColor" cx="14.71" cy="13.81" r="0.72" opacity="0.88"/>
+    <circle fill="currentColor" cx="16.36" cy="14.37" r="0.63" opacity="0.8"/>
+    <circle fill="currentColor" cx="18.14" cy="14.67" r="0.7" opacity="0.73"/>
+    <circle fill="currentColor" cx="19.94" cy="15.14" r="0.74" opacity="0.66"/>
+    <circle fill="currentColor" cx="21.63" cy="15.58" r="0.55" opacity="0.59"/>
+    <circle fill="currentColor" cx="23.26" cy="16.01" r="0.61" opacity="0.52"/>
+    <circle fill="currentColor" cx="25.08" cy="16.41" r="0.44" opacity="0.45"/>
+    <circle fill="currentColor" cx="26.71" cy="16.81" r="0.35" opacity="0.38"/>
+    <circle fill="currentColor" cx="5.72" cy="13.36" r="0.7" opacity="0.71"/>
+    <circle fill="currentColor" cx="7.44" cy="13.9" r="0.69" opacity="0.78"/>
+    <circle fill="currentColor" cx="9.1" cy="14.34" r="0.65" opacity="0.84"/>
+    <circle fill="currentColor" cx="10.76" cy="14.73" r="0.74" opacity="0.88"/>
+    <circle fill="currentColor" cx="12.62" cy="15.23" r="0.76" opacity="0.88"/>
+    <circle fill="currentColor" cx="14.36" cy="15.49" r="0.71" opacity="0.83"/>
+    <circle fill="currentColor" cx="16.07" cy="15.91" r="0.72" opacity="0.77"/>
+    <circle fill="currentColor" cx="17.66" cy="16.34" r="0.67" opacity="0.71"/>
+    <circle fill="currentColor" cx="19.49" cy="16.88" r="0.68" opacity="0.64"/>
+    <circle fill="currentColor" cx="21.1" cy="17.22" r="0.61" opacity="0.57"/>
+    <circle fill="currentColor" cx="22.85" cy="17.75" r="0.59" opacity="0.51"/>
+    <circle fill="currentColor" cx="26.31" cy="18.6" r="0.36" opacity="0.37"/>
+    <circle fill="currentColor" cx="5.13" cy="15.24" r="0.71" opacity="0.68"/>
+    <circle fill="currentColor" cx="6.97" cy="15.53" r="0.68" opacity="0.73"/>
+    <circle fill="currentColor" cx="8.67" cy="16.08" r="0.67" opacity="0.77"/>
+    <circle fill="currentColor" cx="10.38" cy="16.42" r="0.64" opacity="0.8"/>
+    <circle fill="currentColor" cx="12.06" cy="16.91" r="0.71" opacity="0.8"/>
+    <circle fill="currentColor" cx="13.85" cy="17.34" r="0.68" opacity="0.77"/>
+    <circle fill="currentColor" cx="15.63" cy="17.7" r="0.64" opacity="0.72"/>
+    <circle fill="currentColor" cx="17.36" cy="18.07" r="0.71" opacity="0.67"/>
+    <circle fill="currentColor" cx="19.05" cy="18.61" r="0.6" opacity="0.61"/>
+    <circle fill="currentColor" cx="20.7" cy="19.07" r="0.52" opacity="0.55"/>
+    <circle fill="currentColor" cx="22.47" cy="19.39" r="0.54" opacity="0.49"/>
+    <circle fill="currentColor" cx="24.25" cy="19.94" r="0.46" opacity="0.42"/>
+    <circle fill="currentColor" cx="25.91" cy="20.31" r="0.26" opacity="0.35"/>
+    <circle fill="currentColor" cx="4.78" cy="16.97" r="0.61" opacity="0.63"/>
+    <circle fill="currentColor" cx="6.46" cy="17.36" r="0.71" opacity="0.67"/>
+    <circle fill="currentColor" cx="8.19" cy="17.75" r="0.63" opacity="0.71"/>
+    <circle fill="currentColor" cx="9.88" cy="18.2" r="0.61" opacity="0.72"/>
+    <circle fill="currentColor" cx="11.59" cy="18.53" r="0.69" opacity="0.72"/>
+    <circle fill="currentColor" cx="13.32" cy="18.93" r="0.72" opacity="0.7"/>
+    <circle fill="currentColor" cx="15.04" cy="19.4" r="0.65" opacity="0.67"/>
+    <circle fill="currentColor" cx="16.94" cy="19.9" r="0.56" opacity="0.62"/>
+    <circle fill="currentColor" cx="18.67" cy="20.29" r="0.54" opacity="0.57"/>
+    <circle fill="currentColor" cx="20.26" cy="20.76" r="0.59" opacity="0.51"/>
+    <circle fill="currentColor" cx="22.1" cy="21.25" r="0.48" opacity="0.46"/>
+    <circle fill="currentColor" cx="23.82" cy="21.6" r="0.35" opacity="0.39"/>
+    <circle fill="currentColor" cx="6.09" cy="18.95" r="0.6" opacity="0.61"/>
+    <circle fill="currentColor" cx="7.83" cy="19.5" r="0.63" opacity="0.64"/>
+    <circle fill="currentColor" cx="9.55" cy="19.87" r="0.7" opacity="0.65"/>
+    <circle fill="currentColor" cx="11.19" cy="20.34" r="0.65" opacity="0.65"/>
+    <circle fill="currentColor" cx="12.91" cy="20.8" r="0.64" opacity="0.64"/>
+    <circle fill="currentColor" cx="14.67" cy="21.08" r="0.56" opacity="0.61"/>
+    <circle fill="currentColor" cx="16.44" cy="21.65" r="0.54" opacity="0.57"/>
+    <circle fill="currentColor" cx="18.08" cy="22.03" r="0.61" opacity="0.52"/>
+    <circle fill="currentColor" cx="19.83" cy="22.46" r="0.51" opacity="0.47"/>
+    <circle fill="currentColor" cx="21.61" cy="22.99" r="0.45" opacity="0.42"/>
+    <circle fill="currentColor" cx="23.25" cy="23.41" r="0.34" opacity="0.35"/>
+    <circle fill="currentColor" cx="5.65" cy="20.74" r="0.57" opacity="0.55"/>
+    <circle fill="currentColor" cx="7.3" cy="21.24" r="0.52" opacity="0.57"/>
+    <circle fill="currentColor" cx="9.16" cy="21.6" r="0.6" opacity="0.58"/>
+    <circle fill="currentColor" cx="10.84" cy="22.12" r="0.54" opacity="0.58"/>
+    <circle fill="currentColor" cx="12.46" cy="22.4" r="0.57" opacity="0.57"/>
+    <circle fill="currentColor" cx="14.32" cy="22.98" r="0.57" opacity="0.55"/>
+    <circle fill="currentColor" cx="15.93" cy="23.42" r="0.61" opacity="0.51"/>
+    <circle fill="currentColor" cx="17.79" cy="23.78" r="0.5" opacity="0.47"/>
+    <circle fill="currentColor" cx="19.36" cy="24.12" r="0.5" opacity="0.43"/>
+    <circle fill="currentColor" cx="21.11" cy="24.68" r="0.36" opacity="0.37"/>
+    <circle fill="currentColor" cx="8.61" cy="23.28" r="0.54" opacity="0.51"/>
+    <circle fill="currentColor" cx="10.43" cy="23.78" r="0.56" opacity="0.51"/>
+    <circle fill="currentColor" cx="12.16" cy="24.16" r="0.6" opacity="0.5"/>
+    <circle fill="currentColor" cx="13.87" cy="24.65" r="0.48" opacity="0.48"/>
+    <circle fill="currentColor" cx="15.54" cy="25.16" r="0.46" opacity="0.45"/>
+    <circle fill="currentColor" cx="17.25" cy="25.54" r="0.5" opacity="0.42"/>
+    <circle fill="currentColor" cx="19.01" cy="26.03" r="0.39" opacity="0.37"/>
+    <circle fill="currentColor" cx="20.67" cy="26.26" r="0.24" opacity="0.34"/>
+    <circle fill="currentColor" cx="9.9" cy="25.46" r="0.46" opacity="0.44"/>
+    <circle fill="currentColor" cx="11.67" cy="25.83" r="0.49" opacity="0.43"/>
+    <circle fill="currentColor" cx="13.46" cy="26.34" r="0.46" opacity="0.42"/>
+    <circle fill="currentColor" cx="15.16" cy="26.85" r="0.38" opacity="0.39"/>
+    <circle fill="currentColor" cx="16.89" cy="27.29" r="0.36" opacity="0.35"/>
+    <rect fill="#9a86c4" x="10.87" y="10.36" width="1.71" height="1.71"/>
+    <circle fill="#9a86c4" cx="24.66" cy="18.23" r="0.48" opacity="0.44"/>
+  </symbol>
+</defs></svg>
+<div class="wrap">
+
+  <header>
+    <div class="meta">batch-01 · c-halftone</div>
+    <h1>半调网点 · 14° 网线</h1>
+    <p class="sub">把主页那层极细的网点放大到能看清一粒一粒 —— 网线本身成象，象的是左上那团冷光。</p>
+    <p class="lede">制版时半调网屏要定一个 <em>screen angle</em>（15° / 45° / 75°，为了避开摩尔纹）。这枚标记的网线角度取
+    <b>14°</b> —— 正是全站那根发丝线的角度。于是标记斜边上一级一级的台阶，和主页那根台阶状斜线是同一个成因：
+    不是画出来的线，是斜着排的网点在圆的边界上被裁出来的齿。</p>
+    <p class="meta" style="margin-top:16px">网线角度 14° · 两套线数（粗 / 细）· 两态同一组点 · 可退 currentColor</p>
+  </header>
+
+  <hr>
+
+  <!-- 01 主视觉 -->
+  <section>
+    <div class="shead"><span class="n">01</span><h2>主视觉 · 醒与梦</h2></div>
+    <div class="panes">
+      <div class="pane paper on-paper" style="--rm:1">
+        <div class="plabel">醒 · wake · 纸上</div>
+        <div class="duo">
+          <figure><span class="mark" style="--sz:176px">
+        <svg class="mw" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-fw"/></svg>
+        <svg class="md" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-fd"/></svg>
+      </span><figcaption style="color:var(--ink-faint)">细网线 1.78 · 176px（大尺寸版）</figcaption></figure>
+          <figure><span class="mark" style="--sz:48px">
+        <svg class="mw" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cw"/></svg>
+        <svg class="md" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cd"/></svg>
+      </span><figcaption style="color:var(--ink-faint)">粗网线 4.0 · 48px（发货版）</figcaption></figure>
+        </div>
+        <div class="cap">规矩、克制；点按亮度落成 3 / 6 档半径，像印在纸上的一个灰阶形状。左上那一点最亮 —— 全屏唯一的光源，也是全图唯一一枚方点。</div>
+      </div>
+      <div class="pane night on-night" style="--rm:0">
+        <div class="plabel">梦 · dream · 靛夜里</div>
+        <div class="duo">
+          <figure><span class="mark" style="--sz:176px">
+        <svg class="mw" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-fw"/></svg>
+        <svg class="md" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-fd"/></svg>
+      </span><figcaption style="color:rgba(226,233,242,.4)">细网线 1.78 · 176px（大尺寸版）</figcaption></figure>
+          <figure><span class="mark" style="--sz:48px">
+        <svg class="mw" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cw"/></svg>
+        <svg class="md" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cd"/></svg>
+      </span><figcaption style="color:rgba(226,233,242,.4)">粗网线 4.0 · 48px（发货版）</figcaption></figure>
+        </div>
+        <div class="cap" style="color:rgba(226,233,242,.5)">同一组点，离格、散开；外缘的点化进夜里（不是删点）。光源那一枚偏成薄暮紫并微微上浮，环带最远处再留一点紫。</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 02 总闸 -->
+  <section>
+    <div class="shead"><span class="n">02</span><h2>同一枚 · 总闸 --reality-mix</h2></div>
+    <div class="gate" id="gate" style="--rm:1">
+      <span class="mark" style="--sz:104px">
+        <svg class="mw" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cw"/></svg>
+        <svg class="md" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cd"/></svg>
+      </span>
+      <div class="gcol" style="flex:1 1 320px">
+        <div class="gl">reality-mix 1 → 0</div>
+        <input id="rm" type="range" min="0" max="100" value="100">
+        <div class="gv" id="rmv">--reality-mix: 1.00</div>
+      </div>
+      <div class="gcol" style="flex:1 1 300px">
+        <div class="note" style="color:rgba(226,233,242,.6);margin:0">拖动看它化开。两点之间没有切换动作 ——
+        只是同一组点在同一张网线上离格、变淡、上浮。真做标签页两态需 JS 换 <span style="font-family:var(--mono);font-size:11.5px">&lt;link rel="icon"&gt;</span>，见 notes。</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 03 尺寸带 -->
+  <section>
+    <div class="shead"><span class="n">03</span><h2>尺寸带 · 32 / 24 / 16</h2></div>
+    <p class="note" style="margin:0 0 18px">16px 换一套更粗的固定网线（网距 4.0 —— 落到 16px 就是 2.0px）：点的直径收到 1.0–1.7px，间隔 0.3–1.0px，点数从 132 减到 25。
+    形状靠「点还在不在」（删点）定，不靠「点多小」（缩点）定，所以边缘不糊。光源那一枚是全图唯一的方点，
+    周围还退让出一圈空 —— 16px 下它是唯一可辨的锚。</p>
+    <div class="panes">
+      <div class="pane paper on-paper" style="--rm:1">
+        <div class="plabel">醒 · 昼面 #f0f3f6</div>
+        <div class="band">
+          <div class="cell"><span class="mark" style="--sz:32px">
+        <svg class="mw" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cw"/></svg>
+        <svg class="md" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cd"/></svg>
+      </span><span class="px">32 粗</span></div>
+          <div class="cell"><span class="mark" style="--sz:32px">
+        <svg class="mw" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-fw"/></svg>
+        <svg class="md" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-fd"/></svg>
+      </span><span class="px">32 细</span></div>
+          <div class="cell"><span class="mark" style="--sz:24px">
+        <svg class="mw" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cw"/></svg>
+        <svg class="md" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cd"/></svg>
+      </span><span class="px">24 粗</span></div>
+          <div class="cell"><span class="mark" style="--sz:24px">
+        <svg class="mw" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-fw"/></svg>
+        <svg class="md" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-fd"/></svg>
+      </span><span class="px">24 细</span></div>
+          <div class="cell"><span class="mark" style="--sz:16px">
+        <svg class="mw" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cw"/></svg>
+        <svg class="md" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cd"/></svg>
+      </span><span class="px">16 粗</span></div>
+          <div class="cell"><span class="mark" style="--sz:16px">
+        <svg class="mw" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-fw"/></svg>
+        <svg class="md" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-fd"/></svg>
+      </span><span class="px">16 细</span></div>
+        </div>
+      </div>
+      <div class="pane night on-night" style="--rm:0">
+        <div class="plabel">梦 · 深底 #0c0f18</div>
+        <div class="band">
+          <div class="cell"><span class="mark" style="--sz:32px">
+        <svg class="mw" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cw"/></svg>
+        <svg class="md" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cd"/></svg>
+      </span><span class="px">32 粗</span></div>
+          <div class="cell"><span class="mark" style="--sz:32px">
+        <svg class="mw" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-fw"/></svg>
+        <svg class="md" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-fd"/></svg>
+      </span><span class="px">32 细</span></div>
+          <div class="cell"><span class="mark" style="--sz:24px">
+        <svg class="mw" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cw"/></svg>
+        <svg class="md" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cd"/></svg>
+      </span><span class="px">24 粗</span></div>
+          <div class="cell"><span class="mark" style="--sz:24px">
+        <svg class="mw" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-fw"/></svg>
+        <svg class="md" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-fd"/></svg>
+      </span><span class="px">24 细</span></div>
+          <div class="cell"><span class="mark" style="--sz:16px">
+        <svg class="mw" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cw"/></svg>
+        <svg class="md" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cd"/></svg>
+      </span><span class="px">16 粗</span></div>
+          <div class="cell"><span class="mark" style="--sz:16px">
+        <svg class="mw" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-fw"/></svg>
+        <svg class="md" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-fd"/></svg>
+      </span><span class="px">16 细</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="panes" style="margin-top:22px">
+      <div class="pane on-night" style="--rm:0;background:#16171c;border-color:rgba(226,233,242,.08)">
+        <div class="plabel" style="color:rgba(226,233,242,.45)">深色标签栏底色 #16171c · 16px 粗网线，连排六枚</div>
+        <div class="band">
+          <div class="cell"><span class="mark" style="--sz:16px">
+        <svg class="mw" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cw"/></svg>
+        <svg class="md" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cd"/></svg>
+      </span><span class="px">16</span></div>
+          <div class="cell"><span class="mark" style="--sz:16px">
+        <svg class="mw" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cw"/></svg>
+        <svg class="md" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cd"/></svg>
+      </span><span class="px">16</span></div>
+          <div class="cell"><span class="mark" style="--sz:16px">
+        <svg class="mw" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cw"/></svg>
+        <svg class="md" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cd"/></svg>
+      </span><span class="px">16</span></div>
+          <div class="cell"><span class="mark" style="--sz:16px">
+        <svg class="mw" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cw"/></svg>
+        <svg class="md" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cd"/></svg>
+      </span><span class="px">16</span></div>
+          <div class="cell"><span class="mark" style="--sz:16px">
+        <svg class="mw" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cw"/></svg>
+        <svg class="md" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cd"/></svg>
+      </span><span class="px">16</span></div>
+          <div class="cell"><span class="mark" style="--sz:16px">
+        <svg class="mw" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cw"/></svg>
+        <svg class="md" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cd"/></svg>
+      </span><span class="px">16</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="cap">细网线在 16px 下正如所料糊成一片灰 —— 那是它不该出现的尺寸。真正的标签页图标只发粗网线那一份。</div>
+  </section>
+
+  <!-- 04 标签栏 -->
+  <section>
+    <div class="shead"><span class="n">04</span><h2>真实标签页</h2></div>
+    <div class="tabs">
+      <div>
+        <div class="tabbar light">
+          <div class="tab off"><span class="mark" style="--sz:16px">
+        <svg class="mw" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cw"/></svg>
+        <svg class="md" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cd"/></svg>
+      </span><span class="ttl">GitHub</span></div>
+          <div class="tab on"><span class="mark" style="--sz:16px">
+        <svg class="mw" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cw"/></svg>
+        <svg class="md" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cd"/></svg>
+      </span><span class="ttl">Traveritas</span></div>
+          <div class="tab off"><span class="mark" style="--sz:16px">
+        <svg class="mw" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cw"/></svg>
+        <svg class="md" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cd"/></svg>
+      </span><span class="ttl">RSS · 订阅</span></div>
+        </div>
+        <div class="chrome-under"></div>
+      </div>
+      <div>
+        <div class="tabbar dark">
+          <div class="tab off"><span class="mark" style="--sz:16px">
+        <svg class="mw" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cw"/></svg>
+        <svg class="md" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cd"/></svg>
+      </span><span class="ttl">GitHub</span></div>
+          <div class="tab on"><span class="mark" style="--sz:16px">
+        <svg class="mw" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cw"/></svg>
+        <svg class="md" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cd"/></svg>
+      </span><span class="ttl">AveritA</span></div>
+          <div class="tab off"><span class="mark" style="--sz:16px">
+        <svg class="mw" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cw"/></svg>
+        <svg class="md" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cd"/></svg>
+      </span><span class="ttl">RSS</span></div>
+        </div>
+        <div class="chrome-under"></div>
+      </div>
+      <div>
+        <div class="tabbar dark">
+          <div class="tab off"><span class="mark" style="--sz:16px">
+        <svg class="mw" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cw"/></svg>
+        <svg class="md" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cd"/></svg>
+      </span><span class="ttl">Notes</span></div>
+          <div class="tab off"><span class="mark" style="--sz:16px">
+        <svg class="mw" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cw"/></svg>
+        <svg class="md" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cd"/></svg>
+      </span><span class="ttl">Mail</span></div>
+          <div class="tab off"><span class="mark" style="--sz:16px">
+        <svg class="mw" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cw"/></svg>
+        <svg class="md" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cd"/></svg>
+      </span><span class="ttl">Docs</span></div>
+          <div class="tab off"><span class="mark" style="--sz:16px">
+        <svg class="mw" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cw"/></svg>
+        <svg class="md" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cd"/></svg>
+      </span><span class="ttl">Design</span></div>
+          <div class="tab on"><span class="mark" style="--sz:16px">
+        <svg class="mw" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cw"/></svg>
+        <svg class="md" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cd"/></svg>
+      </span><span class="ttl">Traveritas · 断章</span></div>
+          <div class="tab off"><span class="mark" style="--sz:16px">
+        <svg class="mw" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cw"/></svg>
+        <svg class="md" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cd"/></svg>
+      </span><span class="ttl">+</span></div>
+        </div>
+        <div class="chrome-under"></div>
+      </div>
+      <div>
+        <div class="tabbar light">
+          <div class="tab off amber"><span class="mark" style="--sz:16px">
+        <svg class="mw" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cw"/></svg>
+        <svg class="md" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cd"/></svg>
+      </span><span class="ttl">GitHub</span></div>
+          <div class="tab on amber"><span class="mark" style="--sz:16px">
+        <svg class="mw" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cw"/></svg>
+        <svg class="md" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cd"/></svg>
+      </span><span class="ttl">Traveritas</span></div>
+          <div class="tab off amber"><span class="mark" style="--sz:16px">
+        <svg class="mw" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cw"/></svg>
+        <svg class="md" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cd"/></svg>
+      </span><span class="ttl">RSS</span></div>
+        </div>
+        <div class="chrome-under"></div>
+      </div>
+      <div>
+        <div class="tabbar dark">
+          <div class="tab off amber"><span class="mark" style="--sz:16px">
+        <svg class="mw" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cw"/></svg>
+        <svg class="md" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cd"/></svg>
+      </span><span class="ttl">GitHub</span></div>
+          <div class="tab on amber"><span class="mark" style="--sz:16px">
+        <svg class="mw" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cw"/></svg>
+        <svg class="md" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cd"/></svg>
+      </span><span class="ttl">AveritA</span></div>
+          <div class="tab off amber"><span class="mark" style="--sz:16px">
+        <svg class="mw" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cw"/></svg>
+        <svg class="md" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cd"/></svg>
+      </span><span class="ttl">RSS</span></div>
+        </div>
+        <div class="chrome-under"></div>
+      </div>
+    </div>
+    <div class="cap">浅色条上是一枚偏灰的点团；深色条上是一枚偏亮的点团 —— 同一枚，只是 ink 换了。两张条里它都不脏、不消失。
+    最后两条是薄暮紫版：深底上最稳，浅底上偏淡（约 2.3:1），仍然看得见但确实软。</div>
+  </section>
+
+  <!-- 05 单色退让 -->
+  <section>
+    <div class="shead"><span class="n">05</span><h2>单色退让 · currentColor</h2></div>
+    <p class="note" style="margin:0 0 18px">全站图标多半跟 <span style="font-family:var(--mono);font-size:12px">currentColor</span> 走。退成单色时：
+    灰阶层次整个丢掉，只剩「点的大小差」与「点在不在」；醒梦的区别也从「紫 / 亮」退成「在格 / 离格 + 外缘浓淡」。
+    光源那一枚仍然最大 —— 所以它认得出来。</p>
+    <div class="panes">
+      <div class="pane paper on-paper" style="--rm:1">
+        <div class="plabel">单色 · 昼面 · 醒</div>
+        <div class="band">
+          <div class="cell"><span class="mark" style="--sz:128px">
+        <svg class="mw" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cw"/></svg>
+        <svg class="md" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cd"/></svg>
+      </span><span class="px">128 粗</span></div>
+          <div class="cell"><span class="mark" style="--sz:128px">
+        <svg class="mw" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-fw"/></svg>
+        <svg class="md" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-fd"/></svg>
+      </span><span class="px">128 细</span></div>
+          <div class="cell"><span class="mark" style="--sz:32px">
+        <svg class="mw" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cw"/></svg>
+        <svg class="md" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cd"/></svg>
+      </span><span class="px">32</span></div>
+          <div class="cell"><span class="mark" style="--sz:16px">
+        <svg class="mw" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cw"/></svg>
+        <svg class="md" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cd"/></svg>
+      </span><span class="px">16</span></div>
+        </div>
+      </div>
+      <div class="pane night on-night" style="--rm:1">
+        <div class="plabel">单色 · 深底 · 醒面形态</div>
+        <div class="band">
+          <div class="cell"><span class="mark" style="--sz:128px">
+        <svg class="mw" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cw"/></svg>
+        <svg class="md" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cd"/></svg>
+      </span><span class="px">128 粗</span></div>
+          <div class="cell"><span class="mark" style="--sz:128px">
+        <svg class="mw" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-fw"/></svg>
+        <svg class="md" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-fd"/></svg>
+      </span><span class="px">128 细</span></div>
+          <div class="cell"><span class="mark" style="--sz:32px">
+        <svg class="mw" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cw"/></svg>
+        <svg class="md" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cd"/></svg>
+      </span><span class="px">32</span></div>
+          <div class="cell"><span class="mark" style="--sz:16px">
+        <svg class="mw" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cw"/></svg>
+        <svg class="md" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cd"/></svg>
+      </span><span class="px">16</span></div>
+        </div>
+      </div>
+      <div class="pane paper" style="--rm:1;color:#9a86c4">
+        <div class="plabel" style="color:#9a86c4">单色 · 薄暮紫（唯一异质色）· 醒面</div>
+        <div class="band">
+          <div class="cell"><span class="mark" style="--sz:128px">
+        <svg class="mw" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cw"/></svg>
+        <svg class="md" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cd"/></svg>
+      </span><span class="px" style="color:#9a86c4">128 粗</span></div>
+          <div class="cell"><span class="mark" style="--sz:128px">
+        <svg class="mw" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-fw"/></svg>
+        <svg class="md" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-fd"/></svg>
+      </span><span class="px" style="color:#9a86c4">128 细</span></div>
+          <div class="cell"><span class="mark" style="--sz:32px">
+        <svg class="mw" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cw"/></svg>
+        <svg class="md" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cd"/></svg>
+      </span><span class="px" style="color:#9a86c4">32</span></div>
+          <div class="cell"><span class="mark" style="--sz:16px">
+        <svg class="mw" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cw"/></svg>
+        <svg class="md" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cd"/></svg>
+      </span><span class="px" style="color:#9a86c4">16</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="cap">薄暮紫是「一份文件走两边」时的折中：深底上最稳，浅底上偏淡。真要两边都硬，
+    按 <span style="font-family:var(--mono)">prefers-color-scheme</span> 发两份 ink（昼面 <span style="font-family:var(--mono)">#232830</span>、夜面 <span style="font-family:var(--mono)">#e2e9f2</span>）比单发一份紫更清楚 —— 见 notes。</div>
+  </section>
+
+  <!-- 06 网线角度 -->
+  <section>
+    <div class="shead"><span class="n">06</span><h2>小巧思 · 网线角度就是那根发丝线</h2></div>
+    <div class="angle">
+      <svg viewBox="0 0 32 32" aria-hidden="true">
+        <g fill="rgba(35,40,48,.20)"><circle cx="6.46" cy="0.12" r="0.5"/><circle cx="9" cy="0.75" r="0.5"/><circle cx="11.54" cy="1.39" r="0.5"/><circle cx="14.08" cy="2.02" r="0.5"/><circle cx="16.63" cy="2.66" r="0.5"/><circle cx="19.17" cy="3.29" r="0.5"/><circle cx="21.71" cy="3.92" r="0.5"/><circle cx="24.25" cy="4.56" r="0.5"/><circle cx="26.8" cy="5.19" r="0.5"/><circle cx="29.34" cy="5.82" r="0.5"/><circle cx="31.88" cy="6.46" r="0.5"/><circle cx="5.82" cy="2.66" r="0.5"/><circle cx="8.37" cy="3.3" r="0.5"/><circle cx="10.91" cy="3.93" r="0.5"/><circle cx="13.45" cy="4.56" r="0.5"/><circle cx="15.99" cy="5.2" r="0.5"/><circle cx="18.54" cy="5.83" r="0.5"/><circle cx="21.08" cy="6.47" r="0.5"/><circle cx="23.62" cy="7.1" r="0.5"/><circle cx="26.16" cy="7.73" r="0.5"/><circle cx="28.7" cy="8.37" r="0.5"/><circle cx="31.25" cy="9" r="0.5"/><circle cx="5.19" cy="5.2" r="0.5"/><circle cx="7.73" cy="5.84" r="0.5"/><circle cx="10.27" cy="6.47" r="0.5"/><circle cx="12.82" cy="7.11" r="0.5"/><circle cx="15.36" cy="7.74" r="0.5"/><circle cx="17.9" cy="8.37" r="0.5"/><circle cx="20.44" cy="9.01" r="0.5"/><circle cx="22.99" cy="9.64" r="0.5"/><circle cx="25.53" cy="10.27" r="0.5"/><circle cx="28.07" cy="10.91" r="0.5"/><circle cx="30.61" cy="11.54" r="0.5"/><circle cx="4.56" cy="7.75" r="0.5"/><circle cx="7.1" cy="8.38" r="0.5"/><circle cx="9.64" cy="9.01" r="0.5"/><circle cx="12.18" cy="9.65" r="0.5"/><circle cx="14.73" cy="10.28" r="0.5"/><circle cx="17.27" cy="10.92" r="0.5"/><circle cx="19.81" cy="11.55" r="0.5"/><circle cx="22.35" cy="12.18" r="0.5"/><circle cx="24.89" cy="12.82" r="0.5"/><circle cx="27.44" cy="13.45" r="0.5"/><circle cx="29.98" cy="14.08" r="0.5"/><circle cx="3.92" cy="10.29" r="0.5"/><circle cx="6.47" cy="10.92" r="0.5"/><circle cx="9.01" cy="11.56" r="0.5"/><circle cx="11.55" cy="12.19" r="0.5"/><circle cx="14.09" cy="12.82" r="0.5"/><circle cx="16.63" cy="13.46" r="0.5"/><circle cx="19.18" cy="14.09" r="0.5"/><circle cx="21.72" cy="14.73" r="0.5"/><circle cx="24.26" cy="15.36" r="0.5"/><circle cx="26.8" cy="15.99" r="0.5"/><circle cx="29.34" cy="16.63" r="0.5"/><circle cx="3.29" cy="12.83" r="0.5"/><circle cx="5.83" cy="13.46" r="0.5"/><circle cx="8.37" cy="14.1" r="0.5"/><circle cx="10.92" cy="14.73" r="0.5"/><circle cx="13.46" cy="15.37" r="0.5"/><circle cx="16" cy="16" r="0.5"/><circle cx="18.54" cy="16.63" r="0.5"/><circle cx="21.08" cy="17.27" r="0.5"/><circle cx="23.63" cy="17.9" r="0.5"/><circle cx="26.17" cy="18.54" r="0.5"/><circle cx="28.71" cy="19.17" r="0.5"/><circle cx="2.66" cy="15.37" r="0.5"/><circle cx="5.2" cy="16.01" r="0.5"/><circle cx="7.74" cy="16.64" r="0.5"/><circle cx="10.28" cy="17.27" r="0.5"/><circle cx="12.82" cy="17.91" r="0.5"/><circle cx="15.37" cy="18.54" r="0.5"/><circle cx="17.91" cy="19.18" r="0.5"/><circle cx="20.45" cy="19.81" r="0.5"/><circle cx="22.99" cy="20.44" r="0.5"/><circle cx="25.53" cy="21.08" r="0.5"/><circle cx="28.08" cy="21.71" r="0.5"/><circle cx="2.02" cy="17.92" r="0.5"/><circle cx="4.56" cy="18.55" r="0.5"/><circle cx="7.11" cy="19.18" r="0.5"/><circle cx="9.65" cy="19.82" r="0.5"/><circle cx="12.19" cy="20.45" r="0.5"/><circle cx="14.73" cy="21.08" r="0.5"/><circle cx="17.27" cy="21.72" r="0.5"/><circle cx="19.82" cy="22.35" r="0.5"/><circle cx="22.36" cy="22.99" r="0.5"/><circle cx="24.9" cy="23.62" r="0.5"/><circle cx="27.44" cy="24.25" r="0.5"/><circle cx="1.39" cy="20.46" r="0.5"/><circle cx="3.93" cy="21.09" r="0.5"/><circle cx="6.47" cy="21.73" r="0.5"/><circle cx="9.01" cy="22.36" r="0.5"/><circle cx="11.56" cy="22.99" r="0.5"/><circle cx="14.1" cy="23.63" r="0.5"/><circle cx="16.64" cy="24.26" r="0.5"/><circle cx="19.18" cy="24.89" r="0.5"/><circle cx="21.73" cy="25.53" r="0.5"/><circle cx="24.27" cy="26.16" r="0.5"/><circle cx="26.81" cy="26.8" r="0.5"/><circle cx="0.75" cy="23" r="0.5"/><circle cx="3.3" cy="23.63" r="0.5"/><circle cx="5.84" cy="24.27" r="0.5"/><circle cx="8.38" cy="24.9" r="0.5"/><circle cx="10.92" cy="25.53" r="0.5"/><circle cx="13.46" cy="26.17" r="0.5"/><circle cx="16.01" cy="26.8" r="0.5"/><circle cx="18.55" cy="27.44" r="0.5"/><circle cx="21.09" cy="28.07" r="0.5"/><circle cx="23.63" cy="28.7" r="0.5"/><circle cx="26.18" cy="29.34" r="0.5"/><circle cx="0.12" cy="25.54" r="0.5"/><circle cx="2.66" cy="26.18" r="0.5"/><circle cx="5.2" cy="26.81" r="0.5"/><circle cx="7.75" cy="27.44" r="0.5"/><circle cx="10.29" cy="28.08" r="0.5"/><circle cx="12.83" cy="28.71" r="0.5"/><circle cx="15.37" cy="29.34" r="0.5"/><circle cx="17.92" cy="29.98" r="0.5"/><circle cx="20.46" cy="30.61" r="0.5"/><circle cx="23" cy="31.25" r="0.5"/><circle cx="25.54" cy="31.88" r="0.5"/></g>
+        <line x1="0" y1="26" x2="32" y2="18" stroke="#9a86c4" stroke-width="0.4" stroke-dasharray="1.5 1.5"/>
+      </svg>
+      <div style="flex:1 1 340px">
+        <p class="note" style="margin:0 0 10px">轴对齐的网点，只是屏幕上的一块纹理。把整张网斜 14°，它就跟那根发丝线对齐了 ——
+        同一条斜线上，一级一级，横 4px 竖 1px。</p>
+        <p class="note" style="margin:0">标记的圆边于是天然长出齿：<b>不是画了一根斜线，是斜排的点在圆的边界上被裁掉</b>。
+        主页那根斜线在屏幕上也正是这样一级一级的台阶（见参考截图）。这两处的「像素感」因此同源，
+        和右下角 NEXUS 那套像素字是远亲。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 07 语境 -->
+  <section>
+    <div class="shead"><span class="n">07</span><h2>一格语境 · 放回主页</h2></div>
+    <div class="ctx">
+      <div class="ctxbar">
+        <div class="tab off"><span class="mark" style="--sz:16px">
+        <svg class="mw" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cw"/></svg>
+        <svg class="md" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cd"/></svg>
+      </span><span class="ttl">GitHub</span></div>
+        <div class="tab on"><span class="mark" style="--sz:16px">
+        <svg class="mw" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cw"/></svg>
+        <svg class="md" viewBox="0 0 32 32" aria-hidden="true"><use href="#mk-cd"/></svg>
+      </span><span class="ttl">Traveritas</span></div>
+        <div class="dots3"><i></i><i></i><i></i></div>
+      </div>
+      <div class="hero">
+        <div class="dots"></div>
+        <svg class="stepped" viewBox="0 0 760 360" preserveAspectRatio="none">
+          <path d="M -20 250 H -16.0 V 249.0 H -12.0 V 248.0 H -8.0 V 247.0 H -4.0 V 246.0 H 0.1 V 245.0 H 4.1 V 244.0 H 8.1 V 243.0 H 12.1 V 242.0 H 16.1 V 241.0 H 20.1 V 240.0 H 24.1 V 239.0 H 28.1 V 238.0 H 32.1 V 237.0 H 36.2 V 236.0 H 40.2 V 235.0 H 44.2 V 234.0 H 48.2 V 233.0 H 52.2 V 232.0 H 56.2 V 231.0 H 60.2 V 230.0 H 64.2 V 229.0 H 68.2 V 228.0 H 72.2 V 227.0 H 76.3 V 226.0 H 80.3 V 225.0 H 84.3 V 224.0 H 88.3 V 223.0 H 92.3 V 222.0 H 96.3 V 221.0 H 100.3 V 220.0 H 104.3 V 219.0 H 108.3 V 218.0 H 112.4 V 217.0 H 116.4 V 216.0 H 120.4 V 215.0 H 124.4 V 214.0 H 128.4 V 213.0 H 132.4 V 212.0 H 136.4 V 211.0 H 140.4 V 210.0 H 144.4 V 209.0 H 148.5 V 208.0 H 152.5 V 207.0 H 156.5 V 206.0 H 160.5 V 205.0 H 164.5 V 204.0 H 168.5 V 203.0 H 172.5 V 202.0 H 176.5 V 201.0 H 180.5 V 200.0 H 184.5 V 199.0 H 188.6 V 198.0 H 192.6 V 197.0 H 196.6 V 196.0 H 200.6 V 195.0 H 204.6 V 194.0 H 208.6 V 193.0 H 212.6 V 192.0 H 216.6 V 191.0 H 220.6 V 190.0 H 224.7 V 189.0 H 228.7 V 188.0 H 232.7 V 187.0 H 236.7 V 186.0 H 240.7 V 185.0 H 244.7 V 184.0 H 248.7 V 183.0 H 252.7 V 182.0 H 256.7 V 181.0 H 260.8 V 180.0 H 264.8 V 179.0 H 268.8 V 178.0 H 272.8 V 177.0 H 276.8 V 176.0 H 280.8 V 175.0 H 284.8 V 174.0 H 288.8 V 173.0 H 292.8 V 172.0 H 296.9 V 171.0 H 300.9 V 170.0 H 304.9 V 169.0 H 308.9 V 168.0 H 312.9 V 167.0 H 316.9 V 166.0 H 320.9 V 165.0 H 324.9 V 164.0 H 328.9 V 163.0 H 332.9 V 162.0 H 337.0 V 161.0 H 341.0 V 160.0 H 345.0 V 159.0 H 349.0 V 158.0 H 353.0 V 157.0 H 357.0 V 156.0 H 361.0 V 155.0 H 365.0 V 154.0 H 369.0 V 153.0 H 373.1 V 152.0 H 377.1 V 151.0 H 381.1 V 150.0 H 385.1 V 149.0 H 389.1 V 148.0 H 393.1 V 147.0 H 397.1 V 146.0 H 401.1 V 145.0 H 405.1 V 144.0 H 409.2 V 143.0 H 413.2 V 142.0 H 417.2 V 141.0 H 421.2 V 140.0 H 425.2 V 139.0 H 429.2 V 138.0 H 433.2 V 137.0 H 437.2 V 136.0 H 441.2 V 135.0 H 445.3 V 134.0 H 449.3 V 133.0 H 453.3 V 132.0 H 457.3 V 131.0 H 461.3 V 130.0 H 465.3 V 129.0 H 469.3 V 128.0 H 473.3 V 127.0 H 477.3 V 126.0 H 481.3 V 125.0 H 485.4 V 124.0 H 489.4 V 123.0 H 493.4 V 122.0 H 497.4 V 121.0 H 501.4 V 120.0 H 505.4 V 119.0 H 509.4 V 118.0 H 513.4 V 117.0 H 517.4 V 116.0 H 521.5 V 115.0 H 525.5 V 114.0 H 529.5 V 113.0 H 533.5 V 112.0 H 537.5 V 111.0 H 541.5 V 110.0 H 545.5 V 109.0 H 549.5 V 108.0 H 553.5 V 107.0 H 557.6 V 106.0 H 561.6 V 105.0 H 565.6 V 104.0 H 569.6 V 103.0 H 573.6 V 102.0 H 577.6 V 101.0 H 581.6 V 100.0 H 585.6 V 99.0 H 589.6 V 98.0 H 593.6 V 97.0 H 597.7 V 96.0 H 601.7 V 95.0 H 605.7 V 94.0 H 609.7 V 93.0 H 613.7 V 92.0 H 617.7 V 91.0 H 621.7 V 90.0 H 625.7 V 89.0 H 629.7 V 88.0 H 633.8 V 87.0 H 637.8 V 86.0 H 641.8 V 85.0 H 645.8 V 84.0 H 649.8 V 83.0 H 653.8 V 82.0 H 657.8 V 81.0 H 661.8 V 80.0 H 665.8 V 79.0 H 669.9 V 78.0 H 673.9 V 77.0 H 677.9 V 76.0 H 681.9 V 75.0 H 685.9 V 74.0 H 689.9 V 73.0 H 693.9 V 72.0 H 697.9 V 71.0 H 701.9 V 70.0 H 706.0 V 69.0 H 710.0 V 68.0 H 714.0 V 67.0 H 718.0 V 66.0 H 722.0 V 65.0 H 726.0 V 64.0 H 730.0 V 63.0 H 734.0 V 62.0 H 738.0 V 61.0 H 742.0 V 60.0 H 746.1 V 59.0 H 750.1 V 58.0 H 754.1 V 57.0 H 758.1 V 56.0 H 762.1 V 55.0 H 766.1 V 54.0 H 770.1 V 53.0 H 774.1 V 52.0 H 778.1 V 51.0 H 780.0 V 50.5"/>
+        </svg>
+        <div class="eyebrow">昼 梦 幻 集</div>
+        <div class="name">Traveritas</div>
+        <div class="entry" style="left:250px;top:196px"><i></i>Ⅰ 断章 <em>ESSAYS</em></div>
+        <div class="entry" style="left:392px;top:232px"><i></i>Ⅱ 闪念 <em>MOMENTS</em></div>
+        <div class="entry" style="left:534px;top:268px"><i></i>Ⅲ 造物 <em>PROJECTS</em></div>
+        <div class="star"><svg viewBox="0 0 26 26"><polygon points="13.00,1.00 14.70,10.06 23.39,7.00 16.40,13.00 23.39,19.00 14.70,15.94 13.00,25.00 11.30,15.94 2.61,19.00 9.60,13.00 2.61,7.00 11.30,10.06"/></svg></div>
+        <div class="nexus">NEXUS</div>
+      </div>
+    </div>
+    <div class="cap">标签页上那枚点团，和页面里那层网点、那根台阶线、左下那颗星是同一套语汇。它不像「贴上去的 logo」，像从这层纹理里长出来的一点。</div>
+  </section>
+
+  <hr>
+
+  <section>
+    <div class="shead"><span class="n">08</span><h2>交付</h2></div>
+    <div class="files">
+      <b>favicon.svg</b> —— 单枚成品，粗网线（16px 可辨），点走 currentColor<br>
+      <b>favicon-dream.svg</b> —— 梦面，粗网线，两枚薄暮紫点<br>
+      <b>gen.mjs</b> —— 生成器（网点位置由它算出）<br>
+      <b>notes.md</b> —— 设计说明 · <b>shots/</b> —— 截图
+    </div>
+    <p class="note" style="margin-top:16px">
+      <span class="swatch" style="background:#232830"></span>醒 ink #232830 ·
+      <span class="swatch" style="background:#e2e9f2"></span>梦 ink #e2e9f2 ·
+      <span class="swatch" style="background:#9a86c4"></span>薄暮紫 #9a86c4 ·
+      <span class="swatch" style="background:#f0f3f6"></span>昼面 #f0f3f6 ·
+      <span class="swatch" style="background:#0c0f18"></span>靛夜 #0c0f18
+    </p>
+  </section>
+
+</div>
+
+<script>
+  const gate = document.getElementById('gate');
+  const rm = document.getElementById('rm');
+  const rmv = document.getElementById('rmv');
+  const sync = () => {
+    const v = Number(rm.value) / 100;
+    gate.style.setProperty('--rm', String(v));
+    rmv.textContent = '--reality-mix: ' + v.toFixed(2);
+  };
+  rm.addEventListener('input', sync);
+  sync();
+</script>
+</body>
+</html>

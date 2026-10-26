@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>阶线 · 第二轮</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin:0; padding:26px 30px 60px; background:#14161c; color:#c9cfd8;
+    font:13px/1.5 system-ui, "Microsoft YaHei UI", sans-serif; }
+  h1 { font-size:15px; font-weight:600; letter-spacing:.06em; margin:0 0 4px; color:#e6ebf1; }
+  .sub { color:#7c8695; margin:0 0 22px; font-size:12px; }
+  .grid { display:flex; flex-wrap:wrap; gap:16px; }
+  .card { background:#1b1e26; border:1px solid rgba(255,255,255,.07); border-radius:10px; padding:12px 14px 12px; }
+  .name { font-size:11px; letter-spacing:.12em; color:#8f99a8; margin-bottom:10px; }
+  .row { display:flex; align-items:flex-end; gap:12px; }
+  .cell { display:flex; flex-direction:column; align-items:center; gap:5px; }
+  .cap { font-size:9px; letter-spacing:.08em; color:#6d7684; }
+  .box { display:flex; align-items:center; justify-content:center; border-radius:4px; }
+  .dark { background:#0c0f18; }
+  .light { background:#f0f3f6; }
+  canvas { display:block; }
+</style>
+</head>
+<body>
+<h1>阶线 · 第二轮</h1>
+<p class="sub">右三格是真实 16px 光栅（canvas 16×16 后放大 8 倍、pixelated）——按标签栏真实像素判。</p>
+<div class="grid" id="g"></div>
+<script>
+const G = (inner, sw) => `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"
+  fill="none" stroke="currentColor" stroke-linecap="square" stroke-linejoin="miter">${inner}</svg>`;
+
+/* 竖 2 / 横 8 = 1:4 = 14.04°，与 --seam-angle: 14deg 同源 */
+const C = [
+  { n:'C-a 三阶 T',     s:'M4 10V12H12V14H20V16H28', w:4, x:'M16 14V29', xw:4 },
+  { n:'C-b 四阶 T',     s:'M4 10V11.5H10V13H16V14.5H22V16H28', w:4, x:'M16 14.5V29', xw:4 },
+  { n:'C-c 细干 T',     s:'M4 10V12H12V14H20V16H28', w:4, x:'M16 14V29', xw:2.5 },
+  { n:'C-d 满幅 T',     s:'M0 18V16H8V14H16V12H24V10H32', w:4, x:'M16 14V29', xw:4 },
+  { n:'C-e 落脚 T',     s:'M4 10V12H12V14H20V16H28', w:4, x:'M16 14V25H23', xw:3.5 },
+  { n:'D-1 立线',       s:'M2 27V25H10V23H18V21H26V8', w:3.2 },
+  { n:'D-2 立线细干',   s:'M2 27V25H10V23H18V21H26', w:3.4, x:'M26 21V7', xw:2 },
+  { n:'B-2 阶与影',     s:'M4 19V17H12V15H20V13H28', w:3.2, x:'M3 23.5V21.5H11V19.5H19V17.5H27', xw:1.3, xo:.42 },
+  { n:'J-1 阶与点',     s:'M3 27V25H11V23H19V21H27', w:3.4, dot:'M23.5 12H28.5V17H23.5Z' },
+  { n:'J-2 点起阶',     s:'M10 25V23H18V21H26V19H31', w:3.4, dot:'M3 21H8V26H3Z' },
+];
+
+function svgStr(c) {
+  const p = [];
+  p.push(`<path d="${c.s}" stroke-width="${c.w}"/>`);
+  if (c.x) p.push(`<path d="${c.x}" stroke-width="${c.xw}" opacity="${c.xo ?? 1}"/>`);
+  if (c.dot) p.push(`<path d="${c.dot}" fill="currentColor" stroke="none"/>`);
+  return G(p.join(''), c.w);
+}
+
+const size = 16, up = 8;
+async function raster(str, size, up, fg, bg) {
+  const url = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(str.replace('currentColor', fg));
+  const img = new Image();
+  img.src = url;
+  await img.decode();
+  const c = document.createElement('canvas');
+  c.width = size; c.height = size;
+  const g = c.getContext('2d');
+  g.fillStyle = bg; g.fillRect(0, 0, size, size);
+  g.drawImage(img, 0, 0, size, size);
+  c.style.width = size * up + 'px'; c.style.height = size * up + 'px';
+  c.style.imageRendering = 'pixelated';
+  return c;
+}
+
+(async () => {
+  const g = document.getElementById('g');
+  for (const c of C) {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `<div class="name">${c.n}</div><div class="row"></div>`;
+    const row = card.querySelector('.row');
+    const mk = (cls, w) => {
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      const box = document.createElement('div');
+      box.className = 'box ' + cls;
+      box.style.width = w + 'px'; box.style.height = w + 'px';
+      box.style.color = cls === 'light' ? '#232830' : '#e6ebf1';
+      box.innerHTML = svgStr(c);
+      cell.appendChild(box);
+      row.appendChild(cell);
+      return cell;
+    };
+    mk('dark', 128); mk('light', 128);
+    mk('dark', 32);
+    // true 16px rasters
+    const a = document.createElement('div'); a.className = 'cell';
+    a.appendChild(await raster(svgStr(c), size, up, '#e6ebf1', '#0c0f18'));
+    a.insertAdjacentHTML('beforeend', '<span class="cap">16 深 ×8</span>');
+    row.appendChild(a);
+    const b2 = document.createElement('div'); b2.className = 'cell';
+    b2.appendChild(await raster(svgStr(c), size, up, '#232830', '#f0f3f6'));
+    b2.insertAdjacentHTML('beforeend', '<span class="cap">16 浅 ×8</span>');
+    row.appendChild(b2);
+    const c3 = document.createElement('div'); c3.className = 'cell';
+    c3.appendChild(await raster(svgStr(c), 32, 4, '#e6ebf1', '#0c0f18'));
+    c3.insertAdjacentHTML('beforeend', '<span class="cap">32 深 ×4</span>');
+    row.appendChild(c3);
+    g.appendChild(card);
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>favicon mock · 磨砂玻璃棱面 · e-frostfacet</title>
+<style>
+  :root{
+    --sheet:#131519; --card:#1a1d24; --edge:rgba(255,255,255,.08);
+    --tx:#d9dfe7; --tx-2:#8b95a3; --tx-3:#5d6675;
+    --paper:#f0f3f6; --night:#16171c; --night-2:#0c0f18; --violet:#a195c1;
+    --serif:'Palatino Linotype','Iowan Old Style',Palatino,Georgia,'Source Han Serif SC','Songti SC',serif;
+    --mono:'IBM Plex Mono',ui-monospace,'Cascadia Mono',Consolas,'Microsoft YaHei UI',monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:var(--sheet); color:var(--tx);
+    font-family:var(--mono); font-size:13px; line-height:1.7;
+    padding:52px 40px 96px; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1120px;margin:0 auto}
+
+  header{border-bottom:1px solid var(--edge);padding-bottom:26px;margin-bottom:44px}
+  .kicker{font-size:11px;letter-spacing:.18em;color:var(--tx-3);text-transform:uppercase}
+  h1{font-family:var(--serif);font-weight:400;font-size:40px;line-height:1.25;margin:14px 0 10px;color:#eef2f7}
+  h1 em{font-style:normal;color:var(--violet)}
+  .slug{font-size:12px;color:var(--tx-2)}
+  .slug code{background:var(--card);border:1px solid var(--edge);border-radius:4px;padding:2px 6px;color:#c7cfda}
+  .claim{margin:18px 0 0;max-width:46em;color:var(--tx-2)}
+  .claim b{color:#e3e8ef;font-weight:400}
+  .swatches{display:flex;gap:8px;flex-wrap:wrap;margin-top:22px}
+  .sw{display:flex;align-items:center;gap:7px;font-size:10.5px;color:var(--tx-3);
+      border:1px solid var(--edge);border-radius:999px;padding:4px 11px 4px 5px;background:var(--card)}
+  .sw i{width:13px;height:13px;border-radius:50%;display:block;box-shadow:inset 0 0 0 1px rgba(255,255,255,.16)}
+
+  section{margin-bottom:56px}
+  .sh{display:flex;align-items:baseline;gap:14px;margin:0 0 18px;padding-bottom:10px;border-bottom:1px solid var(--edge)}
+  .sh h2{font-family:var(--serif);font-weight:400;font-size:19px;margin:0;color:#e6ebf2}
+  .sh span{font-size:11px;color:var(--tx-3);letter-spacing:.08em}
+  .sh .n{color:var(--violet);font-size:11px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  .card{background:var(--card);border:1px solid var(--edge);border-radius:12px;padding:22px 22px 18px}
+  .card>.cap{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:18px;font-size:11px;color:var(--tx-2)}
+  .card>.cap b{color:#dfe5ec;font-weight:400;font-size:12px}
+  .note{font-size:11.5px;color:var(--tx-3);line-height:1.75;margin:14px 0 0}
+  .note b{color:var(--tx-2);font-weight:400}
+
+  .on-paper{background:var(--paper);border-radius:8px;box-shadow:inset 0 0 0 1px rgba(35,40,48,.07)}
+  .on-night{background:var(--night-2);border-radius:8px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.05)}
+  .stage{display:flex;align-items:center;justify-content:center;gap:38px;padding:30px 20px;min-height:250px;flex-wrap:wrap}
+
+  .band{display:flex;align-items:flex-end;gap:34px;flex-wrap:wrap;padding:22px}
+  .cell{display:flex;flex-direction:column;align-items:center;gap:9px}
+  .cell .lb{font-size:10px;color:var(--tx-3);letter-spacing:.06em;white-space:nowrap}
+  .on-paper .lb{color:#8d97a3}
+  .rep{display:flex;gap:10px;align-items:center}
+
+  .tabs{border-radius:9px;overflow:hidden;border:1px solid var(--edge)}
+  .tabbar{display:flex;align-items:flex-end;gap:4px;padding:8px 8px 0;height:44px}
+  .tabbar.light{background:#dfe2e7}
+  .tabbar.dark{background:#202124}
+  .tabbar .tab{display:flex;align-items:center;gap:8px;height:36px;padding:0 12px;border-radius:8px 8px 0 0;
+      font-size:12px;min-width:150px}
+  .tabbar.light .tab{color:#4a5058}
+  .tabbar.dark .tab{color:#9aa0a6}
+  .tabbar.light .tab.active{background:#f4f6f8;color:#202124}
+  .tabbar.dark .tab.active{background:#35363a;color:#e8eaed}
+  .tabbar .tab .t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tabbar .tab .x{opacity:.45;font-size:13px;margin-left:auto}
+  .tabbar .tab.active .x{opacity:.7}
+  .tabbar .plus{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:15px;margin-bottom:5px;flex:none}
+  .tabbar.light .plus{color:#5f6368}
+  .tabbar.dark .plus{color:#9aa0a6}
+
+  .ctx{background:var(--night-2);border-radius:10px;overflow:hidden}
+  /* 只让外层那块画布铺满；嵌在里面当道具的那枚图标自己定尺寸，
+     否则 width:100% 会顺着一路继承下去，把 44 单位的图标撑成 720 单位 */
+  .ctx>svg{display:block;width:100%;height:auto}
+  .ctx svg.mark-nest{width:44px;height:44px;overflow:visible}
+
+  /* 16px 真栅格 · 最近邻放大 8 倍 */
+  .zoomrow{display:flex;gap:26px;flex-wrap:wrap;align-items:flex-end}
+  .zoom{width:132px;height:132px;display:grid;place-items:center;border-radius:8px;overflow:hidden}
+  .zoom img{width:16px;height:16px;transform:scale(8);image-rendering:pixelated}
+
+  footer{border-top:1px solid var(--edge);margin-top:64px;padding-top:22px;font-size:11.5px;color:var(--tx-3)}
+  footer b{color:var(--tx-2);font-weight:400}
+
+  /* ══ 图标本体 ══ */
+  .mark{display:block;flex:none}
+  .s256{width:256px;height:256px} .s180{width:180px;height:180px} .s128{width:128px;height:128px}
+  .s96{width:96px;height:96px} .s64{width:64px;height:64px} .s48{width:48px;height:48px}
+  .s32{width:32px;height:32px} .s24{width:24px;height:24px} .s16{width:16px;height:16px}
+
+  .wake{
+    --f-lit:#dfe8ef; --f-mid:#bcc7d1; --f-dim:#96a3af;
+    --f-plate:#cbd6df; --f-sliver:#bfccd6; --f-chip:#7d8b99;
+    --ink:#7a8794; --ink-w:.62; --ink-soft:.6;
+    --rim:#fdfeff; --rim-w:.5; --rim-op:.95; --seal:#5d6a78;
+    --crack-op:0; --glow-op:0; --streak-op:0; --chip-d-op:0;
+  }
+  .dream{
+    --f-lit:rgba(214,226,240,.20); --f-mid:rgba(150,136,192,.26); --f-dim:rgba(120,136,158,.15);
+    --f-plate:rgba(200,214,230,.11); --f-sliver:rgba(190,206,224,.13); --f-chip:rgba(6,8,16,.66);
+    --ink:rgba(208,222,238,.40); --ink-soft:.5;
+    --rim:url(#ff-sheen); --rim-op:.7; --seal:rgba(224,236,250,.5);
+    --crack-op:1; --glow-op:1; --streak-op:.55; --chip-d-op:1;
+  }
+  /* 单色退让：只有一种墨，靠 fill 的浓淡把三个面拉开 */
+  .mono{
+    --f-lit:color-mix(in srgb,currentColor 8%,transparent);
+    --f-mid:color-mix(in srgb,currentColor 26%,transparent);
+    --f-dim:color-mix(in srgb,currentColor 42%,transparent);
+    --f-plate:color-mix(in srgb,currentColor 13%,transparent);
+    --f-sliver:color-mix(in srgb,currentColor 19%,transparent);
+    --f-chip:color-mix(in srgb,currentColor 62%,transparent);
+    --ink:currentColor; --ink-w:.62; --ink-soft:.7;
+    --rim:currentColor; --rim-op:0;
+    --seal:color-mix(in srgb,currentColor 55%,transparent);
+    --crack-op:0; --glow-op:0; --streak-op:0; --chip-d-op:0;
+  }
+  .mono.open{ --crack-op:1; --streak-op:.5; --chip-d-op:1; --seal:color-mix(in srgb,currentColor 40%,transparent) }
+  .ink-dark{color:#232830}
+  .ink-light{color:#e6ebf1}
+
+  @media (max-width:900px){
+    body{padding:32px 20px 64px}
+    .grid2{grid-template-columns:1fr}
+    h1{font-size:30px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">醒梦之界 · 标签页图标 mock · batch-02</div>
+  <h1>磨砂玻璃棱面 <em>/</em> 一枚沿 14° 线裂开的碎块</h1>
+  <div class="slug">slug <code>e-frostfacet</code> &nbsp;·&nbsp; viewBox 0 0 32 32 &nbsp;·&nbsp; 单文件、无外部资源</div>
+  <p class="claim">
+    不是一颗规整的水晶，也不是一个孤零零的多边形。是一块<b>被敲下来</b>的玻璃：
+    左上留着一道咬口，右上压着一小片薄板，左下掉出一片屑，右侧一小块已经脱离主体。
+    三个面的明暗一路压下去 —— 这是它在 16px 里唯一还剩下的东西。
+    里面裂着的那道线，正好是主页穿屏的那根 <b>14° 发丝线</b>：醒时合着，梦时张开。
+  </p>
+  <div class="swatches">
+    <span class="sw"><i style="background:#f0f3f6"></i>纸面 #f0f3f6</span>
+    <span class="sw"><i style="background:#a7b1ba"></i>醒 · 冷灰 #a7b1ba</span>
+    <span class="sw"><i style="background:#96a3af"></i>暗面 #96a3af</span>
+    <span class="sw"><i style="background:#56606d"></i>结构 #56606d</span>
+    <span class="sw"><i style="background:#0c0f18"></i>靛夜 #0c0f18</span>
+    <span class="sw"><i style="background:#a195c1"></i>薄暮紫 #a195c1</span>
+  </div>
+</header>
+
+<!-- ══ sprite ══ -->
+<svg aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden">
+  <defs>
+    <linearGradient id="ff-sheen" gradientUnits="userSpaceOnUse" x1="5.8" y1="13.6" x2="16" y2="10.05">
+      <stop offset="0" stop-color="#dceaf4"/><stop offset=".45" stop-color="#c0a8e2"/><stop offset="1" stop-color="#a8ccd0"/>
+    </linearGradient>
+    <radialGradient id="ff-glow" gradientUnits="userSpaceOnUse" cx="10.6" cy="13.4" r="6.6">
+      <stop offset="0" stop-color="#b0a0dc" stop-opacity=".62"/>
+      <stop offset=".45" stop-color="#9684c4" stop-opacity=".26"/>
+      <stop offset="1" stop-color="#9684c4" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="ff-streak" gradientUnits="userSpaceOnUse" x1="15" y1="14.4" x2="20.34" y2="15.73">
+      <stop offset="0" stop-color="#c9b6ef" stop-opacity=".8"/>
+      <stop offset="1" stop-color="#c9b6ef" stop-opacity="0"/>
+    </linearGradient>
+    <clipPath id="ff-glass">
+      <polygon points="5.8,13.6 6.9,10.0 8.4,10.9 10.2,8.6 16.0,10.05 15.0,14.4 11.0,20.4 6.9,18.8"/>
+    </clipPath>
+  </defs>
+
+  <symbol id="frostfacet" viewBox="0 0 32 32">
+    <g transform="translate(16 16) scale(1.74) translate(-13.15 -14.625)">
+      <polygon fill="var(--f-plate)" stroke="var(--ink)" stroke-width="var(--ink-w)" stroke-opacity="var(--ink-soft)"
+               stroke-linejoin="round" points="12.4,7.3 18.6,6.85 19.7,10.8 14.2,10.4"/>
+      <polygon fill="var(--f-sliver)" stroke="var(--ink)" stroke-width="var(--ink-w)" stroke-opacity="var(--ink-soft)"
+               stroke-linejoin="round" points="5.7,16.4 7.9,20.6 6.2,22.3"/>
+
+      <polygon fill="var(--f-lit)" points="6.37,12.25 6.9,10.0 8.4,10.9 10.2,8.6 16.0,10.05 15.0,14.4"/>
+      <polygon fill="var(--f-mid)" points="6.37,12.25 9.36,19.76 6.9,18.8 5.8,13.6"/>
+      <polygon fill="var(--f-dim)" points="6.37,12.25 15.0,14.4 11.0,20.4 9.36,19.76"/>
+      <polygon fill="none" stroke="var(--ink)" stroke-width="var(--ink-w)" stroke-linejoin="round"
+               points="5.8,13.6 6.9,10.0 8.4,10.9 10.2,8.6 16.0,10.05 15.0,14.4 11.0,20.4 6.9,18.8"/>
+      <line stroke="var(--ink)" stroke-width=".42" stroke-opacity="var(--ink-soft)"
+            x1="6.37" y1="12.25" x2="9.36" y2="19.76"/>
+
+      <g clip-path="url(#ff-glass)">
+        <polygon fill="var(--seal)" points="6.34,12.38 14.94,14.63 15.06,14.17 6.40,12.12"/>
+      </g>
+      <circle fill="url(#ff-glow)" opacity="var(--glow-op)" cx="10.6" cy="13.4" r="6.6"/>
+      <g clip-path="url(#ff-glass)" opacity="var(--crack-op)">
+        <polygon fill="#c9b6ef" points="6.32,12.46 14.75,15.42 15.25,13.38 6.42,12.04"/>
+      </g>
+      <polygon fill="url(#ff-streak)" opacity="var(--streak-op)"
+               points="14.93,14.69 20.32,15.80 20.36,15.66 15.07,14.11"/>
+
+      <polyline fill="none" stroke="var(--rim)" stroke-width="var(--rim-w)" stroke-opacity="var(--rim-op)"
+                stroke-linecap="round" stroke-linejoin="round" points="5.8,13.6 6.9,10.0 8.4,10.9 10.2,8.6 16.0,10.05"/>
+
+      <polygon fill="var(--f-chip)" stroke="var(--ink)" stroke-width="var(--ink-w)" stroke-opacity="var(--ink-soft)"
+               stroke-linejoin="round" opacity="calc(1 - var(--chip-d-op))"
+               points="16.4,16.8 19.6,18.2 18.2,21.2 15.9,19.9"/>
+      <polygon fill="var(--f-chip)" stroke="var(--ink)" stroke-width="var(--ink-w)" stroke-opacity="var(--ink-soft)"
+               stroke-linejoin="round" opacity="var(--chip-d-op)" transform="rotate(-5 17.9 19.0) translate(.9 -.6)"
+               points="16.4,16.8 19.6,18.2 18.2,21.2 15.9,19.9"/>
+    </g>
+  </symbol>
+</svg>
+
+<!-- ══ 01 主视觉 ══ -->
+<section>
+  <div class="sh"><span class="n">01</span><h2>主视觉 · 手感</h2><span>醒 / 梦 并排</span></div>
+  <div class="grid2">
+    <div class="card">
+      <div class="cap"><b>醒面 · reality-mix 1</b><span>纸面 / 冷灰 / 那道线合着</span></div>
+      <div class="on-paper stage">
+        <svg class="mark wake s180" viewBox="0 0 32 32" role="img" aria-label="醒面"><use href="#frostfacet"/></svg>
+        <svg class="mark wake s96" viewBox="0 0 32 32" role="img" aria-label="醒面小样"><use href="#frostfacet"/></svg>
+      </div>
+      <p class="note">纸面上它是一块<b>比纸略深</b>的冷玻璃，不是白得发亮的晶体 —— 白面在浅底上会化掉。
+      所以最亮的面也压在纸面之下，靠三个面的浓淡差 + 一条近白的高光棱线把边界立住。</p>
+    </div>
+    <div class="card">
+      <div class="cap"><b>梦面 · reality-mix 0</b><span>靛夜 / 透光 / 裂口张开</span></div>
+      <div class="on-night stage">
+        <svg class="mark dream s180" viewBox="0 0 32 32" role="img" aria-label="梦面"><use href="#frostfacet"/></svg>
+        <svg class="mark dream s96" viewBox="0 0 32 32" role="img" aria-label="梦面小样"><use href="#frostfacet"/></svg>
+      </div>
+      <p class="note">夜里玻璃开始透光：那道 14° 的线从玻璃内部的一个点张开成楔口，薄暮紫顺着它出来、
+      继续往右下淡进空气；棱上换成冷白→紫→一点冷青的虹彩；右侧那一小角<b>又飘开了一点</b>，还偏了五度。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 02 尺寸带 ══ -->
+<section>
+  <div class="sh"><span class="n">02</span><h2>尺寸带 · 32 / 24 / 16</h2><span>两种底色，16px 各连排三次</span></div>
+  <div class="grid2">
+    <div class="card">
+      <div class="cap"><b>浅底 #f0f3f6</b><span>浅色标签栏</span></div>
+      <div class="on-paper band">
+        <div class="cell"><svg class="mark wake s32" viewBox="0 0 32 32" aria-label="醒 32"><use href="#frostfacet"/></svg><span class="lb">32</span></div>
+        <div class="cell"><svg class="mark wake s24" viewBox="0 0 32 32" aria-label="醒 24"><use href="#frostfacet"/></svg><span class="lb">24</span></div>
+        <div class="cell"><svg class="mark wake s16" viewBox="0 0 32 32" aria-label="醒 16"><use href="#frostfacet"/></svg><span class="lb">16</span></div>
+        <div class="cell"><span class="rep">
+          <svg class="mark wake s16" viewBox="0 0 32 32" aria-label="醒 16"><use href="#frostfacet"/></svg>
+          <svg class="mark wake s16" viewBox="0 0 32 32" aria-label="醒 16"><use href="#frostfacet"/></svg>
+          <svg class="mark wake s16" viewBox="0 0 32 32" aria-label="醒 16"><use href="#frostfacet"/></svg>
+        </span><span class="lb">16 ×3</span></div>
+      </div>
+      <div class="on-paper band" style="padding-top:0">
+        <div class="cell"><svg class="mark dream s32" viewBox="0 0 32 32" aria-label="梦 32"><use href="#frostfacet"/></svg><span class="lb">梦 32</span></div>
+        <div class="cell"><svg class="mark dream s24" viewBox="0 0 32 32" aria-label="梦 24"><use href="#frostfacet"/></svg><span class="lb">梦 24</span></div>
+        <div class="cell"><svg class="mark dream s16" viewBox="0 0 32 32" aria-label="梦 16"><use href="#frostfacet"/></svg><span class="lb">梦 16</span></div>
+        <div class="cell"><span class="rep">
+          <svg class="mark dream s16" viewBox="0 0 32 32" aria-label="梦 16"><use href="#frostfacet"/></svg>
+          <svg class="mark dream s16" viewBox="0 0 32 32" aria-label="梦 16"><use href="#frostfacet"/></svg>
+          <svg class="mark dream s16" viewBox="0 0 32 32" aria-label="梦 16"><use href="#frostfacet"/></svg>
+        </span><span class="lb">16 ×3</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="cap"><b>深底 #16171c</b><span>深色标签栏</span></div>
+      <div class="on-night band">
+        <div class="cell"><svg class="mark dream s32" viewBox="0 0 32 32" aria-label="梦 32"><use href="#frostfacet"/></svg><span class="lb">32</span></div>
+        <div class="cell"><svg class="mark dream s24" viewBox="0 0 32 32" aria-label="梦 24"><use href="#frostfacet"/></svg><span class="lb">24</span></div>
+        <div class="cell"><svg class="mark dream s16" viewBox="0 0 32 32" aria-label="梦 16"><use href="#frostfacet"/></svg><span class="lb">16</span></div>
+        <div class="cell"><span class="rep">
+          <svg class="mark dream s16" viewBox="0 0 32 32" aria-label="梦 16"><use href="#frostfacet"/></svg>
+          <svg class="mark dream s16" viewBox="0 0 32 32" aria-label="梦 16"><use href="#frostfacet"/></svg>
+          <svg class="mark dream s16" viewBox="0 0 32 32" aria-label="梦 16"><use href="#frostfacet"/></svg>
+        </span><span class="lb">16 ×3</span></div>
+      </div>
+      <div class="on-night band" style="padding-top:0">
+        <div class="cell"><svg class="mark wake s32" viewBox="0 0 32 32" aria-label="醒 32"><use href="#frostfacet"/></svg><span class="lb">醒 32</span></div>
+        <div class="cell"><svg class="mark wake s24" viewBox="0 0 32 32" aria-label="醒 24"><use href="#frostfacet"/></svg><span class="lb">醒 24</span></div>
+        <div class="cell"><svg class="mark wake s16" viewBox="0 0 32 32" aria-label="醒 16"><use href="#frostfacet"/></svg><span class="lb">醒 16</span></div>
+        <div class="cell"><span class="rep">
+          <svg class="mark wake s16" viewBox="0 0 32 32" aria-label="醒 16"><use href="#frostfacet"/></svg>
+          <svg class="mark wake s16" viewBox="0 0 32 32" aria-label="醒 16"><use href="#frostfacet"/></svg>
+          <svg class="mark wake s16" viewBox="0 0 32 32" aria-label="醒 16"><use href="#frostfacet"/></svg>
+        </span><span class="lb">醒 16</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 03 16px 真栅格 ══ -->
+<section>
+  <div class="sh"><span class="n">03</span><h2>16px 真栅格 · ×8 最近邻放大</h2><span>真的 16×16 位图，不做任何重采样</span></div>
+  <div class="card">
+    <div class="zoomrow">
+      <div class="cell"><span class="zoom on-paper"><img alt="醒面 16px" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAACpUlEQVR4nIxTSWgTURh+82ZJMpNM0qZZ2qQ1l4oHhZqb66V6KIKlSBQUehUFKy1CNV6itlY91K3opehRMTcR6gbRiNaLglsXU1u7HbokNnFmOkvmPWdqM1gJ1Q9+mJlvvo/3/f//KPAfSCQSMM/zNkZVGYhYpifetlDiiPWE/fcf3WJsjIOEBE8zNEtTFCdJy5EPI8Pbr3S2zZj/UH+LHqfT1Q6avyAr8vvFXKFQE6o+5nQ6LV4UJZBbzG4xHtcaPHyW2okxPc7ZnH2sk2vhCVdLRaVbLaqaqEgihwkC2B0ssNkY4Knw7DEkA1aEgdRgJFDlfYsxJnSANZ8/ECoZI6SDfP4nGBoenSdI6iVNkawkK/7hzOTey6eP5uGKC8S7hWWZ5dxuv7fKF/ozEoQkKOo6mFvIdh/e33jo1bdPB4bGZhtNsRWBpmxNQ6MZ6Xn6TXZi/Htk145tU1sbNtdVeStXTARRBIvZ3DuCILDxqqwWsAw+j2SAy+Uq+H2++mAgAIoI1aXSg3J+Kb8wNT1dWxsOz+okngRlAFc7+4Jl2XqM0UyJcDo5eyhcUxuNNgDGbr9bGltZA97NN2laMcvQtnmjkRapG9kFQUgrsnQj0dtfebarb0NZA03TsSAKeZ/PG0YIWaSxNBmj4ubmaarabjTrafzS7WtnLt7ctMaAY7mPmqa5ZEnyGCf4Yn5TFAUosnKvJ37iNfg98CCExEaShCdJCM/FYjHSaiJCxblgMOAby0x0kRTchxGekFXlhyLLfSbf3tvrIFQQAQADI+ES0rXuZDKpWydQVXXeGJHk9vC5zuOtUVEoNOuq2lq6NFc7OpZlmTiiI/0URnqK0Za+liKsbGLX9TvNLMdGB5/A88nkQR2sA/NmGoXWGJiIxR6Q/xKXwy8AAAD//8WowEYAAAAGSURBVAMA4EozTw8YG3EAAAAASUVORK5CYII="></span><span class="lb">醒 · 纸面</span></div>
+      <div class="cell"><span class="zoom on-night"><img alt="梦面 16px" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAACpklEQVR4nJRTSU9TURS+U+/r68wrlTI0AVqkgICpjQaNiexc+gdcunNINODav+DGhcSdMWHpwpIYLVFcIHRhQElopQJBi6WlTalt37uDrw080RiDJ7m50/m++53hEnACk1LCVCpFKn4/1lQVjweD1aM7+C/g4truBEWYCc6wsBNBJJBIoKCBwJt4WCs3fcifoO1tqeb18iUsRU5nAOnA0KXBCsBggDcBlNQBpV5z+TvBysZuR6PIK3v6/hWCQEgi5FMQ0IS0haWbpBljm7xmrEkMqpIzzYRsWSGsrn53MbftLhQAIoQ2CJCfrBih7DYEGOBCdEFIZqVuSAOI9nYaeN3XB+stBUy1d8mSoMgO31EHKAhxPIFwBwoJEEFLoyHP+/l5gHt6ADbBDSsEo1GP1PaYkwo6VTPwJLKBFYBBFkKQRhRtYg9QpMN4Dk05zfcOB7AIdJ35v+3nFj5/zTz+UWvwib6LV9vc3mtY4nu8JgDXQcYRoU/+VqkWASYga0fKaR/xqhWeqyxkFhLmceKUp8MVi5y5rkhVHQm1FZNSkkkI2XEC1CJwqn6b064oiteDMbJ6g3gQsnXDVd+omFpelraZG3fu355+MPlxu6wlk0nyS4EQxO1TtNy6oC6fm5YL5VaChgb6ww4HfRsNBCrZrLTvfNl0vUokbqaWFg/GR2PPTJe5lgKqoAxRib+jXxvs1YKdzbPYueGwy6UWz4YD6819tZonxEa9xcKeUS6W2K3p6SVLAddZnSjoZVdEgwdlZ7SzN9BjdzvavX7y6Cicen2rMTw2Mt/QaxeGRsZK0W53ySIAiOsIgwY3QP7y+dCLlUwhZJZeRgP+yhFBPB43zGk2nS7MPXw64zFLyq1O/LCRH2QctcUi2uJhrU9sVsabX/Z/wU37CQAA//+5+kM7AAAABklEQVQDAOfCG0pQ3jPVAAAAAElFTkSuQmCC"></span><span class="lb">梦 · 靛夜</span></div>
+      <div class="cell"><span class="zoom" style="background:#dfe2e7"><img alt="醒面 16px 标签栏" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAACpUlEQVR4nIxTSWgTURh+82ZJMpNM0qZZ2qQ1l4oHhZqb66V6KIKlSBQUehUFKy1CNV6itlY91K3opehRMTcR6gbRiNaLglsXU1u7HbokNnFmOkvmPWdqM1gJ1Q9+mJlvvo/3/f//KPAfSCQSMM/zNkZVGYhYpifetlDiiPWE/fcf3WJsjIOEBE8zNEtTFCdJy5EPI8Pbr3S2zZj/UH+LHqfT1Q6avyAr8vvFXKFQE6o+5nQ6LV4UJZBbzG4xHtcaPHyW2okxPc7ZnH2sk2vhCVdLRaVbLaqaqEgihwkC2B0ssNkY4Knw7DEkA1aEgdRgJFDlfYsxJnSANZ8/ECoZI6SDfP4nGBoenSdI6iVNkawkK/7hzOTey6eP5uGKC8S7hWWZ5dxuv7fKF/ozEoQkKOo6mFvIdh/e33jo1bdPB4bGZhtNsRWBpmxNQ6MZ6Xn6TXZi/Htk145tU1sbNtdVeStXTARRBIvZ3DuCILDxqqwWsAw+j2SAy+Uq+H2++mAgAIoI1aXSg3J+Kb8wNT1dWxsOz+okngRlAFc7+4Jl2XqM0UyJcDo5eyhcUxuNNgDGbr9bGltZA97NN2laMcvQtnmjkRapG9kFQUgrsnQj0dtfebarb0NZA03TsSAKeZ/PG0YIWaSxNBmj4ubmaarabjTrafzS7WtnLt7ctMaAY7mPmqa5ZEnyGCf4Yn5TFAUosnKvJ37iNfg98CCExEaShCdJCM/FYjHSaiJCxblgMOAby0x0kRTchxGekFXlhyLLfSbf3tvrIFQQAQADI+ES0rXuZDKpWydQVXXeGJHk9vC5zuOtUVEoNOuq2lq6NFc7OpZlmTiiI/0URnqK0Za+liKsbGLX9TvNLMdGB5/A88nkQR2sA/NmGoXWGJiIxR6Q/xKXwy8AAAD//8WowEYAAAAGSURBVAMA4EozTw8YG3EAAAAASUVORK5CYII="></span><span class="lb">醒 · 浅色标签栏 #dfe2e7</span></div>
+      <div class="cell"><span class="zoom" style="background:#202124"><img alt="梦面 16px 标签栏" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAACpklEQVR4nJRTSU9TURS+U+/r68wrlTI0AVqkgICpjQaNiexc+gdcunNINODav+DGhcSdMWHpwpIYLVFcIHRhQElopQJBi6WlTalt37uDrw080RiDJ7m50/m++53hEnACk1LCVCpFKn4/1lQVjweD1aM7+C/g4truBEWYCc6wsBNBJJBIoKCBwJt4WCs3fcifoO1tqeb18iUsRU5nAOnA0KXBCsBggDcBlNQBpV5z+TvBysZuR6PIK3v6/hWCQEgi5FMQ0IS0haWbpBljm7xmrEkMqpIzzYRsWSGsrn53MbftLhQAIoQ2CJCfrBih7DYEGOBCdEFIZqVuSAOI9nYaeN3XB+stBUy1d8mSoMgO31EHKAhxPIFwBwoJEEFLoyHP+/l5gHt6ADbBDSsEo1GP1PaYkwo6VTPwJLKBFYBBFkKQRhRtYg9QpMN4Dk05zfcOB7AIdJ35v+3nFj5/zTz+UWvwib6LV9vc3mtY4nu8JgDXQcYRoU/+VqkWASYga0fKaR/xqhWeqyxkFhLmceKUp8MVi5y5rkhVHQm1FZNSkkkI2XEC1CJwqn6b064oiteDMbJ6g3gQsnXDVd+omFpelraZG3fu355+MPlxu6wlk0nyS4EQxO1TtNy6oC6fm5YL5VaChgb6ww4HfRsNBCrZrLTvfNl0vUokbqaWFg/GR2PPTJe5lgKqoAxRib+jXxvs1YKdzbPYueGwy6UWz4YD6819tZonxEa9xcKeUS6W2K3p6SVLAddZnSjoZVdEgwdlZ7SzN9BjdzvavX7y6Cicen2rMTw2Mt/QaxeGRsZK0W53ySIAiOsIgwY3QP7y+dCLlUwhZJZeRgP+yhFBPB43zGk2nS7MPXw64zFLyq1O/LCRH2QctcUi2uJhrU9sVsabX/Z/wU37CQAA//+5+kM7AAAABklEQVQDAOfCG0pQ3jPVAAAAAElFTkSuQmCC"></span><span class="lb">梦 · 深色标签栏 #202124</span></div>
+    </div>
+    <p class="note">这一排不是把 SVG 缩到 16px 再看 —— 是先在 <b>DPR 1</b> 下把图标渲成真正的 16×16 位图，
+    再只做最近邻放大八倍。所以它比真实标签栏里的样子<b>更难看</b>，糊掉的地方一点都藏不住：
+    三个面的浓淡差在 16px 里只剩两级，左上那道高光棱线化成一条浅边，
+    右侧那一小块脱离的深色碎屑是唯一一个单独的点。整枚在 16px 里从不依赖渐变 —— 渐变一缩就摊平成一块灰。</p>
+  </div>
+</section>
+
+<!-- ══ 04 真实标签栏 ══ -->
+<section>
+  <div class="sh"><span class="n">04</span><h2>真实标签栏</h2><span>放回语境里看它像不像这个站的标签</span></div>
+  <div class="grid2">
+    <div class="card">
+      <div class="cap"><b>浅色标签栏</b><span>醒面 · 名字 Traveritas</span></div>
+      <div class="tabs">
+        <div class="tabbar light">
+          <div class="tab active">
+            <svg class="mark wake s16" viewBox="0 0 32 32" aria-label="醒面"><use href="#frostfacet"/></svg>
+            <span class="t">Traveritas</span><span class="x">×</span>
+          </div>
+          <div class="tab"><span class="t">New Tab</span></div>
+          <div class="plus">+</div>
+        </div>
+      </div>
+      <div class="tabs" style="margin-top:16px">
+        <div class="tabbar light">
+          <div class="tab"><span class="t">New Tab</span></div>
+          <div class="tab active">
+            <svg class="mark wake s16" viewBox="0 0 32 32" aria-label="醒面"><use href="#frostfacet"/></svg>
+            <span class="t">醒梦之界</span><span class="x">×</span>
+          </div>
+          <div class="plus">+</div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="cap"><b>深色标签栏</b><span>梦面 · 名字 AveritA</span></div>
+      <div class="tabs">
+        <div class="tabbar dark">
+          <div class="tab active">
+            <svg class="mark dream s16" viewBox="0 0 32 32" aria-label="梦面"><use href="#frostfacet"/></svg>
+            <span class="t">AveritA</span><span class="x">×</span>
+          </div>
+          <div class="tab"><span class="t">New Tab</span></div>
+          <div class="plus">+</div>
+        </div>
+      </div>
+      <div class="tabs" style="margin-top:16px">
+        <div class="tabbar dark">
+          <div class="tab"><span class="t">GitHub</span></div>
+          <div class="tab active">
+            <svg class="mark dream s16" viewBox="0 0 32 32" aria-label="梦面"><use href="#frostfacet"/></svg>
+            <span class="t">醒梦之界 · 断章</span><span class="x">×</span>
+          </div>
+          <div class="plus">+</div>
+        </div>
+      </div>
+      <p class="note">深色栏里那一缕薄暮紫是整条栏上唯一的紫 —— 一排灰白标签里，它像一颗还在发光的碎片。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 05 单色退让 ══ -->
+<section>
+  <div class="sh"><span class="n">05</span><h2>单色退让 · currentColor</h2><span>全站图标最终跟 currentColor 走</span></div>
+  <div class="grid2">
+    <div class="card">
+      <div class="cap"><b>纸面 · 墨 #232830</b><span>三个面退成 8% / 26% / 42% 的墨</span></div>
+      <div class="on-paper band">
+        <div class="cell"><svg class="mark mono ink-dark s64" viewBox="0 0 32 32" aria-label="单色"><use href="#frostfacet"/></svg><span class="lb">64</span></div>
+        <div class="cell"><svg class="mark mono ink-dark s32" viewBox="0 0 32 32" aria-label="单色"><use href="#frostfacet"/></svg><span class="lb">32</span></div>
+        <div class="cell"><svg class="mark mono ink-dark s24" viewBox="0 0 32 32" aria-label="单色"><use href="#frostfacet"/></svg><span class="lb">24</span></div>
+        <div class="cell"><svg class="mark mono ink-dark s16" viewBox="0 0 32 32" aria-label="单色"><use href="#frostfacet"/></svg><span class="lb">16</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="cap"><b>靛夜 · 墨 #e6ebf1</b><span>裂口开着也成立</span></div>
+      <div class="on-night band">
+        <div class="cell"><svg class="mark mono ink-light s64" viewBox="0 0 32 32" aria-label="单色"><use href="#frostfacet"/></svg><span class="lb">64</span></div>
+        <div class="cell"><svg class="mark mono ink-light s32" viewBox="0 0 32 32" aria-label="单色"><use href="#frostfacet"/></svg><span class="lb">32</span></div>
+        <div class="cell"><svg class="mark mono ink-light s16" viewBox="0 0 32 32" aria-label="单色"><use href="#frostfacet"/></svg><span class="lb">16</span></div>
+        <div class="cell"><svg class="mark mono open ink-light s32" viewBox="0 0 32 32" aria-label="单色 · 裂口开着"><use href="#frostfacet"/></svg><span class="lb">32 · 裂口开着</span></div>
+      </div>
+      <p class="note">单色下它退成<b>一枚线描的碎块</b>：轮廓 + 两个面的分界 + 那道 14° 的线。材质没了，但「碎」还在。
+      高光棱线和虹彩本来就是光，只有一种墨的时候它们就该消失。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 06 一格语境 ══ -->
+<section>
+  <div class="sh"><span class="n">06</span><h2>一格语境 · 落在那条 14° 的台阶线上</h2><span>图标里那道线，就是主页穿屏的那根发丝线</span></div>
+  <div class="card" style="padding:14px">
+    <div class="ctx">
+      <svg viewBox="0 0 720 150" aria-label="14 度台阶发丝线">
+        <defs>
+          <radialGradient id="ctx-light" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(60 20) scale(300 210)">
+            <stop offset="0" stop-color="#e6ebf1" stop-opacity=".42"/>
+            <stop offset=".55" stop-color="#a6b4c6" stop-opacity=".10"/>
+            <stop offset="1" stop-color="#a6b4c6" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+        <rect width="720" height="150" fill="#0c0f18"/>
+        <rect width="720" height="150" fill="url(#ctx-light)"/>
+        <polyline fill="none" stroke="#c9d3de" stroke-opacity=".5" stroke-width="1" vector-effect="non-scaling-stroke"
+          points="0,20 12,20 12,23 24,23 24,26 36,26 36,29 48,29 48,32 60,32 60,35 72,35 72,38 84,38 84,41 96,41 96,44 108,44 108,47 120,47 120,50 132,50 132,53 144,53 144,56 156,56 156,59 168,59 168,62 180,62 180,65 192,65 192,68 204,68 204,71 216,71 216,74 228,74 228,77 240,77 240,80 252,80 252,83 264,83 264,86 276,86 276,89 288,89 288,92 300,92 300,95 312,95 312,98 324,98 324,101 336,101 336,104 348,104 348,107 360,107 360,110 372,110 372,113 384,113 384,116 396,116 396,119 408,119"/>
+        <path fill="#dfe6ee" fill-opacity=".85" transform="translate(52 112)"
+              d="M0,-8 Q1.3,-1.3 8,0 Q1.3,1.3 0,8 Q-1.3,1.3 -8,0 Q-1.3,-1.3 0,-8 Z"/>
+        <circle cx="420" cy="125" r="2.6" fill="#a195c1"/>
+        <circle cx="420" cy="125" r="7" fill="#a195c1" fill-opacity=".18"/>
+        <svg class="dream mark-nest" x="200" y="57" width="44" height="44" viewBox="0 0 32 32" overflow="visible">
+          <use href="#frostfacet"/>
+        </svg>
+        <text x="252" y="60" fill="#7f8b9c" font-size="11" font-family="ui-monospace,Consolas,monospace">seam-angle 14°</text>
+      </svg>
+    </div>
+    <p class="note" style="margin:16px 8px 6px">把图标里那道裂口延长，正好压在主页那根 14° 的台阶线上 ——
+      图标不是站在旁边，它是<b>从这条线上敲下来的一块</b>。醒时这条线在玻璃里合着；梦时它张开，光顺着它漏出去。</p>
+  </div>
+</section>
+
+<!-- ══ 07 放大 ══ -->
+<section>
+  <div class="sh"><span class="n">07</span><h2>放大看材质</h2><span>256px · 只有大尺寸才看得见的部分</span></div>
+  <div class="card">
+    <div class="on-night stage" style="min-height:300px">
+      <svg class="mark dream s256" viewBox="0 0 32 32" aria-label="梦面放大"><use href="#frostfacet"/></svg>
+    </div>
+    <p class="note">大尺寸上多出来的东西，全是<b>可以被丢掉</b>的：内棱那道细线、棱上冷白→薄暮紫→一点冷青的虹彩、
+    裂口里透出来的那团光、光继续往右下淡出去的一小截。16px 里它们会自己消失，剩下的是骨架。</p>
+  </div>
+</section>
+
+<footer>
+  <b>两态怎么换：</b>两枚成品各自独立、都是干净的单文件 ——
+  <code style="color:#c7cfda">favicon.svg</code>（醒，内带
+  <code style="color:#c7cfda">@media (prefers-color-scheme: dark)</code>，深色主题自动转梦面）与
+  <code style="color:#c7cfda">favicon-dream.svg</code>（恒梦面，不带任何判断）。
+  日常只要挂 <code style="color:#c7cfda">favicon.svg</code> 一枚，深浅主题各得其所；
+  若要让标签页图标跟着站内的 <code style="color:#c7cfda">--reality-mix</code> 一起换，
+  由 reality.ts 在改写该变量的同一处顺手改
+  <code style="color:#c7cfda">&lt;link rel="icon"&gt;</code> 的 href：
+  醒 → <code style="color:#c7cfda">/favicon.svg</code>，梦 → <code style="color:#c7cfda">/favicon-dream.svg</code>。
+  <b>但要加一道保险：</b>梦面是为深底画的，浅色标签栏上它会化掉 ——
+  所以只有在 <code style="color:#c7cfda">prefers-color-scheme: dark</code> 也成立时才切梦面，否则一律留在醒面。
+</footer>
+
+</div>
+</body>
+</html>

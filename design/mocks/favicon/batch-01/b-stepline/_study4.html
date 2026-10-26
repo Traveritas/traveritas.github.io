@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>阶线 · 第四轮 · 收口</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin:0; padding:26px 30px 60px; background:#14161c; color:#c9cfd8;
+    font:13px/1.5 system-ui, "Microsoft YaHei UI", sans-serif; }
+  h1 { font-size:15px; font-weight:600; letter-spacing:.06em; margin:0 0 4px; color:#e6ebf1; }
+  .sub { color:#7c8695; margin:0 0 20px; font-size:12px; }
+  .grid { display:flex; flex-wrap:wrap; gap:14px; align-items:flex-start; }
+  .card { background:#1b1e26; border:1px solid rgba(255,255,255,.07); border-radius:10px; padding:11px 13px; }
+  .name { font-size:11px; letter-spacing:.1em; color:#8f99a8; margin-bottom:9px; }
+  .note { font-size:9px; color:#69727f; margin-top:7px; max-width:360px; }
+  .row { display:flex; align-items:flex-end; gap:11px; }
+  .cell { display:flex; flex-direction:column; align-items:center; gap:5px; }
+  .cap { font-size:9px; color:#6d7684; }
+  .box { display:flex; align-items:center; justify-content:center; border-radius:4px; }
+  .dark { background:#0c0f18; } .light { background:#f0f3f6; }
+  canvas { display:block; }
+  .mono .box { background:#fff; }
+</style>
+</head>
+<body>
+<h1>阶线 · 第四轮 · 收口</h1>
+<p class="sub">臂长 / 台阶 / 干的起点三处收口；右侧 24px 与 16px 真实光栅（pixelated）。</p>
+<div class="grid" id="g"></div>
+<script>
+const NS = 'http://www.w3.org/2000/svg';
+const C = [
+  { n:'A · 臂12 阶6 干通顶', p:[['M4 9H16V15H28',4],['M16 9V29',4]], note:'24×6 = 14.04°。干与阶同轴。' },
+  { n:'B · 臂14 阶7 干通顶', p:[['M2 9H16V16H30',4],['M16 9V29',4]], note:'28×7 = 14.04°，更满。' },
+  { n:'C · 干起自右臂',      p:[['M4 9H16V15H28',4],['M16 15V29',4]], note:'干只从右臂往下 → 更像正 T。' },
+  { n:'D · 短干',           p:[['M4 9H16V15H28',4],['M16 9V26',4]], note:'干收短，留白多。' },
+  { n:'E · 臂10 阶4',        p:[['M6 10H16V14H26',4],['M16 10V28',4]], note:'20×4 = 11.3°，留白最多。' },
+  { n:'F · A + 残影',        p:[['M4 9H16V15H28',4],['M16 9V29',4],['M7.5 13.5H19.5V33.5',1.7,.32],['M19.5 19.5H31.5',1.7,.32]], note:'--echo 分离：主缝 + 错位薄影。' },
+  { n:'G · 粗阶细干',        p:[['M4 9H16V15H28',5],['M16 9V29',3.2]], note:'阶厚干薄。' },
+  { n:'H · 臂13 阶6.5',      p:[['M3 8.5H16V15H29',4.4],['M16 8.5V29.5',4.4]], note:'略大一号。' },
+  { n:'I · C 的变体：干偏右', p:[['M4 9H20V15H28',4],['M17 12V29',4]], note:'阶与干解耦，T 感与步感并存。' },
+  { n:'J · 两级台阶',        p:[['M4 9H12V12H20V15H28',3.6],['M12 9V29',3.6]], note:'两步；干起自第一级。' },
+];
+
+function svgEl(c, fg) {
+  const s = document.createElementNS(NS, 'svg');
+  s.setAttribute('viewBox','0 0 32 32'); s.setAttribute('fill','none');
+  s.setAttribute('stroke', fg || 'currentColor');
+  s.setAttribute('stroke-linecap','square'); s.setAttribute('stroke-linejoin','miter');
+  for (const [d,w,o] of c.p) { const el = document.createElementNS(NS,'path');
+    el.setAttribute('d',d); el.setAttribute('stroke-width',w); if(o!=null) el.setAttribute('opacity',o); s.appendChild(el); }
+  return s;
+}
+const STR = (c,fg) => new XMLSerializer().serializeToString(svgEl(c,fg));
+
+async function raster(c, size, up, fg, bg) {
+  const img = new Image();
+  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(STR(c,fg));
+  await img.decode();
+  const cv = document.createElement('canvas'); cv.width=cv.height=size;
+  const g = cv.getContext('2d'); g.fillStyle=bg; g.fillRect(0,0,size,size);
+  g.drawImage(img,0,0,size,size);
+  cv.style.width=cv.style.height=size*up+'px'; cv.style.imageRendering='pixelated';
+  return cv;
+}
+function live(c, px, cls, fg) {
+  const cell=document.createElement('div'); cell.className='cell';
+  const box=document.createElement('div'); box.className='box '+cls;
+  box.style.width=box.style.height=px+'px'; box.style.color=fg;
+  const s=svgEl(c,fg); s.setAttribute('width',px); s.setAttribute('height',px); s.style.display='block';
+  box.appendChild(s); cell.appendChild(box); return cell;
+}
+(async () => {
+  const g=document.getElementById('g');
+  for (const c of C) {
+    const card=document.createElement('div'); card.className='card';
+    card.innerHTML=`<div class="name">${c.n}</div><div class="row"></div><div class="note">${c.note||''}</div>`;
+    const row=card.querySelector('.row');
+    row.appendChild(live(c,104,'dark','#e6ebf1'));
+    row.appendChild(live(c,104,'light','#232830'));
+    row.appendChild(live(c,104,'mono','#111'));
+    const mk=(el,cap)=>{const x=document.createElement('div');x.className='cell';x.appendChild(el);
+      x.insertAdjacentHTML('beforeend',`<span class="cap">${cap}</span>`);row.appendChild(x);};
+    mk(await raster(c,32,4,'#e6ebf1','#0c0f18'),'32×4');
+    mk(await raster(c,24,7,'#e6ebf1','#0c0f18'),'24×7');
+    mk(await raster(c,16,9,'#e6ebf1','#0c0f18'),'16×9 深');
+    mk(await raster(c,16,9,'#232830','#f0f3f6'),'16×9 浅');
+    g.appendChild(card);
+  }
+})();
+</script>
+</body>
+</html>

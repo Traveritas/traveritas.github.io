@@ -1,0 +1,424 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>水面的圆 · h-ripple —— 标签页图标方向</title>
+<style>
+  :root{
+    --paper:#f0f3f6; --sunken:#e5ebf2; --ink:#232830; --soft:#56606d; --faint:#858f9d;
+    --line:rgba(35,40,48,.12); --amber:#9a86c4; --lav:#a195c1;
+    --night:#0c0f18; --night2:#16171c; --deep:#1d1729;
+    --mono:'IBM Plex Mono',ui-monospace,'Cascadia Mono',Consolas,monospace;
+    --serif:'Noto Serif SC','Palatino Linotype',Palatino,Georgia,serif;
+  }
+  *{box-sizing:border-box}
+  html{overflow-x:hidden}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--paper); color:var(--ink);
+    font-family:system-ui,-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei UI',sans-serif;
+    font-size:14px; line-height:1.65; -webkit-font-smoothing:antialiased;
+  }
+  .seam{position:fixed;left:-20vw;top:44vh;width:140vw;height:1px;z-index:0;pointer-events:none;
+    transform:rotate(14deg);transform-origin:0 0;
+    background:repeating-linear-gradient(90deg,rgba(35,40,48,.15) 0 6px,rgba(35,40,48,.05) 6px 9px);}
+  .wrap{position:relative;z-index:1;max-width:1080px;margin:0 auto;padding:62px 40px 90px}
+
+  header .kick{font-family:var(--mono);font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;
+    color:var(--faint);margin:0 0 14px}
+  h1{font-family:var(--serif);font-weight:400;font-size:33px;letter-spacing:.02em;margin:0 0 10px}
+  .sub{color:var(--soft);font-size:14px;margin:0;max-width:60ch}
+  .slug{font-family:var(--mono);font-size:11px;color:var(--faint);letter-spacing:.05em;margin:12px 0 0}
+  .headrow{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;flex-wrap:wrap}
+  .spec{font-family:var(--mono);font-size:10.5px;color:var(--faint);text-align:right;line-height:1.9;letter-spacing:.04em}
+
+  section{margin-top:58px}
+  .lab{font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--faint);border-bottom:1px solid var(--line);padding-bottom:8px;margin-bottom:20px;
+    display:flex;justify-content:space-between;gap:16px;align-items:baseline}
+  .lab b{font-weight:400;color:var(--soft);letter-spacing:.02em;text-transform:none;font-size:11.5px}
+  .note{color:var(--soft);font-size:12.5px;margin:0 0 18px;max-width:66ch}
+  .note em{font-style:normal;color:var(--ink)}
+  .note code{font-family:var(--mono);font-size:11.5px;color:var(--ink);
+    background:rgba(35,40,48,.05);padding:1px 5px;border-radius:2px}
+
+  /* 主视觉 */
+  .hero{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  .plate{border:1px solid var(--line);border-radius:3px;padding:26px 20px 16px;
+    display:flex;flex-direction:column;align-items:center;gap:14px;min-height:262px;justify-content:center}
+  .plate.light{background:var(--paper)}
+  .plate.dark{background:var(--night);border-color:rgba(255,255,255,.09)}
+  .plate .cap{font-family:var(--mono);font-size:10px;letter-spacing:.13em;color:var(--faint);text-align:center}
+  .plate.dark .cap{color:rgba(230,235,241,.42)}
+  .big{width:168px;height:168px;display:block}
+
+  /* 同源滑杆 */
+  .stackbox{display:flex;gap:28px;align-items:center;flex-wrap:wrap}
+  .stack{position:relative;width:168px;height:168px;border-radius:3px;flex:0 0 auto;overflow:hidden;
+    border:1px solid var(--line)}
+  .stack .layer{position:absolute;inset:0;display:grid;place-items:center}
+  .stack .layer svg{width:168px;height:168px;display:block}
+  .ctrl{flex:1 1 260px;min-width:240px}
+  .ctrl input[type=range]{width:100%;accent-color:var(--amber);margin:6px 0 2px}
+  .ctrl .kv{font-family:var(--mono);font-size:11.5px;color:var(--soft);display:flex;justify-content:space-between}
+  .ctrl .hint{font-size:12px;color:var(--faint);margin-top:10px;max-width:46ch}
+
+  /* 16px 真栅格 */
+  .mags{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+  .mag{border:1px solid var(--line);border-radius:3px;padding:14px 12px 10px;text-align:center}
+  .mag.light{background:var(--paper)}
+  .mag.dark{background:var(--night2);border-color:rgba(255,255,255,.09)}
+  .mag canvas{width:128px;height:128px;display:block;margin:0 auto;image-rendering:pixelated;
+    border-radius:2px;box-shadow:0 0 0 1px rgba(128,128,128,.16) inset}
+  .mag .cap{font-family:var(--mono);font-size:10px;letter-spacing:.09em;color:var(--faint);margin-top:9px}
+  .mag.dark .cap{color:rgba(230,235,241,.48)}
+  .raw{display:flex;gap:34px;align-items:center;justify-content:center;padding:16px;
+    border:1px dashed var(--line);border-radius:3px;margin-top:14px;flex-wrap:wrap}
+  .raw .pair{display:flex;align-items:center;gap:9px}
+  .raw .t{font-family:var(--mono);font-size:10px;color:var(--faint);letter-spacing:.08em}
+  .raw .darkchip{background:var(--night2);padding:6px 9px;border-radius:3px;display:flex;align-items:center;gap:9px}
+
+  /* 尺寸带 */
+  .band{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  .band+.band{margin-top:12px}
+  .cell{border-radius:3px;padding:24px 10px 12px;text-align:center;position:relative;border:1px solid var(--line)}
+  .cell.light{background:var(--paper)}
+  .cell.dark{background:var(--night2);border-color:rgba(255,255,255,.09)}
+  .cell .tag{position:absolute;left:10px;top:6px;font-family:var(--mono);font-size:10px;color:var(--faint)}
+  .cell.dark .tag{color:rgba(230,235,241,.4)}
+  .pair{display:flex;align-items:center;justify-content:center;gap:18px;min-height:34px}
+  .tile{display:inline-flex;border-radius:6px;line-height:0}
+  .t-wake{background:var(--paper);box-shadow:0 0 0 1px rgba(35,40,48,.13) inset}
+  .t-dream{background:#12162a;box-shadow:0 0 0 1px rgba(255,255,255,.10) inset}
+
+  /* 标签栏 */
+  .strip{border-radius:9px 9px 3px 3px;padding:9px 10px 0;display:flex;gap:3px;align-items:flex-end;
+    height:50px;overflow:hidden;border:1px solid var(--line)}
+  .strip.light{background:#dee1e6}
+  .strip.dark{background:#202124;border-color:rgba(255,255,255,.09)}
+  .strip+.strip{margin-top:14px}
+  .tab{display:flex;align-items:center;gap:8px;height:38px;padding:0 12px 0 11px;border-radius:8px 8px 0 0;
+    font-size:12.5px;max-width:240px;min-width:152px}
+  .strip.light .tab{color:#5f6368}
+  .strip.light .tab.active{background:var(--paper);color:#202124}
+  .strip.dark .tab{color:#9aa0a6}
+  .strip.dark .tab.active{background:#35363a;color:#e8eaed}
+  .tab .fav{display:inline-flex;line-height:0;flex:0 0 auto}
+  .tab .ttl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tab .x{margin-left:auto;opacity:.45;font-size:13px;line-height:1}
+  .winbody{height:24px;border:1px solid var(--line);border-top:0;border-radius:0 0 5px 5px}
+
+  /* 单色 */
+  .monos{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  .mono{border:1px solid var(--line);border-radius:3px;padding:20px 12px;text-align:center}
+  .mono.m1{background:var(--paper);color:#2b323c}
+  .mono.m2{background:var(--night2);color:#d7d2e8;border-color:rgba(255,255,255,.09)}
+  .mono.m3{background:#e8e2f2;color:#5b4f80}
+  .mono.m4{background:var(--deep);color:var(--lav);border-color:rgba(255,255,255,.09)}
+  .mono svg{margin:0 auto;display:block}
+  .mono .cap{font-family:var(--mono);font-size:10px;letter-spacing:.09em;opacity:.62;margin-top:10px}
+
+  /* 语境 */
+  .ctx{position:relative;height:330px;border-radius:3px;overflow:hidden;background:#0c0f18;
+    border:1px solid rgba(255,255,255,.08)}
+  .ctx .glow{position:absolute;left:-14%;top:-32%;width:62%;height:120%;
+    background:radial-gradient(circle at 50% 50%,rgba(230,235,241,.30),rgba(166,180,198,.10) 42%,transparent 70%);
+    filter:blur(2px)}
+  .ctx .dots{position:absolute;inset:0;opacity:.5;
+    background-image:radial-gradient(circle,rgba(255,255,255,.14) .55px,transparent .75px);
+    background-size:3px 3px}
+  .ctx .seamline{position:absolute;left:-10%;top:58%;width:120%;height:1px;transform:rotate(14deg);
+    transform-origin:0 0;
+    background:repeating-linear-gradient(90deg,rgba(226,233,242,.55) 0 9px,rgba(226,233,242,.16) 9px 12px)}
+  .ctx .name{position:absolute;left:8%;top:12%;font-family:var(--serif);font-size:40px;letter-spacing:.03em;
+    color:rgba(226,233,242,.86)}
+  .ctx .mark{position:absolute;left:56%;top:30%;width:132px;height:132px}
+  .ctx .cap{position:absolute;left:56%;top:72%;font-family:var(--mono);font-size:10px;
+    letter-spacing:.13em;color:rgba(226,233,242,.45);margin-left:6px}
+
+  /* 图解 */
+  .rulewrap{display:grid;grid-template-columns:300px 1fr;gap:34px;align-items:start}
+  .diagbox{position:relative;width:300px;height:300px}
+  .diagbox .daxis{position:absolute;left:0;top:50.6%;width:100%;height:1px;
+    background:linear-gradient(90deg,transparent,rgba(154,134,196,.75) 12%,rgba(154,134,196,.75) 88%,transparent);
+    transform-origin:52.4% 50%;transform:rotate(14deg)}
+  .diagbox .dc{position:absolute;border:1px dashed rgba(35,40,48,.20);border-radius:50%}
+  .diagbox .diagico{position:absolute;inset:0;width:100%;height:100%}
+  .diagbox .dl{position:absolute;transform:translate(-50%,-50%);font-family:var(--mono);
+    font-size:9.5px;font-weight:400;color:var(--faint);letter-spacing:.04em;white-space:nowrap;
+    background:var(--paper);padding:0 3px}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line)}
+  th{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--faint);font-weight:400}
+  td{color:var(--soft);font-family:var(--mono);font-size:11.5px}
+  td:first-child{color:var(--ink)}
+  .rules li{color:var(--soft);font-size:12.5px;margin-bottom:7px}
+  .rules li b{color:var(--ink);font-weight:400}
+  .rules code{font-family:var(--mono);font-size:11.5px;color:var(--ink)}
+
+  /* 风险 */
+  .risks{display:grid;grid-template-columns:1fr 1fr;gap:10px 30px}
+  .risk{font-size:12.5px;color:var(--soft);padding-left:14px;position:relative}
+  .risk::before{content:'';position:absolute;left:0;top:.62em;width:5px;height:1px;background:var(--faint)}
+  .risk b{color:var(--ink);font-weight:400}
+
+  footer{margin-top:64px;padding-top:16px;border-top:1px solid var(--line);
+    font-family:var(--mono);font-size:10.5px;color:var(--faint);line-height:2}
+  footer .ok{color:#3f7d5c}
+  footer .bad{color:#a3452f}
+</style>
+</head>
+<body>
+<div class="seam" aria-hidden="true"></div>
+<div class="wrap">
+
+<svg width="0" height="0" style="position:absolute;left:-9999px" aria-hidden="true"><defs>
+<symbol id="ripple-wake" viewBox="0 0 32 32">
+<defs><linearGradient id="rg-lt-w" gradientUnits="userSpaceOnUse" x1="-6.132" y1="3.999" x2="39.781" y2="28.412"><stop offset="0" stop-color="currentColor" stop-opacity="0.55"/><stop offset="1" stop-color="currentColor" stop-opacity="1"/></linearGradient></defs>
+<path class="rg" d="M12.961 18.126A4.429 4.171 14 1 1 13.909 19.269" fill="none" stroke="url(#rg-lt-w)" stroke-width="2.2" stroke-linecap="butt" opacity="1"/>
+<path class="rg" d="M13.023 8.984A8.446 7.954 14 0 1 24.787 13.828" fill="none" stroke="url(#rg-lt-w)" stroke-width="1.494" stroke-linecap="butt" opacity="0.604"/>
+<path class="rg" d="M25.206 17.176A8.446 7.954 14 1 1 9.952 11.413" fill="none" stroke="url(#rg-lt-w)" stroke-width="1.494" stroke-linecap="butt" opacity="0.604"/>
+<path class="rg" d="M17.458 28.477A12.985 12.229 14 0 1 4.188 18.52" fill="none" stroke="url(#rg-lt-w)" stroke-width="1.154" stroke-linecap="butt" opacity="0.432"/>
+<path class="rg" d="M4.903 11.111A12.985 12.229 14 0 1 19.48 4.268" fill="none" stroke="url(#rg-lt-w)" stroke-width="1.154" stroke-linecap="butt" opacity="0.432"/>
+<path class="rg" d="M26.226 8.025A12.985 12.229 14 0 1 24.205 26.482" fill="none" stroke="url(#rg-lt-w)" stroke-width="1.154" stroke-linecap="butt" opacity="0.432"/>
+<path class="gl" d="M14.925 16.206Q16.825 15.206 18.725 16.206Q16.825 17.206 14.925 16.206Z" fill="currentColor" transform="rotate(14 16.825 16.206)"/>
+</symbol>
+<symbol id="ripple-dream" viewBox="0 0 32 32">
+<defs><linearGradient id="rg-lt-d" gradientUnits="userSpaceOnUse" x1="-6.132" y1="3.999" x2="39.781" y2="28.412"><stop offset="0" stop-color="#b8abdb" stop-opacity="0.55"/><stop offset="1" stop-color="#b8abdb" stop-opacity="1"/></linearGradient><radialGradient id="rg-bloom" gradientUnits="userSpaceOnUse" cx="16.825" cy="16.206" r="9.2"><stop offset="0" stop-color="#d8cff0" stop-opacity=".70"/><stop offset=".38" stop-color="#a195c1" stop-opacity=".26"/><stop offset="1" stop-color="#9a86c4" stop-opacity="0"/></radialGradient></defs>
+<circle cx="16.825" cy="16.206" r="9.2" fill="url(#rg-bloom)"/>
+<path class="rg" d="M12.806 18.087A4.429 4.171 14 1 1 13.753 19.231" fill="none" stroke="url(#rg-lt-d)" stroke-width="2.2" stroke-linecap="butt" opacity="1"/>
+<path class="rg" d="M13.106 8.654A8.446 7.954 14 0 1 24.869 13.498" fill="none" stroke="url(#rg-lt-d)" stroke-width="1.494" stroke-linecap="butt" opacity="0.604"/>
+<path class="rg" d="M25.288 16.846A8.446 7.954 14 1 1 10.035 11.084" fill="none" stroke="url(#rg-lt-d)" stroke-width="1.494" stroke-linecap="butt" opacity="0.604"/>
+<path class="rg" d="M16.921 28.824A13.5 12.714 14 0 1 3.125 18.471" fill="none" stroke="url(#rg-lt-d)" stroke-width="1.154" stroke-linecap="butt" opacity="0.311"/>
+<path class="rg" d="M3.868 10.769A13.5 12.714 14 0 1 19.023 3.654" fill="none" stroke="url(#rg-lt-d)" stroke-width="1.154" stroke-linecap="butt" opacity="0.311"/>
+<path class="rg" d="M26.036 7.56A13.5 12.714 14 0 1 23.935 26.749" fill="none" stroke="url(#rg-lt-d)" stroke-width="1.154" stroke-linecap="butt" opacity="0.311"/>
+<path class="gl" d="M14.925 16.206Q16.825 15.206 18.725 16.206Q16.825 17.206 14.925 16.206Z" fill="#efeafb" transform="rotate(14 16.825 16.206)"/>
+</symbol>
+</defs></svg>
+
+<header>
+  <p class="kick">favicon direction · batch 03</p>
+  <div class="headrow">
+    <div>
+      <h1>水面的圆</h1>
+      <p class="sub">一束很轻的东西落进水面。环从落点散开，间距按几何级数放宽，线宽按 1/√r 摊薄；最外一圈已经断成两段，缺口正对着那根 14° 的线。</p>
+      <p class="slug">design/mocks/favicon/batch-03/h-ripple · viewBox 0 0 32 32 · 单文件 SVG</p>
+    </div>
+    <div class="spec">
+      3 环 · 缺口 44° / 46° / 48°<br>
+      线宽 2.00 / 1.45 / 1.17<br>
+      圆心偏离 0.80 · 方位 14°
+    </div>
+  </div>
+</header>
+
+<section>
+  <div class="lab"><span>01 · 主视觉</span><b>醒 / 梦 · 168px</b></div>
+  <div class="hero">
+    <div class="plate light">
+      <svg class="big" viewBox="0 0 32 32" style="color:#232830" aria-label="醒面"><use href="#ripple-wake"/></svg>
+      <span class="cap">醒 · 纸面 #f0f3f6 · 冷灰细环</span>
+    </div>
+    <div class="plate dark">
+      <svg class="big" viewBox="0 0 32 32" aria-label="梦面"><use href="#ripple-dream"/></svg>
+      <span class="cap">梦 · 靛夜 #0c0f18 · 薄暮紫</span>
+    </div>
+  </div>
+  <p class="note" style="margin-top:16px">两态是<em>同一枚</em>：圆心、三个半径、三个缺口角度一个都不改。梦面只做三件事——环心各自错开一点、最外环外推 0.45、落点从墨色换成近白。最外环那道 24° 的短弧还会再转开 12°，散掉。</p>
+</section>
+
+<section>
+  <div class="lab"><span>02 · 同源</span><b>拖动 · reality-mix</b></div>
+  <div class="stackbox">
+    <div class="stack" id="stack">
+      <div class="layer l-wake"><svg viewBox="0 0 32 32" style="color:#232830"><use href="#ripple-wake"/></svg></div>
+      <div class="layer l-dream"><svg viewBox="0 0 32 32"><use href="#ripple-dream"/></svg></div>
+    </div>
+    <div class="ctrl">
+      <div class="kv"><span>梦 0</span><span id="mixv">醒 1.00</span></div>
+      <input id="mix" type="range" min="0" max="1" step="0.01" value="1" aria-label="醒梦总闸">
+      <p class="hint">底色和图标一起换面，所以拖到中段时两边都不占上风——那正是这枚标记最难被说清的一刻。真标签页里不会这样拖：换态只在跨过阈值时换一次 <code>href</code>。</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="lab"><span>03 · 16px 真栅格</span><b>×8 · 不是矢量缩放</b></div>
+  <p class="note">下面四格是把 SVG 光栅化成 16×16 之后放大八倍的原样。16px 是这枚标记真正的门槛：环会不会糊成一块、缺口还看不看得出、落点还在不在。</p>
+  <div class="mags">
+    <div class="mag light"><canvas id="cv1" width="16" height="16" aria-label="醒面 16px 浅底"></canvas><span class="cap">醒 · 浅底</span></div>
+    <div class="mag dark"><canvas id="cv2" width="16" height="16" aria-label="醒面 16px 深底"></canvas><span class="cap">醒 · 深底</span></div>
+    <div class="mag dark"><canvas id="cv3" width="16" height="16" aria-label="梦面 16px 深底"></canvas><span class="cap">梦 · 深底</span></div>
+    <div class="mag light"><canvas id="cv4" width="16" height="16" aria-label="梦面 16px 浅底"></canvas><span class="cap">梦 · 浅底（偏淡）</span></div>
+  </div>
+  <div class="raw">
+    <div class="pair"><svg width="16" height="16" viewBox="0 0 32 32" style="color:#232830" aria-hidden="true"><use href="#ripple-wake"/></svg><span class="t">醒 16 · 纸面</span></div>
+    <div class="darkchip"><svg width="16" height="16" viewBox="0 0 32 32" style="color:#e2e9f2" aria-hidden="true"><use href="#ripple-wake"/></svg><span class="t" style="color:rgba(230,235,241,.45)">醒 16 · 深底</span></div>
+    <div class="darkchip"><svg width="16" height="16" viewBox="0 0 32 32" aria-hidden="true"><use href="#ripple-dream"/></svg><span class="t" style="color:rgba(230,235,241,.45)">梦 16 · 深底</span></div>
+  </div>
+</section>
+
+<section>
+  <div class="lab"><span>04 · 尺寸带</span><b>32 / 24 / 16 · 昼面与深底</b></div>
+  <div class="band">
+    <div class="cell light"><span class="tag">32</span><div class="pair"><span class="tile t-wake"><svg width="32" height="32" viewBox="0 0 32 32" style="color:#232830"><use href="#ripple-wake"/></svg></span><span class="tile t-dream"><svg width="32" height="32" viewBox="0 0 32 32"><use href="#ripple-dream"/></svg></span></div></div>
+    <div class="cell light"><span class="tag">24</span><div class="pair"><span class="tile t-wake"><svg width="24" height="24" viewBox="0 0 32 32" style="color:#232830"><use href="#ripple-wake"/></svg></span><span class="tile t-dream"><svg width="24" height="24" viewBox="0 0 32 32"><use href="#ripple-dream"/></svg></span></div></div>
+    <div class="cell light"><span class="tag">16</span><div class="pair"><span class="tile t-wake"><svg width="16" height="16" viewBox="0 0 32 32" style="color:#232830"><use href="#ripple-wake"/></svg></span><span class="tile t-dream"><svg width="16" height="16" viewBox="0 0 32 32"><use href="#ripple-dream"/></svg></span></div></div>
+  </div>
+  <div class="band">
+    <div class="cell dark"><span class="tag">32</span><div class="pair"><span class="tile t-dream"><svg width="32" height="32" viewBox="0 0 32 32" style="color:#e2e9f2"><use href="#ripple-wake"/></svg></span><span class="tile t-dream"><svg width="32" height="32" viewBox="0 0 32 32"><use href="#ripple-dream"/></svg></span></div></div>
+    <div class="cell dark"><span class="tag">24</span><div class="pair"><span class="tile t-dream"><svg width="24" height="24" viewBox="0 0 32 32" style="color:#e2e9f2"><use href="#ripple-wake"/></svg></span><span class="tile t-dream"><svg width="24" height="24" viewBox="0 0 32 32"><use href="#ripple-dream"/></svg></span></div></div>
+    <div class="cell dark"><span class="tag">16</span><div class="pair"><span class="tile t-dream"><svg width="16" height="16" viewBox="0 0 32 32" style="color:#e2e9f2"><use href="#ripple-wake"/></svg></span><span class="tile t-dream"><svg width="16" height="16" viewBox="0 0 32 32"><use href="#ripple-dream"/></svg></span></div></div>
+  </div>
+  <p class="note" style="margin-top:14px">每格左醒右梦。深底那一排的左枚是<em>醒面几何配冷白墨</em>——单墨退让时它会变成这样。</p>
+</section>
+
+<section>
+  <div class="lab"><span>05 · 真实标签页</span><b>浅栏 / 深栏</b></div>
+  <div class="strip light">
+    <div class="tab active"><span class="fav"><svg width="16" height="16" viewBox="0 0 32 32" style="color:#232830" aria-hidden="true"><use href="#ripple-wake"/></svg></span><span class="ttl">Traveritas</span><span class="x">×</span></div>
+    <div class="tab"><span class="fav"><svg width="16" height="16" viewBox="0 0 32 32" style="color:#5f6368" aria-hidden="true"><use href="#ripple-wake"/></svg></span><span class="ttl">断章 · ESSAYS</span><span class="x">×</span></div>
+    <div class="tab"><span class="fav"><svg width="16" height="16" viewBox="0 0 32 32" style="color:#5f6368" aria-hidden="true"><use href="#ripple-wake"/></svg></span><span class="ttl">造物 · PROJECTS</span><span class="x">×</span></div>
+  </div>
+  <div class="winbody" style="border-color:var(--line)"></div>
+  <div class="strip dark">
+    <div class="tab active"><span class="fav"><svg width="16" height="16" viewBox="0 0 32 32" aria-hidden="true"><use href="#ripple-dream"/></svg></span><span class="ttl">AveritA</span><span class="x">×</span></div>
+    <div class="tab"><span class="fav"><svg width="16" height="16" viewBox="0 0 32 32" aria-hidden="true"><use href="#ripple-dream"/></svg></span><span class="ttl">闪念 · MOMENTS</span><span class="x">×</span></div>
+    <div class="tab"><span class="fav"><svg width="16" height="16" viewBox="0 0 32 32" aria-hidden="true"><use href="#ripple-dream"/></svg></span><span class="ttl">此身 · PRESENCE</span><span class="x">×</span></div>
+  </div>
+  <p class="note" style="margin-top:14px">浅色栏给醒面，深色栏给梦面。同一枚的两种状态，不是两枚图标——所以标签栏里翻主题时，它是"亮了一点"，不是"换了一个"。</p>
+</section>
+
+<section>
+  <div class="lab"><span>06 · 单色退让</span><b>currentColor</b></div>
+  <div class="monos">
+    <div class="mono m1"><svg width="72" height="72" viewBox="0 0 32 32"><use href="#ripple-wake"/></svg><div class="cap">墨 · 纸</div></div>
+    <div class="mono m2"><svg width="72" height="72" viewBox="0 0 32 32"><use href="#ripple-wake"/></svg><div class="cap">白 · 夜</div></div>
+    <div class="mono m3"><svg width="72" height="72" viewBox="0 0 32 32"><use href="#ripple-wake"/></svg><div class="cap">薄暮 · 淡紫底</div></div>
+    <div class="mono m4"><svg width="72" height="72" viewBox="0 0 32 32"><use href="#ripple-wake"/></svg><div class="cap">薄暮 · 靛底</div></div>
+  </div>
+  <p class="note" style="margin-top:14px">只剩一种墨色时，环的粗细差、缺口的方位、落点那道横向的光，全都还在——它不靠第二种颜色说话。浓度阶梯变成同色不同浓，反而更像一张测绘图。</p>
+</section>
+
+<section>
+  <div class="lab"><span>07 · 语境</span><b>放回夜里</b></div>
+  <div class="ctx">
+    <div class="glow"></div><div class="dots"></div><div class="seamline"></div>
+    <div class="name">Traveritas</div>
+    <svg class="mark" viewBox="0 0 32 32" aria-label="梦面图标放回主页"><use href="#ripple-dream"/></svg>
+    <div class="cap">缺口的方位 · 圆心的偏向</div>
+  </div>
+  <p class="note" style="margin-top:14px">把圆心从几何中心往 14° 的方向挪 0.8；最外环那道 48° 的缺口正落在这条线上。所以它看起来像水面被什么轻轻划了一下，而不是一个摆正的圆。</p>
+</section>
+
+<section>
+  <div class="lab"><span>08 · 生成规矩</span><b>可复述 · 不是手调轮廓</b></div>
+  <div class="rulewrap">
+    <div class="diagbox">
+  <i class="daxis"></i>
+  <i class="dc" style="left:39.14%;top:37.21%;width:26.88%;height:26.88%"></i>
+<i class="dc" style="left:26.95%;top:25.02%;width:51.25%;height:51.25%"></i>
+<i class="dc" style="left:13.18%;top:11.25%;width:78.79%;height:78.79%"></i>
+  <svg class="ico diagico" viewBox="0 0 32 32" style="color:#232830"><use href="#ripple-wake"/></svg>
+  <b class="dl" style="left:51.66%;top:32.70%">r1 · 4.30</b>
+<b class="dl" style="left:62.92%;top:22.77%">r2 · 8.20</b>
+<b class="dl" style="left:82.61%;top:18.94%">r3 · 12.61</b>
+</div>
+    <div>
+      <table>
+        <thead><tr><th>环</th><th>半径 r</th><th>线宽 w</th><th>浓度</th><th>缺口</th></tr></thead>
+        <tbody>
+<tr><td>r1</td><td>4.30</td><td>2.20</td><td>1.00</td><td>1</td><td>20°@128°</td></tr>
+<tr><td>r2</td><td>8.20</td><td>1.49</td><td>0.60</td><td>2</td><td>28°@216° 24°@340°</td></tr>
+<tr><td>r3</td><td>12.61</td><td>1.15</td><td>0.43</td><td>3</td><td>32°@58° 35°@172° 35°@286°</td></tr>
+        </tbody>
+      </table>
+      <ul class="rules">
+        <li><b>间距</b>：<code>r(k) = r(k-1) + g0 · gr^(k-1)</code>，g0 = 3.75，gr = 1.15。越往外越松。</li>
+        <li><b>线宽</b>：<code>w(k) = w0 · √(r0 / r(k))</code>。点源波的能量摊在一圈越来越长的波前上，振幅就这么掉。</li>
+        <li><b>浓度</b>：同一条曲线再压一道，<code>(r0 / r(k))^0.7</code>。所以最外环不是"画淡了"，是它本来就没剩多少。</li>
+        <li><b>缺口</b>：每环的缺口方位互不重叠（104° / 216° / 0° 与 300°），最外环因此碎成两段。任何一环都不是半圆。</li>
+        <li><b>偏心</b>：圆心沿 14° 偏离几何中心 0.8，环再沿同一条轴被拉长 3%。</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="lab"><span>09 · 风险</span><b>我自己不确定的地方</b></div>
+  <div class="risks">
+    <div class="risk"><b>同心环天生像靶心。</b>我用四件事拆它：落点是一道横着的光不是圆点、三环缺口互不重叠、最外环断成两段、圆心偏离几何中心。16px 下前两条起主要作用，后两条是余量。</div>
+    <div class="risk"><b>16px 的内两环间隙只有 1px 左右。</b>放大八倍看是清楚的，但在 1x 屏上可能糊成一条。若验收觉得糊，把 g0 从 3.75 提到 4.4、环数降到 2，形状逻辑不变。</div>
+    <div class="risk"><b>它可能被读成"水波/信号"而不是"水面"。</b>我赌的是缺口与偏心足够把"信号"那一读压下去；这一条只有你看了才算数。</div>
+    <div class="risk"><b>梦面在浅底上偏淡。</b>薄暮紫放在纸面上只有约 3:1，能看但不精神。页面里浅栏只给醒面，就是这个原因。</div>
+  </div>
+</section>
+
+<footer>
+  <div>h-ripple / 水面的圆 · 3 环 · 单文件 SVG · 无外部资源</div>
+  <div>favicon.svg（醒面几何，暗色主题自适应）· favicon-dream.svg（梦面）· gen.cjs（几何生成器）</div>
+  <div>截图：node design/mocks/favicon/.shot.cjs design/mocks/favicon/batch-03/h-ripple/index.html design/mocks/favicon/batch-03/h-ripple/shots/sheet.png 1200 1500 --full</div>
+  <div id="selfcheck">favicon.svg 自检中…</div>
+</footer>
+
+</div>
+
+<script>
+(function () {
+  /* 同源滑杆 */
+  var mix = document.getElementById('mix');
+  var stack = document.getElementById('stack');
+  var lw = stack.querySelector('.l-wake');
+  var ld = stack.querySelector('.l-dream');
+  var mixv = document.getElementById('mixv');
+  function hex(c) { return [parseInt(c.slice(1,3),16), parseInt(c.slice(3,5),16), parseInt(c.slice(5,7),16)]; }
+  function mixHex(a, b, t) {
+    var A = hex(a), B = hex(b);
+    return 'rgb(' + A.map(function (v, i) { return Math.round(v + (B[i]-v)*t); }).join(',') + ')';
+  }
+  function paint() {
+    var m = parseFloat(mix.value);
+    stack.style.background = mixHex('#f0f3f6', '#0c0f18', 1 - m);
+    lw.style.opacity = m;
+    ld.style.opacity = 1 - m;
+    mixv.textContent = '醒 ' + m.toFixed(2);
+  }
+  mix.addEventListener('input', paint);
+  paint();
+
+  /* 16px 真栅格：把 symbol 序列化成一个独立 SVG，按 16px 画进 canvas */
+  function raster(id, color, canvas) {
+    var sym = document.getElementById(id);
+    var inner = sym.innerHTML;
+    var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="16" height="16" style="color:' + color + '">' + inner + '</svg>';
+    var img = new Image();
+    img.onload = function () {
+      var ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, 16, 16);
+      ctx.drawImage(img, 0, 0, 16, 16);
+    };
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  }
+  raster('ripple-wake', '#232830', document.getElementById('cv1'));
+  raster('ripple-wake', '#e2e9f2', document.getElementById('cv2'));
+  raster('ripple-dream', '#b8abdb', document.getElementById('cv3'));
+  raster('ripple-dream', '#6f61a0', document.getElementById('cv4'));
+
+  /* 成品自检：独立 svg 被当图片加载时会不会裂 */
+  var el = document.getElementById('selfcheck');
+  var probe = new Image();
+  probe.onload = function () {
+    el.textContent = '✓ favicon.svg 以图片载入正常 · naturalWidth ' + probe.naturalWidth;
+    el.className = 'ok';
+  };
+  probe.onerror = function () {
+    el.textContent = '✗ favicon.svg 裂图（XML 解析失败）';
+    el.className = 'bad';
+  };
+  probe.src = 'favicon.svg';
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>花 · d-lily —— 标签页图标方向</title>
+<style>
+  :root{
+    --paper:#f0f3f6; --ink:#232830; --soft:#56606d; --faint:#858f9d;
+    --line:rgba(35,40,48,.12); --amber:#9a86c4;
+    --night:#0c0f18; --night2:#16171c; --card:#f7f9fb;
+    --mono:'IBM Plex Mono',ui-monospace,Consolas,'Cascadia Mono',monospace;
+    --serif:'Noto Serif SC','Palatino Linotype',Palatino,Georgia,serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--paper); color:var(--ink);
+    font-family:system-ui,-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei UI',sans-serif;
+    font-size:14px; line-height:1.6; -webkit-font-smoothing:antialiased;
+  }
+  .seam{position:fixed;left:-20vw;top:46vh;width:140vw;height:1px;
+    transform:rotate(14deg);transform-origin:0 0;pointer-events:none;z-index:0;
+    background:repeating-linear-gradient(90deg,rgba(35,40,48,.16) 0 7px,rgba(35,40,48,.07) 7px 9px);}
+  .wrap{position:relative;z-index:1;max-width:1080px;margin:0 auto;padding:64px 40px 96px}
+
+  h1{font-family:var(--serif);font-weight:400;font-size:30px;letter-spacing:.02em;margin:0 0 6px}
+  .sub{color:var(--soft);font-size:13.5px;margin:0 0 4px}
+  .slug{font-family:var(--mono);font-size:11.5px;color:var(--faint);letter-spacing:.06em}
+
+  section{margin-top:64px}
+  .lab{font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--faint);border-bottom:1px solid var(--line);padding-bottom:8px;margin-bottom:22px;
+    display:flex;justify-content:space-between;gap:16px}
+  .lab b{font-weight:400;color:var(--soft);letter-spacing:.02em;text-transform:none;font-size:11.5px}
+  .note{color:var(--soft);font-size:12.5px;margin:0 0 18px;max-width:62ch}
+  .note em{font-style:normal;color:var(--ink)}
+
+  /* 主视觉 */
+  .hero{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+  .plate{border:1px solid var(--line);border-radius:3px;padding:26px 22px 18px;
+    display:flex;flex-direction:column;align-items:center;gap:16px;min-height:270px;justify-content:center}
+  .plate.light{background:#f0f3f6}
+  .plate.dark{background:var(--night);border-color:rgba(255,255,255,.10)}
+  .plate .cap{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;color:var(--faint)}
+  .plate.dark .cap{color:rgba(230,235,241,.45)}
+  .big{width:168px;height:168px;display:block}
+
+  /* 叠合滑杆 */
+  .stackbox{display:flex;gap:26px;align-items:center;flex-wrap:wrap}
+  .stack{position:relative;width:168px;height:168px;border-radius:3px;
+    border:1px solid var(--line);flex:0 0 auto;overflow:hidden}
+  .stack .ground{position:absolute;inset:0}
+  .stack .g-paper{background:#f0f3f6}
+  .stack .g-night{background:var(--night)}
+  .stack .layer{position:absolute;inset:0;display:grid;place-items:center}
+  .stack .layer svg{width:168px;height:168px;display:block}
+  .ctrl{flex:1 1 240px;min-width:220px}
+  .ctrl input[type=range]{width:100%;accent-color:var(--amber)}
+  .ctrl .kv{font-family:var(--mono);font-size:11.5px;color:var(--soft);display:flex;justify-content:space-between}
+  .ctrl .hint{font-size:12px;color:var(--faint);margin-top:8px}
+
+  /* 放大镜 */
+  .mags{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+  .mag{border:1px solid var(--line);border-radius:3px;padding:14px 12px 10px;text-align:center}
+  .mag.light{background:#f0f3f6}
+  .mag.dark{background:var(--night2);border-color:rgba(255,255,255,.10)}
+  .mag canvas{width:128px;height:128px;display:block;margin:0 auto;image-rendering:pixelated;
+    border-radius:2px;box-shadow:0 0 0 1px rgba(128,128,128,.18) inset}
+  .mag .one{display:block;margin:10px auto 0}
+  .mag .cap{font-family:var(--mono);font-size:10px;letter-spacing:.10em;color:var(--faint);margin-top:8px}
+  .mag.dark .cap{color:rgba(230,235,241,.5)}
+
+  /* 尺寸带 */
+  .band{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  .band + .band{margin-top:14px}
+  .cell{border-radius:3px;padding:22px 10px 12px;text-align:center;position:relative;
+    border:1px solid var(--line)}
+  .cell.light{background:#f0f3f6}
+  .cell.dark{background:var(--night2);border-color:rgba(255,255,255,.10)}
+  .pair{display:flex;align-items:center;justify-content:center;gap:20px;min-height:36px}
+  .cell .tag{position:absolute;left:10px;top:6px;font-family:var(--mono);font-size:10px;color:var(--faint)}
+  .cell.dark .tag{color:rgba(230,235,241,.42)}
+  .tile{display:inline-flex;border-radius:7px;line-height:0}
+  .t-wake{background:#f0f3f6;box-shadow:0 0 0 1px rgba(35,40,48,.14) inset}
+  .t-dream{background:#12162a;box-shadow:0 0 0 1px rgba(255,255,255,.10) inset}
+  .raw16{display:flex;gap:26px;align-items:center;justify-content:center;padding:18px;border:1px dashed var(--line);
+    border-radius:3px;margin-top:14px}
+
+  /* 标签栏 */
+  .strip{border-radius:10px 10px 4px 4px;padding:9px 10px 0;display:flex;gap:3px;align-items:flex-end;
+    height:50px;overflow:hidden;border:1px solid var(--line)}
+  .strip.light{background:#dee1e6}
+  .strip.dark{background:#202124;border-color:rgba(255,255,255,.10)}
+  .strip + .strip{margin-top:16px}
+  .tab{display:flex;align-items:center;gap:8px;height:38px;padding:0 12px 0 11px;border-radius:9px 9px 0 0;
+    font-size:12.5px;max-width:230px;min-width:150px}
+  .strip.light .tab{color:#5f6368}
+  .strip.light .tab.active{background:#f0f3f6;color:#202124}
+  .strip.dark .tab{color:#9aa0a6}
+  .strip.dark .tab.active{background:#35363a;color:#e8eaed}
+  .tab .fav{display:inline-flex;line-height:0;flex:0 0 auto}
+  .tab .fav.ph{width:16px;height:16px;border-radius:3px;background:currentColor;opacity:.22}
+  .tab .ttl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tab .x{margin-left:auto;opacity:.5;font-size:14px}
+  .winbody{height:26px;border:1px solid var(--line);border-top:0;border-radius:0 0 6px 6px}
+
+  /* 单色 */
+  .monos{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+  .mono{border:1px solid var(--line);border-radius:3px;padding:20px 12px;text-align:center}
+  .mono.m1{background:#f0f3f6;color:#2b323c}
+  .mono.m2{background:#16171c;color:#d7d2e8;border-color:rgba(255,255,255,.10)}
+  .mono.m3{background:#e8e2f2;color:#5b4f80}
+  .mono.m4{background:#1d1729;color:#a195c1;border-color:rgba(255,255,255,.10)}
+  .mono svg{margin:0 auto}
+  .mono .cap{font-family:var(--mono);font-size:10px;letter-spacing:.10em;opacity:.65;margin-top:10px}
+
+  /* 语境 */
+  .ctx{position:relative;height:340px;border-radius:3px;overflow:hidden;background:#0c0f18;
+    border:1px solid rgba(255,255,255,.08)}
+  .ctx .dots{position:absolute;inset:0;
+    background-image:radial-gradient(rgba(226,232,242,.075) 1px,transparent 1.15px);background-size:3px 3px}
+  .ctx .lamp{position:absolute;left:-14%;top:-30%;width:52%;height:110%;
+    background:radial-gradient(closest-side,rgba(230,235,241,.55),rgba(166,180,198,.20) 55%,transparent 78%);
+    filter:blur(6px)}
+  .ctx .seam{position:absolute;left:-10%;top:44%;width:130%;height:1px;transform:rotate(14deg);transform-origin:0 0;
+    background:repeating-linear-gradient(90deg,rgba(232,238,246,.55) 0 6px,rgba(232,238,246,.26) 6px 9px)}
+  .ctx .name{position:absolute;left:7%;top:12%;font-family:var(--serif);font-size:64px;color:#e6ebf1;
+    opacity:.92;letter-spacing:.01em;text-shadow:6px 0 0 rgba(129,123,163,.30),-3px 0 0 rgba(12,15,24,.6)}
+  .ctx .ent{position:absolute;font-family:var(--mono);font-size:11px;color:rgba(230,235,241,.72);letter-spacing:.08em}
+  .ctx .ent i{font-style:normal;display:inline-block;width:6px;height:6px;border-radius:50%;
+    background:#a195c1;margin-right:9px;vertical-align:1px;box-shadow:0 0 7px rgba(161,149,193,.9)}
+  .ctx .e1{left:33%;top:46%} .ctx .e2{left:52%;top:55%} .ctx .e3{left:71%;top:64%}
+  .ctx .star{position:absolute;left:22px;bottom:20px;opacity:.9}
+  .ctx .nexus{position:absolute;right:22px;bottom:22px;font-family:var(--mono);font-size:11px;
+    letter-spacing:.22em;color:rgba(230,235,241,.5)}
+  .ctx .clock{position:absolute;left:60px;bottom:22px;font-family:var(--mono);font-size:10.5px;color:rgba(230,235,241,.38)}
+
+  /* 几何注解 */
+  .geo{display:grid;grid-template-columns:280px 1fr;gap:30px;align-items:start}
+  table{border-collapse:collapse;font-family:var(--mono);font-size:11.5px;width:100%}
+  th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}
+  th{color:var(--faint);font-weight:400;letter-spacing:.06em;font-size:10.5px;text-transform:uppercase}
+  td{color:var(--soft)}
+  .geo .anno{border:1px solid var(--line);border-radius:3px;background:var(--card);padding:8px}
+  .geo .anno svg{display:block;width:100%;height:auto}
+  code{font-family:var(--mono);font-size:12px;background:rgba(35,40,48,.06);padding:1px 5px;border-radius:2px}
+  ul{margin:0;padding-left:18px;color:var(--soft);font-size:12.5px}
+  li{margin:5px 0}
+  li b{color:var(--ink);font-weight:600}
+  .warn{border-left:2px solid var(--amber);padding:2px 0 2px 14px;color:var(--soft);font-size:12.5px;margin-top:10px}
+  footer{margin-top:70px;padding-top:18px;border-top:1px solid var(--line);
+    font-family:var(--mono);font-size:10.5px;color:var(--faint);letter-spacing:.06em}
+</style>
+</head>
+<body>
+<div class="seam"></div>
+
+<svg id="sprite" style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true"><defs>
+<g id="m-wake"><defs><mask id="k-wake-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="32" height="32"><rect x="0" y="0" width="32" height="32" fill="#fff"/><circle cx="16" cy="16" r="2.3" fill="#000"/><g transform="rotate(5.9 16 16)"><g transform="rotate(0 16 13.4)"><path fill="#000" d="M16.08 12.24 C15.33 10.23 16.12 6.49 16.35 5.05 C16.57 6.49 16.83 10.23 16.08 12.24 Z"/></g></g><g transform="rotate(70.74 16 16)"><g transform="rotate(0 16 13.4)"><path fill="#000" d="M15.96 12.26 C15.21 10.27 15.59 6.6 15.82 5.18 C16.04 6.6 16.71 10.27 15.96 12.26 Z"/></g></g><g transform="rotate(141.14 16 16)"><g transform="rotate(1.5 16 13.4)"><path fill="#000" d="M15.9 12.47 C15.15 10.87 15.34 7.89 15.57 6.74 C15.79 7.89 16.65 10.87 15.9 12.47 Z"/></g></g><g transform="rotate(216.96 16 16)"><g transform="rotate(0 16 13.4)"><path fill="#000" d="M15.98 12.4 C15.23 10.67 15.67 7.45 15.9 6.21 C16.12 7.45 16.73 10.67 15.98 12.4 Z"/></g></g><g transform="rotate(292.24 16 16)"><g transform="rotate(-2.2 16 13.4)"><path fill="#000" d="M16.09 12.2 C15.34 10.13 16.18 6.27 16.4 4.79 C16.63 6.27 16.84 10.13 16.09 12.2 Z"/></g></g></mask></defs><g class="fl"><g class="petals" mask="url(#k-wake-mask)"><g class="whorl" fill="#2b323c" fill-opacity="0.42"><g transform="rotate(40.82 16 16)"><g transform="rotate(-2 16 13.75)"><path d="M14.99 13.75 C14.6 12.72 14.6 11.78 14.6 10.93 C14.6 9.9 15.61 9.33 16.13 9.05 C16.33 9.33 17.2 9.9 17.2 10.93 C17.2 11.78 17.2 12.72 17.17 13.75 Z"/></g></g><g transform="rotate(175.55 16 16)"><g transform="rotate(3 16 13.75)"><path d="M14.75 13.75 C14.76 12.65 14.76 11.65 14.76 10.75 C14.76 9.65 15.65 9.05 15.84 8.75 C16.42 9.05 17.51 9.65 17.51 10.75 C17.51 11.65 17.51 12.65 17.06 13.75 Z"/></g></g><g transform="rotate(-26.93 16 16)"><g transform="rotate(-2 16 13.75)"><path d="M15.01 13.75 C14.67 12.76 14.67 11.86 14.67 11.05 C14.67 10.06 15.63 9.52 16.1 9.25 C16.33 9.52 17.17 10.06 17.17 11.05 C17.17 11.86 17.17 12.76 17.11 13.75 Z"/></g></g></g><g class="ring" fill="#2b323c"><g transform="rotate(5.9 16 16)"><g transform="rotate(0 16 13.4)"><path d="M14.33 13.4 C13.59 11.6 13.57 9.39 13.57 7.27 C13.57 4.95 15.27 3.47 16.24 2.84 C16.62 3.47 18.06 4.95 18.06 7.27 C18.06 9.39 18.04 11.6 17.92 13.4 Z"/></g></g><g transform="rotate(70.74 16 16)"><g transform="rotate(0 16 13.4)"><path d="M14.14 13.4 C13.88 11.63 13.86 9.45 13.86 7.37 C13.86 5.08 15.36 3.62 15.87 3 C16.7 3.62 18.34 5.08 18.34 7.37 C18.34 9.45 18.31 11.63 17.73 13.4 Z"/></g></g><g transform="rotate(141.14 16 16)"><g transform="rotate(1.5 16 13.4)"><path d="M14.04 13.4 C14.17 11.97 14.15 10.2 14.15 8.51 C14.15 6.66 15.45 5.48 15.7 4.97 C16.69 5.48 18.31 6.66 18.31 8.51 C18.31 10.2 18.28 11.97 17.63 13.4 Z"/></g></g><g transform="rotate(216.96 16 16)"><g transform="rotate(0 16 13.4)"><path d="M14.17 13.4 C13.94 11.85 13.92 9.94 13.92 8.12 C13.92 6.12 15.38 4.85 15.93 4.3 C16.66 4.85 18.19 6.12 18.19 8.12 C18.19 9.94 18.17 11.85 17.76 13.4 Z"/></g></g><g transform="rotate(292.24 16 16)"><g transform="rotate(-2.2 16 13.4)"><path d="M14.34 13.4 C13.54 11.55 13.51 9.26 13.51 7.08 C13.51 4.68 15.25 3.15 16.28 2.5 C16.62 3.15 18.06 4.68 18.06 7.08 C18.06 9.26 18.04 11.55 17.93 13.4 Z"/></g></g></g></g></g></g><g id="m-dream"><defs><mask id="k-dream-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="32" height="32"><rect x="0" y="0" width="32" height="32" fill="#fff"/><circle cx="16" cy="16" r="2.3" fill="#000"/><g transform="rotate(5.9 16 16)"><g transform="rotate(0 16 13.4)"><path fill="#000" d="M16.08 12.24 C15.33 10.23 16.12 6.49 16.35 5.05 C16.57 6.49 16.83 10.23 16.08 12.24 Z"/></g></g><g transform="rotate(70.74 16 16)"><g transform="rotate(0 16 13.4)"><path fill="#000" d="M15.96 12.26 C15.21 10.27 15.59 6.6 15.82 5.18 C16.04 6.6 16.71 10.27 15.96 12.26 Z"/></g></g><g transform="translate(1.35 1.67) rotate(141.14 16 16)"><g transform="rotate(5.5 16 13.4)"><path fill="#000" d="M15.9 12.47 C15.15 10.87 15.34 7.89 15.57 6.74 C15.79 7.89 16.65 10.87 15.9 12.47 Z"/></g></g><g transform="rotate(216.96 16 16)"><g transform="rotate(0 16 13.4)"><path fill="#000" d="M15.98 12.4 C15.23 10.67 15.67 7.45 15.9 6.21 C16.12 7.45 16.73 10.67 15.98 12.4 Z"/></g></g><g transform="rotate(292.24 16 16)"><g transform="rotate(-2.2 16 13.4)"><path fill="#000" d="M16.09 12.2 C15.34 10.13 16.18 6.27 16.4 4.79 C16.63 6.27 16.84 10.13 16.09 12.2 Z"/></g></g></mask><radialGradient id="k-dream-grad" gradientUnits="userSpaceOnUse" cx="16" cy="16" r="14.2"><stop offset="0.06" stop-color="#b9aede" stop-opacity="0.66"/><stop offset="0.46" stop-color="#9a86c4" stop-opacity="0.34"/><stop offset="0.86" stop-color="#7d6fae" stop-opacity="0.13"/><stop offset="1" stop-color="#6f61a0" stop-opacity="0.05"/></radialGradient><radialGradient id="k-dream-glow" gradientUnits="userSpaceOnUse" cx="16" cy="16" r="6.4"><stop offset="0" stop-color="#d8cff0" stop-opacity="0.95"/><stop offset="0.38" stop-color="#a195c1" stop-opacity="0.42"/><stop offset="1" stop-color="#a195c1" stop-opacity="0"/></radialGradient></defs><g class="fl"><g class="petals" mask="url(#k-dream-mask)"><g class="whorl" fill="url(#k-dream-grad)" fill-opacity="0.5"><g transform="rotate(40.82 16 16)"><g transform="rotate(-2 16 13.75)"><path d="M14.99 13.75 C14.6 12.72 14.6 11.78 14.6 10.93 C14.6 9.9 15.61 9.33 16.13 9.05 C16.33 9.33 17.2 9.9 17.2 10.93 C17.2 11.78 17.2 12.72 17.17 13.75 Z"/></g></g><g transform="rotate(175.55 16 16)"><g transform="rotate(3 16 13.75)"><path d="M14.75 13.75 C14.76 12.65 14.76 11.65 14.76 10.75 C14.76 9.65 15.65 9.05 15.84 8.75 C16.42 9.05 17.51 9.65 17.51 10.75 C17.51 11.65 17.51 12.65 17.06 13.75 Z"/></g></g><g transform="rotate(-26.93 16 16)"><g transform="rotate(-2 16 13.75)"><path d="M15.01 13.75 C14.67 12.76 14.67 11.86 14.67 11.05 C14.67 10.06 15.63 9.52 16.1 9.25 C16.33 9.52 17.17 10.06 17.17 11.05 C17.17 11.86 17.17 12.76 17.11 13.75 Z"/></g></g></g><g class="ring" fill="url(#k-dream-grad)"><g transform="rotate(5.9 16 16)"><g transform="rotate(0 16 13.4)"><path d="M14.33 13.4 C13.59 11.6 13.57 9.39 13.57 7.27 C13.57 4.95 15.27 3.47 16.24 2.84 C16.62 3.47 18.06 4.95 18.06 7.27 C18.06 9.39 18.04 11.6 17.92 13.4 Z"/></g></g><g transform="rotate(70.74 16 16)"><g transform="rotate(0 16 13.4)"><path d="M14.14 13.4 C13.88 11.63 13.86 9.45 13.86 7.37 C13.86 5.08 15.36 3.62 15.87 3 C16.7 3.62 18.34 5.08 18.34 7.37 C18.34 9.45 18.31 11.63 17.73 13.4 Z"/></g></g><g transform="translate(1.35 1.67) rotate(141.14 16 16)"><g transform="rotate(5.5 16 13.4)"><path d="M14.04 13.4 C14.17 11.97 14.15 10.2 14.15 8.51 C14.15 6.66 15.45 5.48 15.7 4.97 C16.69 5.48 18.31 6.66 18.31 8.51 C18.31 10.2 18.28 11.97 17.63 13.4 Z"/></g></g><g transform="rotate(216.96 16 16)"><g transform="rotate(0 16 13.4)"><path d="M14.17 13.4 C13.94 11.85 13.92 9.94 13.92 8.12 C13.92 6.12 15.38 4.85 15.93 4.3 C16.66 4.85 18.19 6.12 18.19 8.12 C18.19 9.94 18.17 11.85 17.76 13.4 Z"/></g></g><g transform="rotate(292.24 16 16)"><g transform="rotate(-2.2 16 13.4)"><path d="M14.34 13.4 C13.54 11.55 13.51 9.26 13.51 7.08 C13.51 4.68 15.25 3.15 16.28 2.5 C16.62 3.15 18.06 4.68 18.06 7.08 C18.06 9.26 18.04 11.55 17.93 13.4 Z"/></g></g></g></g><circle cx="16" cy="16" r="6.4" fill="url(#k-dream-glow)"/><circle cx="16" cy="16" r="1.0" fill="#efeafb" opacity="0.92"/></g></g><g id="m-mono"><defs><mask id="k-mono-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="32" height="32"><rect x="0" y="0" width="32" height="32" fill="#fff"/><circle cx="16" cy="16" r="2.3" fill="#000"/><g transform="rotate(5.9 16 16)"><g transform="rotate(0 16 13.4)"><path fill="#000" d="M16.08 12.24 C15.33 10.23 16.12 6.49 16.35 5.05 C16.57 6.49 16.83 10.23 16.08 12.24 Z"/></g></g><g transform="rotate(70.74 16 16)"><g transform="rotate(0 16 13.4)"><path fill="#000" d="M15.96 12.26 C15.21 10.27 15.59 6.6 15.82 5.18 C16.04 6.6 16.71 10.27 15.96 12.26 Z"/></g></g><g transform="rotate(141.14 16 16)"><g transform="rotate(1.5 16 13.4)"><path fill="#000" d="M15.9 12.47 C15.15 10.87 15.34 7.89 15.57 6.74 C15.79 7.89 16.65 10.87 15.9 12.47 Z"/></g></g><g transform="rotate(216.96 16 16)"><g transform="rotate(0 16 13.4)"><path fill="#000" d="M15.98 12.4 C15.23 10.67 15.67 7.45 15.9 6.21 C16.12 7.45 16.73 10.67 15.98 12.4 Z"/></g></g><g transform="rotate(292.24 16 16)"><g transform="rotate(-2.2 16 13.4)"><path fill="#000" d="M16.09 12.2 C15.34 10.13 16.18 6.27 16.4 4.79 C16.63 6.27 16.84 10.13 16.09 12.2 Z"/></g></g></mask></defs><g class="fl"><g class="petals" mask="url(#k-mono-mask)"><g class="whorl" fill="currentColor" fill-opacity="0.42"><g transform="rotate(40.82 16 16)"><g transform="rotate(-2 16 13.75)"><path d="M14.99 13.75 C14.6 12.72 14.6 11.78 14.6 10.93 C14.6 9.9 15.61 9.33 16.13 9.05 C16.33 9.33 17.2 9.9 17.2 10.93 C17.2 11.78 17.2 12.72 17.17 13.75 Z"/></g></g><g transform="rotate(175.55 16 16)"><g transform="rotate(3 16 13.75)"><path d="M14.75 13.75 C14.76 12.65 14.76 11.65 14.76 10.75 C14.76 9.65 15.65 9.05 15.84 8.75 C16.42 9.05 17.51 9.65 17.51 10.75 C17.51 11.65 17.51 12.65 17.06 13.75 Z"/></g></g><g transform="rotate(-26.93 16 16)"><g transform="rotate(-2 16 13.75)"><path d="M15.01 13.75 C14.67 12.76 14.67 11.86 14.67 11.05 C14.67 10.06 15.63 9.52 16.1 9.25 C16.33 9.52 17.17 10.06 17.17 11.05 C17.17 11.86 17.17 12.76 17.11 13.75 Z"/></g></g></g><g class="ring" fill="currentColor"><g transform="rotate(5.9 16 16)"><g transform="rotate(0 16 13.4)"><path d="M14.33 13.4 C13.59 11.6 13.57 9.39 13.57 7.27 C13.57 4.95 15.27 3.47 16.24 2.84 C16.62 3.47 18.06 4.95 18.06 7.27 C18.06 9.39 18.04 11.6 17.92 13.4 Z"/></g></g><g transform="rotate(70.74 16 16)"><g transform="rotate(0 16 13.4)"><path d="M14.14 13.4 C13.88 11.63 13.86 9.45 13.86 7.37 C13.86 5.08 15.36 3.62 15.87 3 C16.7 3.62 18.34 5.08 18.34 7.37 C18.34 9.45 18.31 11.63 17.73 13.4 Z"/></g></g><g transform="rotate(141.14 16 16)"><g transform="rotate(1.5 16 13.4)"><path d="M14.04 13.4 C14.17 11.97 14.15 10.2 14.15 8.51 C14.15 6.66 15.45 5.48 15.7 4.97 C16.69 5.48 18.31 6.66 18.31 8.51 C18.31 10.2 18.28 11.97 17.63 13.4 Z"/></g></g><g transform="rotate(216.96 16 16)"><g transform="rotate(0 16 13.4)"><path d="M14.17 13.4 C13.94 11.85 13.92 9.94 13.92 8.12 C13.92 6.12 15.38 4.85 15.93 4.3 C16.66 4.85 18.19 6.12 18.19 8.12 C18.19 9.94 18.17 11.85 17.76 13.4 Z"/></g></g><g transform="rotate(292.24 16 16)"><g transform="rotate(-2.2 16 13.4)"><path d="M14.34 13.4 C13.54 11.55 13.51 9.26 13.51 7.08 C13.51 4.68 15.25 3.15 16.28 2.5 C16.62 3.15 18.06 4.68 18.06 7.08 C18.06 9.26 18.04 11.55 17.93 13.4 Z"/></g></g></g></g></g></g><g id="m-hard"><defs><mask id="k-hard-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="32" height="32"><rect x="0" y="0" width="32" height="32" fill="#fff"/><circle cx="16" cy="16" r="2.5" fill="#000"/></mask></defs><g class="fl"><g class="petals" mask="url(#k-hard-mask)"><g class="ring" fill="#2b323c"><g transform="rotate(5.9 16 16)"><g transform="rotate(0 16 13.5)"><path d="M13.63 13.5 C13.16 11.81 13.13 9.73 13.13 7.74 C13.13 5.56 15.14 4.17 16.28 3.57 C16.73 4.17 18.44 5.56 18.44 7.74 C18.44 9.73 18.41 11.81 18.71 13.5 Z"/></g></g><g transform="rotate(70.74 16 16)"><g transform="rotate(0 16 13.5)"><path d="M13.37 13.5 C13.5 11.84 13.48 9.78 13.48 7.83 C13.48 5.68 15.24 4.31 15.85 3.72 C16.83 4.31 18.76 5.68 18.76 7.83 C18.76 9.78 18.73 11.84 18.45 13.5 Z"/></g></g><g transform="rotate(141.14 16 16)"><g transform="rotate(1.5 16 13.5)"><path d="M13.23 13.5 C13.84 12.15 13.82 10.49 13.82 8.9 C13.82 7.16 15.35 6.05 15.65 5.58 C16.82 6.05 18.72 7.16 18.72 8.9 C18.72 10.49 18.69 12.15 18.31 13.5 Z"/></g></g><g transform="rotate(216.96 16 16)"><g transform="rotate(0 16 13.5)"><path d="M13.41 13.5 C13.57 12.05 13.55 10.25 13.55 8.54 C13.55 6.66 15.26 5.46 15.92 4.95 C16.77 5.46 18.58 6.66 18.58 8.54 C18.58 10.25 18.56 12.05 18.49 13.5 Z"/></g></g><g transform="rotate(292.24 16 16)"><g transform="rotate(-2.2 16 13.5)"><path d="M13.66 13.5 C13.09 11.76 13.06 9.61 13.06 7.56 C13.06 5.3 15.12 3.87 16.33 3.25 C16.73 3.87 18.43 5.3 18.43 7.56 C18.43 9.61 18.41 11.76 18.74 13.5 Z"/></g></g></g></g></g></g><g id="m-harddream"><defs><mask id="k-harddream-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="32" height="32"><rect x="0" y="0" width="32" height="32" fill="#fff"/><circle cx="16" cy="16" r="2.5" fill="#000"/></mask><radialGradient id="k-harddream-grad" gradientUnits="userSpaceOnUse" cx="16" cy="16" r="14.2"><stop offset="0.06" stop-color="#b9aede" stop-opacity="0.66"/><stop offset="0.46" stop-color="#9a86c4" stop-opacity="0.34"/><stop offset="0.86" stop-color="#7d6fae" stop-opacity="0.13"/><stop offset="1" stop-color="#6f61a0" stop-opacity="0.05"/></radialGradient><radialGradient id="k-harddream-glow" gradientUnits="userSpaceOnUse" cx="16" cy="16" r="6.4"><stop offset="0" stop-color="#d8cff0" stop-opacity="0.95"/><stop offset="0.38" stop-color="#a195c1" stop-opacity="0.42"/><stop offset="1" stop-color="#a195c1" stop-opacity="0"/></radialGradient></defs><g class="fl"><g class="petals" mask="url(#k-harddream-mask)"><g class="ring" fill="url(#k-harddream-grad)"><g transform="rotate(5.9 16 16)"><g transform="rotate(0 16 13.5)"><path d="M13.63 13.5 C13.16 11.81 13.13 9.73 13.13 7.74 C13.13 5.56 15.14 4.17 16.28 3.57 C16.73 4.17 18.44 5.56 18.44 7.74 C18.44 9.73 18.41 11.81 18.71 13.5 Z"/></g></g><g transform="rotate(70.74 16 16)"><g transform="rotate(0 16 13.5)"><path d="M13.37 13.5 C13.5 11.84 13.48 9.78 13.48 7.83 C13.48 5.68 15.24 4.31 15.85 3.72 C16.83 4.31 18.76 5.68 18.76 7.83 C18.76 9.78 18.73 11.84 18.45 13.5 Z"/></g></g><g transform="rotate(141.14 16 16)"><g transform="rotate(1.5 16 13.5)"><path d="M13.23 13.5 C13.84 12.15 13.82 10.49 13.82 8.9 C13.82 7.16 15.35 6.05 15.65 5.58 C16.82 6.05 18.72 7.16 18.72 8.9 C18.72 10.49 18.69 12.15 18.31 13.5 Z"/></g></g><g transform="rotate(216.96 16 16)"><g transform="rotate(0 16 13.5)"><path d="M13.41 13.5 C13.57 12.05 13.55 10.25 13.55 8.54 C13.55 6.66 15.26 5.46 15.92 4.95 C16.77 5.46 18.58 6.66 18.58 8.54 C18.58 10.25 18.56 12.05 18.49 13.5 Z"/></g></g><g transform="rotate(292.24 16 16)"><g transform="rotate(-2.2 16 13.5)"><path d="M13.66 13.5 C13.09 11.76 13.06 9.61 13.06 7.56 C13.06 5.3 15.12 3.87 16.33 3.25 C16.73 3.87 18.43 5.3 18.43 7.56 C18.43 9.61 18.41 11.76 18.74 13.5 Z"/></g></g></g></g><circle cx="16" cy="16" r="6.4" fill="url(#k-harddream-glow)"/><circle cx="16" cy="16" r="1.0" fill="#efeafb" opacity="0.92"/></g></g>
+</defs></svg>
+
+<div class="wrap">
+  <h1>花</h1>
+  <p class="sub">俯视一朵正在开、或正在合的花。五瓣，瓣长、开角、左右偏斜各自成一条采样正弦——像有规则，读不出是哪条。</p>
+  <p class="slug">design/mocks/favicon/batch-02/d-lily &nbsp;·&nbsp; 醒梦两态 &nbsp;·&nbsp; viewBox 0 0 32 32</p>
+
+  <section>
+    <div class="lab"><span>主视觉 · 168px</span><b>醒面 #f0f3f6 / 梦面 #0c0f18</b></div>
+    <div class="hero">
+      <div class="plate light"><svg class="ic" viewBox="0 0 32 32" width="168" height="168" aria-hidden="true"><use href="#m-wake"/></svg><span class="cap">WAKE · 醒</span></div>
+      <div class="plate dark"><svg class="ic" viewBox="0 0 32 32" width="168" height="168" aria-hidden="true"><use href="#m-dream"/></svg><span class="cap">DREAM · 梦</span></div>
+    </div>
+    <p class="note" style="margin-top:18px">
+      醒：纸上一朵刻出来的冷灰花，瓣间留空，花心是一枚<em>真的孔</em>（透出底色，不是画上去的白点）。
+      梦：同一套几何，瓣换成磨砂、由花心向外化开，花心点亮，<em>第三瓣正在离开花心</em>（只挪了 2.15 单位）。
+      两态是同一枚图标——形状只差那一瓣的距离。
+    </p>
+  </section>
+
+  <section>
+    <div class="lab"><span>醒梦同源 · 拖动看材质换面</span><b>--reality-mix</b></div>
+    <div class="stackbox">
+      <div class="stack">
+        <div class="ground g-paper"></div>
+        <div class="ground g-night"></div>
+        <div class="layer" id="layerDream"><svg class="ic" viewBox="0 0 32 32" width="168" height="168" aria-hidden="true"><use href="#m-dream"/></svg></div>
+        <div class="layer" id="layerWake"><svg class="ic" viewBox="0 0 32 32" width="168" height="168" aria-hidden="true"><use href="#m-wake"/></svg></div>
+      </div>
+      <div class="ctrl">
+        <div class="kv"><span>0 · 梦</span><span>--reality-mix</span><span>1 · 醒</span></div>
+        <input type="range" id="mix" min="0" max="100" value="100">
+        <div class="kv"><span id="mixv">1.00</span><span></span><span>&nbsp;</span></div>
+        <div class="hint">两态叠在同一处交叉淡入淡出：轮廓几乎不动，动的是材质与光，<em>底色也跟着换</em>——醒面归纸、梦面归夜。
+        真实标签页里做不到逐帧过渡，那是 JS 换 <code>&lt;link rel=&quot;icon&quot;&gt;</code>，在 <code>--reality-mix</code> 跨过 0.5 的那一下换一次，不跟着每帧走。</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="lab"><span>16px 放大镜 · 真栅格（非矢量缩放）</span><b>×8 nearest</b></div>
+    <p class="note">把每个形态真的画进一张 16×16 的画布，再原样放大 8 倍（不是把矢量放大）。左边两格是醒面、右边两格是梦面；每对里前者是默认花型、后者是专给 16px 的「硬花」——瓣短而阔、花心孔加大、去掉内层与中脊。下面还有一行 1:1 原始大小，请贴着看。</p>
+    <div class="mags" id="mags">
+      <div class="mag light" data-mag="wake" data-ground="#f0f3f6"><span class="one"><svg class="ic" viewBox="0 0 32 32" width="16" height="16" aria-hidden="true"><use href="#m-wake"/></svg></span><span class="cap">醒 · 默认 · 浅底</span></div>
+      <div class="mag light" data-mag="hard" data-ground="#f0f3f6"><span class="one"><svg class="ic" viewBox="0 0 32 32" width="16" height="16" aria-hidden="true"><use href="#m-hard"/></svg></span><span class="cap">醒 · 硬花 · 浅底</span></div>
+      <div class="mag dark" data-mag="dream" data-ground="#0c0f18"><span class="one"><svg class="ic" viewBox="0 0 32 32" width="16" height="16" aria-hidden="true"><use href="#m-dream"/></svg></span><span class="cap">梦 · 默认 · 靛夜底</span></div>
+      <div class="mag dark" data-mag="harddream" data-ground="#0c0f18"><span class="one"><svg class="ic" viewBox="0 0 32 32" width="16" height="16" aria-hidden="true"><use href="#m-harddream"/></svg></span><span class="cap">梦 · 硬花 · 靛夜底</span></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="lab"><span>尺寸带 · 32 / 24 / 16</span><b>左醒 右梦</b></div>
+    <div class="band"><div class="cell light"><div class="pair"><svg class="ic" viewBox="0 0 32 32" width="32" height="32" aria-hidden="true"><use href="#m-wake"/></svg><svg class="ic" viewBox="0 0 32 32" width="32" height="32" aria-hidden="true"><use href="#m-dream"/></svg></div><span class="tag">32</span></div><div class="cell light"><div class="pair"><svg class="ic" viewBox="0 0 32 32" width="24" height="24" aria-hidden="true"><use href="#m-wake"/></svg><svg class="ic" viewBox="0 0 32 32" width="24" height="24" aria-hidden="true"><use href="#m-dream"/></svg></div><span class="tag">24</span></div><div class="cell light"><div class="pair"><svg class="ic" viewBox="0 0 32 32" width="16" height="16" aria-hidden="true"><use href="#m-wake"/></svg><svg class="ic" viewBox="0 0 32 32" width="16" height="16" aria-hidden="true"><use href="#m-dream"/></svg></div><span class="tag">16</span></div></div>
+    <div class="band"><div class="cell dark"><div class="pair"><svg class="ic" viewBox="0 0 32 32" width="32" height="32" aria-hidden="true"><use href="#m-wake"/></svg><svg class="ic" viewBox="0 0 32 32" width="32" height="32" aria-hidden="true"><use href="#m-dream"/></svg></div><span class="tag">32</span></div><div class="cell dark"><div class="pair"><svg class="ic" viewBox="0 0 32 32" width="24" height="24" aria-hidden="true"><use href="#m-wake"/></svg><svg class="ic" viewBox="0 0 32 32" width="24" height="24" aria-hidden="true"><use href="#m-dream"/></svg></div><span class="tag">24</span></div><div class="cell dark"><div class="pair"><svg class="ic" viewBox="0 0 32 32" width="16" height="16" aria-hidden="true"><use href="#m-wake"/></svg><svg class="ic" viewBox="0 0 32 32" width="16" height="16" aria-hidden="true"><use href="#m-dream"/></svg></div><span class="tag">16</span></div></div>
+    <div class="lab" style="margin-top:26px"><span>尺寸带 · 带底衬（保证任意标签栏都活）</span><b>substrate</b></div>
+    <div class="band"><div class="cell light"><div class="pair"><span class="tile t-wake" style="padding:5px"><svg class="ic" viewBox="0 0 32 32" width="32" height="32" aria-hidden="true"><use href="#m-wake"/></svg></span><span class="tile t-dream" style="padding:5px"><svg class="ic" viewBox="0 0 32 32" width="32" height="32" aria-hidden="true"><use href="#m-dream"/></svg></span></div><span class="tag">32</span></div><div class="cell light"><div class="pair"><span class="tile t-wake" style="padding:4px"><svg class="ic" viewBox="0 0 32 32" width="24" height="24" aria-hidden="true"><use href="#m-wake"/></svg></span><span class="tile t-dream" style="padding:4px"><svg class="ic" viewBox="0 0 32 32" width="24" height="24" aria-hidden="true"><use href="#m-dream"/></svg></span></div><span class="tag">24</span></div><div class="cell light"><div class="pair"><span class="tile t-wake" style="padding:3px"><svg class="ic" viewBox="0 0 32 32" width="16" height="16" aria-hidden="true"><use href="#m-wake"/></svg></span><span class="tile t-dream" style="padding:3px"><svg class="ic" viewBox="0 0 32 32" width="16" height="16" aria-hidden="true"><use href="#m-dream"/></svg></span></div><span class="tag">16</span></div></div>
+    <div class="band"><div class="cell dark"><div class="pair"><span class="tile t-wake" style="padding:5px"><svg class="ic" viewBox="0 0 32 32" width="32" height="32" aria-hidden="true"><use href="#m-wake"/></svg></span><span class="tile t-dream" style="padding:5px"><svg class="ic" viewBox="0 0 32 32" width="32" height="32" aria-hidden="true"><use href="#m-dream"/></svg></span></div><span class="tag">32</span></div><div class="cell dark"><div class="pair"><span class="tile t-wake" style="padding:4px"><svg class="ic" viewBox="0 0 32 32" width="24" height="24" aria-hidden="true"><use href="#m-wake"/></svg></span><span class="tile t-dream" style="padding:4px"><svg class="ic" viewBox="0 0 32 32" width="24" height="24" aria-hidden="true"><use href="#m-dream"/></svg></span></div><span class="tag">24</span></div><div class="cell dark"><div class="pair"><span class="tile t-wake" style="padding:3px"><svg class="ic" viewBox="0 0 32 32" width="16" height="16" aria-hidden="true"><use href="#m-wake"/></svg></span><span class="tile t-dream" style="padding:3px"><svg class="ic" viewBox="0 0 32 32" width="16" height="16" aria-hidden="true"><use href="#m-dream"/></svg></span></div><span class="tag">16</span></div></div>
+    <div class="raw16">
+      <span style="font-family:var(--mono);font-size:10.5px;color:var(--faint);letter-spacing:.1em">原始大小 1:1 · 醒默认 / 醒硬 / 梦默认 / 梦硬</span>
+      <svg class="ic" viewBox="0 0 32 32" width="16" height="16" aria-hidden="true"><use href="#m-wake"/></svg><svg class="ic" viewBox="0 0 32 32" width="16" height="16" aria-hidden="true"><use href="#m-hard"/></svg><svg class="ic" viewBox="0 0 32 32" width="16" height="16" aria-hidden="true"><use href="#m-dream"/></svg><svg class="ic" viewBox="0 0 32 32" width="16" height="16" aria-hidden="true"><use href="#m-harddream"/></svg>
+    </div>
+  </section>
+
+  <section>
+    <div class="lab"><span>真实标签页</span><b>浅色栏 / 深色栏</b></div>
+    <div class="strip light"><div class="tab active"><span class="fav"><svg class="ic" viewBox="0 0 32 32" width="16" height="16" aria-hidden="true"><use href="#m-wake"/></svg></span><span class="ttl">Traveritas</span><span class="x">×</span></div><div class="tab"><span class="fav ph"></span><span class="ttl">断章 · ESSAYS</span><span class="x">×</span></div><div class="tab"><span class="fav ph"></span><span class="ttl">造物 · PROJECTS</span><span class="x">×</span></div></div>
+    <div class="winbody"></div>
+    <div class="strip dark" style="margin-top:22px"><div class="tab active"><span class="fav"><svg class="ic" viewBox="0 0 32 32" width="16" height="16" aria-hidden="true"><use href="#m-dream"/></svg></span><span class="ttl">AveritA</span><span class="x">×</span></div><div class="tab"><span class="fav ph"></span><span class="ttl">断章 · ESSAYS</span><span class="x">×</span></div><div class="tab"><span class="fav ph"></span><span class="ttl">造物 · PROJECTS</span><span class="x">×</span></div></div>
+    <div class="winbody"></div>
+    <p class="note" style="margin-top:18px">
+      浅色栏里是醒面（墨花）；深色栏里是梦面（发光的磨砂花）。两条都成立——这也是这枚标记的现实用法：
+      站点是夜站，标签栏里默认给梦面。
+    </p>
+  </section>
+
+  <section>
+    <div class="lab"><span>单色退让 · currentColor</span><b>只有一种墨色时</b></div>
+    <div class="monos">
+      <div class="mono m1"><svg class="ic" viewBox="0 0 32 32" width="88" height="88" aria-hidden="true"><use href="#m-mono"/></svg><span class="cap">纸底 · 墨</span></div>
+      <div class="mono m2"><svg class="ic" viewBox="0 0 32 32" width="88" height="88" aria-hidden="true"><use href="#m-mono"/></svg><span class="cap">夜底 · 冷白</span></div>
+      <div class="mono m3"><svg class="ic" viewBox="0 0 32 32" width="88" height="88" aria-hidden="true"><use href="#m-mono"/></svg><span class="cap">淡紫底 · 深紫</span></div>
+      <div class="mono m4"><svg class="ic" viewBox="0 0 32 32" width="88" height="88" aria-hidden="true"><use href="#m-mono"/></svg><span class="cap">靛底 · 薄暮</span></div>
+    </div>
+    <p class="note" style="margin-top:18px">
+      退让后仍成立：轮廓靠<em>瓣间留空</em>与<em>花心的孔</em>读出来，不靠颜色。内层三瓣用同一个墨色的 42% 不透明度，
+      所以单墨时它是「同一色的两层」，而不是第二种颜色。花心的孔在单墨下依然透底——这就是它不依赖底色的原因。
+    </p>
+  </section>
+
+  <section>
+    <div class="lab"><span>一格语境 · 放回主页</span><b>左下角小星的位置</b></div>
+    <div class="ctx">
+      <div class="dots"></div><div class="lamp"></div><div class="seam"></div>
+      <div class="name">Traveritas</div>
+      <div class="ent e1"><i></i>Ⅰ 断章 &nbsp;ESSAYS</div>
+      <div class="ent e2"><i></i>Ⅱ 闪念 &nbsp;MOMENTS</div>
+      <div class="ent e3"><i></i>Ⅲ 造物 &nbsp;PROJECTS</div>
+      <div class="star"><svg class="ic" viewBox="0 0 32 32" width="34" height="34" aria-hidden="true"><use href="#m-dream"/></svg></div>
+      <div class="clock">15:31 · 2026.10.22</div>
+      <div class="nexus">NEXUS</div>
+    </div>
+    <p class="note" style="margin-top:16px">
+      把梦面放到左下角原本那颗小星的位置：它和三个入口前面的淡紫光点、和名字的残影，是同一族的颜色与光。
+      花心那点光，就是主页左上角那唯一光源缩到最小的一粒。
+    </p>
+  </section>
+
+  <section>
+    <div class="lab"><span>几何注解 · 「抖」是怎么算出来的</span><b>三条采样正弦</b></div>
+    <div class="geo">
+      <div class="anno"><svg class="ic" viewBox="0 0 32 32" width="264" height="264" aria-hidden="true"><use href="#m-wake"/></svg></div>
+      <div>
+        <ul>
+          <li><b>角位移</b> <code>4.6·sin(1.9k+1.15) + 1.7·cos(3.3k)</code> —— 把等分的 72° 打散到 64.8°–75.8°</li>
+          <li><b>瓣长</b> <code>9.6·(1 + 0.14·sin(1.7k+0.8))</code> —— 8.43 到 10.90</li>
+          <li><b>左右偏斜</b> <code>0.13·sin(1.25k+2.3)</code> —— 每瓣的左右半宽不等，尖梢也偏</li>
+          <li><b>内层三瓣</b>落在五个外层瓣的空档中点上，间距天然不均（140.7° / 149.9° / 69.4°）</li>
+        </ul>
+        <table>
+          <thead><tr><th>瓣</th><th>角</th><th>间隔</th><th>长</th><th>宽</th><th>偏斜</th></tr></thead>
+          <tbody><tr><td>瓣 1</td><td>5.9°</td><td>73.65°</td><td>10.56</td><td>4.5</td><td>0.1</td></tr><tr><td>瓣 2</td><td>70.74°</td><td>64.84°</td><td>10.4</td><td>4.47</td><td>-0.05</td></tr><tr><td>瓣 3</td><td>141.14°</td><td>70.4°</td><td>8.43</td><td>4.16</td><td>-0.13</td></tr><tr><td>瓣 4</td><td>216.96°</td><td>75.81°</td><td>9.1</td><td>4.27</td><td>-0.03</td></tr><tr><td>瓣 5</td><td>292.24°</td><td>75.29°</td><td>10.9</td><td>4.55</td><td>0.11</td></tr></tbody>
+        </table>
+        <div class="warn">没有任何一个是手摆的坐标：改一个系数，整朵重排。这是它「像有规则」的来源，也是它读不出规则的原因。</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="lab"><span>交付与风险</span><b>notes.md</b></div>
+    <ul>
+      <li><b>favicon.svg</b>：单墨可退（<code>currentColor</code>），自带 <code>prefers-color-scheme: dark</code> —— 暗色浏览器主题下自动翻成冷白并在花心点亮，同一枚文件不用换。</li>
+      <li><b>最大的风险</b>：16px 下花极易糊成一颗星或一团棉花。解法写在 notes.md：五瓣（不是六瓣）、瓣根弦宽 &gt; 相邻根部弧距（花心天然实心）、花心打真孔、以及给 16px 另备一对「硬花」（醒硬 / 梦硬，站点默认的梦面也有自己的一版）。</li>
+      <li><b>不确定</b>：花心的孔在 16px 深底上只剩约 2.5px；硬花在 16px 更实，但会不会因此丢了「花的碎感」，请对着上面那排放大镜与 1:1 那行裁。</li>
+    </ul>
+  </section>
+
+  <footer>d-lily · 花 · 2026-10-22 · 截图 node design/mocks/favicon/.shot.cjs design/mocks/favicon/batch-02/d-lily/index.html design/mocks/favicon/batch-02/d-lily/shots/sheet.png 1200 1500</footer>
+</div>
+
+<script>
+(function () {
+  var mix = document.getElementById('mix');
+  var lw = document.getElementById('layerWake');
+  var ld = document.getElementById('layerDream');
+  var v = document.getElementById('mixv');
+  var gp = document.querySelector('.stack .g-paper');
+  var gn = document.querySelector('.stack .g-night');
+  function apply() {
+    var m = mix.value / 100;
+    lw.style.opacity = m;
+    ld.style.opacity = 1 - m;
+    /* 底也一起换：醒面是纸上的墨花、梦面是夜里的光，各回各的底才对得上。
+       这也正是站点 --reality-mix 的做法——换面时连底色一起插值。 */
+    gp.style.opacity = m;
+    gn.style.opacity = 1 - m;
+    v.textContent = m.toFixed(2);
+  }
+  mix.addEventListener('input', apply);
+  apply();
+
+  /* 真栅格放大镜：把形态画进 16x16 画布，再 nearest 放大 */
+  var defs = document.querySelector('#sprite defs').innerHTML;
+  var SCALE = 8, S = 16;
+  document.querySelectorAll('[data-mag]').forEach(function (host) {
+    var mode = host.getAttribute('data-mag');
+    var ground = host.getAttribute('data-ground') || '#ffffff';
+    var payload = '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" ' +
+      'viewBox="0 0 32 32" width="32" height="32"><defs>' + defs + '</defs>' +
+      '<use href="#m-' + mode + '" xlink:href="#m-' + mode + '"/></svg>';
+    var url = URL.createObjectURL(new Blob([payload], { type: 'image/svg+xml;charset=utf-8' }));
+    var img = new Image();
+    img.onload = function () {
+      var c = document.createElement('canvas');
+      c.width = S; c.height = S;
+      var g = c.getContext('2d');
+      g.drawImage(img, 0, 0, S, S);
+      var big = document.createElement('canvas');
+      big.width = S * SCALE; big.height = S * SCALE;
+      var b = big.getContext('2d');
+      b.imageSmoothingEnabled = false;
+      b.fillStyle = ground;
+      b.fillRect(0, 0, big.width, big.height);
+      b.drawImage(c, 0, 0, big.width, big.height);
+      host.insertBefore(big, host.firstChild);
+      URL.revokeObjectURL(url);
+    };
+    img.onerror = function () {
+      var w = document.createElement('div');
+      w.style.cssText = 'color:#a3452f;font:11px monospace';
+      w.textContent = '栅格化失败';
+      host.insertBefore(w, host.firstChild);
+    };
+    img.src = url;
+  });
+})();
+</script>
+</body>
+</html>
