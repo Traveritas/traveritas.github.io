@@ -7,4 +7,5 @@ links:
   - label: GitHub 仓库
     href: https://github.com/Traveritas/nexus
 draft: false
+ave: 别走丢了哦。
 ---

@@ -14,6 +14,7 @@ related:
     href: /articles/co-creation-notes/
   - label: 《字面与光景 · 全样式样张》
     href: /articles/style-specimen/
+ave: 睡觉时一定会做梦吗？做梦时一定在睡觉吗？祢喜欢做梦吗？
 ---
 
 :::wake

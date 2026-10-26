@@ -12,6 +12,7 @@ note:
   awake: 回来了，都回来了......
   dream: 喜欢搞些୨୧花里胡哨୨୧的东西
 draft: false
+ave: 同一个字，可以换好多种衣服哦。
 ---
 
 :::wake

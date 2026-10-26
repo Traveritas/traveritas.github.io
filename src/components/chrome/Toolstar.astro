@@ -3,12 +3,16 @@
    工具栏 · 星与同心轨道（全站常驻，左下角；原型与对照见 design/mocks/tool-star/）
    · 一颗三轴正交六芒星（±x ±y ±z 六支，正等轴视角下投影成六芒星）只是开关：
      醒面静止，梦面慢慢自转；开合时转 90°（立方对称，转完同形）。
-   · 点开：工具落在绕星的内圈轨道上——先是点了就切的两件（换面 / 环境声），隔一道空，
-     再是会往外展开的四件（去处 / 寻找 / 本页（只在阅读页）/ 设置），这四件外侧各带一道小刻，指向它要展开去的那一圈。
+   · 点开：工具落在绕星的内圈轨道上——先是点了就切的一件（换面），隔一道空，
+     再是会往外展开的几件（声音 / 去处 / 寻找 / 本页（只在阅读页）/ 设置），外侧各带一道小刻，指向它要展开去的那一圈。
      展开的在更外的轨道上放射排开，可滚轮 / 拖动转，去处与标签那两圈首尾相接；寻找另有一圈年月。
+   · 声音展开成三圈音量：由内到外 环境声 / Ave / 音效。每圈的图标在最下面（星正右方），
+     滑条从它沿圈往上走；最内一圈走满四分之一圈，外两圈与它等长（所以走不到头）。
+     点图标开关那一路，拖弧（或滚轮、方向键）调音量，拉到 0 就是关。
+   · 设置也是两层：第二圈是分类（界面 / 阅读 / Ave），点一类在第三圈摆出它的项。
    · 圆弧说不好的退回平直薄片，贴在轨道上方：寻找的输入框、本页的目录与字号 / 行距。
    · 接的都是现成的机制：面 → reality.ts 的 flipFrom（同一个塌缩圈，从图标起）；
-     声 → sound.ts 认 [data-sound-toggle]；光标 → cursor.ts 认 [data-cursor-toggle]；
+     声 → sound.ts 的 getLevel / setLevel / toggleLevel（toolstar.ts 直接调）；光标 → cursor.ts 认 [data-cursor-toggle]；Ave → ave.ts 认 [data-ave-toggle]；
      寻找 → 漫游空间（wander.js）的 xm:find / xm:found，别的页回车带 ?q= 去目录；
      字号 / 行距 → html[data-read-size / data-read-lead] 与 localStorage（预排版的那段脚本在 Gauge.astro）。
    · 轨道上的条目都写在这里的标记里（双面文案要在 morph 初始化时就在），位置由 toolstar.ts 逐帧写。
@@ -56,18 +60,30 @@ const ICON: Record<string, string> = {
   page: '<path d="M7 4V20 M7 7.5H16 M7 11.5H12.5 M7 15.5H17.5"/>',
   // 一枚圆被那条 14° 的发丝线劈开，一半薄薄地亮着；线与亮面是一组（.ts-cut），换面时绕圆心转半圈
   face: '<circle cx="12" cy="12" r="7"/><g class="ts-cut"><path class="ts-fill ts-fill--face" d="M13.69 5.21A7 7 0 0 1 10.31 18.79Z"/><path d="M14.3 2.8 9.7 21.2"/></g>',
-  sound: '<line x1="7" y1="6" x2="7" y2="18"/><line x1="12" y1="6" x2="12" y2="18"/><line x1="17" y1="6" x2="17" y2="18"/>',
+  // 声音：一点，三道等长的弧——就是它展开出来的那三圈的缩影
+  sound:
+    '<circle class="ts-dot" cx="4.5" cy="16" r="1.3"/><path d="M10 16A5.5 5.5 0 0 0 4.5 10.5 M14.5 16A10 10 0 0 0 10.99 8.4 M19 16A14.5 14.5 0 0 0 16.51 7.87"/>',
+  // 三路音量各自的图标：关着时都平卧下去
+  bgm: '<line x1="7" y1="6" x2="7" y2="18"/><line x1="12" y1="6" x2="12" y2="18"/><line x1="17" y1="6" x2="17" y2="18"/>',
+  voice: '<g class="ts-dia"><path class="ts-fill" d="M12 4.5 17.5 12 12 19.5 6.5 12Z"/><path d="M12 4.5 17.5 12 12 19.5 6.5 12Z"/></g>',
+  fx: '<circle class="ts-dot" cx="12" cy="12" r="1.6"/><path class="ts-rays" d="M12 4.5V8 M12 16V19.5 M4.5 12H8 M16 12H19.5"/>',
   set: '<path d="M4 7H20 M4 12H20 M4 17H20"/><circle class="ts-knob" cx="9" cy="7" r="1.9"/><circle class="ts-knob" cx="15.5" cy="12" r="1.9"/><circle class="ts-knob" cx="11" cy="17" r="1.9"/>',
 };
-/* 先是点了就切的两件，再是会展开的四件（toolstar.ts 在这两组之间留一道空） */
+/* 先是点了就切的一件，再是会展开的几件（toolstar.ts 在这两组之间留一道空） */
 const TOOLS: { id: string; wake: string; dream?: string; en: string; panel?: boolean }[] = [
   // 文案沿用原先首屏那枚指引（RealityGuide）：说的是按下去会去哪一面
   { id: 'face', wake: '重归夜色', dream: '唤醒世界', en: 'FACE' },
-  { id: 'sound', wake: '环境声', dream: '回响', en: 'SOUND' },
+  { id: 'sound', wake: '声音', dream: '回响', en: 'SOUND', panel: true },
   { id: 'go', wake: '去处', en: 'GO', panel: true },
   { id: 'find', wake: '寻找', en: 'FIND', panel: true },
   ...(reading ? [{ id: 'page', wake: '本页', en: 'PAGE', panel: true }] : []),
   { id: 'set', wake: '设置', en: 'PREFS', panel: true },
+];
+/* 三圈音量，由内到外（sound.ts 的 Channel） */
+const VOLS: { id: 'bgm' | 'voice' | 'fx'; wake: string; en: string }[] = [
+  { id: 'bgm', wake: '环境声', en: 'BGM' },
+  { id: 'voice', wake: 'Ave', en: 'VOICE' },
+  { id: 'fx', wake: '音效', en: 'FX' },
 ];
 ---
 
@@ -85,8 +101,6 @@ const TOOLS: { id: string; wake: string; dream?: string; en: string; panel?: boo
             data-nofx
             aria-label={t.id === 'face' ? '换面' : t.wake}
             aria-expanded={t.panel ? 'false' : undefined}
-            aria-pressed={t.id === 'sound' ? 'false' : undefined}
-            data-sound-toggle={t.id === 'sound' ? '' : undefined}
           >
             <svg class={`ts-ico ts-ico-${t.id}`} viewBox="0 0 24 24" aria-hidden="true" set:html={ICON[t.id]} />
             <span class="ts-lab">
@@ -139,15 +153,89 @@ const TOOLS: { id: string; wake: string; dream?: string; en: string; panel?: boo
       }
     </div>
 
+    <div class="ts-vols" role="group" aria-label="音量" hidden>
+      <svg class="ts-vol-arcs">
+        {
+          VOLS.map((v) => (
+            <g
+              class="ts-vol"
+              data-ch={v.id}
+              data-nofx
+              tabindex="0"
+              role="slider"
+              aria-label={`${v.wake} 音量`}
+              aria-valuemin="0"
+              aria-valuemax="100"
+              aria-valuenow="0"
+            >
+              <path class="ts-vol-track" />
+              <path class="ts-vol-fill" pathLength="1" />
+              <circle class="ts-vol-thumb" r="3.5" />
+              <path class="ts-vol-hit" />
+            </g>
+          ))
+        }
+      </svg>
+      {
+        VOLS.map((v) => (
+          <button class="ts-vch" type="button" data-ch={v.id} data-nofx aria-pressed="false" aria-label={v.wake}>
+            <svg class={`ts-ico ts-ico-${v.id}`} viewBox="0 0 24 24" aria-hidden="true" set:html={ICON[v.id]} />
+            <span class="ts-lab">
+              {v.wake}
+              <small>{v.en}</small>
+            </span>
+          </button>
+        ))
+      }
+    </div>
+
+    <!-- 设置：这一圈是分类，点一类，具体的项在再外一圈 -->
     <div class="ts-ring" data-ring="set" role="group" aria-label="设置" hidden>
+      <button class="ts-item ts-ray" type="button" data-set-cat="ui" data-nofx aria-pressed="false">界面</button>
+      <button class="ts-item ts-ray" type="button" data-set-cat="read" data-nofx aria-pressed="false">阅读</button>
+      <button class="ts-item ts-ray" type="button" data-set-cat="ave" data-nofx aria-pressed="false">Ave</button>
+    </div>
+
+    <div class="ts-ring" data-ring="set-ui" role="group" aria-label="界面" hidden>
       <button class="ts-item ts-ray ts-opt" type="button" data-cursor-toggle data-nofx aria-pressed="false">
         光标 · <b class="ts-v-off">自绘</b><b class="ts-v-on">系统</b>
       </button>
       <button class="ts-item ts-ray ts-opt" type="button" data-keep-face data-nofx aria-pressed="true">
         记住面 · <b class="ts-v-on">开</b><b class="ts-v-off">关</b>
       </button>
+    </div>
+
+    <div class="ts-ring" data-ring="set-read" role="group" aria-label="阅读" hidden>
       <button class="ts-item ts-ray ts-opt" type="button" data-multi data-nofx>
         多图 · <b data-multi-v>网格</b>
+      </button>
+    </div>
+
+    <!-- 各项的值与文案由 ave.ts 管（[data-ave-opt] / [data-ave-reset]）；这里写的是默认那档，免得脚本到之前空着 -->
+    <div class="ts-ring" data-ring="set-ave" role="group" aria-label="Ave" hidden>
+      <button class="ts-item ts-ray ts-opt" type="button" data-ave-toggle data-nofx aria-pressed="true">
+        说话 · <b class="ts-v-on">开</b><b class="ts-v-off">关</b>
+      </button>
+      <button class="ts-item ts-ray ts-opt ts-ave-dep" type="button" data-ave-opt="chat" data-nofx>
+        闲聊 · <b data-v>常</b>
+      </button>
+      <button class="ts-item ts-ray ts-opt ts-ave-dep" type="button" data-ave-opt="page" data-nofx>
+        文章里 · <b data-v>每次</b>
+      </button>
+      <button class="ts-item ts-ray ts-opt ts-ave-dep" type="button" data-ave-opt="reveal" data-nofx>
+        字幕 · <b data-v>逐字</b>
+      </button>
+      <button class="ts-item ts-ray ts-opt ts-ave-dep" type="button" data-ave-opt="hold" data-nofx>
+        停留 · <b data-v>常</b>
+      </button>
+      <button class="ts-item ts-ray ts-opt ts-ave-dep" type="button" data-ave-opt="anchor" data-nofx>
+        位置 · <b data-v>贴着说</b>
+      </button>
+      <button class="ts-item ts-ray ts-ave-dep" type="button" data-goto="sound" data-nofx>
+        音量 <small>→ 声音</small>
+      </button>
+      <button class="ts-item ts-ray ts-opt" type="button" data-ave-reset data-nofx>
+        再认识一次 <b data-v></b>
       </button>
     </div>
   </div>
@@ -429,21 +517,185 @@ const TOOLS: { id: string; wake: string; dream?: string; en: string; panel?: boo
       fill-opacity: 0.46;
     }
   }
-  /* 环境声：静音时三根弦平卧成点，响时起伏（与原先的微章同一个意思） */
-  .ts-ico-sound line {
+  .ts-ico .ts-dot {
+    fill: currentColor;
+    stroke: none;
+  }
+  /* 声音：有一路在响时，三道弧由内往外轮流亮一下 */
+  .ts-ico-sound path {
+    stroke-opacity: 0.9;
+  }
+  html[data-sound='on'] .ts-ico-sound path {
+    animation: ts-echo 2.4s ease-in-out infinite;
+  }
+  @keyframes ts-echo {
+    0%,
+    100% {
+      stroke-opacity: 0.9;
+    }
+    20% {
+      stroke-opacity: 0.35;
+    }
+  }
+
+  /* ── 三圈音量（显隐的转与淡由 toolstar.ts 逐帧写，与别的圈同一套） ── */
+  .ts-vols {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0;
+    transform-origin: var(--ts-cx, 46px) var(--ts-cy, 100vh);
+  }
+  .ts-vols[hidden] {
+    display: none;
+  }
+  .ts-vol-arcs {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+  .ts-vol {
+    outline: none;
+    cursor: pointer;
+    touch-action: none;
+  }
+  .ts-vol path {
+    fill: none;
+    stroke-linecap: round;
+  }
+  .ts-vol-track {
+    stroke: var(--fg);
+    stroke-opacity: 0.16;
+    stroke-width: 1.25;
+  }
+  .ts-vol-fill {
+    stroke: var(--amber);
+    stroke-width: 1.5;
+    stroke-dasharray: 0 1;
+  }
+  .ts-vol-thumb {
+    fill: var(--amber);
+    stroke: none;
+    transition: r 0.2s;
+  }
+  /* 关着：滑块缩成起点上的一个空心点 */
+  .ts-vol[aria-valuenow='0'] .ts-vol-thumb {
+    fill: var(--bg);
+    stroke: var(--fg-faint);
+    stroke-width: 1.25;
+    r: 2.5;
+  }
+  .ts-vol:hover .ts-vol-track,
+  .ts-vol.is-drag .ts-vol-track {
+    stroke-opacity: 0.3;
+  }
+  .ts-vol:hover .ts-vol-thumb,
+  .ts-vol.is-drag .ts-vol-thumb {
+    r: 5;
+  }
+  .ts-vol:focus-visible .ts-vol-track {
+    stroke: var(--amber);
+    stroke-opacity: 0.6;
+  }
+  .ts-vol-hit {
+    stroke: transparent;
+    stroke-width: 30;
+    pointer-events: stroke;
+  }
+  /* 记着音量、还没等到浏览器的播放许可：亮着但淡一档 */
+  .ts-vol.is-waiting .ts-vol-fill,
+  .ts-vol.is-waiting .ts-vol-thumb {
+    opacity: 0.5;
+  }
+
+  .ts-vch {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 36px;
+    height: 36px;
+    margin: -18px 0 0 -18px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    display: grid;
+    place-items: center;
+    color: var(--fg-faint);
+    cursor: pointer;
+    pointer-events: auto;
+    transition: color 0.2s, background-color 0.2s;
+  }
+  .ts-vch[aria-pressed='true'] {
+    color: var(--fg-soft);
+  }
+  .ts-vch.is-live {
+    color: var(--fg);
+  }
+  .ts-vch:hover {
+    background: color-mix(in srgb, var(--fg) 6%, transparent);
+  }
+  .ts-vch:focus-visible {
+    outline: 1.5px solid var(--amber);
+    outline-offset: 2px;
+  }
+  /* 名字落在图标正下方（右边是外一圈的图标） */
+  .ts-vch .ts-lab {
+    --ts-a: -90;
+  }
+  .ts-vch:hover .ts-lab,
+  .ts-vch:focus-visible .ts-lab,
+  .ts-vch.is-drag .ts-lab {
+    opacity: 1;
+  }
+
+  /* 环境声：关着三根弦平卧成点，响时起伏（与原先的微章同一个意思） */
+  .ts-ico-bgm line {
     transform-box: fill-box;
     transform-origin: center;
     transform: scaleY(0.12);
     transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   }
-  html[data-sound='on'] .ts-ico-sound line {
+  .ts-vch[aria-pressed='true'] .ts-ico-bgm line {
+    transform: scaleY(0.6);
+  }
+  .ts-vch.is-live .ts-ico-bgm line {
     animation: ts-str 1.7s ease-in-out infinite alternate;
   }
-  html[data-sound='on'] .ts-ico-sound line:nth-child(2) {
+  .ts-vch.is-live .ts-ico-bgm line:nth-child(2) {
     animation-duration: 1.3s;
   }
-  html[data-sound='on'] .ts-ico-sound line:nth-child(3) {
+  .ts-vch.is-live .ts-ico-bgm line:nth-child(3) {
     animation-duration: 2.3s;
+  }
+  /* Ave：关着菱形压成一道横线，响时亮面慢慢呼吸 */
+  .ts-ico-voice .ts-dia {
+    transform-box: fill-box;
+    transform-origin: center;
+    transform: scaleY(0.08);
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .ts-vch[aria-pressed='true'] .ts-ico-voice .ts-dia {
+    transform: none;
+  }
+  .ts-vch.is-live .ts-ico-voice .ts-fill {
+    animation: ts-breathe 2.6s ease-in-out infinite alternate;
+  }
+  /* 音效：关着四道光收进中心那一点 */
+  .ts-ico-fx .ts-rays {
+    transform-box: view-box;
+    transform-origin: 12px 12px;
+    transform: scale(0.35);
+    opacity: 0.4;
+    transition:
+      transform 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+      opacity 0.4s;
+  }
+  .ts-vch[aria-pressed='true'] .ts-ico-fx .ts-rays {
+    transform: none;
+    opacity: 1;
   }
   @keyframes ts-str {
     from {
@@ -518,11 +770,13 @@ const TOOLS: { id: string; wake: string; dream?: string; en: string; panel?: boo
     color: var(--fg);
   }
   .ts-ray[aria-current='page'],
-  .ts-ray[data-word][aria-pressed='true'] {
+  .ts-ray[data-word][aria-pressed='true'],
+  .ts-ray[data-set-cat][aria-pressed='true'] {
     color: var(--amber);
   }
   .ts-ray[aria-current='page']::before,
-  .ts-ray[data-word][aria-pressed='true']::before {
+  .ts-ray[data-word][aria-pressed='true']::before,
+  .ts-ray[data-set-cat][aria-pressed='true']::before {
     opacity: 1;
     width: 5px;
     height: 5px;
@@ -541,6 +795,11 @@ const TOOLS: { id: string; wake: string; dream?: string; en: string; panel?: boo
   .ts-opt[aria-pressed='true'] .ts-v-off,
   .ts-opt[aria-pressed='false'] .ts-v-on {
     display: none;
+  }
+  /* Ave 不说话时，依附于说话的那几项变淡（仍可调）。透明度归帧循环管，这里只改颜色 */
+  html[data-ave='off'] .ts-ave-dep,
+  html[data-ave='off'] .ts-ave-dep b {
+    color: var(--fg-faint);
   }
 
   /* ── 平直薄片 ── */
@@ -660,7 +919,9 @@ const TOOLS: { id: string; wake: string; dream?: string; en: string; panel?: boo
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .ts-ico-sound line,
+    .ts-ico-bgm line,
+    .ts-ico-sound path,
+    .ts-ico-voice .ts-fill,
     .ts-ico-face .ts-fill--face {
       animation: none !important;
     }

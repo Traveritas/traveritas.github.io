@@ -9,4 +9,5 @@ links:
   - label: 在线页面
     href: https://traveritas.github.io/kimi-code-theme-editor/
 draft: false
+ave: 咳咳，落了好多灰尘......
 ---

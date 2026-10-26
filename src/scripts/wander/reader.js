@@ -11,6 +11,8 @@
      · 瞬间：没有单独的页，正文在构建期就写进了数据（html）。
    地址：打开时把地址栏换成这一篇自己的地址（瞬间是 /moments/#<id>），可以分享、可以后退；
    后退 = 收起。翻页换地址但不多压历史。
+   事件：打开 / 翻到另一条时发 xm:read（detail.href = 这一条的地址），收起时发 xm:read（href: null）——
+   Ave 据此说这一篇自带的那句（src/scripts/ave.ts）。
    ───────────────────────────────────────────────────────────── */
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const dot = (d) => d.slice(0, 10).replace(/-/g, '.');
@@ -23,6 +25,7 @@ const LABEL = { essay: ['随笔', 'ESSAY', '断章'], project: ['项目', 'PROJE
 
 /* ── 正文取材：同一个地址只取一次 ── */
 const cache = new Map();
+const announce = (href) => dispatchEvent(new CustomEvent('xm:read', { detail: { href } }));
 export function prefetch(it) {
   if (it.kind !== 'article' && it.kind !== 'project') return null;
   const href = it.ref.href;
@@ -210,6 +213,7 @@ export function createReader({ onOpen, onNav, onClosing, onClosed, onBody }) {
     face.style.aspectRatio = `${it.w} / ${it.h}`;
     document.documentElement.classList.add('w-reading');
     setURL(it, !opts.fromURL);
+    announce(it.ref.href);
     onOpen && onOpen(it, el);
     fill(it);
 
@@ -258,6 +262,7 @@ export function createReader({ onOpen, onNav, onClosing, onClosed, onBody }) {
       cur.face.style.aspectRatio = `${next.w} / ${next.h}`;
       scroll.scrollTop = 0;
       setURL(next, false);
+      announce(next.ref.href);
       onNav && onNav(prev, next, el);
       fill(next);
       resizeTo();
@@ -284,6 +289,7 @@ export function createReader({ onOpen, onNav, onClosing, onClosed, onBody }) {
     const target = (opts.getRect && opts.getRect(it)) || null;
     const pr = { left: win.offsetLeft, top: win.offsetTop, width: win.offsetWidth, height: win.offsetHeight };
     document.title = baseTitle;
+    announce(null);
     onClosing && onClosing(it);
     [win, face, tb, col].forEach((x) => x.getAnimations().forEach((a) => a.cancel()));
     anim(col, [{ opacity: 1 }, { opacity: 0 }], { duration: 160, easing: 'ease-in' });

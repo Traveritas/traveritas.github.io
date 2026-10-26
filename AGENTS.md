@@ -44,6 +44,7 @@
   - `src/scripts/reality.ts` & `src/scripts/morph.ts`：负责“入梦检验”与双声轨文字转换；
   - `src/components/chrome/Gauge.astro` & `src/scripts/gauge.ts`：阅读页左侧的页内导览轨（滚动进度与节点）；
   - `src/components/chrome/Toolstar.astro` & `src/scripts/toolstar.ts`：全站左下角的工具栏——一颗三轴六芒星开关，点开是绕星的同心轨道（去处 / 寻找 / 本页 / 换面 / 环境声 / 设置），阅读页的目录与字号、行距在「本页」里；
+  - `src/components/chrome/Ave.astro` & `src/scripts/ave.ts`：右下角偶尔冒出的 Ave 旁白（台词表 `src/data/ave-lines.ts`）；
   - `src/styles/tokens.css` & `global.css`：全站设计令牌与全局样式。
 - **修改验证**：任何代码修改后，务必在根目录运行 `npm run build`，确保 100% 静态编译通过。
 
@@ -57,6 +58,8 @@
   👉 必读 `docs/writing.md`（包含双态行内 `[[醒|梦]]`、块级 `:::wake / :::dream`、行内光景 `((浮起))` / `{{流过}}` 参数表、导航与版块映射、维特根斯坦命题徽标体系等）。
 - **样式开发 / 组件设计 / 视觉验收**：
   👉 必读 `docs/design/styleguide.md` 与 `docs/design/content-typography.md`（包含样式预览页 `/styleguide/` 规范、设计令牌、以及自动化截图验证脚本 `node design/.shot-styleguide.cjs`）。
+- **Ave（右下角旁白）/ 台词 / 她的声音**：
+  👉 必读 `docs/design/ave.md`（台词表与出现条件、`npm run ave` 预渲染、节奏参数、声源许可）。Ave 的台词按作者本人的判断写，不套上面的文风红线，也不要替作者改词。
 - **环境声 / 两态 BGM / 换音频**：
   👉 必读 `docs/design/bgm.md`（等响流水线 `design/audio/normalize-bgm.mjs`、两态交叉换面机制、换音频后的重跑与验收步骤）。
 - **深层审美判定 / 视觉母题与哲学背景**：

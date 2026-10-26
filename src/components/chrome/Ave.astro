@@ -1,0 +1,485 @@
+---
+/* ─────────────────────────────────────────────────────────────
+   Ave：偶尔冒出来的一句旁白。
+   · 台词、出现条件在 src/data/ave-lines.ts；调度、字幕揭开、出声、定位在 src/scripts/ave.ts。
+     随笔 / 项目 / 瞬间可以在 frontmatter 里写 ave: 自带一句（见 src/lib/ave-page.ts）：这里构建时收齐、
+     内联进每一页，漫游里点开那一篇、或进了它自己那一整页（entry），她就说那一句。
+   · 位置：平时在右下角；台词带 at（或事件点名时带元素）就贴到那个元素旁边，
+     从元素字尾牵一根发丝线接到框边上。
+   · 外观：一块细边磨砂薄片。上沿的折点落在框里本来就有的竖线上——头像栏那段平，
+     过了竖刻线起坡，坡顶在字栏上方，到右侧晶柱的缝落下；左下切一个小斜角。
+     名牌是伸出框沿的薄暮紫深片，带楔口；晶柱上端是关闭，下端一颗四芒星。
+     字底下一条线跟着念出来的字长，最后两个字底下是薄暮紫的线头，念完在句尾碎成三截。
+   · 没有 JS 就不出现（它不承载正文内容）；工具栏「设置」里可以关掉。
+   ───────────────────────────────────────────────────────────── */
+import { getCollection } from 'astro:content';
+import { avePageLine, type AvePageLine } from '../../lib/ave-page';
+
+interface Props {
+  /** 本页是哪一篇条目（<集合>/<条目 id>，随笔 / 项目自己那一整页）。
+      条目页只说它自带的那一句，没写就不说，不拿版块的进页句子顶替 */
+  entry?: string;
+}
+const { entry } = Astro.props;
+
+/* 所有条目自带的那一句，键 = <集合>/<条目 id> */
+const pages: Record<string, AvePageLine> = {};
+for (const col of ['articles', 'projects', 'moments'] as const) {
+  for (const e of await getCollection(col, (x) => !x.data.draft)) {
+    const line = avePageLine(col, e.id, e.data.ave);
+    if (line) pages[`${col}/${e.id}`] = line;
+  }
+}
+// 内联 JSON：把 < 转义，免得台词里的 </script> 提前收掉标签
+const pagesJson = JSON.stringify(pages).replace(/</g, '\\u003c');
+---
+
+<aside id="ave" class="ave" aria-label="Ave" data-entry={entry} hidden>
+  {/* 贴元素时的牵线：元素那头一颗空心菱形，另一头接到框边上 */}
+  <i class="ave-lead" aria-hidden="true"><b class="ave-nail"></b></i>
+  <div class="ave-card">
+    <div class="ave-portrait" aria-hidden="true">
+      {/* 头像还没定稿时的占位：一小块像素流光，用她自己的配色（src/scripts/ave-flow.ts）。
+          ave.ts 的 USE_FACES 打开后，表情图盖在它上面 */}
+      <canvas class="ave-flow" width="10" height="10"></canvas>
+      <img class="ave-face" alt="" width="50" height="50" decoding="async" />
+    </div>
+    <div class="ave-body">
+      <p class="ave-name mono" aria-hidden="true"><span class="ave-who">Ave</span><i class="ave-mark"></i></p>
+      {/* 逐字的 span 由 ave.ts 生成：.c 是字，.on 是念到了，.head 是线头，末尾 .ave-tail 是碎屑 */}
+      <p class="ave-text" aria-hidden="true"></p>
+      {/* 读屏只念整句一次，不跟着逐字揭开反复播报 */}
+      <p class="ave-sr" role="status"></p>
+    </div>
+    <button class="ave-x" type="button" aria-label="收起">
+      <svg viewBox="0 0 10 10" width="10" height="10" aria-hidden="true">
+        <path d="M2 2l6 6M8 2L2 8" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"></path>
+      </svg>
+    </button>
+  </div>
+  <script type="application/json" class="ave-pages" set:html={pagesJson} />
+</aside>
+
+<style is:global>
+  .ave {
+    /* 材质：平时与工具栏薄片同一种玻璃；主页 / 漫游时跟场景（--w-*，见 wander.css），
+       深色场景就是深色玻璃 + 浅字 */
+    --ave-fg: var(--w-fg, var(--fg));
+    --ave-bg: var(--w-bg, var(--bg));
+    --ave-faint: var(--w-faint, var(--fg-faint));
+    --ave-panel: color-mix(in srgb, var(--bg) 74%, transparent);
+    --ave-rim: rgb(255 255 255 / 0.7);
+    --ave-sheen: rgb(255 255 255 / 0.6);
+    --ave-sh: rgb(38 44 51 / 0.22);
+    /* 线的墨色：比正文淡，像铅笔量出来的 */
+    --ave-ink: color-mix(in srgb, var(--ave-fg) 46%, transparent);
+    --ave-line: 1px;
+    /* 线在字身底下多远（inline 的 padding-bottom，不占排版） */
+    --ave-drop: 3px;
+    /* 晶面上的淡色：浅色页压暗、深色场景提亮 */
+    --ave-facet: color-mix(in srgb, var(--ave-fg) 5%, transparent);
+    --ave-facet-2: color-mix(in srgb, var(--ave-fg) 9%, transparent);
+    /* 名牌：薄暮紫深片，两种底色上都是深底浅字 */
+    --ave-chip: var(--umber);
+    --ave-chip-ink: #ece8f2;
+    --ave-star: polygon(50% 0, 61% 39%, 100% 50%, 61% 61%, 50% 100%, 39% 61%, 0 50%, 39% 39%);
+    /* 头像边长（框的折点也按它算，所以放在根上；与背景同一个 5px 像素格，取 5 的倍数） */
+    --ave-size: 50px;
+    /* 收起要多久（ave.ts 读它）：先让线退，再淡出 */
+    --ave-out: 900;
+    position: fixed;
+    right: 22px;
+    /* 让开页脚那一行链接 */
+    bottom: 58px;
+    z-index: 59; /* 工具栏（60/61）展开时压在它上面 */
+    /* 头像一栏占掉一截宽度，字栏要留够一行十几个字 */
+    max-width: min(24rem, calc(100vw - 112px));
+    pointer-events: none;
+  }
+  html[data-tone='dark'][data-hour] .ave {
+    --ave-rim: rgb(var(--frost) / calc(var(--frost-edge-a) * 0.82));
+    --ave-sheen: rgb(255 255 255 / var(--frost-hi-a));
+    --ave-sh: rgb(var(--frost-sh) / calc(var(--frost-sh-a) * 1.67));
+  }
+  html[data-wscene] .ave {
+    --ave-panel: rgb(var(--w-glass) / calc(var(--w-glass-a) + 0.2));
+    --ave-rim: rgb(var(--w-edge) / calc(var(--w-edge-a) + 0.08));
+    --ave-sheen: rgb(var(--w-sheen) / var(--w-sheen-a));
+  }
+  /* 贴元素：left/top（必要时还有 max-width）由 ave.ts 写 */
+  .ave.is-anchored {
+    right: auto;
+    bottom: auto;
+    max-width: min(24rem, calc(100vw - 32px));
+  }
+  .ave[hidden] {
+    display: none;
+  }
+
+  /* ── 框 ── */
+  .ave-card {
+    --col: 22px; /* 右侧晶柱宽 */
+    --pc: calc(var(--ave-size) + 1.4rem); /* 头像栏宽 = 竖刻线的位置 */
+    --pk: calc(var(--pc) + (100% - var(--pc) - var(--col)) * 0.58); /* 坡顶 */
+    --sc: calc(100% - var(--col)); /* 晶柱的缝 */
+    --ch: 7px; /* 左下斜角 */
+    position: relative;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: stretch;
+    padding: 9px var(--col) 0 0;
+    color: var(--ave-fg);
+    isolation: isolate; /* 底下两层伪元素（z-index 负值）留在卡片里 */
+    opacity: 0;
+    translate: 0 4px;
+    transition:
+      opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1),
+      translate 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .ave.is-on .ave-card {
+    opacity: 1;
+    translate: 0 0;
+    pointer-events: auto;
+  }
+  .ave.is-leaving .ave-card {
+    transition-delay: 0.32s;
+  }
+  /* 轮廓不是矩形：底和边交给两个伪元素（同一组折点，一个画边环、一个画填充），
+     这样名牌可以伸出轮廓之外 */
+  .ave-card::before,
+  .ave-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+  /* 边环：外轮廓 + 内轮廓（往里 1px），evenodd 只留中间那一圈 */
+  .ave-card::before {
+    z-index: -1;
+    background: var(--ave-rim);
+    clip-path: polygon(
+      evenodd,
+      0 9px,
+      var(--pc) 9px,
+      var(--pk) 1px,
+      var(--sc) 6px,
+      100% 6px,
+      100% 100%,
+      var(--ch) 100%,
+      0 calc(100% - var(--ch)),
+      0 9px,
+      1px 10px,
+      1px calc(100% - var(--ch) - 0.4px),
+      calc(var(--ch) + 0.4px) calc(100% - 1px),
+      calc(100% - 1px) calc(100% - 1px),
+      calc(100% - 1px) 7px,
+      var(--sc) 7px,
+      var(--pk) 2px,
+      var(--pc) 10px,
+      1px 10px
+    );
+  }
+  .ave-card::after {
+    z-index: -2;
+    background:
+      /* 晶柱：比台面深半档，缝是一道细边 */
+      linear-gradient(to left, var(--ave-facet-2) var(--col), var(--ave-rim) var(--col) calc(var(--col) + 1px), transparent calc(var(--col) + 1px)),
+      /* 斜切面：从坡顶往右下落的两道光 */
+      linear-gradient(
+        112deg,
+        transparent 0 62%,
+        var(--ave-facet) 62% 75%,
+        transparent 75% 78%,
+        var(--ave-facet-2) 78% 80%,
+        transparent 80%
+      ),
+      var(--ave-panel);
+    -webkit-backdrop-filter: blur(16px) saturate(1.06);
+    backdrop-filter: blur(16px) saturate(1.06);
+    clip-path: polygon(0 9px, var(--pc) 9px, var(--pk) 1px, var(--sc) 6px, 100% 6px, 100% 100%, var(--ch) 100%, 0 calc(100% - var(--ch)));
+  }
+
+  /* ── 头像栏 ── */
+  .ave-portrait {
+    position: relative;
+    align-self: start;
+    width: var(--ave-size);
+    height: var(--ave-size);
+    margin: 0.7rem;
+    overflow: hidden;
+    /* 底色只在流光的缝里露出来：她自己的紫 / 蓝各自压暗一档，浅色页上也不会与卡片连成一片 */
+    background: linear-gradient(
+      165deg,
+      color-mix(in srgb, var(--dream) 42%, var(--bg)) 0%,
+      color-mix(in srgb, var(--umber) 52%, var(--bg)) 100%
+    );
+    box-shadow: 0 0 0 1px var(--ave-rim);
+    isolation: isolate;
+  }
+  .ave-face {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .ave-face:not([src]) {
+    display: none;
+  }
+  /* 占位：背景流光的一小块，5px 一格 */
+  .ave-flow {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+  }
+
+  /* ── 字栏 ── */
+  .ave-body {
+    min-width: 0;
+    padding: 0.8rem 1rem 0.7rem 0.85rem;
+    border-left: 1px solid var(--ave-rim);
+  }
+  /* 名牌：伸出框沿的深片，左下一枚向下的小楔口扎进框里，里面一颗空心菱饰 */
+  .ave-name {
+    position: absolute;
+    left: 0.7rem;
+    top: -6px;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: 0.55em;
+    height: 18px;
+    margin: 0;
+    padding: 0 0.85em 0 0.9em;
+    background: var(--ave-chip);
+    color: var(--ave-chip-ink);
+    font-size: 10px;
+    letter-spacing: 0.16em;
+  }
+  .ave-name::after {
+    content: '';
+    position: absolute;
+    left: 0.9em;
+    top: 100%;
+    width: 8px;
+    height: 5px;
+    background: var(--ave-chip);
+    clip-path: polygon(0 0, 100% 0, 50% 100%);
+  }
+  .ave-mark {
+    width: 6px;
+    height: 6px;
+    border: 1px solid color-mix(in srgb, var(--amber) 80%, #fff);
+    rotate: 45deg;
+  }
+  .ave-text {
+    margin: 0;
+    font: 500 15px/2 var(--font-display);
+    overflow-wrap: anywhere;
+  }
+  /* 字：还没念到的先占着位置（框不跟着字一点点长），只是看不见。
+     每个字底下自己的一小段线，念到了才长出来；相邻的字连成一条 */
+  .ave-text .c {
+    position: relative;
+    padding-bottom: var(--ave-drop);
+    background: linear-gradient(var(--ave-ink), var(--ave-ink)) 0 100% / 0 var(--ave-line) no-repeat;
+    transition:
+      background-size 0.22s cubic-bezier(0.3, 0.7, 0.2, 1),
+      color 0.3s;
+  }
+  .ave-text .c:not(.on) {
+    color: transparent;
+  }
+  .ave-text .c.on {
+    background-size: 100% var(--ave-line);
+  }
+  /* 线头：最后念到的两个字底下换成薄暮紫，加一点厚度——念完就停在句尾当句读 */
+  .ave-text .c.head {
+    background-image: linear-gradient(var(--amber), var(--amber));
+    background-size: 100% 2px;
+  }
+  /* 收起：线从句首往句尾一字一字退掉，再整片淡出 */
+  .ave.is-leaving .ave-text .c {
+    background-size: 0 var(--ave-line);
+    background-position: 100% 100%;
+    transition-delay: calc(var(--i) * 14ms);
+  }
+  /* 句尾的三截碎屑：线说完了在这里碎掉（和最后一个字包在 .ave-end 里，不单独折行） */
+  .ave-end {
+    white-space: nowrap;
+  }
+  .ave-tail {
+    display: inline-flex;
+    align-items: flex-end;
+    gap: 3px;
+    height: 1em;
+    margin-left: 5px;
+    vertical-align: calc(-1 * var(--ave-drop) - 0.18em);
+  }
+  .ave-tail i {
+    width: var(--ave-line);
+    background: var(--ave-ink);
+    opacity: 0;
+    translate: 0 -4px;
+    transition:
+      opacity 0.35s,
+      translate 0.5s cubic-bezier(0.3, 0.7, 0.2, 1);
+  }
+  .ave-tail i:nth-child(1) {
+    height: 7px;
+  }
+  .ave-tail i:nth-child(2) {
+    height: 4px;
+    transition-delay: 0.12s;
+  }
+  .ave-tail i:nth-child(3) {
+    height: 2px;
+    transition-delay: 0.24s;
+  }
+  .ave.is-done .ave-tail i {
+    opacity: 1;
+    translate: 0 0;
+  }
+  .ave.is-leaving .ave-tail i {
+    opacity: 0;
+    translate: 0 4px;
+    transition-delay: 0s;
+  }
+  .ave-sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* ── 晶柱：上端关闭（平时就淡淡地在），下端一颗四芒星 ── */
+  .ave-body::after {
+    content: '';
+    position: absolute;
+    right: calc(var(--col) / 2 - 5px);
+    bottom: 10px;
+    width: 10px;
+    height: 10px;
+    background: var(--amber);
+    clip-path: var(--ave-star);
+  }
+  .ave-x {
+    position: absolute;
+    top: 12px;
+    right: calc(var(--col) / 2 - 10px);
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    color: var(--ave-faint);
+    cursor: pointer;
+    opacity: 0.55;
+    transition:
+      opacity 0.25s,
+      color 0.25s;
+  }
+  .ave-card:hover .ave-x,
+  .ave-x:focus-visible {
+    opacity: 1;
+  }
+  .ave-x:hover {
+    color: var(--ave-fg);
+  }
+
+  /* ── 贴元素时的牵线：一根发丝，元素那头钉一颗空心菱形 ── */
+  .ave-lead {
+    display: none;
+  }
+  .ave.is-anchored .ave-lead {
+    display: block;
+    position: fixed;
+    left: 0;
+    top: 0;
+    height: var(--ave-line);
+    background: var(--ave-ink);
+    transform-origin: 0 50%;
+    opacity: 0;
+    scale: 0 1;
+    transition:
+      opacity 0.3s,
+      scale 0.45s cubic-bezier(0.3, 0.7, 0.2, 1);
+  }
+  .ave.is-anchored.is-on .ave-lead {
+    opacity: 1;
+    scale: 1 1;
+  }
+  .ave.is-anchored.is-leaving .ave-lead {
+    opacity: 0;
+    transition-delay: 0.2s;
+  }
+  .ave-nail {
+    position: absolute;
+    left: 0;
+    top: 50%;
+    width: 7px;
+    height: 7px;
+    border: 1px solid var(--ave-ink);
+    background: var(--ave-bg);
+    /* 以线的中心为准居中（全站 border-box，按半格偏移会差 1px） */
+    transform: translate(-50%, -50%) rotate(45deg);
+  }
+
+  /* 连说中途换位置时的快收（ave.ts 的 QUICK_OUT = 250ms）：不演线退场，整片 0.2s 淡掉 */
+  .ave.is-quick .ave-card {
+    transition:
+      opacity 0.2s ease,
+      translate 0.2s ease;
+    transition-delay: 0s;
+  }
+  .ave.is-quick .ave-text .c,
+  .ave.is-quick .ave-tail i {
+    transition: none;
+  }
+  .ave.is-quick.is-anchored .ave-lead {
+    transition: opacity 0.2s;
+    transition-delay: 0s;
+  }
+
+  @media (max-width: 560px) {
+    .ave {
+      --ave-size: 40px;
+      right: 12px;
+      /* 让开底部那条阅读工具条 */
+      bottom: 64px;
+      /* 左边让出工具栏的星（left 22 + 48） */
+      max-width: calc(100vw - 94px);
+    }
+    .ave-portrait {
+      margin: 0.55rem;
+    }
+    .ave-body {
+      padding: 0.7rem 0.8rem 0.6rem 0.7rem;
+    }
+    .ave-text {
+      font-size: 14px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ave-card {
+      translate: none;
+      transition: opacity 0.3s;
+    }
+    .ave-text .c,
+    .ave-tail i,
+    .ave-lead {
+      transition: none;
+    }
+  }
+</style>

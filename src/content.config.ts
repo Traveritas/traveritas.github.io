@@ -1,5 +1,6 @@
 import { defineCollection, z } from 'astro:content';
 import { glob } from 'astro/loaders';
+import { aveField } from './lib/ave-page';
 
 /* 标签进 URL（/tags/<标签>/）：不许斜杠与空白 */
 const tag = z.string().regex(/^[^/\s]+$/, '标签里不能有斜杠或空白');
@@ -17,6 +18,8 @@ const articles = defineCollection({
     draft: z.boolean().default(false),
     // 跨页互链（文末「关联篇章」）：站内路径或外链
     related: z.array(z.object({ label: z.string(), href })).default([]),
+    // 进页时 Ave 说的一句（可省；写法见 src/lib/ave-page.ts）
+    ave: aveField,
   }),
 });
 
@@ -32,6 +35,8 @@ const projects = defineCollection({
     related: z.array(z.object({ label: z.string(), href })).default([]),
     // 深眠注记（素夜：项目页尾的琥珀左边注，醒/梦双声轨）
     note: z.object({ awake: z.string(), dream: z.string() }).optional(),
+    // 进页时 Ave 说的一句（可省；写法见 src/lib/ave-page.ts）
+    ave: aveField,
   }),
 });
 
@@ -48,6 +53,8 @@ const moments = defineCollection({
         .array(z.union([image(), z.object({ src: image(), alt: z.string().default('') })]))
         .max(9)
         .default([]),
+      // 漫游里点开这则瞬间时 Ave 说的一句（可省；写法见 src/lib/ave-page.ts）
+      ave: aveField,
     }),
 });
 

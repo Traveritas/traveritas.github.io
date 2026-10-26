@@ -7,4 +7,5 @@ links:
   - label: GitHub 仓库
     href: https://github.com/Traveritas/MemePanel
 draft: false
+ave: 是装表情包的抽屉！要拉开看看吗？
 ---

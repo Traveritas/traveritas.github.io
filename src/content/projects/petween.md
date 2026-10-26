@@ -13,4 +13,5 @@ links:
   - label: petween-physics（插件前身）
     href: https://github.com/Traveritas/petween-physics
 draft: false
+ave: 这里住着会动的小家伙。祢也想养一只吗？
 ---
