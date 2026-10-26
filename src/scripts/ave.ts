@@ -20,7 +20,7 @@
 import { AVE_LINES, type AveLine } from '../data/ave-lines';
 import { AVE_VOICE, type AveVoiceClip } from '../data/ave-voice';
 import { getReality } from './reality';
-import { playVoice } from './sound';
+import { playVoice, preloadVoice } from './sound';
 import { reducedMotion } from './lib';
 import { createAveFlow } from './ave-flow';
 import type { AvePageLine } from '../lib/ave-page';
@@ -52,8 +52,9 @@ const PAGE_ONCE: AveLine['once'] = 'always';
 const THEN_PAUSE = 2000;
 /** 进页台词默认在开屏面纱打开后几秒说（s；台词可用 after 改） */
 const ENTER_AFTER = 3;
-/** 位置要变时，收起之后再隔多久出现（ms；收起动画约 --ave-out） */
-const THEN_GAP = 100;
+/** 位置要变时：快速收起多久（ms，与样式里 .is-quick 的过渡对齐）、收起之后再隔多久出现 */
+const QUICK_OUT = 250;
+const THEN_GAP = 60;
 /** 鼠标移开后再停多久（ms） */
 const HOLD_AFTER_HOVER = 2400;
 /** 贴元素时：句子离元素多远（牵线的最短长度，px）、离视口边至少多远 */
@@ -265,13 +266,16 @@ function show(line: AveLine, idle = false, at?: Element | null) {
   remember(line, idle);
 
   const { text, clip } = clipOf(line);
+  // 连说：这句一开口就把下一句的声音取好、解好，接上时不用等
+  const nextClip = line.then ? clipOf(lines.find((l) => l.id === line.then) ?? line).clip : null;
+  if (nextClip) preloadVoice(nextClip.src);
   if (USE_FACES) face.src = `/ave/face/${line.face ?? 'smile'}.webp`;
   sr.textContent = `Ave：${text}`;
   revealDone = false;
   build(text);
   paint(clip && !reducedMotion() ? 0 : chars.length);
 
-  root.classList.remove('is-leaving', 'is-done');
+  root.classList.remove('is-leaving', 'is-done', 'is-quick');
   root.hidden = false;
   balance();
   anchor = resolveAnchor(at ?? line.at);
@@ -328,9 +332,9 @@ function finishReveal(len: number) {
     const same = (next.at ?? '') === (current!.at ?? '');
     const left = Math.max(0, speakEnd - performance.now());
     clearTimeout(holdT);
-    // 要挪位置时，收起（--ave-out）+ 再出现前的间隔也算在 THEN_PAUSE 里
-    const out = Number(getComputedStyle(root).getPropertyValue('--ave-out')) || 520;
-    holdT = window.setTimeout(() => (same ? swapTo(next) : hide(true)), left + (same ? THEN_PAUSE : Math.max(0, THEN_PAUSE - out - THEN_GAP)));
+    // 要挪位置：框照样留到接近 THEN_PAUSE，再快速收起（QUICK_OUT）、隔 THEN_GAP 在新位置出现——
+    // 两种接法的节奏一致：都是声音说完约 THEN_PAUSE 后下一句开口
+    holdT = window.setTimeout(() => (same ? swapTo(next) : hide(true, true)), left + (same ? THEN_PAUSE : Math.max(0, THEN_PAUSE - QUICK_OUT - THEN_GAP)));
     return;
   }
   if (!hovering) hold(Math.min(HOLD_MAX, HOLD_BASE + len * HOLD_PER_CHAR));
@@ -353,8 +357,9 @@ function hold(ms: number) {
   holdT = window.setTimeout(() => hide(true), ms);
 }
 
-/** natural = 停留时间到了自然收起（只有这样才接 then；点 ×、关掉、被别的打断都不接） */
-function hide(natural = false) {
+/** natural = 停留时间到了自然收起（只有这样才接 then；点 ×、关掉、被别的打断都不接）；
+    quick = 连说中途换位置：快速收起，不演线一字一字退的那段 */
+function hide(natural = false, quick = false) {
   if (!current) return;
   const then = natural && !reading && current.then ? lines.find((l) => l.id === current!.then) : undefined;
   if (then && fresh(then)) pending = { line: then, gap: THEN_GAP };
@@ -368,13 +373,14 @@ function hide(natural = false) {
   placeRaf = 0;
   removeEventListener('scroll', onMove);
   removeEventListener('resize', onMove);
+  root.classList.toggle('is-quick', quick);
   root.classList.add('is-leaving');
   root.classList.remove('is-on');
-  // 收起多久由皮肤定（D 系列先让线退掉再淡出）
-  const out = Number(getComputedStyle(root).getPropertyValue('--ave-out')) || 520;
+  // 收起多久：平时先让线退掉再淡出（--ave-out），换位置时快收
+  const out = quick ? QUICK_OUT : Number(getComputedStyle(root).getPropertyValue('--ave-out')) || 520;
   hideT = window.setTimeout(() => {
     root.hidden = true;
-    root.classList.remove('is-leaving', 'is-done', 'is-anchored');
+    root.classList.remove('is-leaving', 'is-done', 'is-anchored', 'is-quick');
     root.style.maxWidth = '';
     anchor = null;
     flow?.stop();

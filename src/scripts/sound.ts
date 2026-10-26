@@ -222,18 +222,26 @@ export function voiceReady(): boolean {
 }
 
 /** 放一句人声。返回开口的 ctx 时间离现在多少毫秒（字幕据此对齐）；不能出声返回 null */
-export async function playVoice(src: string): Promise<{ delayMs: number; stop: () => void } | null> {
-  if (!voiceReady() || !ctx) return null;
+function loadVoice(c: AudioContext, src: string) {
   let p = voiceBufs.get(src);
   if (!p) {
-    const c = ctx;
     p = fetch(src)
       .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject()))
       .then((b) => c.decodeAudioData(b))
       .catch(() => null);
     voiceBufs.set(src, p);
   }
-  const b = await p;
+  return p;
+}
+
+/** 先把一句人声取好、解好（连说时预取下一句，接上时不用再等网络和解码）；不能出声就什么都不做 */
+export function preloadVoice(src: string): void {
+  if (voiceReady() && ctx) void loadVoice(ctx, src);
+}
+
+export async function playVoice(src: string): Promise<{ delayMs: number; stop: () => void } | null> {
+  if (!voiceReady() || !ctx) return null;
+  const b = await loadVoice(ctx, src);
   if (!b || !voiceReady() || !ctx) return null;
   stopVoice();
   const s = ctx.createBufferSource();
