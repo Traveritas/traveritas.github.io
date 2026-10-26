@@ -9,7 +9,7 @@
    · 克制：随机句之间至少隔 IDLE_GAP、每次来访最多 SESSION_CAP 句；点名类（enter/end/event）
      只要求离上一句 CUE_GAP。间隔与计数存 sessionStorage，换页也算数。
      说过没有按台词的 once 记（session / ever / always）。
-   · 出声：环境声开着才出声（sound.ts 的 playVoice），字幕跟着音节揭开；
+   · 出声：Ave 的音量不为 0 才出声（sound.ts 的 playVoice，工具栏「声音」里单独一圈），字幕跟着音节揭开；
      没开声音也按同一节奏揭开，只是安静。没有预渲染的句子整句直接出现。
    · 停留：揭开完再停 HOLD（按字数），鼠标停在上面不收；点 × 收起。
    · 位置：平时在右下角；台词带 at（或事件 detail.at 传了元素）就贴到那个元素旁边——
@@ -44,9 +44,7 @@ const HOLD_PER_CHAR = 130;
 const HOLD_MAX = 9000;
 /** 漫游里点开一篇后，窗长大完再过多久说它自带的那句（s，条目可用 after 改） */
 const READ_AFTER = 3;
-/** 每一篇自带的那句说几次：always = 每次点开 / 进页都说（2026-10-26 作者定）；
-    以后要做成设置项，就把它换成读设置（session = 每次来访一次，ever = 这台设备上一次） */
-const PAGE_ONCE: AveLine['once'] = 'always';
+/* 每一篇自带的那句说几次、闲聊多少、字幕怎么出、停多久、贴不贴元素：都是访客的设置（PREFS，见下） */
 /** 一段连着说的几句：上一句的声音说完后多久开始下一句（ms）。
     位置不变就原地换字；位置要变（贴到别处 / 回到角落）就收起再出现，收起的动画也算在这段里 */
 const THEN_PAUSE = 2000;
@@ -68,6 +66,72 @@ const OFF_KEY = 'xm-ave'; // localStorage：'off' = 关掉
 const EVER_KEY = 'xm-ave-ever'; // localStorage：once: 'ever' 说过的 id
 const VISITED_KEY = 'xm-ave-visited'; // localStorage：来过（欢迎说出口时写上）
 const SESSION_KEY = 'xm-ave'; // sessionStorage：本次来访的记录
+const PREFS_KEY = 'xm-ave-prefs'; // localStorage：访客的设置（只存改过的项）
+
+/* ── 访客设置（工具栏「设置 → Ave」：[data-ave-opt] 点一下换到下一档，ave.ts 管值与文案） ──
+   点一下按 opts 的顺序换到下一档（转到头回到第一档）。闲聊的「常」就是原先的固定参数；
+   文章里默认每次都说（2026-10-26 作者定） */
+const PREFS = {
+  chat: {
+    def: 'mid',
+    opts: [
+      ['off', '不闲聊'],
+      ['low', '少'],
+      ['mid', '常'],
+      ['high', '多'],
+    ],
+  },
+  page: {
+    def: 'always',
+    opts: [
+      ['off', '不说'],
+      ['ever', '第一次'],
+      ['always', '每次'],
+    ],
+  },
+  reveal: {
+    def: 'step',
+    opts: [
+      ['step', '逐字'],
+      ['whole', '整句'],
+    ],
+  },
+  hold: {
+    def: 'mid',
+    opts: [
+      ['short', '短'],
+      ['mid', '常'],
+      ['long', '长'],
+    ],
+  },
+  anchor: {
+    def: 'on',
+    opts: [
+      ['on', '贴着说'],
+      ['off', '右下角'],
+    ],
+  },
+} as const;
+type PrefKey = keyof typeof PREFS;
+type PrefVal<K extends PrefKey> = (typeof PREFS)[K]['opts'][number][0];
+function pref<K extends PrefKey>(k: K): PrefVal<K> {
+  const v = store.get<Record<string, string>>(localStorage, PREFS_KEY, {})[k];
+  return (PREFS[k].opts.some(([x]) => x === v) ? v : PREFS[k].def) as PrefVal<K>;
+}
+function setPref(k: PrefKey, v: string) {
+  const all = store.get<Record<string, string>>(localStorage, PREFS_KEY, {});
+  if (v === PREFS[k].def) delete all[k];
+  else all[k] = v;
+  store.set(localStorage, PREFS_KEY, all);
+}
+/** 闲聊各档：掷中的概率、两句之间至少隔多久（ms）、每次来访最多几句。不闲聊 = 随机池（含按时段、静置）整个不掷 */
+const CHAT = {
+  low: { chance: 0.2, gap: 240_000, cap: 3 },
+  mid: { chance: IDLE_CHANCE, gap: IDLE_GAP, cap: SESSION_CAP },
+  high: { chance: 0.5, gap: 60_000, cap: 10 },
+} as const;
+/** 停留各档：揭开完再停的时长乘这个数 */
+const HOLD_K = { short: 0.6, mid: 1, long: 1.6 } as const;
 
 interface Session {
   seen: string[];
@@ -273,7 +337,9 @@ function show(line: AveLine, idle = false, at?: Element | null) {
   sr.textContent = `Ave：${text}`;
   revealDone = false;
   build(text);
-  paint(clip && !reducedMotion() ? 0 : chars.length);
+  // 访客选了整句出现、或不要动效：不逐字揭开（有声音照样放）
+  const whole = reducedMotion() || pref('reveal') === 'whole';
+  paint(clip && !whole ? 0 : chars.length);
 
   root.classList.remove('is-leaving', 'is-done', 'is-quick');
   root.hidden = false;
@@ -287,8 +353,8 @@ function show(line: AveLine, idle = false, at?: Element | null) {
   if (anchor) follow();
   if (!USE_FACES) flow?.start();
 
-  if (!clip || reducedMotion()) {
-    // 没有节奏可跟（或不要动效）：整句直接出现；有声音照样放
+  if (!clip || whole) {
+    // 没有节奏可跟（或不逐字）：整句直接出现；有声音照样放
     speakEnd = performance.now() + (clip ? clip.dur * 1000 + 60 : 0);
     if (clip) void playVoice(clip.src).then((v) => token === showToken && v && (stopVoice = v.stop));
     finishReveal(chars.length);
@@ -337,7 +403,7 @@ function finishReveal(len: number) {
     holdT = window.setTimeout(() => (same ? swapTo(next) : hide(true, true)), left + (same ? THEN_PAUSE : Math.max(0, THEN_PAUSE - QUICK_OUT - THEN_GAP)));
     return;
   }
-  if (!hovering) hold(Math.min(HOLD_MAX, HOLD_BASE + len * HOLD_PER_CHAR));
+  if (!hovering) hold(Math.min(HOLD_MAX, HOLD_BASE + len * HOLD_PER_CHAR) * HOLD_K[pref('hold')]);
 }
 
 /** 连说时位置不变：框不收起，原地换成下一句 */
@@ -396,7 +462,7 @@ function inView(r: DOMRect) {
 }
 
 function resolveAnchor(at?: Element | string | null) {
-  if (!at) return null;
+  if (!at || pref('anchor') === 'off') return null; // 访客选了总在右下角
   const el = typeof at === 'string' ? document.querySelector(at) : at;
   return el && inView(el.getBoundingClientRect()) ? el : null;
 }
@@ -497,9 +563,12 @@ function cue(line: AveLine, at?: Element | null) {
 function idleTick() {
   if (isOff() || reading || current || pending || document.hidden) return;
   if (Date.now() - pageStart < FIRST_QUIET) return;
+  const chat = pref('chat');
+  if (chat === 'off') return;
+  const c = CHAT[chat];
   const s = session();
-  if (s.n >= SESSION_CAP || Date.now() - s.last < IDLE_GAP) return;
-  if (Math.random() > IDLE_CHANCE) return;
+  if (s.n >= c.cap || Date.now() - s.last < c.gap) return;
+  if (Math.random() > c.chance) return;
   const ok = (l: AveLine) => fresh(l) && pathHits('path' in l.when ? l.when.path : undefined);
   const clock = AVE_LINES.filter((l) => l.when.on === 'clock' && ok(l) && inClock(l.when.from, l.when.to));
   // 静置时优先抽 still 类；still 类也只在静置时出现
@@ -531,6 +600,14 @@ function watchEnd(lines: AveLine[]) {
 
 function initToggle() {
   const btns = document.querySelectorAll<HTMLButtonElement>('[data-ave-toggle]');
+  // html[data-ave="off"]：设置里依附于「说话」的那几项跟着变淡
+  const mark = () => {
+    if (isOff()) document.documentElement.dataset.ave = 'off';
+    else delete document.documentElement.dataset.ave;
+  };
+  mark();
+  for (const b of btns) b.addEventListener('click', () => setTimeout(mark));
+  initPrefs();
   for (const b of btns) {
     b.setAttribute('aria-pressed', String(!isOff()));
     b.addEventListener('click', () => {
@@ -546,6 +623,43 @@ function initToggle() {
         pending = null;
         hide();
       }
+    });
+  }
+}
+
+/** 设置里的各项：[data-ave-opt="<项>"] 点一下换到下一档，<b data-v> 写当前那档的字；
+    [data-ave-reset] 再认识一次——忘掉说过的话和「来过」，下次进主页重新欢迎 */
+function initPrefs() {
+  for (const b of document.querySelectorAll<HTMLButtonElement>('[data-ave-opt]')) {
+    const k = b.dataset.aveOpt as PrefKey;
+    if (!(k in PREFS)) continue;
+    const v = b.querySelector<HTMLElement>('[data-v]');
+    const opts = PREFS[k].opts as readonly (readonly [string, string])[];
+    const paint = () => {
+      const cur = pref(k);
+      if (v) v.textContent = opts.find(([x]) => x === cur)?.[1] ?? '';
+    };
+    paint();
+    b.addEventListener('click', () => {
+      const i = opts.findIndex(([x]) => x === pref(k));
+      setPref(k, opts[(i + 1) % opts.length][0]);
+      paint();
+    });
+  }
+  for (const b of document.querySelectorAll<HTMLButtonElement>('[data-ave-reset]')) {
+    const v = b.querySelector<HTMLElement>('[data-v]');
+    let t = 0;
+    b.addEventListener('click', () => {
+      try {
+        sessionStorage.removeItem(SESSION_KEY);
+        localStorage.removeItem(EVER_KEY);
+        localStorage.removeItem(VISITED_KEY);
+      } catch {
+        /* 清不掉就算了 */
+      }
+      if (v) v.textContent = '好';
+      clearTimeout(t);
+      t = window.setTimeout(() => v && (v.textContent = ''), 1800);
     });
   }
 }
@@ -566,8 +680,12 @@ function keyOfHref(href: string) {
   return m ? `${m[1]}/${decodeURIComponent(m[2])}` : '';
 }
 
-function pageToLine(p: AvePageLine, after: number): AveLine {
-  return { id: p.id, text: p.text, dream: p.dream, face: p.face, mood: p.mood, at: p.at, once: PAGE_ONCE, when: { on: 'enter', path: here(), after: p.after ?? after } };
+/** 条目自带的那句；访客选了「文章里不说」就没有。「第一次」= 这台设备上只说一次 */
+function pageToLine(p: AvePageLine, after: number): AveLine | null {
+  const mode = pref('page');
+  if (mode === 'off') return null;
+  const once = mode === 'ever' ? 'ever' : 'always';
+  return { id: p.id, text: p.text, dream: p.dream, face: p.face, mood: p.mood, at: p.at, once, when: { on: 'enter', path: here(), after: p.after ?? after } };
 }
 
 /** 漫游里点开的那一篇（reader.js 发 xm:read）：窗长大之后几秒说它自带的那句；

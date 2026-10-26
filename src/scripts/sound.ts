@@ -17,6 +17,11 @@
      一整个 loop），音乐不回头、不重播刚听过的那一段。
    · 自动播放：首屏绝不出声（浏览器也拦）；用户点开过之后，站内换页尝试续播，
      被策略拦下就如实退回待开启态——不假装在播。
+   · 音量分三路，各自独立：环境声（bgm）、Ave 的人声（voice）、音效（fx，还没有音效，先只记着值）。
+     每路 0–1，0 就是关；音量跨来访记在 localStorage。界面是工具栏「声音 / 回响」展开的三圈弧
+     （toolstar.ts），它通过 getLevel / setLevel / toggleLevel / onLevels 和这里说话。
+     记着的音量在新一次来访里也不会抢在首屏出声：浏览器不给播放许可时，等访客在页面上
+     第一次点按或敲键再接上（armUnlock）。
    · 未开启时一个字节都不取；开启后先要当前形态的 open，另一态 loop 随后
      （闲时）预取，换面要交叉时不会晚。
    ───────────────────────────────────────────────────────────── */
@@ -56,6 +61,16 @@ const HEAD_ROOM = 0.94;
 /** 阅读页（长文与关于）整体的退后量（dB）。页面用 BaseLayout 的 bgm="reading" 声明意图，
      具体数字只在这里一处，改它两态同时挪、等响关系不变 */
 const READING_TRIM_DB = -5;
+/** 音量 → 增益：平方曲线（拉到一半约 −12 dB），比线性更接近耳朵 */
+const curve = (v: number) => v * v;
+/** 点图标从 0 打开、又没有上一次的值可回时，落到这里 */
+const LEVEL_DEFAULT: Record<Channel, number> = { bgm: 0.8, voice: 1, fx: 0.8 };
+/** 拖音量时增益的跟手时间常数（秒） */
+const LEVEL_TAU = 0.06;
+const MIX_KEY = 'xm-mix';
+
+export type Channel = 'bgm' | 'voice' | 'fx';
+const CHANNELS: Channel[] = ['bgm', 'voice', 'fx'];
 
 interface Stored {
   on: boolean;
@@ -96,6 +111,11 @@ let duckDepth = 0;
 let hidden = false;
 let pollTimer: ReturnType<typeof setInterval> | 0 = 0;
 let els: HTMLButtonElement[] = [];
+/** 三路音量与各自「关之前」的值（点图标再打开时回到它） */
+const levels: Record<Channel, number> = { bgm: 0, voice: 0, fx: 0 };
+const lastLevels: Partial<Record<Channel, number>> = {};
+const levelSubs = new Set<() => void>();
+let voiceGain: GainNode | null = null;
 let storedDurs: Partial<Record<Seg, number>> = {};
 /** 本页的页面级电平（阅读页退后一档），进场时由 body[data-bgm] 定下 */
 let pageGain = 1;
@@ -197,6 +217,10 @@ function buildGraph() {
   scene.gain.value = sceneHub.level;
   master.connect(scene);
   scene.connect(ctx.destination);
+  // 人声单走一路：不吃阅读页退后量与页内演出压声，只吃自己那条音量
+  voiceGain = ctx.createGain();
+  voiceGain.gain.value = curve(levels.voice);
+  voiceGain.connect(ctx.destination);
 }
 
 /* ── 页内演出的压声（关于页退场：世界退去，声音一起退到无） ──────────
@@ -210,15 +234,15 @@ sceneHub.apply = () => {
 };
 
 /* ── Ave 的人声 ─────────────────────────────────────
-   借环境声同一个 AudioContext 出声：只有环境声开着（用户点过、ctx 在跑）才出声，
-   否则 Ave 只出字——不为她单独去要播放许可。她说话时环境声照常（2026-10-26 作者定：不用让开），
+   与环境声共用一个 AudioContext，音量单独一路（与环境声互不相干）：那路不为 0、ctx 在跑才出声，
+   否则 Ave 只出字。她说话时环境声照常（2026-10-26 作者定：不用让开），
    人声本身不吃阅读页退后量与页内演出压声（成片电平见 design/ave-voice/render.mjs）。 */
 const voiceBufs = new Map<string, Promise<AudioBuffer | null>>();
 let voiceSrc: AudioBufferSourceNode | null = null;
 
-/** 环境声此刻能不能让 Ave 出声 */
+/** 此刻能不能让 Ave 出声 */
 export function voiceReady(): boolean {
-  return on && !!ctx && ctx.state === 'running';
+  return levels.voice > 0 && !!ctx && ctx.state === 'running';
 }
 
 /** 放一句人声。返回开口的 ctx 时间离现在多少毫秒（字幕据此对齐）；不能出声返回 null */
@@ -246,7 +270,7 @@ export async function playVoice(src: string): Promise<{ delayMs: number; stop: (
   stopVoice();
   const s = ctx.createBufferSource();
   s.buffer = b;
-  s.connect(ctx.destination);
+  s.connect(voiceGain ?? ctx.destination);
   const at = now() + 0.04;
   s.start(at);
   s.onended = () => {
@@ -408,7 +432,7 @@ async function startPlayback() {
   mixWanted = mixApplied = form === 'wake' ? 1 : 0;
   const t = now();
   master?.gain.cancelScheduledValues(t);
-  master?.gain.setTargetAtTime(pageGain, t, FADE_IN / 3);
+  master?.gain.setTargetAtTime(pageGain * curve(levels.bgm), t, FADE_IN / 3);
   bedGain?.gain.cancelScheduledValues(t);
   bedGain?.gain.setTargetAtTime(1, t, 0.2);
   applyMix(mixApplied, 0.4);
@@ -432,22 +456,14 @@ function haltPlayback() {
       if (on) return;
       for (const f of FORMS) stopLoop(f);
       bedAtCtx = null;
-      ctx?.suspend().catch(() => {});
+      suspendIfIdle();
     },
     FADE_OUT * 2000 + 250,
   );
 }
 
-async function turnOn() {
-  on = true;
-  // 关了太久（> OFF_RESET_MS）再打开：旧的弧线弃掉，从零点重来（开场重演）；
-  // 关一下就回来则接着原相位续上，不打断
-  if (offAt !== null && Date.now() - offAt > OFF_RESET_MS) {
-    epoch = Date.now();
-    bedAtCtx = null;
-  }
-  offAt = null;
-  persist();
+/** 建好图、把 ctx 跑起来；被自动播放策略拦下返回 false */
+async function ensureCtx(): Promise<boolean> {
   if (!ctx) {
     // 不锁采样率：iOS 的实际输出率随路由漂移（蓝牙 44.1k、语音会话残留等），
     // 锁 48k 就得走 WebKit 的实时重采样——那是出名的失真路径（WebKit Bug 154538，
@@ -463,12 +479,32 @@ async function turnOn() {
       /* 按 state 判定 */
     }
   }
-  if (ctx.state !== 'running') {
-    on = false; // 被自动播放策略拦下：如实退回待开启态（epoch 留着，点开即续上）
+  return ctx.state === 'running';
+}
+
+/** 环境声停了、人声也拉到 0：ctx 挂起，不空转 */
+function suspendIfIdle() {
+  if (!on && levels.voice === 0) ctx?.suspend().catch(() => {});
+}
+
+async function turnOn() {
+  on = true;
+  // 关了太久（> OFF_RESET_MS）再打开：旧的弧线弃掉，从零点重来（开场重演）；
+  // 关一下就回来则接着原相位续上，不打断
+  if (offAt !== null && Date.now() - offAt > OFF_RESET_MS) {
+    epoch = Date.now();
+    bedAtCtx = null;
+  }
+  offAt = null;
+  persist();
+  if (!(await ensureCtx())) {
+    on = false; // 被自动播放策略拦下：音量照旧记着，等访客第一次点按或敲键再接上
+    armUnlock();
     persist();
     paint();
     return;
   }
+  if (!on || levels.bgm === 0) return; // 等许可的工夫里又被拉回 0
   paint();
   if (epoch === null) epoch = Date.now();
   await startPlayback();
@@ -480,6 +516,105 @@ function turnOff() {
   persist();
   paint();
   haltPlayback();
+}
+
+/* ── 三路音量 ─────────────────────────────────────── */
+/** 浏览器没给播放许可：等页面上第一次点按 / 敲键（这些才算用户激活）再把记着的音量接上 */
+let unlockArmed = false;
+function armUnlock() {
+  if (unlockArmed) return;
+  unlockArmed = true;
+  const evs = ['pointerup', 'keydown', 'touchend'] as const;
+  const go = () => {
+    for (const e of evs) removeEventListener(e, go, true);
+    unlockArmed = false;
+    if (levels.bgm > 0 && !on) void turnOn();
+    if (levels.voice > 0) void ensureCtx().then(paint);
+  };
+  for (const e of evs) addEventListener(e, go, true);
+}
+
+export function getLevel(ch: Channel): number {
+  return levels[ch];
+}
+/** 这一路此刻是不是真的在响（音量 > 0，且浏览器给了播放许可） */
+export function isLive(ch: Channel): boolean {
+  const running = !!ctx && ctx.state === 'running';
+  if (ch === 'bgm') return on && running;
+  return levels[ch] > 0 && running;
+}
+/** 音量或在不在响变了就叫一声；返回取消订阅 */
+export function onLevels(cb: () => void): () => void {
+  levelSubs.add(cb);
+  return () => levelSubs.delete(cb);
+}
+/** 拖到 0 时记下拖之前的值：点图标再打开回到它 */
+export function rememberLevel(ch: Channel, v: number): void {
+  if (v > 0) {
+    lastLevels[ch] = v;
+    saveLevels();
+  }
+}
+
+export function setLevel(ch: Channel, value: number): void {
+  const v = value < 0.01 ? 0 : Math.min(1, value);
+  const prev = levels[ch];
+  if (v === prev) return;
+  levels[ch] = v;
+  if (v > 0) lastLevels[ch] = v;
+  saveLevels();
+  if (ch === 'bgm') {
+    if (v > 0 && !on) void turnOn();
+    else if (v === 0 && on) turnOff();
+    else if (on && master) master.gain.setTargetAtTime(pageGain * curve(v), now(), LEVEL_TAU);
+  } else if (ch === 'voice') {
+    if (v > 0) {
+      void ensureCtx().then((ok) => {
+        if (!ok) return armUnlock();
+        voiceGain?.gain.setTargetAtTime(curve(levels.voice), now(), LEVEL_TAU);
+        paint();
+        // 人声从没有到有：叫 Ave 一声（台词 voice-hello）
+        if (prev === 0 && levels.voice > 0) dispatchEvent(new CustomEvent('xm:ave', { detail: { name: 'voice-on' } }));
+      });
+    } else {
+      stopVoice();
+      if (voiceGain) voiceGain.gain.setTargetAtTime(0, now(), LEVEL_TAU);
+      suspendIfIdle();
+    }
+  }
+  // fx：还没有音效，值先记着；以后的音效从这里取 getLevel('fx')
+  paint();
+}
+
+/** 点图标：响着就关（记下当前值），关着就回到上一次的值 */
+export function toggleLevel(ch: Channel): void {
+  if (levels[ch] > 0) {
+    lastLevels[ch] = levels[ch];
+    setLevel(ch, 0);
+  } else setLevel(ch, lastLevels[ch] || LEVEL_DEFAULT[ch]);
+}
+
+function saveLevels() {
+  try {
+    localStorage.setItem(MIX_KEY, JSON.stringify({ ...levels, last: lastLevels }));
+  } catch {
+    /* 存不下就只管这一次 */
+  }
+}
+function loadLevels() {
+  try {
+    const rec = JSON.parse(localStorage.getItem(MIX_KEY) ?? 'null') as
+      | (Partial<Record<Channel, number>> & { last?: Partial<Record<Channel, number>> })
+      | null;
+    if (!rec) return;
+    const ok = (x: unknown): x is number => typeof x === 'number' && x >= 0 && x <= 1;
+    for (const c of CHANNELS) {
+      if (ok(rec[c])) levels[c] = rec[c];
+      if (ok(rec.last?.[c])) lastLevels[c] = rec.last[c];
+    }
+  } catch {
+    /* 读不到就都从 0 起 */
+  }
 }
 
 /** 闲时把另一态的 loop 取回来（换面要交叉，到时才取就晚了）。页面常驻动画会把
@@ -550,27 +685,23 @@ function persist() {
   }
 }
 function paint() {
-  if (on) document.documentElement.dataset.sound = 'on';
+  // html[data-sound="on"]：此刻有一路真的在响（工具栏图标、样张的弦据此起伏）
+  if (CHANNELS.some(isLive)) document.documentElement.dataset.sound = 'on';
   else delete document.documentElement.dataset.sound;
   for (const b of els) b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  for (const cb of levelSubs) cb();
 }
 
 /* ── 初始化 ───────────────────────────────────────── */
 export function initSound(): void {
   // 可能不止一颗（样式预览页把它当样张又摆了一份）：都接上，状态由 html[data-sound] 统一驱动
+  // 旧的单颗开关（只剩样式预览页的样张）：开关环境声那一路
   els = [...document.querySelectorAll<HTMLButtonElement>('[data-sound-toggle]')];
-  if (!els.length) return;
   hidden = document.hidden;
   pageGain = document.body.dataset.bgm === 'reading' ? 10 ** (READING_TRIM_DB / 20) : 1;
+  loadLevels();
 
-  for (const b of els) {
-    b.addEventListener('click', () => {
-      if (on) turnOff();
-      // 用户亲手打开、真的开成了：Ave 这时才有声音，叫她一声（台词 voice-hello）。
-      // 以后有了单独的 Ave 音量设置，从 0 调上去时也发同一个事件
-      else void turnOn().then(() => on && dispatchEvent(new CustomEvent('xm:ave', { detail: { name: 'voice-on' } })));
-    });
-  }
+  for (const b of els) b.addEventListener('click', () => toggleLevel('bgm'));
   document.addEventListener('visibilitychange', () => {
     hidden = document.hidden;
     if (ctx && on) applyMix(mixApplied, HIDDEN_TAU);
@@ -582,6 +713,7 @@ export function initSound(): void {
     (window as unknown as { __sound?: unknown }).__sound = {
       state: () => ({
         on,
+        levels: { ...levels },
         ctx: ctx?.state ?? null,
         arc: +arcNow().toFixed(2),
         mix: +mixApplied.toFixed(3),
@@ -621,9 +753,8 @@ export function initSound(): void {
     };
   }
 
-  // 站内换页续播：点开过才尝试；浏览器若拦（未取得该域的播放许可），
-  // turnOn 自己会退回待开启态，与「从未点开」呈现一致。
-  let wanted = false;
+  // 弧线（相位）只记在这次来访里；音量跨来访记着。
+  // 记着的音量不为 0 就试着接上：浏览器若拦（这一页还没有用户激活），等第一次点按 / 敲键
   try {
     const raw = sessionStorage.getItem(STORE_KEY);
     if (raw) {
@@ -631,11 +762,11 @@ export function initSound(): void {
       epoch = rec.epoch;
       offAt = rec.offAt ?? null;
       storedDurs = { open: rec.durs?.open || undefined, loop: rec.durs?.loop || undefined };
-      wanted = rec.on === true;
     }
   } catch {
     /* 隐私模式静默 */
   }
-  if (wanted) void turnOn();
-  else paint();
+  if (levels.bgm > 0) void turnOn();
+  if (levels.voice > 0) void ensureCtx().then((ok) => (ok ? paint() : armUnlock()));
+  paint();
 }

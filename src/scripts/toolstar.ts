@@ -5,13 +5,16 @@
    · 首尾相接的圈（data-loop）：项少时复制几份，周期总大于可见弧，转出去的从另一头回来。
      复制件 aria-hidden、不进 Tab 序，点它等于点原件；文字逐帧跟原件对齐（梦面换字时也跟着）。
    · 滚轮 / 拖动转圈，松手吸附到最近一格。
-   · 工具圈：前两件点了就切，后面的会展开，两组之间多空出 0.7 格。
+   · 工具圈：第一件（换面）点了就切，后面的会展开，两组之间多空出 0.7 格。
+   · 设置：分类一圈，点一类在再外一圈摆出它的项（与标签 / 年月一样，外圈跟着里圈最长的字往外让）。
+   · 声音：三圈音量弧（环境声 / Ave / 音效），图标在每圈最下面，点它开关；拖弧、滚轮、方向键调音量。
    · 寻找：标签与年月都是检索框里的一个词（漫游空间的检索要求每个词都命中），点一下加上，再点去掉。
    · 帧循环只在有东西在动时运转：开合、转圈、梦面里星的自转（梦面自转降到约 24fps）。
    ───────────────────────────────────────────────────────────── */
 
 import { clamp, reducedMotion } from './lib';
 import { flipFrom, onRealityChange, type Reality } from './reality';
+import { getLevel, isLive, onLevels, rememberLevel, setLevel, toggleLevel, type Channel } from './sound';
 
 const DEG = Math.PI / 180;
 const mod = (a: number, n: number) => ((a % n) + n) % n;
@@ -19,7 +22,11 @@ const SVGNS = 'http://www.w3.org/2000/svg';
 /** 跳到目录里某一节时，那一节停在视口上方这么一截处（与导览轨一致） */
 const LEAD = 0.16;
 
-type Tool = 'go' | 'find' | 'page' | 'set';
+type Tool = 'sound' | 'go' | 'find' | 'page' | 'set';
+
+/* 三圈音量：基准半径（由内到外）；图标中心到滑条起点的弧长（px） */
+const VOL_R = [150, 188, 226];
+const VOL_GAP = 22;
 
 interface Item {
   el: HTMLElement;
@@ -214,13 +221,20 @@ export function initToolstar() {
 
   const toolsN = root.querySelectorAll('[data-ring="tools"] > .ts-item').length;
   const rings = {
-    tools: new Ring(ringEl('tools'), 104, 88 / Math.max(1, toolsN - 1 + 0.7), 92, 1),
+    tools: new Ring(ringEl('tools'), 104, 88 / Math.max(1, toolsN - 1 + 0.7), 92, 0),
     go: new Ring(ringEl('go'), 180, 17),
     tags: new Ring(ringEl('tags'), 170, 15),
     months: new Ring(ringEl('months'), 246, 12, 62),
-    set: new Ring(ringEl('set'), 168, 19, 70),
+    set: new Ring(ringEl('set'), 168, 19, 66),
+    setUi: new Ring(ringEl('set-ui'), 240, 14, 70),
+    setRead: new Ring(ringEl('set-read'), 240, 14, 70),
+    setAve: new Ring(ringEl('set-ave'), 240, 12, 84),
   };
-  const OUTER: Record<Tool, (keyof typeof rings)[]> = { go: ['go'], find: ['tags', 'months'], page: [], set: ['set'] };
+  const OUTER: Record<Tool, (keyof typeof rings)[]> = { sound: [], go: ['go'], find: ['tags', 'months'], page: [], set: ['set'] };
+  /* 设置：第二圈是分类，点一类在第三圈摆出它的项（再点同一类收起） */
+  type SetCat = 'ui' | 'read' | 'ave';
+  const CAT_RING: Record<SetCat, keyof typeof rings> = { ui: 'setUi', read: 'setRead', ave: 'setAve' };
+  let setCat: SetCat | null = null;
 
   let open = false;
   let tool: Tool | null = null;
@@ -289,6 +303,7 @@ export function initToolstar() {
     raf = 0;
     let busy = false;
     for (const r of Object.values(rings)) if (!r.el.hidden) busy = r.frame(RM) || busy;
+    if (!volBox.hidden) busy = frameVols(RM) || busy;
     // 星：开合 / 回正时每帧画；梦面里只是慢慢自转，降到约 24fps
     const dream = reality === 'dream' && !RM;
     if (Math.abs(ST.spinTo - ST.spin) > 0.05 || !dream || now - lastStar > 41) {
@@ -338,6 +353,7 @@ export function initToolstar() {
   function discR() {
     let outer = 0;
     for (const ring of Object.values(rings)) if (ring !== rings.tools && ring.visible) outer = Math.max(outer, ring.R + ring.extent);
+    if (open && tool === 'sound') outer = Math.max(outer, VOL_R[VOL_R.length - 1] * scaleK() + 6);
     return outer ? outer + 24 : rings.tools.R + 34;
   }
 
@@ -403,26 +419,185 @@ export function initToolstar() {
     drag = null;
   });
 
+  /* ── 声音：三圈音量 ──
+     角度同上（0° 星正右，往上逆时针增）。图标钉在 0°，滑条从 0° 往后让出 VOL_GAP 的弧长起步；
+     最内一圈的滑条走 90°，外圈与它等长、角度相应短一些。 */
+  const volBox = root.querySelector<HTMLElement>('.ts-vols')!;
+  const vols = [...volBox.querySelectorAll<SVGGElement>('.ts-vol')].map((g, i) => ({
+    ch: g.dataset.ch as Channel,
+    i,
+    g,
+    track: g.querySelector<SVGPathElement>('.ts-vol-track')!,
+    fill: g.querySelector<SVGPathElement>('.ts-vol-fill')!,
+    thumb: g.querySelector<SVGCircleElement>('.ts-vol-thumb')!,
+    hit: g.querySelector<SVGPathElement>('.ts-vol-hit')!,
+    btn: volBox.querySelector<HTMLButtonElement>(`.ts-vch[data-ch="${g.dataset.ch}"]`)!,
+    R: 0,
+    s: 0, // 滑条起点（弧度）
+    span: 0, // 滑条张角（弧度）
+  }));
+  type Vol = (typeof vols)[number];
+  const polar = (R: number, a: number) => [C.x + R * Math.cos(a), C.y - R * Math.sin(a)] as const;
+  function layoutVols() {
+    const k = scaleK();
+    const L = (VOL_R[0] * k * Math.PI) / 2;
+    for (const v of vols) {
+      v.R = VOL_R[v.i] * k;
+      v.s = VOL_GAP / v.R;
+      v.span = L / v.R;
+      const [x0, y0] = polar(v.R, v.s);
+      const [x1, y1] = polar(v.R, v.s + v.span);
+      const d = `M${x0.toFixed(1)} ${y0.toFixed(1)}A${v.R.toFixed(1)} ${v.R.toFixed(1)} 0 0 0 ${x1.toFixed(1)} ${y1.toFixed(1)}`;
+      v.track.setAttribute('d', d);
+      v.fill.setAttribute('d', d);
+      v.hit.setAttribute('d', d);
+      const [bx, by] = polar(v.R, 0);
+      v.btn.style.transform = `translate(${bx.toFixed(1)}px,${by.toFixed(1)}px)`;
+    }
+    paintVols();
+  }
+  function paintVols() {
+    for (const v of vols) {
+      const x = getLevel(v.ch);
+      const live = isLive(v.ch);
+      const [tx, ty] = polar(v.R, v.s + x * v.span);
+      v.thumb.setAttribute('cx', tx.toFixed(1));
+      v.thumb.setAttribute('cy', ty.toFixed(1));
+      v.fill.style.strokeDasharray = `${x.toFixed(4)} 1`;
+      const n = Math.round(x * 100);
+      v.g.setAttribute('aria-valuenow', String(n));
+      v.g.setAttribute('aria-valuetext', n ? `${n}%` : '关');
+      v.g.classList.toggle('is-waiting', x > 0 && !live && v.ch !== 'fx');
+      v.btn.setAttribute('aria-pressed', String(x > 0));
+      v.btn.classList.toggle('is-live', live);
+    }
+  }
+  onLevels(paintVols);
+
+  /* 拖：指针绕星心的角度换成音量；起点之下算 0，终点之外算满 */
+  let volDrag: { v: Vol; from: number; id: number } | null = null;
+  const volAt = (v: Vol, e: PointerEvent) => {
+    const a = Math.atan2(C.y - e.clientY, e.clientX - C.x);
+    return clamp((a - v.s) / v.span, 0, 1);
+  };
+  for (const v of vols) {
+    v.g.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      v.g.setPointerCapture(e.pointerId);
+      volDrag = { v, from: getLevel(v.ch), id: e.pointerId };
+      v.g.classList.add('is-drag');
+      v.btn.classList.add('is-drag');
+      v.g.focus({ preventScroll: true });
+      setLevel(v.ch, volAt(v, e));
+    });
+    v.g.addEventListener('pointermove', (e) => {
+      if (volDrag?.v === v && e.pointerId === volDrag.id) setLevel(v.ch, volAt(v, e));
+    });
+    const end = (e: PointerEvent) => {
+      if (volDrag?.v !== v || e.pointerId !== volDrag.id) return;
+      // 拖到 0：记下拖之前的值，点图标再打开回到它
+      if (getLevel(v.ch) === 0) rememberLevel(v.ch, volDrag.from);
+      volDrag = null;
+      v.g.classList.remove('is-drag');
+      v.btn.classList.remove('is-drag');
+    };
+    v.g.addEventListener('pointerup', end);
+    v.g.addEventListener('pointercancel', end);
+    v.g.addEventListener(
+      'wheel',
+      (e) => {
+        e.preventDefault();
+        setLevel(v.ch, clamp(getLevel(v.ch) - e.deltaY * 0.0006, 0, 1));
+      },
+      { passive: false },
+    );
+    v.g.addEventListener('keydown', (e) => {
+      const x = getLevel(v.ch);
+      const to: Record<string, number> = {
+        ArrowUp: x + 0.05,
+        ArrowRight: x + 0.05,
+        ArrowDown: x - 0.05,
+        ArrowLeft: x - 0.05,
+        PageUp: x + 0.2,
+        PageDown: x - 0.2,
+        Home: 0,
+        End: 1,
+      };
+      if (!(e.key in to)) return;
+      e.preventDefault();
+      if (to[e.key] <= 0.005 && x > 0) rememberLevel(v.ch, x);
+      setLevel(v.ch, clamp(to[e.key], 0, 1));
+    });
+    v.btn.addEventListener('click', () => toggleLevel(v.ch));
+  }
+
+  /* 显隐与别的圈同一套：从顺时针 50° 处转进来，收起时再往前转 30° 淡掉（见 Ring.show / hide / frame）。
+     三圈一起转，整块绕星心旋转即可 */
+  const VA = { offset: 0, target: 0, alpha: 0, alphaTo: 0, hideT: 0 };
+  function showVols(on: boolean) {
+    if (on) {
+      if (VA.alphaTo === 1) return;
+      clearTimeout(VA.hideT);
+      if (volBox.hidden) layoutVols();
+      volBox.hidden = false;
+      VA.alphaTo = 1;
+      VA.target = 0;
+      if (VA.alpha === 0) VA.offset = RM ? 0 : -50;
+    } else {
+      if (volBox.hidden || VA.alphaTo === 0) return;
+      VA.alphaTo = 0;
+      if (!RM) VA.target -= 30;
+      clearTimeout(VA.hideT);
+      VA.hideT = window.setTimeout(
+        () => {
+          if (VA.alphaTo === 0) {
+            volBox.hidden = true;
+            VA.alpha = 0;
+            VA.target = VA.offset = 0;
+          }
+        },
+        RM ? 0 : 420,
+      );
+    }
+  }
+  function frameVols(rm: boolean): boolean {
+    VA.offset += (VA.target - VA.offset) * (rm ? 1 : 0.16);
+    VA.alpha += (VA.alphaTo - VA.alpha) * (rm ? 1 : 0.18);
+    if (Math.abs(VA.target - VA.offset) < 0.01) VA.offset = VA.target;
+    if (Math.abs(VA.alphaTo - VA.alpha) < 0.005) VA.alpha = VA.alphaTo;
+    volBox.style.opacity = VA.alpha.toFixed(3);
+    // 角度往小走 = 屏幕上顺时针 = CSS 的正向旋转
+    volBox.style.transform = VA.offset ? `rotate(${(-VA.offset).toFixed(2)}deg)` : '';
+    return VA.offset !== VA.target || VA.alpha !== VA.alphaTo;
+  }
+
   /* ── 开合与切换 ── */
   const toolBtns = [...root.querySelectorAll<HTMLButtonElement>('.ts-tool')];
+  const catBtns = [...root.querySelectorAll<HTMLButtonElement>('[data-set-cat]')];
   function sync() {
     place();
     star.setAttribute('aria-expanded', String(open));
     for (const b of toolBtns) if (b.hasAttribute('aria-expanded')) b.setAttribute('aria-expanded', String(open && tool === b.dataset.t));
     const want = new Set<keyof typeof rings>(open ? ['tools', ...(tool ? OUTER[tool] : [])] : []);
-    // 年月圈跟着标签圈最长的那枚往外让：标签长了不压上去
-    if (want.has('months')) {
-      if (!rings.tags.visible) rings.tags.show(RM);
-      const R0 = (rings.tags.R + rings.tags.extent + 26) / scaleK();
-      if (Math.abs(R0 - rings.months.R0) > 0.5) {
-        rings.months.R0 = R0;
-        rings.months.layout();
+    if (open && tool === 'set' && setCat) want.add(CAT_RING[setCat]);
+    for (const b of catBtns) b.setAttribute('aria-pressed', String(b.dataset.setCat === setCat));
+    // 外一圈跟着里一圈最长的那枚往外让：字长了不压上去（年月让标签，设置项让分类）
+    const outside = (inner: Ring, outer: Ring) => {
+      if (!inner.visible) inner.show(RM);
+      const R0 = (inner.R + inner.extent + 26) / scaleK();
+      if (Math.abs(R0 - outer.R0) > 0.5) {
+        outer.R0 = R0;
+        outer.layout();
       }
-    }
+    };
+    if (want.has('months')) outside(rings.tags, rings.months);
+    for (const c of Object.values(CAT_RING)) if (want.has(c)) outside(rings.set, rings[c]);
     for (const [name, ring] of Object.entries(rings) as [keyof typeof rings, Ring][]) {
       if (want.has(name) && !ring.visible) ring.show(RM);
       else if (!want.has(name) && ring.visible) ring.hide(RM);
     }
+    showVols(open && tool === 'sound');
     showSheet(findSheet, open && tool === 'find', discR() + 14);
     if (pageSheet) showSheet(pageSheet, open && tool === 'page', rings.tools.R + 34 + 14);
     drawTracks();
@@ -463,9 +638,19 @@ export function initToolstar() {
         flipFrom(r.left + r.width / 2, r.top + r.height / 2);
         return;
       }
-      if (t === 'sound') return; // sound.ts 认 [data-sound-toggle]
       setTool(tool === t ? null : (t as Tool));
     });
+  }
+  for (const b of catBtns) {
+    b.addEventListener('click', () => {
+      const c = b.dataset.setCat as SetCat;
+      setCat = setCat === c ? null : c;
+      sync();
+    });
+  }
+  // 设置里「音量 → 声音」：直接换到声音那三圈
+  for (const b of root.querySelectorAll<HTMLButtonElement>('[data-goto]')) {
+    b.addEventListener('click', () => setTool(b.dataset.goto as Tool));
   }
 
   addEventListener('keydown', (e) => {
@@ -490,6 +675,7 @@ export function initToolstar() {
     clearTimeout(resizeT);
     resizeT = window.setTimeout(() => {
       place();
+      layoutVols();
       for (const r of Object.values(rings)) {
         r.layout();
         for (const it of r.items) if (it.src && r !== rings.tools) bindTurn(it.el, r);
