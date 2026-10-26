@@ -93,7 +93,6 @@ export const AVE_LINES: AveLine[] = [
     when: { on: 'then' },
     at: '.ts-star',
     once: 'ever',
-    covers: ['idle-star', 'idle-sound'],
     then: 'welcome-4',
   },
   {
@@ -103,7 +102,7 @@ export const AVE_LINES: AveLine[] = [
     when: { on: 'then' },
     once: 'ever',
   },
-  /* 人声从没有到有（现在 = 用户点开环境声；以后做了 Ave 音量设置，从 0 调上去时发同一个事件） */
+  /* 人声从没有到有（用户把 Ave 的音量从 0 拉起来时发） */
   {
     id: 'voice-hello',
     text: '哈喽，能听见吗~',
@@ -159,7 +158,7 @@ export const AVE_LINES: AveLine[] = [
   },
   {
     id: 'evening',
-    text: '晚上好呀。',
+    text: '嗯，已经晚上了呢。',
     face: 'smile',
     when: { on: 'clock', from: '18:00', to: '23:00' },
   },
@@ -193,21 +192,5 @@ export const AVE_LINES: AveLine[] = [
     text: '发呆也很好呀，我陪祢一起。',
     face: 'happy',
     when: { on: 'still' },
-  },
-  {
-    id: 'idle-star',
-    text: '左下角那颗星可以点开哦，目录和设置都在里面。',
-    face: 'smile',
-    when: { on: 'idle' },
-    at: '.ts-star',
-    once: 'ever',
-  },
-  {
-    id: 'idle-sound',
-    text: '星星里还有环境声，打开的话我也能出声。',
-    face: 'shy',
-    when: { on: 'idle' },
-    at: '.ts-star',
-    once: 'ever',
   },
 ];
