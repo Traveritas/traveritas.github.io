@@ -13,6 +13,8 @@ const R = 2;
 const LODS = [6, 12, 24];
 const TB = 30; // 标题栏高
 const RAD = 3;
+// 画卡的先后：随笔 → 瞬间 → 项目（与屏上从左到右一致，首屏每栏取前几张）
+const SCENE_ORDER = ['essay', 'moment', 'project'];
 
 /* 窗的墨色：浅底（随笔）与两种深底。ink 与 chip 是强调色那一族（怎么推出来的见 design/accent-contrast.cjs） */
 const INK = {
@@ -137,6 +139,17 @@ function rrect(ctx, x, y, w, h, r) {
   ctx.arcTo(x, y + h, x, y, r);
   ctx.arcTo(x, y, x + w, y, r);
   ctx.closePath();
+}
+
+/* 预热配图：瞬间的窗要等图下载完才能画。图片原本是「轮到画这张卡时」才开始请求的，
+   首屏那张图卡因此要空等 4 张图的下载（移动端实测首张卡 3.5s 才出来）。
+   这里在开始画之前就把首屏几张卡的图并发拉起来 —— 与画卡并行，不再串行。
+   loadImage 有缓存，后面真正画的时候直接命中，不会重复请求。 */
+function prewarm(list) {
+  for (const it of list) {
+    if (it.kind !== 'img' || !it._pl) continue;
+    for (const im of (it.ref.images || []).slice(0, it._pl.cells.length)) loadImage(im.m);
+  }
 }
 
 const imgCache = new Map();
@@ -330,31 +343,79 @@ async function content(ctx, it, c) {
   }
 }
 
-async function toLODs(cv, w, h) {
-  const toURL = (canvas) => new Promise((res) => canvas.toBlob((b) => res(URL.createObjectURL(b))));
-  const urls = [await toURL(cv)];
+/* 各档图的 blob URL。第一档（清晰那档）单独返回，另外三档延后补：
+   首页 / 目录页第一次画完所有窗要 4–5s（移动端 4× 节流实测），期间页面一片空白。
+   现在 paint() 只等第一档，其余三档在空闲时补齐，拿到之前 apply() 继续用第一档顶上
+   ——顶替的是「还没降采样」的那张，本来就不糊，只是远景少了点像素味的失焦。
+
+   编码用 WebP 不用 PNG：同一张卡（840×500 @2x）在 4× 节流下
+   PNG toBlob 实测 93–100ms/张、WebP(q.92) 约 55–66ms，而体积从 250KB 降到 ~95KB
+   ——十几张卡连着画，光这一步就差出 0.5s 以上，而 LCP 就压在「最后一张大卡画完」上。 */
+const MIME = 'image/webp';
+const QUALITY = 0.92;
+async function toURL(canvas) {
+  return new Promise((res) => canvas.toBlob((b) => res(b ? URL.createObjectURL(b) : ''), MIME, QUALITY));
+}
+function downscale(cv, w, h, f) {
+  const lw = Math.max(2, Math.round(w / f));
+  const lh = Math.max(2, Math.round(h / f));
+  const mid = document.createElement('canvas');
+  mid.width = Math.max(lw * 2, 4);
+  mid.height = Math.max(lh * 2, 4);
+  const mc = mid.getContext('2d');
+  mc.imageSmoothingQuality = 'high';
+  mc.drawImage(cv, 0, 0, mid.width, mid.height);
+  const lo = document.createElement('canvas');
+  lo.width = lw;
+  lo.height = lh;
+  const lc = lo.getContext('2d');
+  lc.imageSmoothingQuality = 'high';
+  lc.drawImage(mid, 0, 0, lw, lh);
+  return lo;
+}
+/* 空闲时再补齐剩下的档位（别和自己的绘制抢同一帧）：写回 it.lod，
+   标记 _ver +1 —— apply() 见到版本变了会把正在显示的那一档重贴上去 */
+const idle = (fn) =>
+  (typeof requestIdleCallback === 'function' ? requestIdleCallback(fn, { timeout: 2000 }) : setTimeout(fn, 120));
+const nextIdle = (timeout = 120) =>
+  new Promise((res) => {
+    if (typeof requestIdleCallback === 'function') requestIdleCallback(() => res(), { timeout });
+    else setTimeout(res, 0);
+  });
+const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
+async function restLODs(it, cv, w, h) {
+  const gen = it._lodGen;
   for (const f of LODS) {
-    const lw = Math.max(2, Math.round(w / f));
-    const lh = Math.max(2, Math.round(h / f));
-    const mid = document.createElement('canvas');
-    mid.width = Math.max(lw * 2, 4);
-    mid.height = Math.max(lh * 2, 4);
-    const mc = mid.getContext('2d');
-    mc.imageSmoothingQuality = 'high';
-    mc.drawImage(cv, 0, 0, mid.width, mid.height);
-    const lo = document.createElement('canvas');
-    lo.width = lw;
-    lo.height = lh;
-    const lc = lo.getContext('2d');
-    lc.imageSmoothingQuality = 'high';
-    lc.drawImage(mid, 0, 0, lw, lh);
-    urls.push(await toURL(lo));
+    if (gen !== it._lodGen) return; // 这一条被重画过了（换了「多图」的排法），旧的别写回去
+    const url = await toURL(downscale(cv, w, h, f));
+    if (gen !== it._lodGen) return;
+    if (url) it.lod.push(url);
   }
-  return urls;
+  // _verHost：重画（repaintMulti）时画在副本 nt 上、结果并回原条目 it，
+  // 而 apply() 读的是原条目的 _ver —— 版本号必须记到它身上，否则补完档也没人重贴
+  if (gen === it._lodGen) {
+    const host = it._verHost || it;
+    host._ver = (host._ver || 0) + 1;
+  }
+}
+function scheduleRest(it, cv, w, h) {
+  it._lodGen = (it._lodGen || 0) + 1;
+  const gen = it._lodGen;
+  idle(() => { if (gen === it._lodGen) restLODs(it, cv, w, h); });
+}
+
+/* 取某一档的图：档位还没补齐时退到已有的最接近的档，
+   再不行就退到第一档（清晰那张）。绝不返回 undefined —— 否则兜底会把窗刷成空。 */
+function lodURL(it, i) {
+  const a = it.lod || [];
+  if (!a.length) return '';
+  return a[i] || a[a.length - 1] || '';
 }
 
 let measureCtx = null;
-async function paint(it) {
+/* revoke：重画自己的条目时才回收旧图。repaintMulti 传的是「副本」，
+   它的 lod 就是原条目正在用的那个数组 —— 在副本上回收会把屏幕上的窗一起弄坏。 */
+async function paint(it, { revoke = true } = {}) {
   const c = INK[it.scene];
   measureCtx ||= document.createElement('canvas').getContext('2d');
   if (it.kind !== 'img') layoutText(measureCtx, it);
@@ -366,20 +427,88 @@ async function paint(it) {
   ctx.textBaseline = 'alphabetic';
   frame(ctx, it, c);
   await content(ctx, it, c);
-  it.lod = await toLODs(cv, it.w, it.h);
+  // 先只交出第一档：等它就能上屏，其余三档排到空闲时
+  const first = await toURL(cv);
+  const old = it.lod || [];
+  it.lod = first ? [first] : [];
+  it._fb = !fontsSettled; // 用的是兜底字，字体到位后要补一遍
+  if (revoke) for (const u of old) if (u && u !== first) URL.revokeObjectURL(u);
+  (it._verHost || it)._ver = ((it._verHost || it)._ver || 0) + 1;
+  scheduleRest(it, cv, it.w, it.h);
+}
+/** 这条还没画过就现画（阅读窗打开时兜底：别让人点开一扇空窗） */
+async function ensurePainted(it) {
+  if ((it.lod || []).length) return;
+  if (!it._painting) it._painting = paint(it).finally(() => { it._painting = null; });
+  await it._painting;
 }
 
-async function build(D) {
-  const all = items(D);
+const FONT_CAP = 450;
+const HEAD = 4; // 第一屏每栏先画几张
+let fontsSettled = false;
+
+function loadFonts(D) {
   const text = JSON.stringify(D);
-  await Promise.all([
+  /* 只等「画卡要用到的那几个字面」，绝不再挂 document.fonts.ready ——
+     那是全站字体计划的闩：任何一个分包（体积正文用的 500-1…500-4）还在路上，
+     它就不 resolve，移动端实测要 3.3s。卡面只需要这几个字号/字重的行，
+     load() 各自 resolves 就够了。 */
+  return Promise.all([
     document.fonts.load(`500 23px ${SERIF}`, text),
     document.fonts.load(`600 12.5px ${SERIF}`, '随笔项目瞬间'),
     document.fonts.load(`400 13px ${SERIF}`, text),
     document.fonts.load(`400 10px ${MONO}`, '0123456789 .·ESAYPROJCTMN°'),
   ]).catch(() => {});
-  await document.fonts.ready;
-  for (const s in all) await Promise.all(all[s].map(paint));
+}
+
+async function paintMany(list) {
+  for (let i = 0; i < list.length; i += 3) {
+    await Promise.all(list.slice(i, i + 3).map((it) => paint(it)));
+    if (i + 3 < list.length) await nextIdle();
+  }
+}
+
+async function build(D) {
+  const all = items(D);
+  const order = SCENE_ORDER.flatMap((s) => all[s]);
+
+  let settled = false;
+  const fonts = loadFonts(D).then(() => {
+    settled = true;
+    fontsSettled = true;
+  });
+  // 配图和字体的等待并行起来：图先下去，等字体那 450ms 正好用来下载
+  prewarm(SCENE_ORDER.flatMap((s) => all[s].slice(0, HEAD)));
+  await Promise.race([fonts, sleep(FONT_CAP)]);
+
+  /* 前台只画一张：首屏里**面积最大**的那张，其余全部进后台队列。
+     两条约束叠在一起才说得通：
+     · 卡片直到 build() 返回才进 DOM，所以「前台画几张」直接等于「首屏要等多久」。
+       一张约 250ms（2× 栅格 + WebP 编码），等满 12 张就是 2.8s，全压在 LCP 上
+       （实测：等 12 张时首屏卡片到 4.9s 才现身）。
+     · LCP 只认「目前为止最大」的那一次刷新。按顺序画的话，起手的小卡先上屏，
+       真正最大的那张（瞬间的图卡）最后才到，LCP 就被拖到最后（实测 5.4s）。
+       先把最大的那张画出来，它一上屏 LCP 就锁住；后面再贴多小的卡都不再改动它。 */
+  const head = new Set();
+  for (const s of SCENE_ORDER) for (const it of all[s].slice(0, HEAD)) head.add(it);
+  const byArea = (a, b) => b.w * b.h - a.w * a.h;
+  const firstScreen = order.filter((it) => head.has(it)).sort(byArea);
+  await paintMany(firstScreen.slice(0, 1));
+
+  // 字体迟到（拿了兜底字）：到位后把这些补一遍
+  if (!settled) fonts.then(() => paintMany(order.filter((it) => it._fb)));
+
+  /* 后台补画：首屏剩下的先补（同样大的先画），再补首屏之外的。
+     一张一张来 —— 和首屏抢主线程的话，先出现的那张反而更晚。 */
+  (async () => {
+    if (!fontsSettled) await Promise.race([fonts, sleep(2500)]);
+    for (const it of firstScreen.slice(1).concat(order.filter((it) => !head.has(it)))) {
+      if ((it.lod || []).length) continue;
+      await paint(it);
+      await nextIdle();
+    }
+  })();
+
   return all;
 }
 
@@ -392,13 +521,16 @@ async function repaintMulti(all) {
   await Promise.all(its.map(async (it) => {
     // 先在一份副本上画完，再一起换上：画的途中窗不会是新高度配旧图
     const pl = picLayout(it.ref.images, it.w, mode);
-    const nt = { ...it, _pl: pl, h: TB + pl.ih + 44 };
-    await paint(nt);
+    const nt = { ...it, _pl: pl, h: TB + pl.ih + 44, _verHost: it };
+    // revoke:false —— nt.lod 从 it 继承来的那个数组正是屏幕在用的一份，不能在这里回收
+    await paint(nt, { revoke: false });
     // 连着点了几下：只认最后一次
-    if (gen !== multiGen) return nt.lod.forEach((u) => URL.revokeObjectURL(u));
-    Object.assign(it, { _pl: nt._pl, h: nt.h, lod: nt.lod, _ver: (it._ver || 0) + 1 });
+    if (gen !== multiGen) { for (const u of nt.lod) if (!(it.lod || []).includes(u)) URL.revokeObjectURL(u); return; }
+    const gone = (it.lod || []).filter((u) => !nt.lod.includes(u));
+    Object.assign(it, { _pl: nt._pl, h: nt.h, lod: nt.lod, _fb: nt._fb, _ver: (it._ver || 0) + 1 });
+    for (const u of gone) URL.revokeObjectURL(u);
   }));
   return its;
 }
 
-export const Faces = { build, LODS, INK, LABEL, TB, multi, repaintMulti };
+export const Faces = { build, LODS, INK, LABEL, TB, multi, repaintMulti, lodURL, ensurePainted };

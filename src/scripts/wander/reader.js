@@ -209,8 +209,13 @@ export function createReader({ onOpen, onNav, onClosing, onClosed, onBody }) {
     tb.innerHTML = titleBar(it);
     col.innerHTML = body(it);
     wireCarousel(col);
-    face.style.backgroundImage = `url(${it.lod[0]})`;
+    face.style.backgroundImage = `url(${Faces.lodURL(it, 0)})`;
     face.style.aspectRatio = `${it.w} / ${it.h}`;
+    // 这一条还没轮上绘制（其余卡是排进空闲时段画的）：现画一张补上，别留一扇空窗
+    if (!(it.lod || []).length) Faces.ensurePainted(it).then(() => {
+      if (!cur || cur.it !== it) return;
+      cur.face.style.backgroundImage = `url(${Faces.lodURL(it, 0)})`;
+    });
     document.documentElement.classList.add('w-reading');
     setURL(it, !opts.fromURL);
     announce(it.ref.href);
@@ -258,8 +263,12 @@ export function createReader({ onOpen, onNav, onClosing, onClosed, onBody }) {
       tb.innerHTML = titleBar(next);
       col.innerHTML = body(next);
       wireCarousel(col);
-      cur.face.style.backgroundImage = `url(${next.lod[0]})`;
+      cur.face.style.backgroundImage = `url(${Faces.lodURL(next, 0)})`;
       cur.face.style.aspectRatio = `${next.w} / ${next.h}`;
+      if (!(next.lod || []).length) Faces.ensurePainted(next).then(() => {
+        if (!cur || cur.it !== next) return;
+        cur.face.style.backgroundImage = `url(${Faces.lodURL(next, 0)})`;
+      });
       scroll.scrollTop = 0;
       setURL(next, false);
       announce(next.ref.href);

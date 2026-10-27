@@ -73,11 +73,21 @@ export async function initWander(host) {
   const clock = { t: performance.now(), last: performance.now(), speed: 1 };
   const now = () => clock.t;
 
-  let light = null;
-  try { light = createLight(host.querySelector('#w-light'), PX, { wind: true }); } catch { /* 没有 WebGL2：退回 CSS 渐变 */ }
-  const weather = createWeather(host.querySelector('#w-wx-back'), host.querySelector('#w-wx-front'));
+  /* 先画首屏的窗、把入场编排跑起来，再起 WebGL。
+     理由：createLight() 里编译着色器 + linkProgram 会同步占住主线程将近 1s
+     （移动端 trace 实测 GetProgramiv 一项 934ms）。原来它排在 Faces.build() 之前，
+     第一张卡要等到 ~3.4s 才画；即便挪到 build 之后，只要它还在入场那段里，
+     卡片就一直到 ~6s 才真正可见（LCP 5.1s）。
+     现在它挪到最后：先让窗落位、灯稍后亮。light 在两处使用都是 `if (light)` 保护的，
+     未就绪时 #w-light 退回 CSS 渐变（wander.css 本来就备了这一手）。 */
   const ALL = await Faces.build(DATA);
   const ITEMS = SC.flatMap((s) => ALL[s]);
+
+  let light = null;
+  const startLight = () => {
+    try { light = createLight(host.querySelector('#w-light'), PX, { wind: true }); } catch { /* 没有 WebGL2：退回 CSS 渐变 */ }
+  };
+  const weather = createWeather(host.querySelector('#w-wx-back'), host.querySelector('#w-wx-front'));
 
   /* 每个场景一个容器：换场景、切视图时按斜缝裁（平时不裁——clip-path 会让窗的 backdrop-filter 只看得到容器里面） */
   const spaces = {};
@@ -332,6 +342,7 @@ export async function initWander(host) {
     el.dataset.nofx = ''; // 长按窗不入梦（入梦检验只在空处）
     el.style.cssText = 'opacity:0';
     el._it = null;
+    el._url = '';
     el._free = false;
     el.removeAttribute('data-lod');
     if (el.parentNode !== spaces[s]) spaces[s].appendChild(el);
@@ -343,6 +354,7 @@ export async function initWander(host) {
     el.classList.remove('hot');
     el.style.cssText = 'opacity:0;visibility:hidden';
     el._it = null;
+    el._url = '';
     el.removeAttribute('tabindex');
     el.removeAttribute('role');
     el.removeAttribute('aria-label');
@@ -392,9 +404,12 @@ export async function initWander(host) {
       v._t = v._a = v._z = "";
     }
     const lod = ringOn ? Math.max(v.lod, ringLod(v.x, v.y)) : v.lod;
-    if (lod !== v._lod) {
+    // 档位可能还没补齐（其余三档排到空闲时画）：lodURL 会退到已有的最接近的一档
+    const url = Faces.lodURL(v.it, lod);
+    if (lod !== v._lod || el._url !== url) {
       v._lod = lod;
-      el.style.backgroundImage = `url(${v.it.lod[lod]})`;
+      el._url = url;
+      el.style.backgroundImage = url ? `url(${url})` : '';
       el.dataset.lod = lod;
     }
     const tilt = Math.abs(v.rx) + Math.abs(v.ry) > 0.02 ? ` perspective(1000px) rotateX(${v.rx.toFixed(2)}deg) rotateY(${v.ry.toFixed(2)}deg)` : '';
@@ -1852,6 +1867,11 @@ export async function initWander(host) {
   }
   root.classList.add('w-ready');
   requestAnimationFrame(tick);
+
+  /* 窗已经在落位了，现在才去编译那套 WebGL 着色器（≈0.9s 的主线程块）。
+     等两跳：入场的第一帧先排出去，免得又把它挤在卡片出现之前。 */
+  if (typeof requestIdleCallback === 'function') requestIdleCallback(startLight, { timeout: 1500 });
+  else setTimeout(startLight, 600);
 
   /* 从别的页带着要找的字（?q=）进来：直接筛上 */
   const q0 = new URLSearchParams(location.search).get('q');
