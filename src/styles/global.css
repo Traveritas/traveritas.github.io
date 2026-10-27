@@ -286,6 +286,16 @@ body[data-reality='dream'] .float-ch {
   will-change: translate;
 }
 
+/* 屏外的定格漂浮族暂停（lib.ts 的 pauseOffscreenFloats 挂上 .is-steady）。
+   这一族因为 keyframes 里读了 var(--still)，动画走主线程：一篇随笔页同时有 55 条在跑，
+   而绝大多数元素在屏幕外。暂停它们零视觉代价，实测静置主线程 36.8% → 27.8%
+   （样张页 48.3% → 32.3%），滚回来时立刻接着跑、相位不跳。
+   用 play-state 而不是 animation:none —— 后者会把元素一步拽回基线。 */
+.is-steady,
+.is-steady::after {
+  animation-play-state: paused !important;
+}
+
 .float-ch:nth-child(odd) {
   --float-dir: 1;
 }

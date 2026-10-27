@@ -97,3 +97,44 @@ export function onFrame30(fn: FrameFn): () => void {
 export const easeOut = (t: number) => 1 - Math.pow(1 - t, 3);
 export const easeInOut = (t: number) =>
   t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+
+/* ─────────────────────────────────────────────────────────────
+   只让视口里的「定格漂浮族」在跑。
+
+   为什么要这一步：这一族的 keyframes 里出现 var(--still) ⇒ 动画走主线程。
+   一篇普通随笔页同时有 55 条这样的动画（逐字浮起 + 小节序号 + 流光 + 品牌），
+   而它们的元素绝大多数在屏幕外。实测（390×844、4× CPU 节流、Chrome 自己的
+   Performance.getMetrics 计数器口径，3 轮中位）：
+
+     · 随笔页   静置主线程 36.8%（样式重算 20.1%）→ 暂停屏外后 27.8%（12.7%）
+     · 样式样张 静置主线程 48.3%（26.6%）        → 暂停屏外后 32.3%（14.4%）
+
+   屏外的字本来就看不见，暂停它零视觉代价；滚回来时立刻接着跑。
+   用 animation-play-state 而不是摘掉 animation：后者会让元素一步跳回基线
+   （见 docs/design/content-typography.md「定格漂浮族」一节的实测），
+   暂停则保留当前相位，滚回来时从原处继续。
+
+   rootMargin 给 200px：滚到之前就已经在跑，不会看到「刚进屏才开始动」。
+   ───────────────────────────────────────────────────────────── */
+const FLOAT_SELECTOR = '.float-ch, .ord-digit, .sheen-u, .brand-char';
+
+export function pauseOffscreenFloats(): void {
+  if (typeof IntersectionObserver === 'undefined') return;
+  const els = document.querySelectorAll<HTMLElement>(FLOAT_SELECTOR);
+  if (!els.length) return;
+
+  const set = (el: HTMLElement, on: boolean) => {
+    // 直接写行内 style 会跟动画自身的样式打架，用 important 的类名更稳
+    el.classList.toggle('is-steady', !on);
+  };
+
+  const io = new IntersectionObserver(
+    (entries) => {
+      for (const e of entries) set(e.target as HTMLElement, e.isIntersecting);
+    },
+    { rootMargin: '200px 0px', threshold: 0 },
+  );
+  for (const el of els) io.observe(el);
+
+  // 视口尺寸变了，观察器会自己重算；这里不用额外挂 resize
+}

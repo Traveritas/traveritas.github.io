@@ -210,6 +210,7 @@ const [, hour, tone] = HOURS.find(([p]) => path.startsWith(p)) ?? ['', path === 
       import { initCursor } from '../scripts/cursor';
       import { initSound } from '../scripts/sound';
       import { initAve } from '../scripts/ave';
+      import { pauseOffscreenFloats } from '../scripts/lib';
       initBoot();
       initChrome();
       initNight();
@@ -220,6 +221,9 @@ const [, hour, tone] = HOURS.find(([p]) => path.startsWith(p)) ?? ['', path === 
       initCursor();
       initSound(); // 在 initReality 之后：开启时要按当前醒度定初始混合
       initAve(); // 在 initSound 之后：出声借环境声的 AudioContext
+      // 屏外的「定格漂浮族」不跑：这一族走主线程，一页 50 多条同时跑会白烧半个核
+      // （实测随笔页静置 36.8% → 27.8%）。放在最后：此时逐字浮起、序号、流光都已在 DOM 里。
+      pauseOffscreenFloats();
 
       // 进页停在页头之下（p11-h 终选）：页头恰好被遮住，上滚才露出；
       // 浏览器还原了滚动位置或带锚点进入时不干预。
