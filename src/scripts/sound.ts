@@ -154,10 +154,17 @@ function load(form: Reality, seg: Seg): Promise<AudioBuffer | null> {
     measureHeadroom();
     ensureBed(); // loop 迟到时，到了就按时间轴补进相位
     return decoded;
-  })().catch((e) => {
-    console.warn('[sound]', e);
-    return null;
-  });
+  })()
+    .catch((e) => {
+      console.warn('[sound]', e);
+      return null;
+    })
+    .finally(() => {
+      // 这一趟有结果了就从「在飞」里摘掉：成功的话 buffers 已命中，不会重取；
+      // 失败（网络抖一下、ctx 还没建好）则留给下一次——否则一次失手会把这条曲子
+      // 在整次来访里永久钉死成 null：音量亮着、永远不出声，只有重开才恢复。
+      inflight.delete(key);
+    });
   inflight.set(key, p);
   return p;
 }
@@ -217,6 +224,12 @@ function buildGraph() {
   scene.gain.value = sceneHub.level;
   master.connect(scene);
   scene.connect(ctx.destination);
+  // ctx 被浏览器挂起 / 恢复（移动端来电、音频中断）时：图标要跟着说实话，
+  // 该还在响的也别就此哑掉——挂着等下一次点按把它接回来
+  ctx.addEventListener('statechange', () => {
+    paint();
+    if (on && ctx?.state === 'suspended') armUnlock();
+  });
   // 人声单走一路：不吃阅读页退后量与页内演出压声，只吃自己那条音量
   voiceGain = ctx.createGain();
   voiceGain.gain.value = curve(levels.voice);
@@ -395,6 +408,7 @@ function startLoop(form: Reality, at: number, offset: number) {
   src.connect(c.gain);
   src.start(at, mod(offset, b.duration));
   c.src = src;
+  paint();
 }
 function stopLoop(form: Reality) {
   const c = chain[form];
@@ -407,6 +421,7 @@ function stopLoop(form: Reality) {
     /* 已停 */
   }
   src.disconnect();
+  paint();
 }
 /** 两条 loop 都追上 bed 时间轴；缓冲迟到就等它到（相位由时间轴推出）。
     bed 起点在弧线定下来时就预排好（at 落在未来就原样排上，音频钟准点起音），
@@ -450,6 +465,7 @@ function startFromArc() {
         }
       };
       openSrc = src;
+      paint();
       gOpen.gain.cancelScheduledValues(at);
       gOpen.gain.setValueAtTime(0, at);
       gOpen.gain.linearRampToValueAtTime(1, at + FADE_IN);
@@ -526,6 +542,31 @@ function haltPlayback() {
   );
 }
 
+/** 等 resume() 有个结果：它可能既不 resolve 也不 reject。
+    没有用户激活时 Chrome 就是如此（实测这一次加载里挂十几秒、之后访客点了页面也不动），
+    原先 await 它就把整个 turnOn 卡死在这里：音量记着、界面亮着，实际一个源都没建、
+    一个字节都没取，也永远走不到 armUnlock——「关一下再打开」才有声正是这个来由。
+    所以 resume() 只当一个「差不多该好了」的信号，判定一律看 ctx.state。 */
+const RESUME_WAIT_MS = 600;
+function settleResume(c: AudioContext): Promise<void> {
+  return new Promise((done) => {
+    let fin = false;
+    const end = () => {
+      if (fin) return;
+      fin = true;
+      clearTimeout(timer);
+      c.removeEventListener('statechange', onState);
+      done();
+    };
+    const onState = () => {
+      if (c.state === 'running') end();
+    };
+    const timer = window.setTimeout(end, RESUME_WAIT_MS);
+    c.addEventListener('statechange', onState);
+    c.resume().then(end, end);
+  });
+}
+
 /** 建好图、把 ctx 跑起来；被自动播放策略拦下返回 false */
 async function ensureCtx(): Promise<boolean> {
   if (!ctx) {
@@ -536,13 +577,7 @@ async function ensureCtx(): Promise<boolean> {
     ctx = new AudioContext();
     buildGraph();
   }
-  if (ctx.state !== 'running') {
-    try {
-      await ctx.resume();
-    } catch {
-      /* 按 state 判定 */
-    }
-  }
+  if (ctx.state !== 'running') await settleResume(ctx);
   return ctx.state === 'running';
 }
 
@@ -585,6 +620,8 @@ function turnOff() {
 /* ── 三路音量 ─────────────────────────────────────── */
 /** 浏览器没给播放许可：等页面上第一次点按 / 敲键（这些才算用户激活）再把记着的音量接上 */
 let unlockArmed = false;
+/** 自动补试的次数上限：有激活却仍然起不来时，别在定时器里来回空转 */
+let unlockRetries = 0;
 function armUnlock() {
   if (unlockArmed) return;
   unlockArmed = true;
@@ -593,18 +630,41 @@ function armUnlock() {
     for (const e of evs) removeEventListener(e, go, true);
     unlockArmed = false;
     if (levels.bgm > 0 && !on) void turnOn();
+    // on 还亮着却挂起了（移动端来电、系统中断把 ctx 掐停）：源与时间轴都还在音频钟上，
+    // 只要把 ctx 跑起来就接着响，不重排时间轴
+    else if (on) void ensureCtx().then(paint);
     if (levels.voice > 0) void ensureCtx().then((ok) => (ok ? warmVoices() : null)).then(paint);
   };
   for (const e of evs) addEventListener(e, go, true);
+  // 进页时就已经有用户激活（访客点得比这里的判定还快，激活被那一次用掉了）：
+  // 不必再等下一次点击，稍后自己补试一回
+  const ua = (navigator as Navigator & { userActivation?: { hasBeenActive: boolean } }).userActivation;
+  if (ua?.hasBeenActive && unlockRetries < 3) {
+    unlockRetries++;
+    setTimeout(() => {
+      if (unlockArmed) go();
+    }, 120);
+  }
 }
 
 export function getLevel(ch: Channel): number {
   return levels[ch];
 }
-/** 这一路此刻是不是真的在响（音量 > 0，且浏览器给了播放许可） */
+/** 这一路是不是「开着」——图标的第三态（起伏 / 呼吸）由它驱动。
+    说的是这一路的状态，不是电平表：曲子还在缓冲时照样起伏，Ave 没开口时亮面也照常呼吸，
+    音效还没有素材也是如此（作者 2026-10-28 定：三路一个标准，不按「此刻真有样本在流」）。
+    要判断「此刻真的有没有出声」是另一回事，见 isSounding()。 */
 export function isLive(ch: Channel): boolean {
+  return levels[ch] > 0;
+}
+/** 此刻真的在出声吗（音量 > 0、浏览器给了许可、且源已经在跑）。
+    不进图标，留给调试与以后的电平指示用。 */
+export function isSounding(ch: Channel): boolean {
   const running = !!ctx && ctx.state === 'running';
-  if (ch === 'bgm') return on && running;
+  if (ch === 'bgm') {
+    const sounding = !!openSrc || !!chain.wake?.src || !!chain.dream?.src;
+    return on && running && sounding;
+  }
   return levels[ch] > 0 && running;
 }
 /** 音量或在不在响变了就叫一声；返回取消订阅 */
@@ -750,7 +810,8 @@ function persist() {
   }
 }
 function paint() {
-  // html[data-sound="on"]：此刻有一路真的在响（工具栏图标、样张的弦据此起伏）
+  // html[data-sound="on"]：有三路里任一路开着（工具栏图标、样张的弦据此起伏、微章亮 ON）。
+  // 说的是「开着」，不是「此刻真有样本在流」——见 isLive / isSounding 的分工
   if (CHANNELS.some(isLive)) document.documentElement.dataset.sound = 'on';
   else delete document.documentElement.dataset.sound;
   for (const b of els) b.setAttribute('aria-pressed', on ? 'true' : 'false');

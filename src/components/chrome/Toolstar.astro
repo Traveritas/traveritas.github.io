@@ -631,7 +631,11 @@ const VOLS: { id: 'bgm' | 'voice' | 'fx'; wake: string; en: string }[] = [
   .ts-vch[aria-pressed='true'] {
     color: var(--fg-soft);
   }
-  .ts-vch.is-live {
+  /* 三态：关着（音量 0）＝压平、最暗；开着＝形状展开；第三态（起伏 / 呼吸）＝更亮。
+     第三态由「这一路开着」驱动（aria-pressed），不是「此刻真的有样本在流」——
+     图标说的是这一路的状态，不是电平表：曲子还在缓冲时它照样起伏，Ave 没开口时
+     亮面也照常呼吸。颜色深浅与动画都由 aria-pressed 一处决定，三路标准一致。 */
+  .ts-vch[aria-pressed='true'].is-live {
     color: var(--fg);
   }
   .ts-vch:hover {
@@ -651,7 +655,7 @@ const VOLS: { id: 'bgm' | 'voice' | 'fx'; wake: string; en: string }[] = [
     opacity: 1;
   }
 
-  /* 环境声：关着三根弦平卧成点，响时起伏（与原先的微章同一个意思） */
+  /* 环境声：关着三根弦平卧成点，开着起伏（与原先的微章同一个意思） */
   .ts-ico-bgm line {
     transform-box: fill-box;
     transform-origin: center;
@@ -661,16 +665,16 @@ const VOLS: { id: 'bgm' | 'voice' | 'fx'; wake: string; en: string }[] = [
   .ts-vch[aria-pressed='true'] .ts-ico-bgm line {
     transform: scaleY(0.6);
   }
-  .ts-vch.is-live .ts-ico-bgm line {
+  .ts-vch[aria-pressed='true'].is-live .ts-ico-bgm line {
     animation: ts-str 1.7s ease-in-out infinite alternate;
   }
-  .ts-vch.is-live .ts-ico-bgm line:nth-child(2) {
+  .ts-vch[aria-pressed='true'].is-live .ts-ico-bgm line:nth-child(2) {
     animation-duration: 1.3s;
   }
-  .ts-vch.is-live .ts-ico-bgm line:nth-child(3) {
+  .ts-vch[aria-pressed='true'].is-live .ts-ico-bgm line:nth-child(3) {
     animation-duration: 2.3s;
   }
-  /* Ave：关着菱形压成一道横线，响时亮面慢慢呼吸 */
+  /* Ave：关着菱形压成一道横线，开着亮面慢慢呼吸 */
   .ts-ico-voice .ts-dia {
     transform-box: fill-box;
     transform-origin: center;
@@ -680,10 +684,10 @@ const VOLS: { id: 'bgm' | 'voice' | 'fx'; wake: string; en: string }[] = [
   .ts-vch[aria-pressed='true'] .ts-ico-voice .ts-dia {
     transform: none;
   }
-  .ts-vch.is-live .ts-ico-voice .ts-fill {
+  .ts-vch[aria-pressed='true'].is-live .ts-ico-voice .ts-fill {
     animation: ts-breathe 2.6s ease-in-out infinite alternate;
   }
-  /* 音效：关着四道光收进中心那一点 */
+  /* 音效：关着四道光收进中心那一点，开着四道光一轮轮往外散 */
   .ts-ico-fx .ts-rays {
     transform-box: view-box;
     transform-origin: 12px 12px;
@@ -697,12 +701,26 @@ const VOLS: { id: 'bgm' | 'voice' | 'fx'; wake: string; en: string }[] = [
     transform: none;
     opacity: 1;
   }
+  .ts-vch[aria-pressed='true'].is-live .ts-ico-fx .ts-rays {
+    animation: ts-rays 2.1s ease-in-out infinite alternate;
+  }
   @keyframes ts-str {
     from {
       transform: scaleY(0.35);
     }
     to {
       transform: scaleY(1);
+    }
+  }
+  /* 音效：四道光从中心一点点往外撑开，再收回来 */
+  @keyframes ts-rays {
+    from {
+      transform: scale(0.82);
+      opacity: 0.55;
+    }
+    to {
+      transform: scale(1.08);
+      opacity: 1;
     }
   }
   /* 名字沿半径往外浮出，字保持横排，垫一片玻璃：不压在相邻的图标上，外圈展开着时也读得清。
@@ -922,6 +940,7 @@ const VOLS: { id: 'bgm' | 'voice' | 'fx'; wake: string; en: string }[] = [
     .ts-ico-bgm line,
     .ts-ico-sound path,
     .ts-ico-voice .ts-fill,
+    .ts-ico-fx .ts-rays,
     .ts-ico-face .ts-fill--face {
       animation: none !important;
     }

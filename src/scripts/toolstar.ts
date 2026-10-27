@@ -14,7 +14,7 @@
 
 import { clamp, reducedMotion } from './lib';
 import { flipFrom, onRealityChange, type Reality } from './reality';
-import { getLevel, isLive, onLevels, rememberLevel, setLevel, toggleLevel, type Channel } from './sound';
+import { getLevel, isLive, isSounding, onLevels, rememberLevel, setLevel, toggleLevel, type Channel } from './sound';
 
 const DEG = Math.PI / 180;
 const mod = (a: number, n: number) => ((a % n) + n) % n;
@@ -459,7 +459,10 @@ export function initToolstar() {
   function paintVols() {
     for (const v of vols) {
       const x = getLevel(v.ch);
+      // 图标：开着就有第三态（起伏 / 呼吸），与「此刻真有样本在流」无关
       const live = isLive(v.ch);
+      // 滑条：开着却还没真的出声（曲子还在缓冲、或浏览器还没给播放许可）时淡一档
+      const waiting = live && !isSounding(v.ch) && v.ch !== 'fx';
       const [tx, ty] = polar(v.R, v.s + x * v.span);
       v.thumb.setAttribute('cx', tx.toFixed(1));
       v.thumb.setAttribute('cy', ty.toFixed(1));
@@ -467,7 +470,7 @@ export function initToolstar() {
       const n = Math.round(x * 100);
       v.g.setAttribute('aria-valuenow', String(n));
       v.g.setAttribute('aria-valuetext', n ? `${n}%` : '关');
-      v.g.classList.toggle('is-waiting', x > 0 && !live && v.ch !== 'fx');
+      v.g.classList.toggle('is-waiting', waiting);
       v.btn.setAttribute('aria-pressed', String(x > 0));
       v.btn.classList.toggle('is-live', live);
     }

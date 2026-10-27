@@ -154,6 +154,30 @@ t ≥  openDur        → loop，相位 = (t − openDur) mod loopDur
 - 切走标签页：声音退到 0.22（「世界在此处悬停」），回来即复原；时间轴不中断。
 - 关声后 `ctx.suspend()`，不留后台音频（Ave 的人声那一路还开着时不挂起）。
 
+#### `resume()` 永不 settle（2026-10-27 修的）
+
+没有用户激活时，Chrome 的 `AudioContext.resume()` **既不 resolve 也不 reject**，就那么挂着
+（实测：这一次加载里挂十几秒，之后访客点了页面也不动，只有重新调用一次 `resume()` 才会活）。
+原先 `ensureCtx()` 直接 `await ctx.resume()`，于是 `turnOn()` 永久卡死在这一行：`on` 早已置真、
+音量与图标照常显示，却一个源都没建、一个字节都没取，也永远走不到 `armUnlock`——症状就是
+「刷新后有音量却不出声，关一下再打开才响」。
+
+现在 `resume()` 只当一个「差不多该好了」的信号（`settleResume`，600 ms 或 `statechange` 先到者），
+要不要出声一律看 `ctx.state === 'running'`。起不来就退回待开启态并挂上 `armUnlock`，
+访客下一次点按 / 敲键接上。
+
+配套的两处「界面说实话」：
+
+- `isLive()` 只表示**这一路开着**（音量 > 0），三路同一个标准；图标的第三态（起伏 / 呼吸）由它驱动，
+  见 §3.4.1。它与「此刻真的有没有样本在流」是两件事：后者是 `isSounding()`——还要 `ctx` 在跑、
+  环境声还要源真的起来了。曲子还在缓冲、浏览器还没给许可，都靠 `isSounding()` 判断，只用于
+  滑条的 `.is-waiting` 淡一档与调试（2026-10-28 作者定：图标说的是这一路的状态，不是电平表）。
+- `ctx` 的 `statechange` 会重画一次；被系统掐停（来电、音频中断）而 `on` 仍亮着时挂 `armUnlock`，
+  下次点按只把 ctx 跑起来、时间轴不动。
+
+`load()` 的失败不再钉死：`inflight` 在 `finally` 里摘掉，一次网络抖动不会让那条曲子
+在整次来访里永久取不到。
+
 ### 3.4.1 三路音量
 
 工具栏「声音 / 回响」展开成绕星的三圈弧，由内到外：**环境声（BGM）/ Ave（人声）/ 音效（FX）**，三路互不相干。
@@ -165,8 +189,22 @@ Home / End 调音量，拉到 0 就是关。
   人声单走一路 `voiceGain` 直出，不吃阅读页退后量与页内演出压声。
 - 人声的 0 只管声音：Ave 照样出现、出字（她出不出现由「设置」里的 Ave 开关管）。人声从 0 拉起来时发
   `xm:ave` 的 `voice-on`（台词 voice-hello）。
-- 音效还没有素材，那一路先只记着值；以后的音效从 `getLevel('fx')` 取。
-- 接口（`sound.ts`）：`getLevel / setLevel / toggleLevel / rememberLevel / isLive / onLevels`，toolstar.ts 直接调。
+- 音效还没有素材，那一路先只记着值；以后的音效从 `getLevel('fx')` 取。图标照样有第三态
+  （四道光一轮轮往外散），因为图标说的是「开着」。
+- 接口（`sound.ts`）：`getLevel / setLevel / toggleLevel / rememberLevel / isLive / isSounding / onLevels`，
+  toolstar.ts 直接调。
+
+**图标的三个状态**（`.ts-vch`，由 `aria-pressed` 与 `.is-live` 两个点决定）：
+
+| 状态 | 判据 | 表现 |
+| --- | --- | --- |
+| 关 | 音量 = 0 | 形状压平（弦成点、菱形成横线、四道光滑到 `.ts-vch` 的 `--fg-faint`），无动画 |
+| 开 | 音量 > 0 | 形状展开、颜色到 `--fg-soft` |
+| 响 | 上面再加 `.is-live` | 颜色到 `--fg`，并起动画：环境声三根弦 `ts-str`（1.7 / 1.3 / 2.3 s）、Ave 亮面 `ts-breathe`（2.6 s）、音效四道光 `ts-rays`（2.1 s） |
+
+`.is-live` 由 `isLive()` 给，等于「音量 > 0」，**三路一个标准**：曲子还在缓冲时它照样起伏，
+Ave 没开口时亮面也照常呼吸。要判断「此刻真有样本在流」用 `isSounding()`（进 `.is-waiting`
+的淡一档与调试），两件事分开。`prefers-reduced-motion` 下三种动画都关掉，只留前两态的形状与颜色。
 
 ### 3.4.2 Ave 人声的整包预取
 
