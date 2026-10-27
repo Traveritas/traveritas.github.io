@@ -20,7 +20,7 @@
 import { AVE_LINES, type AveLine } from '../data/ave-lines';
 import { AVE_VOICE, type AveVoiceClip } from '../data/ave-voice';
 import { getReality } from './reality';
-import { playVoice, preloadVoice } from './sound';
+import { playVoice, preloadVoice, prefetchVoices } from './sound';
 import { reducedMotion } from './lib';
 import { createAveFlow } from './ave-flow';
 import type { AvePageLine } from '../lib/ave-page';
@@ -58,6 +58,10 @@ const HOLD_AFTER_HOVER = 2400;
 /** 贴元素时：句子离元素多远（牵线的最短长度，px）、离视口边至少多远 */
 const ANCHOR_GAP = 28;
 const VIEW_PAD = 14;
+/** 人声还没到手时，字幕最多等它这么久（ms）再自己先走——不让人对着空白卡片等网络。
+    整包预取之后几乎不会走到这里；真走到了（刚开声那一两句、或网络确实很差），
+    与其让字空等两三秒，不如字先出现、这一句安静。 */
+const VOICE_WAIT = 1200;
 
 /** 表情头像（public/ave/face/）：定稿前关着，用组件里的占位人影 */
 const USE_FACES = false;
@@ -356,11 +360,13 @@ function show(line: AveLine, idle = false, at?: Element | null) {
   if (!clip || whole) {
     // 没有节奏可跟（或不逐字）：整句直接出现；有声音照样放
     speakEnd = performance.now() + (clip ? clip.dur * 1000 + 60 : 0);
-    if (clip) void playVoice(clip.src).then((v) => token === showToken && v && (stopVoice = v.stop));
+    if (clip) void playVoice(clip.src, VOICE_WAIT).then((v) => token === showToken && v && (stopVoice = v.stop));
     finishReveal(chars.length);
     return;
   }
-  void playVoice(clip.src).then((v) => {
+  // 人声一般已经在缓存里（sound.ts 的整包预取），playVoice 即刻返回；
+  // 万一还没到手，最多等 VOICE_WAIT 就自己先走，不让那句话空着等网络。
+  void playVoice(clip.src, VOICE_WAIT).then((v) => {
     if (token !== showToken) return v?.stop();
     if (v) stopVoice = v.stop;
     const delay = v ? v.delayMs : 120;
@@ -738,6 +744,9 @@ function afterBoot(fn: () => void) {
 /* ── 初始化 ─────────────────────────────────────────── */
 export function initAve(): void {
   initToggle();
+  // 人声整包预取：她说的每一句都在这张表里（320 KB 全部），开声后一次取完，
+  // 此后开口不再等网络和冷连接。没开声就一个字节都不取。
+  prefetchVoices(Object.values(AVE_VOICE).map((c) => c.src));
   const el = document.getElementById('ave');
   if (!el) return;
   root = el;

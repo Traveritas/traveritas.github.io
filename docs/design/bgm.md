@@ -11,14 +11,14 @@
 
 成片在 `public/audio/`，六个文件，随站点一起发布：
 
-| 文件 | 段落 | 时长 | 成片响度 | 真峰值 |
-| --- | --- | --- | --- | --- |
-| `wake-open.mp3` | 醒 · 开场（intro+一遍 loop） | 76.364s | −15.19 LUFS | −7.37 dBTP |
-| `wake-loop.mp3` | 醒 · 循环 | 50.909s | −14.46 LUFS | −7.38 dBTP |
-| `wake-outro.mp3` | 醒 · 收束（**运行时不用**） | 18.182s | −19.93 LUFS | −8.15 dBTP |
-| `dream-open.mp3` | 梦 · 开场（intro+一遍 loop） | 76.364s | −15.38 LUFS | −0.83 dBTP |
-| `dream-loop.mp3` | 梦 · 循环 | 50.909s | −14.38 LUFS | −0.77 dBTP |
-| `dream-outro.mp3` | 梦 · 收束（**运行时不用**） | 19.091s | −18.52 LUFS | −5.48 dBTP |
+| 文件 | 段落 | 时长 | 成片响度 | 真峰值 | 体积 |
+| --- | --- | --- | --- | --- | --- |
+| `wake-open.mp3` | 醒 · 开场（intro+一遍 loop） | 76.364s | −15.20 LUFS | −6.97 dBTP | 766 KB |
+| `wake-loop.mp3` | 醒 · 循环 | 50.909s | −14.45 LUFS | −6.74 dBTP | 553 KB |
+| `wake-outro.mp3` | 醒 · 收束（**运行时不用**） | 18.182s | −19.94 LUFS | −8.31 dBTP | 178 KB |
+| `dream-open.mp3` | 梦 · 开场（intro+一遍 loop） | 76.364s | −15.38 LUFS | −0.71 dBTP | 931 KB |
+| `dream-loop.mp3` | 梦 · 循环 | 50.909s | −14.38 LUFS | −0.63 dBTP | 706 KB |
+| `dream-outro.mp3` | 梦 · 收束（**运行时不用**） | 19.091s | −18.53 LUFS | −6.12 dBTP | 170 KB |
 
 源文件**不进仓库**（`D:\myDownloads\personalwebsite-<awake|dream>-<intro+loopAB|loopAB|outro>.wav`）。
 开场是 `intro+loopAB` 合并母带、loop 是独立源，都是各自一整次渲染（接缝修在母带内部）；
@@ -64,8 +64,22 @@ node design/audio/normalize-bgm.mjs --src <目录>  # 换源目录
   （新母带比上一版热约 2 dB，故比冻结期的 −5.87 dB 更退）；dream 是参考态，仍 0 dB。
   成片整态差 0.01 dB，逐段残差最大 1.41 dB（outro 段，整体对齐的必然代价）。
 - **参考形态**：`dream`。它的电平即目标，一个 bit 不动；只调另一态。
-- **编码**：始终从无损源编一次（`libmp3lame -q:a 4` ≈165 kbps），不二次编码；
+- **编码**：始终从无损源编一次（`libmp3lame -q:a 8` ≈100 kbps），不二次编码；
   编完再量一遍，偏差超 0.25 dB 就用残余量从源重编。
+  > **为什么从 q4 降到 q8**（2026-10-27）：q4（≈165 kbps）一条 open 就 1.56 MB，
+  > 线上实测（GitHub Pages，日本节点，RTT 1.0–1.6 s、均速 100–180 KB/s）光下载
+  > 就要 9–15 s，正是「开声后十几秒才听见」的来源。逐档对比后定在 q8：
+  > - **无缝前提不受影响**：解码后样点数仍与源 wav **逐一相等**
+  >   （open 3665455、loop 2443637），`loop=true` 的无缝性来自 LAME 标签裁掉
+  >   编码填充，与码率无关。开场内部接缝、loop 循环边界的跳变值实测与源 wav
+  >   相差 <0.3 dB，即接缝特征由母带本身决定，不是编码引入的。
+  > - **听感**：梦面源带宽到 19.6 kHz，q8 截至 15.0 kHz（q6/q7 亦为 15.6 kHz）；
+  >   醒面源本身只到 10.8 kHz，q8 的按频段编码噪声比信号低 20–23 dB。
+  >   环境音乐作阅读背景，这一档换来的 40% 体积划算。若要再压，q9（≈82 kbps）
+  >   把梦面 8–12k 段砍到 −49.5 dBFS 噪声、醒面 8–12k 归零，**不可取**。
+  > - 解码开销与码率无关（实测 76 s 立体声约 80 ms），瓶颈纯在网络，故降码率
+  >   是线性收益。若要再往下压首包，下一步是**拆 open**（只发 25.45 s 的 intro，
+  >   约 0.3 MB，loop 由既有预排接力），而不是继续降码率。
 - **自检**：最后拿真正要发布的六个文件拼成整态再量一次，两态差值与容差一起打印，
   报告落在 `design/audio/out/normalize-report.json`。
 - **成片版本号与 OPEN_SEAM**：成片文件名是固定的（`wake-loop.mp3` 等），换稿后 URL
@@ -153,6 +167,24 @@ Home / End 调音量，拉到 0 就是关。
   `xm:ave` 的 `voice-on`（台词 voice-hello）。
 - 音效还没有素材，那一路先只记着值；以后的音效从 `getLevel('fx')` 取。
 - 接口（`sound.ts`）：`getLevel / setLevel / toggleLevel / rememberLevel / isLive / onLevels`，toolstar.ts 直接调。
+
+### 3.4.2 Ave 人声的整包预取
+
+人声一句一个文件，共 31 个 clip、合计 320 KB（`public/audio/ave/`）。早先每一句都在
+开口那一刻才发请求，冷连接 + TTFB 就要一两秒，而 `ave.ts` 原来是 `await playVoice()`
+之后才揭开字幕——那两三秒的空白就是这么来的。
+
+现在 `ave.ts` 在 `initAve()` 里把全部 clip 的地址交给 `sound.ts` 的 `prefetchVoices()`；
+**人声那一路一开**（打开声音面板、或记着的音量不为 0 时进页）就整包取回、解好，
+此后任何一句都是零等待（串行取，避免并发 `decodeAudioData` 挤占主线程）。
+
+- 没开声就一个字节都不取；中途关掉就停下，剩下的等下次开声补齐（已取的命中缓存）。
+- `navigator.connection.saveData` 为真时跳过预取，用到了再取。
+- 兜底：`playVoice(src, maxWaitMs)` 超时返回 `null` 且**不再补放**——字已经走完、
+  声音才到反而错位，不如这一句安静；buffer 照样留在缓存里。`ave.ts` 传
+  `VOICE_WAIT`（1.2 s），只在整包还没取完的那一两句上才可能走到。
+- 限速实测（RTT 1200 ms / 150 KB/s）：预取后首字 **94 ms**，不预取 **1384 ms**；
+  本地网络下整包 31 个 clip 约 300 ms 取完。
 
 ### 3.5 阅读页的页面级电平
 

@@ -33,7 +33,7 @@
      node design/audio/normalize-bgm.mjs --align segment
      node design/audio/normalize-bgm.mjs --src <目录>
      node design/audio/normalize-bgm.mjs --check               # 只测量，不写文件
-     node design/audio/normalize-bgm.mjs --quality 2           # LAME VBR 档（默认 4 ≈165kbps）
+     node design/audio/normalize-bgm.mjs --quality 6           # LAME VBR 档（默认 8 ≈100kbps）
    ───────────────────────────────────────────────────────────── */
 
 import { spawnSync } from 'node:child_process';
@@ -48,7 +48,7 @@ const DEFAULTS = {
   out: 'public/audio',
   align: 'whole', // whole | segment
   ref: 'dream', // 参考形态：实测电平即目标，保持不动
-  quality: '4', // libmp3lame VBR 档，4 ≈ 165 kbps
+  quality: '8', // libmp3lame VBR 档，8 ≈ 100 kbps（原为 4 ≈165 kbps；见 docs/design/bgm.md §2 码率取舍）
   tolerance: 0.25, // 成片实测与目标的允许偏差（dB），超出则用残余量从源再编一次
 };
 /* 绝对目标（LUFS）。null = 跟随参考形态的实测值。

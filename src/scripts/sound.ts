@@ -239,6 +239,9 @@ sceneHub.apply = () => {
    人声本身不吃阅读页退后量与页内演出压声（成片电平见 design/ave-voice/render.mjs）。 */
 const voiceBufs = new Map<string, Promise<AudioBuffer | null>>();
 let voiceSrc: AudioBufferSourceNode | null = null;
+/** Ave 的全部 clip（ave.ts 初始化时交进来）。只记着，取不取看有没有开声 */
+let voicePool: readonly string[] = [];
+let voiceWarming = false;
 
 /** 此刻能不能让 Ave 出声 */
 export function voiceReady(): boolean {
@@ -250,9 +253,13 @@ function loadVoice(c: AudioContext, src: string) {
   let p = voiceBufs.get(src);
   if (!p) {
     p = fetch(src)
-      .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject()))
+      .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(String(r.status)))))
       .then((b) => c.decodeAudioData(b))
-      .catch(() => null);
+      .catch(() => {
+        // 失败不记：预取时网络抖一下，不该让这一句在整次来访里永远没声
+        voiceBufs.delete(src);
+        return null;
+      });
     voiceBufs.set(src, p);
   }
   return p;
@@ -263,9 +270,66 @@ export function preloadVoice(src: string): void {
   if (voiceReady() && ctx) void loadVoice(ctx, src);
 }
 
-export async function playVoice(src: string): Promise<{ delayMs: number; stop: () => void } | null> {
+/** 整包预取：人声一句一个文件，每句都在开口那一刻才发请求时，冷连接 + TTFB 就要
+    一两秒，字幕得跟着等（原来那两三秒的空白就是这么来的）。整包只有 320 KB，
+    开声后一次性取完、解好，此后任何一句都是零等待。
+    没开声就不取（一个字节都不白花）；中途关掉就停下，剩下的等下次开声再取。
+    串行而非并发：并发 decodeAudioData 会把主线程排满，反而拖慢马上就要说的那一句。 */
+function warmVoices() {
+  if (voiceWarming || !ctx || levels.voice === 0 || !voicePool.length) return;
+  const net = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection;
+  if (net?.saveData) return; // 省流模式：不替访客花流量，用到了再取
+  const c = ctx;
+  voiceWarming = true;
+  const run = (i: number) => {
+    if (i >= voicePool.length || levels.voice === 0 || ctx !== c) {
+      voiceWarming = false; // 没取完：下次开声从头补齐（已取的命中缓存，不重发）
+      return;
+    }
+    void loadVoice(c, voicePool[i]).then(() => run(i + 1));
+  };
+  // 闲时起步；页面常驻动画会把纯 idle 回调饿住，故带 timeout 兜底（同 prefetchRest）
+  const ric = (
+    window as unknown as {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+    }
+  ).requestIdleCallback;
+  if (ric) ric(() => run(0), { timeout: 2000 });
+  else setTimeout(() => run(0), 1200);
+}
+
+/** 交上 Ave 的全部 clip，开声时整包取回来（ave.ts 在初始化时调用一次） */
+export function prefetchVoices(srcs: readonly string[]): void {
+  voicePool = srcs;
+  if (levels.voice === 0) return;
+  // ctx 还没建好（或 resume 还没落地）时 warmVoices 会直接返回，故等一次再起。
+  // 这一步只确保 ctx 存在，不会越过自动播放策略把声音放出来。
+  warmVoices();
+  if (!voiceWarming) void ensureCtx().then(() => warmVoices());
+}
+
+/** 放一句人声。返回开口的 ctx 时间离现在多少毫秒（字幕据此对齐）；不能出声返回 null。
+    maxWaitMs：最多等这么久（预取还没到手时）。超时返回 null 并且**不再补放**——
+    声音晚到、字已经走完了，那两样就对不上，不如这一回安静。
+    取回来的 buffer 照样留在缓存里，下一次开口就是即时的。 */
+export async function playVoice(
+  src: string,
+  maxWaitMs = Infinity,
+): Promise<{ delayMs: number; stop: () => void } | null> {
   if (!voiceReady() || !ctx) return null;
-  const b = await loadVoice(ctx, src);
+  const c = ctx;
+  const loading = loadVoice(c, src);
+  let timer = 0;
+  const b =
+    maxWaitMs === Infinity
+      ? await loading
+      : await Promise.race([
+          loading,
+          new Promise<null>((r) => {
+            timer = window.setTimeout(() => r(null), maxWaitMs);
+          }),
+        ]);
+  clearTimeout(timer);
   if (!b || !voiceReady() || !ctx) return null;
   stopVoice();
   const s = ctx.createBufferSource();
@@ -529,7 +593,7 @@ function armUnlock() {
     for (const e of evs) removeEventListener(e, go, true);
     unlockArmed = false;
     if (levels.bgm > 0 && !on) void turnOn();
-    if (levels.voice > 0) void ensureCtx().then(paint);
+    if (levels.voice > 0) void ensureCtx().then((ok) => (ok ? warmVoices() : null)).then(paint);
   };
   for (const e of evs) addEventListener(e, go, true);
 }
@@ -572,6 +636,7 @@ export function setLevel(ch: Channel, value: number): void {
       void ensureCtx().then((ok) => {
         if (!ok) return armUnlock();
         voiceGain?.gain.setTargetAtTime(curve(levels.voice), now(), LEVEL_TAU);
+        warmVoices(); // 人声这路一开就把整包取回来，头一句不必再等网络
         paint();
         // 人声从没有到有：叫 Ave 一声（台词 voice-hello）
         if (prev === 0 && levels.voice > 0) dispatchEvent(new CustomEvent('xm:ave', { detail: { name: 'voice-on' } }));
@@ -731,6 +796,9 @@ export function initSound(): void {
         bedIn: bedAtCtx === null ? null : +(bedAtCtx - now()).toFixed(2),
         bedPhase: +bedPhase.toFixed(3),
         offFor: offAt === null ? null : +((Date.now() - offAt) / 1000).toFixed(2),
+        /* Ave 人声整包预取：取到几个 / 共几个、还在不在跑 */
+        voices: `${voiceBufs.size}/${voicePool.length}`,
+        voicesWarming: voiceWarming,
       }),
       /* 量输出端实际电平：只看调度不算数，要看到样本在流 */
       probe: async (ms = 320) => {
@@ -767,6 +835,11 @@ export function initSound(): void {
     /* 隐私模式静默 */
   }
   if (levels.bgm > 0) void turnOn();
-  if (levels.voice > 0) void ensureCtx().then((ok) => (ok ? paint() : armUnlock()));
+  if (levels.voice > 0)
+    void ensureCtx().then((ok) => {
+      if (!ok) return armUnlock();
+      warmVoices();
+      paint();
+    });
   paint();
 }
