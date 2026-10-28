@@ -1,0 +1,709 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>开屏 mock 5 · 夜里的一枚开口</title>
+<link rel="icon" href="data:,">
+<script>
+  /* 首帧之前就定好放不放。data-boot 只由脚本加上 —— 无 JS 时 #boot 从不显示（不留死幕）；
+     脚本起不来时 2.6s 自己摘掉。 */
+  try {
+    var R = document.documentElement;
+    var off = matchMedia('(prefers-reduced-motion: reduce)').matches || /[?&]noboot=1/.test(location.search);
+    if (off) R.setAttribute('data-boot-skip', '');
+    else R.setAttribute('data-boot', '');
+    setTimeout(function () { if (!window.__boot) R.removeAttribute('data-boot'); }, 2600);
+  } catch (e) {}
+</script>
+<link rel="stylesheet" href="/fonts/noto/font.css">
+<link rel="stylesheet" href="/fonts/plex/400.css">
+<style>
+  :root {
+    --font-display: 'Noto Serif SC', 'Palatino Linotype', Palatino, serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
+    --amber: #9a86c4;
+  }
+  html, body { margin: 0; height: 100%; background: #0e0f1d; }
+  body { overflow: hidden; }
+
+  /* ══════════════════════════════════════════════════════════════════
+     开屏 · 夜里的一枚开口
+
+     夜不是一块幕，是一叠：八条带沿 14°（首页那根线的角度）叠成一片叶状的夜，
+     正中留着一枚开口，环与星落在开口里。开口把夜分成上下两半 ——
+     「夜里的一枚开口」就是这个正中。
+
+     四条硬约束（这一版的全部理由）：
+       · 零网络资源：没有一个 <img>，没有一处 url()；颜色与形状全是 CSS 与内联 SVG。
+       · 零 mask：不用 mask / mask-composite / clip-path / backdrop-filter，
+         也没有整屏 filter —— 光是一层静态的径向渐变（琥珀，只有中段 alpha）。
+       · 纯合成器：所有运动只写 transform / opacity，走 Web Animations 上合成线程；
+         主线程只在开场建十几条轨道，之后完全不参与。
+       · 不等资源：不等字体、不等纹理、不等 preload；脚本跑到的那一帧就是第一帧。 */
+  #boot {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: none;
+    overflow: hidden;
+    pointer-events: none;
+    contain: strict;
+    --crest: #c6ced9;      /* 随笔那池浅蓝灰：夜里的两道浅带与发丝边 */
+  }
+  html[data-boot] #boot { display: block; }
+  html[data-boot-skip] #boot { display: none; }
+
+  /* 夜：一层近乎不透的底色。它不是遮罩，是首页夜色被压深之后的样子 ——
+     最后它淡掉，首页的流光从叶缝与开口里一点点亮回来，而不是「撤幕」。 */
+  #veil {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, #090a12 0%, #0b0d18 52%, #07080f 100%);
+    opacity: 0.94;
+    will-change: opacity;
+  }
+
+  /* 骨架：与首页那根线同轴（14°）。叶与开口都挂在这里，坐标只在轴向与法向展开。 */
+  #ng {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 0;
+    height: 0;
+    transform: rotate(14deg);
+  }
+
+  /* 开口里透出来的光：垫在带下面，只从缝与开口里看得见 */
+  #glow {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 1px;
+    height: 1px;
+    margin: -1px 0 0 -1px;
+    display: block;
+    will-change: transform, opacity;
+  }
+  #glow::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: calc(var(--gw, 620px));
+    height: calc(var(--gh, 300px));
+    display: block;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background: radial-gradient(closest-side,
+      rgb(154 134 196 / 0.72) 0%,
+      rgb(154 134 196 / 0.28) 38%,
+      rgb(154 134 196 / 0) 72%);
+  }
+
+  /* 八条带：长短厚薄不一，沿 14° 叠成一枚叶。带与带之间是真的缝（缝里是夜），
+     每条上沿一根发丝亮边 —— 八条因此一眼数得清。 */
+  #stack {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 0;
+    height: 0;
+  }
+  .bd {
+    position: absolute;
+    display: block;
+    border-radius: 3px;
+    transform-origin: 50% 50%;
+    box-shadow: inset 0 1px 0 rgb(207 214 226 / 0.26), inset 0 -1px 0 rgb(0 0 0 / 0.6);
+    will-change: transform, opacity;
+  }
+
+  /* 开口：正中两带之间那道亮缝。它比别的缝宽，光是先从这里漏出来的 */
+  #slit {
+    position: absolute;
+    left: 0;
+    top: 0;
+    display: block;
+    transform-origin: 50% 50%;
+    will-change: transform, opacity;
+  }
+
+  /* 环与星：落在开口正中 */
+  .rg {
+    position: absolute;
+    left: 0;
+    top: 0;
+    display: block;
+    overflow: visible;
+    fill: none;
+    transform-origin: 50% 50%;
+    will-change: transform, opacity;
+  }
+  .rg circle { fill: none; stroke: var(--crest); stroke-width: 0.55; }
+  .ringB circle { stroke-width: 1.6; stroke-linecap: round; stroke-dasharray: 0.7 78; }
+  .st {
+    position: absolute;
+    left: 0;
+    top: 0;
+    display: block;
+    overflow: visible;
+    transform-origin: 50% 50%;
+    will-change: transform, opacity;
+  }
+  .st path { fill: var(--amber); }
+
+  @media (prefers-reduced-motion: reduce) {
+    #boot { display: none; }
+  }
+</style>
+<noscript><style>#boot { display: none; }</style></noscript>
+</head>
+<body>
+
+<div id="boot" aria-hidden="true">
+  <i id="veil"></i>
+  <div id="ng">
+    <i id="glow"></i>
+    <div id="stack">
+      <i class="bd"></i><i class="bd"></i><i class="bd"></i><i class="bd"></i>
+      <i class="bd"></i><i class="bd"></i><i class="bd"></i><i class="bd"></i>
+      <i id="slit"></i>
+      <svg class="rg ringA" viewBox="-100 -100 200 200" aria-hidden="true"><circle cx="0" cy="0" r="70"/></svg>
+      <svg class="rg ringB" viewBox="-100 -100 200 200" aria-hidden="true"><circle cx="0" cy="0" r="92"/></svg>
+      <svg class="st" viewBox="-11 -11 22 22" aria-hidden="true">
+        <path d="M0,-10C0.7,-2.6 2.6,-0.7 10,0C2.6,0.7 0.7,2.6 0,10C-0.7,2.6 -2.6,0.7 -10,0C-2.6,-0.7 -0.7,-2.6 0,-10Z"/>
+      </svg>
+    </div>
+  </div>
+</div>
+
+<!-- ─────────────────────────────────────────────────────────────
+     假首页 · 交接标的（整块复制进你 index.html 的 <body> 末尾，别改 _shared 本身）
+
+     这不是真首页，只还原「一眼认出」的那几件：
+       靛夜底 + 像素化的流光（静态，一层底图 + 网点）+ 一根 14° 波形线
+       + 左上小字与大字 + 线下三个栏头 + 左下时刻 + 右下出口 + 底部「下沉」。
+     大字按站里的做法是「流光的一扇反相窗」——这里用 backdrop-filter 近似，
+     效果对得上就够了；真首页是 canvas 反相 + 字形遮罩。
+
+     它自带 window.HomeMock 三个旋钮，给你的开屏调用：
+       HomeMock.line(0..1)       脑电线「从中心往两端画出」的进度（0 = 一个点都没有）
+       HomeMock.focus(0..1)      大字的对焦（0 = blur 14px + 透明，1 = 清楚）
+       HomeMock.pixels(px)       流光底图的一个粗颗粒提示（1 = 不粗，8 = 很粗）——
+                                 只在你想「从粗到细」时用；不用就一直是 1
+     不调也行：默认 line=1 focus=1 pixels=1，即首页静置的样子。
+     若你的开屏完全接管了入场，就在自己的时间轴里调它们，别让两段各演一遍。
+     ───────────────────────────────────────────────────────────── -->
+
+<div id="home" aria-label="首页（假）">
+  <div class="h-flow"></div>
+  <svg class="h-eeg" id="h-eeg" viewBox="0 0 1440 900" preserveAspectRatio="none" aria-hidden="true">
+    <path id="h-eeg-path" fill="none" stroke="#7f7a99" stroke-width="1.2" stroke-linecap="round" opacity=".62"></path>
+  </svg>
+
+  <div class="h-head">
+    <p class="h-kicker">个人网站</p>
+    <h1 class="h-brand">Traveritas</h1>
+  </div>
+
+  <div class="h-entries">
+    <a href="#" class="h-entry"><i></i><span class="no">01</span><b>断章</b><em>ESSAYS</em></a>
+    <a href="#" class="h-entry"><i></i><span class="no">02</span><b>闪念</b><em>MOMENTS</em></a>
+    <a href="#" class="h-entry"><i></i><span class="no">03</span><b>造物</b><em>PROJECTS</em></a>
+  </div>
+
+  <p class="h-clock">21:34 · 2026.10.18</p>
+  <nav class="h-exits"><a href="#">GitHub</a><a href="#">RSS</a><a href="#">◇ NEXUS</a></nav>
+  <p class="h-hint">下沉<i></i></p>
+</div>
+
+<style>
+  /* 只在你自己的 index.html 里用；类名都带 h- 前缀，不会撞到开屏自己的样式 */
+  #home {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    background: #0e0f1d;
+    color: #ece8f2;
+    --hx: 8vw;
+    --tan14: 0.249328;
+    font-family: var(--font-display, 'Noto Serif SC', serif);
+  }
+
+  /* 流光：三池夜色 + 一层网点（真站是 1/5 分辨率上采样的像素流光，这里用叠色近似） */
+  .h-flow {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(58vw 46vw at 6% 18%, #b9c2cf 0%, rgb(185 194 207 / 0.55) 34%, transparent 68%),
+      radial-gradient(46vw 40vw at 46% 62%, rgb(29 23 41 / 0.9) 0%, transparent 70%),
+      radial-gradient(50vw 44vw at 88% 78%, rgb(13 21 36 / 0.95) 0%, transparent 72%),
+      radial-gradient(70vw 60vw at 70% 10%, rgb(40 36 64 / 0.7) 0%, transparent 70%),
+      #0e0f1d;
+    filter: saturate(0.92);
+    transition: filter 0.4s linear;
+  }
+  .h-flow::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(circle, rgb(236 232 242 / 0.1) 0 1px, transparent 1.2px);
+    background-size: 5px 5px;
+    opacity: 0.5;
+  }
+
+  .h-eeg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    pointer-events: none;
+  }
+
+  .h-head {
+    position: absolute;
+    left: var(--hx);
+    bottom: calc(50vh + (50vw - var(--hx)) * var(--tan14) + 22px);
+  }
+  .h-kicker {
+    margin: 0 0 1.05rem 0.2em;
+    font: 500 13px/1 var(--font-display, serif);
+    letter-spacing: 0.62em;
+    color: #9a97b0;
+  }
+  .h-brand {
+    margin: 0;
+    font: 500 clamp(54px, 7.4vw, 128px)/0.86 var(--font-display, serif);
+    letter-spacing: 0.035em;
+    color: #f1edf6;
+    white-space: nowrap;
+    /* 真站里大字是「流光的一扇反相窗」（canvas 反相 + 字形遮罩）。
+       这里不真的反相：backdrop-filter 的矩形会把字周围切出一块亮板，反而失真。
+       写成一块偏冷、略透明的浅字，近似它被流光照亮的样子就够。 */
+    color: #eef0f7;
+  }
+
+  .h-entries {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+  .h-entries .h-entry {
+    position: absolute;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    pointer-events: auto;
+    text-decoration: none;
+    color: #e6e2ee;
+    transition: letter-spacing 0.5s ease;
+  }
+  /* 三个栏头挂在线下：左右位置对应将来三栏的位置，纵向跟着那根 14° 线走 */
+  .h-entries .h-entry:nth-child(1) { left: 33vw; top: calc(50vh + (33vw - 50vw) * var(--tan14) + 30px); }
+  .h-entries .h-entry:nth-child(2) { left: 52vw; top: calc(50vh + (52vw - 50vw) * var(--tan14) + 46px); }
+  .h-entries .h-entry:nth-child(3) { left: 71vw; top: calc(50vh + (71vw - 50vw) * var(--tan14) + 62px); }
+  .h-entry i {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: #9a86c4;
+    box-shadow: 0 0 10px 1px #9a86c4;
+    align-self: center;
+  }
+  .h-entry .no { font: italic 400 13px/1 var(--font-display, serif); letter-spacing: 0.08em; color: #8d8aa3; }
+  .h-entry b { font: 600 19px/1 var(--font-display, serif); letter-spacing: 0.34em; }
+  .h-entry em { font: normal 400 9px/1 var(--font-mono, monospace); letter-spacing: 0.3em; color: #8d8aa3; }
+  .h-entry:hover b { letter-spacing: 0.44em; }
+
+  .h-clock,
+  .h-exits {
+    position: absolute;
+    bottom: 26px;
+    margin: 0;
+    font: 400 10px/1 var(--font-mono, monospace);
+    letter-spacing: 0.18em;
+    color: #827f98;
+  }
+  .h-clock { left: var(--hx); }
+  .h-exits { right: 7vw; display: flex; gap: 22px; }
+  .h-exits a { color: inherit; text-decoration: none; }
+
+  .h-hint {
+    position: absolute;
+    left: 50%;
+    bottom: 22px;
+    margin: 0;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    font: 500 11px/1 var(--font-display, serif);
+    letter-spacing: 0.6em;
+    padding-left: 0.6em;
+    color: #827f98;
+  }
+  .h-hint i { width: 1px; height: 26px; background: linear-gradient(rgb(236 230 244 / 0.5), transparent); }
+
+  @media (max-width: 899px) {
+    #home { --hx: 22px; }
+    .h-brand { font-size: clamp(44px, 13vw, 72px); }
+    .h-kicker { font-size: 12px; margin-bottom: 0.8rem; }
+    .h-entries .h-entry:nth-child(1) { left: 22px; top: calc(50vh - 30px); }
+    .h-entries .h-entry:nth-child(2) { left: 22px; top: calc(50vh + 16px); }
+    .h-entries .h-entry:nth-child(3) { left: 22px; top: calc(50vh + 62px); }
+    .h-clock { display: none; }
+    .h-exits { right: 22px; }
+  }
+</style>
+
+<script>
+  window.HomeMock = (() => {
+    const flow = document.querySelector('#home .h-flow');
+    const brand = document.querySelector('#home .h-brand');
+    const path = document.getElementById('h-eeg-path');
+    const W = 1440, H = 900, TAN = Math.tan((14 * Math.PI) / 180);
+    let reveal = 1, focus = 1, px = 1;
+    /* 14° 轴上的波形线：整条线 = 视口对角线那么长，按 reveal 从中心往两端露出 */
+    function draw() {
+      const half = Math.hypot(W, H) / 2 + 40;
+      const n = 220;
+      let d = '';
+      let last = null;
+      for (let i = 0; i <= n; i++) {
+        const s = i / n;
+        const t = (s * 2 - 1) * half; // 沿线坐标
+        const x = W / 2 + Math.cos(Math.atan(TAN)) * t;
+        const y = H / 2 + Math.sin(Math.atan(TAN)) * t;
+        const wob = 3.6 * (Math.sin(t * 0.5 + performance.now() / 2000) * 0.6 + Math.sin(t * 1.9) * 0.4);
+        const ox = -Math.sin(Math.atan(TAN)) * wob;
+        const oy = Math.cos(Math.atan(TAN)) * wob;
+        const p = [x + ox, y + oy];
+        d += (last ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1);
+        last = p;
+      }
+      path.setAttribute('d', d);
+      // 从中心往两端露：用线性渐变的遮罩近似（左半 + 右半各露 reveal 的一半）
+      const m = `linear-gradient(90deg, transparent ${50 - reveal * 50}%, #000 ${50 - reveal * 50}%, #000 ${50 + reveal * 50}%, transparent ${50 + reveal * 50}%)`;
+      path.style.maskImage = m;
+      path.style.webkitMaskImage = m;
+    }
+    let raf = 0;
+    const loop = () => { draw(); raf = requestAnimationFrame(loop); };
+    loop();
+    return {
+      line(v) { reveal = v; draw(); },
+      focus(v) { focus = v; brand.style.filter = v >= 1 ? '' : `blur(${((1 - v) * 14).toFixed(2)}px)`; brand.style.opacity = String(v); },
+      pixels(v) {
+        px = v;
+        // 粗颗粒提示：把底图按倍数放大再裁回去（等价于降采样），真站是 1/5 分辨率 canvas
+        if (v <= 1) { flow.style.transform = ''; flow.style.filter = 'saturate(0.92)'; return; }
+        flow.style.transform = `scale(${v.toFixed(2)})`;
+        flow.style.transformOrigin = '50% 45%';
+        flow.style.filter = `saturate(0.92) blur(${(v * 0.6).toFixed(2)}px)`;
+      },
+      stop() { if (raf) cancelAnimationFrame(raf); raf = 0; },
+    };
+  })();
+</script>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════
+   时间轴 · 夜里的一枚开口      总长 2040ms
+
+     0 ── 520    亮起   夜压着首页；八条带在夜里显影（从开口往外，一条接一条），
+                        开口里的光、双环、星同时亮起
+   520 ── 1160   错开   带按离开口的远近沿 14° 各滑开一点（像套印没对），
+                        开口自己张开一线；光从张开的缝里漏到带上
+  1160 ── 1990   打开   带从开口中心往外飞、越飞越薄，夜淡掉 ——
+                        首页的流光从叶缝与开口里亮回来，环撑散，星沿 14° 拉成一根线
+  1990 ── 2040   静置   只剩首页静置的样子
+
+   全部走 Web Animations：一条轨道 = 一个元素 + 一条 2040ms 的 animation，关键字帧按毫秒写。
+   seek(ms) 就是把每条 animation 的 currentTime 设成 ms —— 画面因此完全确定。
+   开屏自己不等任何资源；脚本执行到的那一帧就是它的第一帧。
+   ═══════════════════════════════════════════════════════════════════════════ */
+(function () {
+  var TOTAL = 2040;
+  var root = document.documentElement;
+  var box = document.getElementById('boot');
+  var HM = window.HomeMock;
+
+  /* 首页那根波形线自带一个常驻 rAF。开屏期间它被夜盖着，纯属白跑；
+     这里停掉，并把它直接摆成静置的样子（reveal=1 / 对焦清楚）——
+     开屏接管了首页那两段入场，不让它们压在夜底下先演一遍。 */
+  if (HM) { try { HM.stop(); HM.line(1); HM.focus(1); } catch (e) {} }
+
+  var noop = function () {};
+  if (!box || root.hasAttribute('data-boot-skip')) {
+    window.__boot = { total: TOTAL, ready: true, skipped: true, pause: noop, seek: noop, resume: noop };
+    return;
+  }
+
+  var veil = document.getElementById('veil');
+  var glow = document.getElementById('glow');
+  var slit = document.getElementById('slit');
+  var bands = [].slice.call(box.querySelectorAll('.bd'));
+  var ringA = box.querySelector('.ringA');
+  var ringB = box.querySelector('.ringB');
+  var star = box.querySelector('.st');
+
+  /* 八条带：夜色只有三池（瞬间紫 / 项目深蓝 / 随笔浅蓝灰），深浅各一档。
+     从开口往上：深蓝 → 浅灰 → 深蓝 → 紫；往下镜像但把两道浅带压暗一点，
+     叶因此不对称，像真的叠起来的夜，而不是一组对称的装饰。 */
+  var TONE = [
+    'rgba(20,32,54,0.95)',    /* 0 项目深蓝 */
+    'rgba(198,206,217,0.5)',  /* 1 随笔浅灰 */
+    'rgba(26,40,66,0.96)',    /* 2 项目深蓝 */
+    'rgba(38,31,60,0.96)',    /* 3 瞬间紫 */
+    'rgba(45,38,68,0.96)',    /* 4 瞬间紫 */
+    'rgba(198,206,217,0.3)',  /* 5 随笔浅灰（压暗） */
+    'rgba(26,40,66,0.96)',    /* 6 项目深蓝 */
+    'rgba(16,24,42,0.95)'     /* 7 项目深蓝（最暗） */
+  ];
+  /* 每条两头化进夜里（不到 4 成透明），叶因此没有切齐的边 */
+  var ENDFADE = 'linear-gradient(90deg, rgba(7,8,14,0.92) 0%, rgba(7,8,14,0.12) 22%, rgba(7,8,14,0) 50%, rgba(7,8,14,0.12) 78%, rgba(7,8,14,0.92) 100%)';
+
+  /* 基准厚度（px）：八条 + 七道缝 = 467；实际按视口缩放，见 geo() */
+  var HW = [33, 45, 57, 67, 67, 57, 45, 33];
+  var GW = [9, 9, 9, 18, 9, 9, 9];   /* 正中那道缝最宽 —— 那就是开口 */
+  var LW = [0.42, 0.63, 0.84, 0.98, 0.98, 0.84, 0.63, 0.42];
+  var BASE = HW.reduce(function (a, b) { return a + b; }, 0) + GW.reduce(function (a, b) { return a + b; }, 0);
+
+  bands.forEach(function (b, i) {
+    b.style.background = ENDFADE + ', ' + TONE[i];
+  });
+
+  var EASE = {
+    out: 'cubic-bezier(.16,1,.3,1)',
+    io: 'cubic-bezier(.5,0,.22,1)',
+    soft: 'cubic-bezier(.33,.9,.24,1)',
+    in: 'cubic-bezier(.6,.02,.85,.4)'
+  };
+
+  var G = {};
+  var anims = [];
+  var cur = 0;
+  var paused = false;
+
+  function geo() {
+    var W = innerWidth;
+    var H = innerHeight;
+    var perp = Math.max(260, Math.min(560, H * 0.56));   /* 叶在法向上的总厚度 */
+    perp = Math.min(perp, W * 0.92);                     /* 窄屏不要把叶撑出两侧 */
+    var len = Math.min(W * 0.88, 1040);                  /* 叶沿 14° 的长度 */
+    var k = perp / BASE;
+    var orb = Math.min(len * 0.85, perp * 1.02);
+    var starPx = Math.max(24, orb * 0.155);
+    G = { W: W, H: H, perp: perp, len: len, k: k, orb: orb, star: starPx };
+
+    box.style.setProperty('--gw', (orb * 1.35).toFixed(0) + 'px');
+    box.style.setProperty('--gh', (perp * 0.78).toFixed(0) + 'px');
+
+    var y = -perp / 2;
+    bands.forEach(function (b, i) {
+      var h = HW[i] * k;
+      var w = LW[i] * len;
+      b.style.width = w.toFixed(2) + 'px';
+      b.style.height = h.toFixed(2) + 'px';
+      b.style.left = (-w / 2).toFixed(2) + 'px';
+      b.style.top = y.toFixed(2) + 'px';
+      y += h + GW[i] * k;
+    });
+
+    /* 开口：正中那道缝上的一道亮线 */
+    var sw = len * 0.9;
+    var sh = Math.max(2, 3.4 * k);
+    slit.style.width = sw.toFixed(1) + 'px';
+    slit.style.height = sh.toFixed(1) + 'px';
+    slit.style.left = (-sw / 2).toFixed(1) + 'px';
+    slit.style.top = (-sh / 2).toFixed(1) + 'px';
+    slit.style.background =
+      'linear-gradient(90deg, rgb(230 234 244 / 0) 0%, rgb(207 214 226 / 0.5) 22%,' +
+      ' rgb(240 236 250 / 0.95) 50%, rgb(207 214 226 / 0.5) 78%, rgb(230 234 244 / 0) 100%)';
+
+    [ringA, ringB].forEach(function (r) {
+      r.style.width = orb.toFixed(1) + 'px';
+      r.style.height = orb.toFixed(1) + 'px';
+      r.style.left = (-orb / 2).toFixed(1) + 'px';
+      r.style.top = (-orb / 2).toFixed(1) + 'px';
+    });
+    star.style.width = starPx.toFixed(1) + 'px';
+    star.style.height = starPx.toFixed(1) + 'px';
+    star.style.left = (-starPx / 2).toFixed(1) + 'px';
+    star.style.top = (-starPx / 2).toFixed(1) + 'px';
+  }
+
+  function T(tx, ty, sx, sy) {
+    return 'translate3d(' + tx.toFixed(2) + 'px,' + ty.toFixed(2) + 'px,0) scale(' +
+      sx.toFixed(4) + ',' + sy.toFixed(4) + ')';
+  }
+  function TR(deg, sx, sy) {
+    return 'rotate(' + deg.toFixed(2) + 'deg) scale(' + sx.toFixed(4) + ',' + sy.toFixed(4) + ')';
+  }
+
+  /* 一条轨道：关键字帧 [毫秒, 属性, 这一段用的缓动]；末帧自动补到 offset:1 */
+  function track(el, keys) {
+    var fr = keys.map(function (k) {
+      var o = { offset: Math.min(1, Math.max(0, k[0] / TOTAL)), easing: k[2] || 'linear' };
+      for (var p in k[1]) o[p] = k[1][p];
+      return o;
+    });
+    if (fr[fr.length - 1].offset < 1) {
+      var last = { offset: 1, easing: 'linear' };
+      for (var p2 in fr[fr.length - 1]) {
+        if (p2 === 'offset' || p2 === 'easing') continue;
+        last[p2] = fr[fr.length - 1][p2];
+      }
+      fr.push(last);
+    }
+    var a = el.animate(fr, { duration: TOTAL, fill: 'both', easing: 'linear' });
+    a.pause();
+    a.currentTime = cur;
+    anims.push(a);
+    return a;
+  }
+
+  function build() {
+    anims.forEach(function (a) { try { a.cancel(); } catch (e) {} });
+    anims = [];
+
+    var k = G.k;
+
+    /* ── 八条带 ──────────────────────────────────────────────────────── */
+    bands.forEach(function (b, i) {
+      var above = i < 4;
+      var sg = above ? -1 : 1;
+      var axis = above ? 3.5 - i : i - 3.5;              /* 离开口几格：0.5 … 3.5 */
+      var d0 = 40 + (3.5 - axis) * 62;                   /* 显影从开口往外 */
+      var dx = (i % 2 ? 1 : -1) * (12 + axis * 5) * k;   /* ②沿 14° 的错版 */
+      var sep = (3.4 - axis) * 9 * k;                    /* ②开口张开：里层的先让 */
+      var fly = (0.58 + (3.5 - axis) * 0.17) * G.H;      /* ③里层飞得最远，开口从中心裂开 */
+      var t0 = 1160 + (3.5 - axis) * 52;                 /* ③里层先动 */
+      var bloom = 26 * k;                                 /* ①从开口往外摊开 */
+      track(b, [
+        [0, { transform: T(0, sg * -bloom, 0.58, 0.86), opacity: '0' }],
+        [d0, { transform: T(0, sg * -bloom, 0.58, 0.86), opacity: '0.16' }, EASE.out],
+        [d0 + 400, { transform: T(0, 0, 1, 1), opacity: '1' }, EASE.io],
+        [800, { transform: T(dx, sg * sep, 1, 1), opacity: '1' }, EASE.io],
+        [1030, { transform: T(dx * 0.4, sg * (sep + 5 * k), 1, 1), opacity: '1' }, EASE.in],
+        [1160, { transform: T(0, sg * sep * 0.7, 1, 1), opacity: '1' }, EASE.io],
+        [t0 + 420, { transform: T(dx * 0.18, sg * fly * 0.55, 1.01, 0.82), opacity: '0.9' }, EASE.io],
+        [1970, { transform: T(dx * 0.26, sg * fly, 1.03, 0.52), opacity: '0' }]
+      ]);
+    });
+
+    /* ── 开口的亮线：先亮，随后跟着开口张开，最后被拉长淡掉 ─────────────── */
+    track(slit, [
+      [0, { transform: T(0, 0, 0.06, 0.6), opacity: '0' }],
+      [90, { transform: T(0, 0, 0.06, 0.6), opacity: '0' }, EASE.out],
+      [520, { transform: T(0, 0, 1, 1), opacity: '1' }, EASE.io],
+      [1160, { transform: T(0, 0, 1.02, 1.5), opacity: '1' }, EASE.in],
+      [1520, { transform: T(0, 0, 1.22, 1.4), opacity: '0.5' }, EASE.io],
+      [1860, { transform: T(0, 0, 1.6, 1.1), opacity: '0' }]
+    ]);
+
+    /* ── 里的光：垫在带下面，只从缝与开口漏出来 ─────────────────────────── */
+    track(glow, [
+      [0, { transform: TR(0, 0.5, 0.5), opacity: '0' }],
+      [180, { transform: TR(0, 0.5, 0.5), opacity: '0' }, EASE.out],
+      [740, { transform: TR(0, 1, 1), opacity: '0.95' }, EASE.io],
+      [1160, { transform: TR(0, 1.1, 1.1), opacity: '1' }, EASE.in],
+      [1620, { transform: TR(0, 1.7, 1.7), opacity: '0' }]
+    ]);
+
+    /* ── 开口里的双环与星 ──────────────────────────────────────────────── */
+    track(ringA, [
+      [0, { transform: TR(0, 0.86, 0.86), opacity: '0' }],
+      [140, { transform: TR(0, 0.86, 0.86), opacity: '0' }, EASE.out],
+      [660, { transform: TR(14, 1, 1), opacity: '0.72' }, EASE.io],
+      [1160, { transform: TR(56, 1.03, 1.03), opacity: '0.66' }, EASE.in],
+      [1730, { transform: TR(92, 2.5, 2.5), opacity: '0' }]
+    ]);
+    track(ringB, [
+      [0, { transform: TR(0, 0.9, 0.9), opacity: '0' }],
+      [200, { transform: TR(0, 0.9, 0.9), opacity: '0' }, EASE.out],
+      [700, { transform: TR(-10, 1, 1), opacity: '0.5' }, EASE.io],
+      [1160, { transform: TR(-44, 1.05, 1.05), opacity: '0.42' }, EASE.in],
+      [1790, { transform: TR(-116, 1.7, 1.7), opacity: '0' }]
+    ]);
+    track(star, [
+      [0, { transform: TR(0, 0.2, 0.2), opacity: '0' }],
+      [240, { transform: TR(0, 0.2, 0.2), opacity: '0' }, EASE.out],
+      [580, { transform: TR(34, 1.1, 1.1), opacity: '1' }, EASE.soft],
+      [760, { transform: TR(30, 1, 1), opacity: '1' }, EASE.io],
+      [1160, { transform: TR(14, 1.05, 1.05), opacity: '1' }, EASE.io],
+      [1400, { transform: TR(14, 1.3, 1.25), opacity: '0.95' }, EASE.in],
+      [1830, { transform: TR(14, 5.2, 0.26), opacity: '0' }]
+    ]);
+
+    /* ── 夜：最后淡掉的一层。它本来就是首页的夜色被压深，退开时不会跳色 ──── */
+    track(veil, [
+      [0, { opacity: '1' }],
+      [1290, { opacity: '1' }, EASE.io],
+      [1970, { opacity: '0' }]
+    ]);
+  }
+
+  geo();
+  build();
+  anims.forEach(function (a) { a.play(); });
+
+  /* ── 统一控制口 ──────────────────────────────────────────────────── */
+  var api = {
+    total: TOTAL,
+    ready: false,
+    pause: function () {
+      paused = true;
+      anims.forEach(function (a) { a.pause(); });
+    },
+    seek: function (ms) {
+      cur = Math.max(0, Math.min(TOTAL, Number(ms) || 0));
+      if (root.hasAttribute('data-boot-skip')) return;
+      root.setAttribute('data-boot', '');
+      anims.forEach(function (a) { a.pause(); a.currentTime = cur; });
+    },
+    resume: function () {
+      paused = false;
+      anims.forEach(function (a) { a.play(); });
+    },
+    geo: function () { return { perp: G.perp, len: G.len, orb: G.orb, star: G.star }; }
+  };
+  window.__boot = api;
+
+  /* 走完就整层摘掉：不留一块隐身但仍在的幕，也不留合成层 */
+  var tail = anims[anims.length - 1];
+  if (tail) {
+    Promise.resolve(tail.finished).then(function () {
+      cur = TOTAL;
+      if (!paused) root.removeAttribute('data-boot');
+    }).catch(noop);
+  }
+
+  /* 视口变了重排（mock 用；真站可按需处理） */
+  var rt = 0;
+  addEventListener('resize', function () {
+    clearTimeout(rt);
+    rt = setTimeout(function () {
+      var keep = cur;
+      geo();
+      build();
+      api.seek(keep);
+    }, 180);
+  });
+
+  /* ready 等字体（首页要用），最多 1500ms。开屏自己不等。 */
+  requestAnimationFrame(function () {
+    var fonts = document.fonts ? document.fonts.ready : Promise.resolve();
+    var cap = new Promise(function (r) { setTimeout(r, 1500); });
+    Promise.race([fonts, cap]).then(function () {
+      requestAnimationFrame(function () { api.ready = true; });
+    });
+  });
+})();
+</script>
+</body>
+</html>

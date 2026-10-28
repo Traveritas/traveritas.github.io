@@ -1,0 +1,459 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>开屏 2 迭代 · 跳 / 连续 / 混合 · 对照台</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/fonts/noto/font.css">
+<link rel="stylesheet" href="/fonts/plex/400.css">
+<style>
+  :root {
+    --bg: #0a0b14;
+    --panel: #0e0f1d;
+    --fg: #ece8f2;
+    --soft: #b7b3c8;
+    --faint: #827f98;
+    --line: rgb(236 232 242 / 0.12);
+    --amber: #9a86c4;
+    --a: #c6ced9;
+    --b: #9a86c4;
+    --c: #86b3c6;
+    --font-display: 'Noto Serif SC', 'Songti SC', serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font-display); }
+  body { padding: 30px clamp(14px, 3.5vw, 48px) 64px; }
+
+  h1 { margin: 0 0 6px; font-size: 21px; font-weight: 500; letter-spacing: 0.1em; }
+  h2 { margin: 44px 0 10px; font-size: 15px; font-weight: 500; letter-spacing: 0.22em; color: var(--soft); }
+  .lede { margin: 0 0 20px; max-width: 70em; font-size: 12.5px; line-height: 1.95; color: var(--soft); }
+  .lede code { font-family: var(--font-mono); font-size: 0.92em; color: var(--amber); }
+  p.note { margin: 8px 0 0; font: 400 11px/1.8 var(--font-mono); color: var(--faint); }
+
+  /* ── 控制条 ── */
+  .bar {
+    position: sticky; top: 0; z-index: 20;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 12px;
+    margin: 0 0 18px; padding: 11px 14px;
+    border: 1px solid var(--line); border-radius: 4px;
+    background: rgb(10 11 20 / 0.94);
+    backdrop-filter: blur(10px);
+  }
+  .bar button {
+    appearance: none; border: 1px solid var(--line); border-radius: 3px;
+    background: transparent; color: var(--fg); cursor: pointer;
+    padding: 7px 13px; font: 500 12px/1 var(--font-display); letter-spacing: 0.14em;
+    transition: border-color 0.18s, color 0.18s;
+  }
+  .bar button:hover, .bar button.on { border-color: var(--amber); color: var(--amber); }
+  .bar label { display: flex; align-items: center; gap: 8px; font: 400 11px/1 var(--font-mono); color: var(--faint); }
+  .bar input[type=range] { width: min(48vw, 440px); accent-color: var(--amber); }
+  .bar .t { font: 400 11px/1 var(--font-mono); color: var(--amber); min-width: 5.5em; }
+  .bar .hint { margin-left: auto; font: 400 10.5px/1.7 var(--font-mono); color: var(--faint); }
+
+  /* ── 三候选同屏 ── */
+  .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+  @media (max-width: 1100px) { .grid { grid-template-columns: 1fr; } }
+  .cell { border: 1px solid var(--line); border-radius: 4px; overflow: hidden; background: #0b0c16; }
+  .cell header { display: flex; align-items: baseline; gap: 9px; padding: 9px 12px; border-bottom: 1px solid var(--line); }
+  .cell header b { font: 500 12.5px/1 var(--font-display); letter-spacing: 0.14em; }
+  .cell header em { font: normal 400 9.5px/1 var(--font-mono); color: var(--faint); letter-spacing: 0.12em; }
+  .cell header .ms { margin-left: auto; font: 400 10px/1 var(--font-mono); color: var(--amber); }
+  .cell .frame { position: relative; aspect-ratio: 16 / 10; overflow: hidden; }
+  .cell iframe {
+    position: absolute; left: 0; top: 0; width: 1440px; height: 900px;
+    border: 0; display: block; background: var(--panel);
+    transform-origin: 0 0; transform: scale(var(--s, 0.28));
+  }
+  .cell .readout { padding: 8px 12px 10px; border-top: 1px solid var(--line); font: 400 10.5px/1.8 var(--font-mono); color: var(--faint); }
+  .cell .readout b { color: var(--soft); font-weight: 400; }
+
+  /* ── 曲线 ── */
+  .chart-wrap { position: relative; border: 1px solid var(--line); border-radius: 4px; background: #0b0c16; padding: 10px 12px 6px; }
+  #chart { display: block; width: 100%; height: 210px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 18px; padding: 6px 2px 4px; font: 400 10.5px/1.6 var(--font-mono); color: var(--faint); }
+  .legend i { display: inline-block; width: 22px; height: 2px; vertical-align: middle; margin-right: 6px; }
+  .legend .dash i { background: repeating-linear-gradient(90deg, currentColor 0 4px, transparent 4px 7px); }
+
+  /* ── 胶片条 ── */
+  .strips { --w: 240px; }
+  .strips.zoom-1 { --w: 150px; }
+  .strips.zoom-2 { --w: 360px; }
+  .ruler { display: flex; align-items: baseline; gap: 10px; margin: 4px 0 8px; font: 400 10px/1 var(--font-mono); color: var(--faint); overflow: hidden; }
+  .ruler .btn { margin-left: auto; }
+  .strip-row { display: grid; grid-template-columns: 138px 1fr; gap: 10px; align-items: start; padding: 10px 0 14px; border-top: 1px solid var(--line); }
+  .strip-row > .name { position: sticky; left: 0; font: 400 11px/1.7 var(--font-mono); color: var(--soft); }
+  .strip-row > .name b { display: block; font: 500 12px/1.5 var(--font-display); letter-spacing: 0.1em; color: var(--fg); }
+  .strip { display: flex; gap: 2px; overflow-x: auto; padding-bottom: 6px; scrollbar-width: thin; }
+  .strip figure { margin: 0; flex: 0 0 auto; position: relative; }
+  .strip img { display: block; width: var(--w); height: auto; background: var(--panel); }
+  .strip figcaption { font: 400 9px/1.6 var(--font-mono); color: var(--faint); padding-top: 2px; }
+  .strip figure.cut::before {
+    content: ''; position: absolute; left: 0; right: 0; top: 0; height: 3px;
+    background: var(--amber); box-shadow: 0 0 10px 0 var(--amber);
+  }
+  .strip figure.cut figcaption { color: var(--amber); }
+
+  /* ── 实测表 ── */
+  table { border-collapse: collapse; width: 100%; max-width: 760px; font: 400 11px/1.9 var(--font-mono); color: var(--soft); }
+  th, td { text-align: right; padding: 3px 10px; border-bottom: 1px solid var(--line); }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--faint); font-weight: 400; }
+  .evidence { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 8px; }
+  .evidence a { color: var(--soft); font: 400 11px/1.9 var(--font-mono); text-decoration: none; border-bottom: 1px solid var(--line); }
+  .evidence a:hover { color: var(--amber); border-color: var(--amber); }
+  .warn { color: var(--amber); }
+</style>
+</head>
+<body>
+
+<h1>开屏 2 · 粗到细 · 跳 ／ 连续 ／ 混合</h1>
+<p class="lede">
+  三案同一条时间轴（总长 <code>2000ms</code>，终帧都落在同一张假首页）。上面三格是活页；拖滑杆 = 把三案一起钉到同一毫秒。
+  <b>B 案（用户选定）</b>这一轮改成「起始格极粗」：0ms 时一格 = max(视口宽, 高)×1.2（1440×900 下是 1728px），
+  整屏只有一块，它的颜色就是这块的均值；停 120ms，再从这一格连续收细到 5px / 26 阶 ——
+  过程中会看到 1 块 → 2 块 → 4 块，这是分辨率真的在变（不是叠了一层纯色）。
+  B 还有 <code>?print=1</code> 可切回上一版粗段的块级 Bayer 质感。
+  下面「曲线」看节奏：细实线是格子边长（屏 px，对数轴，纵轴从 5 到 1728），点线是量化阶数；
+  两条线怎么落，就是跳与连续的区别。
+  再下面「胶片条」是同一条时间轴每 <code>80ms</code> 抽一帧，一排一案 —— 静帧里也能看出 A 是一格一格换、
+  B 是一块→分裂→一路变细、C 前段换、后段流。
+</p>
+
+<div class="bar">
+  <button id="replay">重播（同步）</button>
+  <button id="toggle">暂停</button>
+  <label>时间 <input id="scrub" type="range" min="0" max="2000" value="0"></label>
+  <span class="t" id="tlabel">0ms</span>
+  <span class="hint">暂停后拖滑杆：三案按同一毫秒 seek，帧完全确定</span>
+</div>
+
+<div class="grid" id="grid"></div>
+
+<h2>节奏 · 格子与阶数随时间</h2>
+<div class="chart-wrap">
+  <canvas id="chart"></canvas>
+  <div class="legend">
+    <span><i style="background:var(--a)"></i>A 格宽</span>
+    <span><i style="background:var(--b)"></i>B 格宽</span>
+    <span><i style="background:var(--c)"></i>C 格宽</span>
+    <span class="dash" style="color:var(--faint)"><i></i>量化阶数（0–26，虚线）</span>
+    <span>格宽 5px 在纵轴最下；B 的首帧一格 1728px，接近最上</span>
+  </div>
+</div>
+
+<h2>胶片条 · 每 80ms 一帧（0–2000ms）</h2>
+<div class="ruler">
+  <span>生成：<code>node design/mocks/boot/iter/2-grain/.shot.cjs</code> → <code>.shots/film/</code></span>
+  <span class="btn">缩放
+    <button data-zoom="0" class="on">1×</button>
+    <button data-zoom="1">0.6×</button>
+    <button data-zoom="2">1.5×</button>
+  </span>
+</div>
+<div class="strips" id="strips"></div>
+
+<h2>实测 · 每帧重画耗时（seek 20 次平均）</h2>
+<table id="cost"></table>
+<p class="note" id="costNote">每格单位 ms。重画路径 = 页面自己的 seek(ms)，不是只算 canvas。数据来自 <code>.shots/meta.json</code>（跑过截图脚本后才有）。</p>
+
+<h2>证据截图</h2>
+<div class="evidence">
+  <a href=".shots/contact-a-step.png">A · 8 帧拼版</a>
+  <a href=".shots/contact-b-flow.png">B · 8 帧拼版</a>
+  <a href=".shots/contact-b-first.png">B · 首帧与显影（0/80/160/240/320ms）</a>
+  <a href=".shots/contact-print.png">B · 干净 ／ print 对照</a>
+  <a href=".shots/contact-c-hybrid.png">C · 8 帧拼版</a>
+  <a href=".shots/contact-film-a-step.png">A · 胶片条密帧</a>
+  <a href=".shots/contact-film-b-flow.png">B · 胶片条密帧</a>
+  <a href=".shots/contact-film-c-hybrid.png">C · 胶片条密帧</a>
+  <a href=".shots/contact-misc.png">手机 / reduced-motion</a>
+  <a href=".shots/contact-ease.png">B · 三种缓动</a>
+  <a href=".shots/meta.json">meta.json</a>
+</div>
+
+<script>
+  const TOTAL = 2000;
+  const CANDS = [
+    { dir: 'a-step', name: 'A · 一段一段跳', note: '硬切 · 6 级 5 跳 · 各停 160–300ms' },
+    { dir: 'b-flow', name: 'B · 连续收细（选定）', note: '首帧一格 1728px（整屏一块）· 停 120ms · 连续收细 · ?print=1 旧印刷质感' },
+    { dir: 'c-hybrid', name: 'C · 粗处跳，细处连', note: '3 次跳 + 一段连续收束' },
+  ];
+
+  /* ── 建三格 ── */
+  const grid = document.getElementById('grid');
+  const frames = [];
+  for (const c of CANDS) {
+    const el = document.createElement('section');
+    el.className = 'cell';
+    el.innerHTML =
+      '<header><b>' + c.name + '</b><em>' + c.dir + '</em><span class="ms">2000ms</span></header>' +
+      '<div class="frame"><iframe src="./' + c.dir + '/" title="' + c.name + '" loading="eager"></iframe></div>' +
+      '<p class="readout">' + c.note + ' · <b class="out">…</b></p>';
+    grid.appendChild(el);
+    frames.push({ dir: c.dir, iframe: el.querySelector('iframe'), out: el.querySelector('.out') });
+  }
+
+  const bootOf = (f) => {
+    try { return f.iframe.contentWindow.__boot || null; } catch { return null; }
+  };
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  function whenReady(f) {
+    return new Promise((res) => {
+      const t = setInterval(() => {
+        const b = bootOf(f);
+        if (b && b.ready) { clearInterval(t); res(b); }
+      }, 40);
+    });
+  }
+  const allBoot = () => frames.map((f) => bootOf(f)).filter(Boolean);
+
+  /* 每个 iframe 里的画面是 1440×900，等比缩进格子里（保持桌面排版，不会被压成手机版） */
+  function fit() {
+    for (const f of frames) {
+      const box = f.iframe.parentElement;
+      f.iframe.style.setProperty('--s', (box.clientWidth / 1440).toFixed(4));
+    }
+  }
+  addEventListener('resize', fit);
+
+  /* ── 控制 ── */
+  const scrub = document.getElementById('scrub');
+  const tlabel = document.getElementById('tlabel');
+  const toggle = document.getElementById('toggle');
+  let playing = false;
+
+  function setPlaying(v) {
+    playing = v;
+    toggle.textContent = v ? '暂停' : '播放';
+    toggle.classList.toggle('on', !v);
+    for (const b of allBoot()) v ? (b.resume ? b.resume() : 0) : (b.pause ? b.pause() : 0);
+  }
+  toggle.onclick = () => setPlaying(!playing);
+
+  function seekAll(ms) {
+    for (const b of allBoot()) if (b.seek) b.seek(ms);
+    const t = Math.round(ms);
+    tlabel.textContent = t + 'ms';
+    scrub.value = t;
+    drawChart(t);
+    updateReadout(t);
+  }
+  function updateReadout(ms) {
+    for (const f of frames) {
+      const b = bootOf(f);
+      if (!b || !b.probe) continue;
+      const s = b.probe(ms);
+      const wholeNote = s.whole ? '整屏一格 · ' : '';
+      f.out.textContent = wholeNote + '格 ' + s.cellPx.toFixed(1) + 'px · ' + Math.round(s.levels) + ' 阶';
+    }
+  }
+
+  scrub.oninput = () => { if (playing) setPlaying(false); seekAll(+scrub.value); };
+  addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'INPUT') return;
+    if (e.code === 'Space') { e.preventDefault(); setPlaying(!playing); }
+    if (e.code === 'ArrowRight') seekAll(Math.min(TOTAL, +scrub.value + 16));
+    if (e.code === 'ArrowLeft') seekAll(Math.max(0, +scrub.value - 16));
+  });
+
+  document.getElementById('replay').onclick = async () => {
+    for (const f of frames) f.iframe.contentWindow.location.reload();
+    await sleep(120);
+    await Promise.all(frames.map(whenReady));
+    seekAll(0);
+    if (playing) setPlaying(true);
+  };
+
+  /* ── 曲线：格子（对数）与阶数 ── */
+  const cv = document.getElementById('chart');
+  function drawChart(cursor) {
+    const dpr = Math.min(2, devicePixelRatio || 1);
+    const W = cv.clientWidth;
+    const H = 210;
+    if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) {
+      cv.width = Math.round(W * dpr);
+      cv.height = Math.round(H * dpr);
+    }
+    const g = cv.getContext('2d');
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.clearRect(0, 0, W, H);
+    const L0 = 46, R = 40, T = 12, B = 24;
+    const x = (ms) => L0 + (W - L0 - R) * (ms / TOTAL);
+    const yCell = (px) => {
+      // 5px → 底，1728px（B 的首帧一格）→ 顶（对数）；A/C 的 56px 顶也落在下半区
+      const lo = Math.log(5), hi = Math.log(1728);
+      return T + (H - T - B) * (1 - (Math.log(px) - lo) / (hi - lo));
+    };
+    const yLv = (lv) => T + (H - T - B) * (1 - (lv - 3) / (26 - 3));
+
+    g.font = '10px "IBM Plex Mono", monospace';
+    g.lineWidth = 1;
+    // 横网格：每 250ms
+    for (let ms = 0; ms <= TOTAL; ms += 250) {
+      g.strokeStyle = ms % 500 === 0 ? 'rgba(236,232,242,0.13)' : 'rgba(236,232,242,0.06)';
+      g.beginPath(); g.moveTo(x(ms), T); g.lineTo(x(ms), H - B); g.stroke();
+      g.fillStyle = 'rgba(130,127,152,0.9)';
+      g.fillText(ms + 'ms', x(ms) - 12, H - 8);
+    }
+    // 纵刻度：格 5 / 20 / 100 / 500 / 1728（对数）
+    for (const v of [5, 20, 100, 500, 1728]) {
+      g.strokeStyle = 'rgba(236,232,242,0.07)';
+      g.beginPath(); g.moveTo(L0, yCell(v)); g.lineTo(W - R, yCell(v)); g.stroke();
+      g.fillStyle = 'rgba(130,127,152,0.75)';
+      g.fillText(v + 'px', 4, yCell(v) + 3);
+    }
+    // 阶数右轴
+    g.textAlign = 'right';
+    for (const v of [3, 13, 26]) {
+      g.fillStyle = 'rgba(130,127,152,0.6)';
+      g.fillText(v + '阶', W - 6, yLv(v) + 3);
+    }
+    g.textAlign = 'left';
+
+    /* B 的首帧：0–120ms 一整块（一格比整屏还大）。这一段 B 的格宽线在最上面几乎不动，
+       标出来才不让人以为曲线画错了。 */
+    const HOLD = 120;
+    g.fillStyle = 'rgba(154,134,196,0.07)';
+    g.fillRect(x(0), T, x(HOLD) - x(0), H - T - B);
+    g.fillStyle = 'rgba(154,134,196,0.85)';
+    g.fillText('B 整屏一格 0–120', x(8) + 4, T + 12);
+
+    const colors = { 'a-step': '#c6ced9', 'b-flow': '#9a86c4', 'c-hybrid': '#86b3c6' };
+    for (const f of frames) {
+      const b = bootOf(f);
+      if (!b || !b.probe) continue;
+      const col = colors[f.dir] || '#fff';
+      const pts = [];
+      for (let ms = 0; ms <= TOTAL; ms += 8) pts.push([ms, b.probe(ms)]);
+      // 阶数（虚线，淡）
+      g.setLineDash([4, 4]);
+      g.strokeStyle = col + '88';
+      g.lineWidth = 1;
+      g.beginPath();
+      pts.forEach(([ms, s], i) => (i ? g.lineTo : g.moveTo).call(g, x(ms), yLv(s.levels)));
+      g.stroke();
+      g.setLineDash([]);
+      // 格宽（实线）
+      g.strokeStyle = col;
+      g.lineWidth = 1.6;
+      g.beginPath();
+      pts.forEach(([ms, s], i) => (i ? g.lineTo : g.moveTo).call(g, x(ms), yCell(s.cellPx)));
+      g.stroke();
+    }
+    // 游标
+    if (cursor != null) {
+      g.strokeStyle = 'rgba(236,232,242,0.55)';
+      g.lineWidth = 1;
+      g.beginPath(); g.moveTo(x(cursor), T); g.lineTo(x(cursor), H - B); g.stroke();
+    }
+  }
+
+  /* ── 胶片条 ── */
+  const FILM_STEP = 80;
+  const FILM_N = 26;
+  const strips = document.getElementById('strips');
+  const stripEls = [];
+  for (const c of CANDS) {
+    const row = document.createElement('div');
+    row.className = 'strip-row';
+    const figs = [];
+    for (let i = 0; i < FILM_N; i++) {
+      const fig = document.createElement('figure');
+      fig.innerHTML =
+        '<img loading="lazy" alt="' + c.dir + ' t=' + i * FILM_STEP + 'ms" src=".shots/film/' + c.dir + '/' +
+        String(i).padStart(2, '0') + '.png"><figcaption>' + i * FILM_STEP + '</figcaption>';
+      row.appendChild(fig); // 占位，稍后搬进 .strip
+      figs.push(fig);
+    }
+    const name = document.createElement('div');
+    name.className = 'name';
+    name.innerHTML = '<b>' + c.name + '</b>' + c.dir;
+    const strip = document.createElement('div');
+    strip.className = 'strip';
+    for (const f of figs) strip.appendChild(f);
+    row.innerHTML = '';
+    row.appendChild(name);
+    row.appendChild(strip);
+    strips.appendChild(row);
+    stripEls.push({ dir: c.dir, figs, strip });
+  }
+
+  /* 标出「这一帧刚刚跳了」：靠 probe 的 state 变化，不靠猜 */
+  function markCuts() {
+    for (const s of stripEls) {
+      const b = (frames.find((f) => f.dir === s.dir) || {});
+      const boot = b && bootOf(b);
+      if (!boot || !boot.probe) continue;
+      let prev = null;
+      s.figs.forEach((fig, i) => {
+        const st = boot.probe(i * FILM_STEP).state;
+        if (prev !== null && st !== prev && st >= 0) fig.classList.add('cut');
+        prev = st;
+      });
+    }
+  }
+
+  document.querySelectorAll('[data-zoom]').forEach((btn) => {
+    btn.onclick = () => {
+      document.querySelectorAll('[data-zoom]').forEach((b) => b.classList.remove('on'));
+      btn.classList.add('on');
+      strips.className = 'strips zoom-' + btn.dataset.zoom;
+    };
+  });
+
+  /* ── 实测表 ── */
+  async function loadMeta() {
+    try {
+      const m = await (await fetch('.shots/meta.json')).json();
+      const times = [0, 300, 600, 900, 1200, 1500];
+      let html = '<tr><th>候选</th>' + times.map((t) => '<th>t=' + t + '</th>').join('') +
+        '<th>播放重画次数</th><th>60fps 掉帧</th></tr>';
+      for (const c of CANDS) {
+        const d = m.candidates && m.candidates[c.dir];
+        if (!d) continue;
+        html += '<tr><td>' + c.name.split(' · ')[0] + '</td>' +
+          times.map((t) => '<td>' + (d.cost && d.cost[t] != null ? d.cost[t] : '—') + '</td>').join('') +
+          '<td>' + (d.play ? d.play.paints + ' / ' + d.play.frames + ' 帧' : '—') + '</td>' +
+          '<td>' + (d.play ? (d.play.over20ms + ' 帧 >20ms') : '—') + '</td></tr>';
+      }
+      document.getElementById('cost').innerHTML = html;
+      const b = m.candidates && m.candidates['b-flow'];
+      if (b && b.playMobile4x) {
+        document.getElementById('costNote').textContent =
+          '每格单位 ms。B 案手机 390×844 + 4× CPU 降速：' + b.playMobile4x.avgDelta + 'ms/帧（p95 ' +
+          b.playMobile4x.p95Delta + '，最大 ' + b.playMobile4x.maxDelta + '，>20ms ' + b.playMobile4x.over20ms + ' 帧）。';
+      }
+    } catch (e) {
+      document.getElementById('costNote').textContent = '还没跑截图脚本，所以没有 meta.json。先 node design/mocks/boot/iter/2-grain/.shot.cjs。';
+    }
+  }
+
+  /* ── 起来 ── */
+  (async () => {
+    fit();
+    await Promise.all(frames.map(whenReady));
+    fit();
+    drawChart(0);
+    markCuts();
+    setPlaying(true); // 三案一起放（同一 tick 调 resume，起跑差 < 1 帧）
+    let lastPaint = 0;
+    const cursorLoop = () => {
+      const b = allBoot()[0];
+      if (b && playing) {
+        const t = b.time;
+        tlabel.textContent = Math.round(t) + 'ms';
+        scrub.value = Math.round(t);
+        if (performance.now() - lastPaint > 90) { drawChart(t); updateReadout(t); lastPaint = performance.now(); }
+      }
+      requestAnimationFrame(cursorLoop);
+    };
+    requestAnimationFrame(cursorLoop);
+    loadMeta();
+    addEventListener('resize', () => { drawChart(+scrub.value); });
+  })();
+</script>
+</body>
+</html>

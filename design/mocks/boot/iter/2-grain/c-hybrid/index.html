@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>开屏 2c · 粗处跳，细处连</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/fonts/noto/font.css">
+<link rel="stylesheet" href="/fonts/plex/400.css">
+<link rel="stylesheet" href="../_shared/base.css">
+<link rel="stylesheet" href="../_shared/home.css">
+<script>
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    document.documentElement.dataset.bootSkip = '';
+  }
+</script>
+<noscript><style>.boot-face, .boot-dot { display: none !important; }</style></noscript>
+</head>
+<body>
+
+<div id="home" aria-label="首页（假）">
+  <div class="h-flow"></div>
+  <svg class="h-eeg" id="h-eeg" viewBox="0 0 1440 900" preserveAspectRatio="none" aria-hidden="true">
+    <path id="h-eeg-path" fill="none" stroke="#7f7a99" stroke-width="1.2" stroke-linecap="round" opacity=".62"
+          d="M -60 255.4 L 1500 644.6"></path>
+  </svg>
+
+  <div class="h-head">
+    <p class="h-kicker">个人网站</p>
+    <h1 class="h-brand">Traveritas</h1>
+  </div>
+
+  <div class="h-entries">
+    <a href="#" class="h-entry"><i></i><span class="no">01</span><b>断章</b><em>ESSAYS</em></a>
+    <a href="#" class="h-entry"><i></i><span class="no">02</span><b>闪念</b><em>MOMENTS</em></a>
+    <a href="#" class="h-entry"><i></i><span class="no">03</span><b>造物</b><em>PROJECTS</em></a>
+  </div>
+
+  <p class="h-clock">21:34 · 2026.10.18</p>
+  <nav class="h-exits"><a href="#">GitHub</a><a href="#">RSS</a><a href="#">◇ NEXUS</a></nav>
+  <p class="h-hint">下沉<i></i></p>
+</div>
+
+<script src="../_shared/homemock.js"></script>
+<script src="../_shared/grain.js"></script>
+<script src="../_shared/bootbase.js"></script>
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   C · 粗处跳，细处连（推荐稿）
+
+   规则，分两段：
+     粗段（0–460ms）＝**跳**。级 56 → 30 → 15 屏 px，量化 3 → 6 → 10 阶。
+       每一跳都是硬切，格宽对半，停 230ms。世界一格一格变清楚 —— 级数可数。
+     细段（460–1380ms）＝**连续**。从 15 px 一路收到首页的 5 px，量化 10 → 26 阶，
+       无级差、无跳。这一段每跳一次只差几个像素，硬跳反而会读成「闪一下」。
+     收束（1380–1700ms）＝停在 5 px / 26 阶，等大字对完焦。
+     交接（1700–1950ms）＝画布淡出，露出的就是假首页自己的 .h-flow。
+
+   为什么粗段跳：粗段的每次变化都很大（56→30→15 是面积差 3.5 倍），
+     只有跳才读得懂「这是提了一级」；如果连续，粗段会变成一块块翻色的沸腾。
+   为什么细段连：15→5 的空间里，一「级」只差两三个像素，跳一下更像掉帧、不像变清楚；
+     连续收细才像对焦。抖动也在这一段从 0 长到 1，末了才长出首页的网点。
+
+   纯函数：timeline(ms, vw) → { cellPx, levels, octaves, dither, state }
+   ══════════════════════════════════════════════════════════════════════════ */
+
+(function () {
+  'use strict';
+
+  const TOTAL = 2000;
+  const FADE = [1700, 1950];
+
+  /* 粗段：三跳 */
+  const CUTS = [
+    { at: 0,   cell: 56, levels: 3,  oct: 2 }, // 0  一片粗马赛克
+    { at: 230, cell: 30, levels: 6,  oct: 2 }, // ①  跳（硬切）
+    { at: 460, cell: 15, levels: 10, oct: 3 }, // ②  跳（硬切）
+  ];
+  const TAIL = [460, 1380]; // 细段：连续收细
+  const CELL1 = 5;
+  const clamp01 = (x) => (x < 0 ? 0 : x > 1 ? 1 : x);
+
+  /* 纯函数：只依赖 ms 与视口宽 */
+  function timeline(ms, vw) {
+    if (ms < TAIL[0]) {
+      let i = 0;
+      while (i + 1 < CUTS.length && ms >= CUTS[i + 1].at) i++;
+      const s = CUTS[i];
+      return {
+        cellPx: Grain.scaledCell(s.cell, vw),
+        levels: s.levels,
+        octaves: s.oct,
+        dither: 0,
+        state: i,
+        span: 'jump',
+      };
+    }
+    const p = clamp01((ms - TAIL[0]) / (TAIL[1] - TAIL[0]));
+    /* 前快后慢：大部分收细在细段前半段完成，后半段是「沉下去」 */
+    const e = 1 - Math.pow(1 - p, 2);
+    const cell = 15 + (CELL1 - 15) * e;
+    const levels = 10 + (26 - 10) * (1 - Math.pow(1 - p, 1.6));
+    /* 抖动只在格子已经够细时出现：格 12px 起长，6px 时长满 */
+    const dither = 1 - Grain.sstep(6, 12, cell);
+    return {
+      cellPx: Grain.scaledCell(cell, vw),
+      levels,
+      octaves: 3,
+      dither,
+      state: -1,
+      span: p >= 1 ? 'settle' : 'flow',
+    };
+  }
+
+  mountBoot({
+    total: TOTAL,
+    fade: FADE,
+    timeline,
+    entry: {
+      kicker: [230, 460],
+      brand: [420, 1280],
+      line: [600, 1400],
+      entries: [850, 320],
+      foot: [1300, 1560],
+    },
+  });
+})();
+</script>
+</body>
+</html>
+
+

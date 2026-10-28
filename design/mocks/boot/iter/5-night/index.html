@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>开屏 5 · 夜与星 · 三个闭环</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/fonts/noto/font.css">
+<link rel="stylesheet" href="/fonts/plex/400.css">
+<style>
+  :root {
+    --font-display: 'Noto Serif SC', 'Palatino Linotype', Palatino, serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
+    --amber: #9a86c4;
+    --line: rgb(236 232 242 / 0.12);
+    --soft: #b7b3c8;
+    --faint: #827f98;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: #0a0b14; color: #ece8f2; }
+  body {
+    font-family: var(--font-display);
+    -webkit-font-smoothing: antialiased;
+    padding: 56px clamp(20px, 5vw, 72px) 90px;
+    background:
+      radial-gradient(120vmax 80vmax at 12% 0%, rgb(60 54 96 / 0.36) 0%, transparent 55%),
+      radial-gradient(100vmax 80vmax at 92% 100%, rgb(22 40 62 / 0.4) 0%, transparent 60%),
+      #0a0b14;
+    min-height: 100vh;
+  }
+  a { color: inherit; }
+
+  .head { max-width: 1180px; margin: 0 auto 44px; }
+  .kicker {
+    margin: 0 0 20px;
+    font: 400 10.5px/1 var(--font-mono);
+    letter-spacing: 0.34em;
+    color: var(--faint);
+    text-transform: uppercase;
+  }
+  h1 {
+    margin: 0;
+    font: 500 clamp(34px, 4.6vw, 58px)/1.1 var(--font-display);
+    letter-spacing: 0.04em;
+    font-weight: 500;
+  }
+  h1 em { font-style: normal; color: var(--amber); }
+  .lede {
+    margin: 22px 0 0;
+    max-width: 44em;
+    font: 400 14px/2.05 var(--font-display);
+    letter-spacing: 0.06em;
+    color: var(--soft);
+  }
+  .lede b { font-weight: 500; color: #e6e2ee; }
+
+  /* ── 对照板：每候选 3 个关键帧 ── */
+  .board { max-width: 1180px; margin: 0 auto 54px; border-top: 1px solid var(--line); }
+  .row {
+    display: grid;
+    grid-template-columns: 230px 1fr 1fr 1fr;
+    gap: 14px;
+    padding: 22px 0;
+    border-bottom: 1px solid var(--line);
+    align-items: start;
+  }
+  .cap b {
+    display: inline-block;
+    margin-right: 8px;
+    font: 500 13px/1 var(--font-mono);
+    letter-spacing: 0.12em;
+    color: var(--amber);
+  }
+  .cap h2 {
+    display: inline;
+    margin: 0;
+    font: 500 19px/1.3 var(--font-display);
+    letter-spacing: 0.06em;
+  }
+  .cap p {
+    margin: 12px 0 0;
+    font: 400 11.5px/1.85 var(--font-mono);
+    letter-spacing: 0.04em;
+    color: var(--faint);
+  }
+  .cap a {
+    display: inline-block;
+    margin-top: 14px;
+    font: 400 10.5px/1 var(--font-mono);
+    letter-spacing: 0.16em;
+    color: var(--soft);
+    text-decoration: none;
+    border-bottom: 1px solid rgb(154 134 196 / 0.5);
+    padding-bottom: 4px;
+  }
+  .cap a:hover { color: #f1edf6; }
+  figure { margin: 0; }
+  figure .ph {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1440 / 900;
+    overflow: hidden;
+    background: #0e0f1d;
+    border: 1px solid rgb(236 232 242 / 0.09);
+  }
+  figure img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  figcaption {
+    margin-top: 8px;
+    font: 400 10px/1 var(--font-mono);
+    letter-spacing: 0.1em;
+    color: var(--faint);
+  }
+
+  /* ── 同屏播放 ── */
+  .stage { max-width: 1180px; margin: 0 auto; border-top: 1px solid var(--line); padding-top: 26px; }
+  .bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 16px 22px;
+    margin-bottom: 20px;
+  }
+  .bar button {
+    appearance: none;
+    border: 1px solid rgb(236 232 242 / 0.22);
+    background: rgb(236 232 242 / 0.04);
+    color: #e6e2ee;
+    font: 400 11px/1 var(--font-mono);
+    letter-spacing: 0.18em;
+    padding: 11px 18px;
+    cursor: pointer;
+    transition: border-color 0.25s ease, background 0.25s ease, color 0.25s ease;
+  }
+  .bar button:hover { border-color: rgb(154 134 196 / 0.8); color: #f1edf6; }
+  .bar button:focus-visible { outline: 1px solid var(--amber); outline-offset: 2px; }
+  .bar input[type='range'] {
+    flex: 1 1 320px;
+    min-width: 200px;
+    accent-color: #9a86c4;
+    cursor: pointer;
+  }
+  .bar .t {
+    font: 400 10.5px/1 var(--font-mono);
+    letter-spacing: 0.12em;
+    color: var(--faint);
+    white-space: nowrap;
+  }
+  .frames {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+  }
+  .frame { min-width: 0; }
+  .frame .shot {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1440 / 900;
+    overflow: hidden;
+    border: 1px solid rgb(236 232 242 / 0.09);
+    background: #0e0f1d;
+  }
+  .frame iframe {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 1440px;
+    height: 900px;
+    border: 0;
+    transform-origin: 0 0;
+    background: #0e0f1d;
+  }
+  .frame p {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    margin: 9px 0 0;
+    font: 400 10.5px/1.4 var(--font-mono);
+    letter-spacing: 0.06em;
+    color: var(--faint);
+  }
+  .frame p b { font-weight: 400; color: var(--soft); letter-spacing: 0.12em; }
+  .foot {
+    max-width: 1180px;
+    margin: 46px auto 0;
+    padding-top: 18px;
+    border-top: 1px solid var(--line);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 28px;
+    font: 400 10.5px/1.8 var(--font-mono);
+    letter-spacing: 0.06em;
+    color: var(--faint);
+  }
+  .foot a { color: var(--soft); text-decoration: none; border-bottom: 1px solid rgb(154 134 196 / 0.4); }
+
+  @media (max-width: 1080px) {
+    .row { grid-template-columns: 1fr 1fr; }
+    .cap { grid-column: 1 / -1; }
+    .frames { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 640px) {
+    .row { grid-template-columns: 1fr; }
+    .cap { grid-column: auto; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<header class="head">
+  <p class="kicker">开屏 5 · night &amp; star</p>
+  <h1>三个审美闭环，<em>一条 14° 线</em></h1>
+  <p class="lede">
+    星与环是母题（全站光标星 / 星环是同一枚四芒）；三个候选各只有一条审美逻辑，
+    终点都是这张首页：<b>一根 14° 脑电线、一扇大字反相窗、三池夜色、5px 网点</b>。
+    上面三行是每候选的三个关键帧，不用点进去就能初筛；下面是三候选同屏、同步 seek 的播放。
+  </p>
+</header>
+
+<section class="board" aria-label="关键帧对照板">
+  <div class="row">
+    <div class="cap">
+      <b>A</b><h2>一颗星的余像</h2>
+      <p>星 → 衍射环 → 余像 → 首页流光；光脊就是那根脑电线</p>
+      <a href="a-afterimage/">打开 A →</a>
+    </div>
+    <figure>
+      <div class="ph"><img src=".shots/a-afterimage/02-rings.png" alt="A 900ms：星的衍射环" loading="lazy"></div>
+      <figcaption>900ms · 成像</figcaption>
+    </figure>
+    <figure>
+      <div class="ph"><img src=".shots/a-afterimage/03-afterimage.png" alt="A 1250ms：余像浮起" loading="lazy"></div>
+      <figcaption>1250ms · 余像</figcaption>
+    </figure>
+    <figure>
+      <div class="ph"><img src=".shots/a-afterimage/05-drawn.png" alt="A 1750ms：线长成" loading="lazy"></div>
+      <figcaption>1750ms · 光脊成线</figcaption>
+    </figure>
+  </div>
+
+  <div class="row">
+    <div class="cap">
+      <b>B</b><h2>夜里的一道开口</h2>
+      <p>一道按 14° 睡着的细缝；开口呼吸，夜像雾一样退，两条边合拢成一根发丝</p>
+      <a href="b-opening/">打开 B →</a>
+    </div>
+    <figure>
+      <div class="ph"><img src=".shots/b-opening/02-open.png" alt="B 750ms：口子划开" loading="lazy"></div>
+      <figcaption>750ms · 划开</figcaption>
+    </figure>
+    <figure>
+      <div class="ph"><img src=".shots/b-opening/03-breath.png" alt="B 1050ms：口子呼吸" loading="lazy"></div>
+      <figcaption>1050ms · 呼吸</figcaption>
+    </figure>
+    <figure>
+      <div class="ph"><img src=".shots/b-opening/05-recede.png" alt="B 1600ms：夜退开" loading="lazy"></div>
+      <figcaption>1600ms · 夜退</figcaption>
+    </figure>
+  </div>
+
+  <div class="row">
+    <div class="cap">
+      <b>C</b><h2>星落进池子</h2>
+      <p>星落进池心，等高线散开，三池依次被点亮；星沉入轴心，线与流光浮起来</p>
+      <a href="c-pool/">打开 C →</a>
+    </div>
+    <figure>
+      <div class="ph"><img src=".shots/c-pool/03-impact.png" alt="C 1000ms：落点" loading="lazy"></div>
+      <figcaption>1000ms · 落点</figcaption>
+    </figure>
+    <figure>
+      <div class="ph"><img src=".shots/c-pool/04-ripple.png" alt="C 1350ms：涟漪" loading="lazy"></div>
+      <figcaption>1350ms · 涟漪</figcaption>
+    </figure>
+    <figure>
+      <div class="ph"><img src=".shots/c-pool/05-pools.png" alt="C 1650ms：三池点亮" loading="lazy"></div>
+      <figcaption>1650ms · 三池</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="stage" aria-label="同屏同步播放">
+  <div class="bar">
+    <button id="play" type="button">播放</button>
+    <button id="replay" type="button">从头</button>
+    <input id="scrub" type="range" min="0" max="1000" value="0" step="1" aria-label="时间轴">
+    <span class="t" id="clock">0 / 2260 ms</span>
+  </div>
+  <div class="frames">
+    <div class="frame">
+      <div class="shot"><iframe id="fa" src="a-afterimage/" title="A 一颗星的余像" loading="lazy"></iframe></div>
+      <p><b>A 一颗星的余像</b><span id="ta">0 ms</span></p>
+    </div>
+    <div class="frame">
+      <div class="shot"><iframe id="fb" src="b-opening/" title="B 夜里的一道开口" loading="lazy"></iframe></div>
+      <p><b>B 夜里的一道开口</b><span id="tb">0 ms</span></p>
+    </div>
+    <div class="frame">
+      <div class="shot"><iframe id="fc" src="c-pool/" title="C 星落进池子" loading="lazy"></iframe></div>
+      <p><b>C 星落进池子</b><span id="tc">0 ms</span></p>
+    </div>
+  </div>
+</section>
+
+<footer class="foot">
+  <span>三候选共用：<a href="../../_shared/BRIEF.md">任务书</a> · <a href="../2-grain/">隔壁 2 号「从粗到细」迭代</a></span>
+  <span>假首页 = _shared/home-fragment.html（线改为按视口真实像素画，手机上也保持 14°）</span>
+  <span>每候选 8 桌面 + 4 手机 + 减动效帧，在 .shots/</span>
+</footer>
+
+<script>
+(function () {
+  var CAND = [
+    { key: 'a', id: 'fa', ta: 'ta', total: 2200 },
+    { key: 'b', id: 'fb', ta: 'tb', total: 2260 },
+    { key: 'c', id: 'fc', ta: 'tc', total: 2220 },
+  ];
+  var frames = CAND.map(function (c) { return document.getElementById(c.id); });
+  var els = {
+    play: document.getElementById('play'),
+    replay: document.getElementById('replay'),
+    scrub: document.getElementById('scrub'),
+    clock: document.getElementById('clock'),
+  };
+  var MAX = Math.max.apply(null, CAND.map(function (c) { return c.total; }));
+  var ready = false;
+  var playing = false;
+  var t0 = 0;
+  var raf = 0;
+  var cur = 0;
+
+  function boot(i) {
+    var f = frames[i];
+    try {
+      var w = f.contentWindow;
+      return w && w.__boot && w.__boot.ready ? w.__boot : null;
+    } catch (e) { return null; }
+  }
+  function each(fn) {
+    for (var i = 0; i < CAND.length; i++) {
+      var b = boot(i);
+      if (b) fn(b, CAND[i], i);
+    }
+  }
+  function layout() {
+    for (var i = 0; i < frames.length; i++) {
+      var f = frames[i];
+      var box = f.parentElement;
+      var s = box.clientWidth / 1440;
+      f.style.transform = 'scale(' + s.toFixed(4) + ')';
+    }
+  }
+  function labels(ms) {
+    each(function (b, c, i) {
+      document.getElementById(c.ta).textContent = Math.round((Math.min(ms, MAX) / MAX) * c.total) + ' ms';
+    });
+    els.clock.textContent = Math.round(Math.min(ms, MAX)) + ' / ' + MAX + ' ms';
+    els.scrub.value = String(Math.round((Math.min(ms, MAX) / MAX) * 1000));
+  }
+  function pauseAll() {
+    playing = false;
+    cancelAnimationFrame(raf);
+    each(function (b) { b.pause(); });
+    els.play.textContent = '播放';
+  }
+  function seekAll(p, keepPaused) {
+    cur = p * MAX;
+    each(function (b, c) { b.pause(); b.seek(cur * (c.total / MAX)); });
+    labels(cur);
+    if (!keepPaused) pauseAll();
+  }
+  function tick() {
+    if (!playing) return;
+    cur = performance.now() - t0;
+    if (cur >= MAX) {
+      cur = MAX;
+      labels(cur);
+      pauseAll();
+      return;
+    }
+    labels(cur);
+    raf = requestAnimationFrame(tick);
+  }
+  function play() {
+    if (!ready) return;
+    if (cur >= MAX - 1) { seekAll(0, true); }
+    each(function (b) { b.resume(); });
+    playing = true;
+    t0 = performance.now() - cur;
+    els.play.textContent = '暂停';
+    raf = requestAnimationFrame(tick);
+  }
+
+  els.play.addEventListener('click', function () {
+    if (playing) pauseAll();
+    else play();
+  });
+  els.replay.addEventListener('click', function () {
+    pauseAll();
+    seekAll(0, true);
+    labels(0);
+  });
+  els.scrub.addEventListener('input', function () {
+    pauseAll();
+    seekAll(Number(els.scrub.value) / 1000, true);
+  });
+  addEventListener('keydown', function (e) {
+    if (e.code === 'Space' && e.target === document.body) {
+      e.preventDefault();
+      if (playing) pauseAll();
+      else play();
+    }
+  });
+  addEventListener('resize', layout);
+
+  layout();
+  (function wait() {
+    var ok = 0;
+    for (var i = 0; i < frames.length; i++) if (boot(i)) ok++;
+    if (ok === frames.length) {
+      ready = true;
+      layout();
+      each(function (b) { b.pause(); b.seek(0); });
+      labels(0);
+      return;
+    }
+    setTimeout(wait, 120);
+  })();
+})();
+</script>
+</body>
+</html>
+
+

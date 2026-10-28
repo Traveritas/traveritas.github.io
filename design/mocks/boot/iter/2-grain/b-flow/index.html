@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>开屏 2b · 连续收细</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/fonts/noto/font.css">
+<link rel="stylesheet" href="/fonts/plex/400.css">
+<link rel="stylesheet" href="../_shared/base.css">
+<link rel="stylesheet" href="../_shared/home.css">
+<script>
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    document.documentElement.dataset.bootSkip = '';
+  }
+</script>
+<noscript><style>.boot-face, .boot-dot { display: none !important; }</style></noscript>
+</head>
+<body>
+
+<div id="home" aria-label="首页（假）">
+  <div class="h-flow"></div>
+  <svg class="h-eeg" id="h-eeg" viewBox="0 0 1440 900" preserveAspectRatio="none" aria-hidden="true">
+    <path id="h-eeg-path" fill="none" stroke="#7f7a99" stroke-width="1.2" stroke-linecap="round" opacity=".62"
+          d="M -60 255.4 L 1500 644.6"></path>
+  </svg>
+
+  <div class="h-head">
+    <p class="h-kicker">个人网站</p>
+    <h1 class="h-brand">Traveritas</h1>
+  </div>
+
+  <div class="h-entries">
+    <a href="#" class="h-entry"><i></i><span class="no">01</span><b>断章</b><em>ESSAYS</em></a>
+    <a href="#" class="h-entry"><i></i><span class="no">02</span><b>闪念</b><em>MOMENTS</em></a>
+    <a href="#" class="h-entry"><i></i><span class="no">03</span><b>造物</b><em>PROJECTS</em></a>
+  </div>
+
+  <p class="h-clock">21:34 · 2026.10.18</p>
+  <nav class="h-exits"><a href="#">GitHub</a><a href="#">RSS</a><a href="#">◇ NEXUS</a></nav>
+  <p class="h-hint">下沉<i></i></p>
+</div>
+
+<script src="../_shared/homemock.js"></script>
+<script src="../_shared/grain.js"></script>
+<script src="../_shared/bootbase.js"></script>
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   B · 连续收细（用户选定）
+
+   一、首帧 = 分辨率真的不够粗
+     0ms 的格宽 = max(视口宽, 视口高) × 1.2 —— 一格比整屏还大，所以整屏只有一块，
+     它的颜色就是这一块的均值（盒式降采样，不是叠上去的纯色层）。停 120ms，
+     之后连续收细到 5px / 26 阶。
+     格宽降到屏幕宽度以下时，整屏会「裂」成两块，再降到高度以下变成 2×2 ——
+     这是分辨率真的在变粗/变细，分裂是可见的，也应当可见。不额外盖层。
+
+   二、连续收细
+     120–1560ms：格宽在对数空间从 max(视口)×1.2 收到 5 屏 px，量化 8 → 26 阶。
+     默认 settle（前快后慢）；?ease=even（对数匀速）/ ?ease=creep（前慢后快）留作对照。
+
+   三、?print=1 对照开关
+     上一版 2-grain 的粗段有「块级 Bayer」：每个大格按块序号取 Bayer 偏移，相邻格落在相邻一阶上，
+     像印刷棋盘。这一版默认关掉（干净色块），因为首帧的一块应当是干净的均值色，
+     连续收细时块边界也一直在动（块序号 Bayer 会每帧重排、动起来闪）。
+     要旧质感时加 ?print=1，块级抖动只长在粗段（格 8px 以上），随收细自动退场。
+
+   四、非整数网格的三件事（沿用上一轮结论）
+     ① 块的色 = 场的盒式均值，不是点采样 → 块边界挪动时颜色连续，不沸腾；
+     ② Bayer 索引锁在画布像素格（5px）上 → 网点不爬、不跳；
+     ③ 抖动强度从 0 长到 1，粗段是干净色块，细段才长出首页的网点。
+
+   纯函数：timeline(ms, vw, vh) → { cellPx, levels, octaves, dither, blockDither }
+   ══════════════════════════════════════════════════════════════════════════ */
+
+(function () {
+  'use strict';
+
+  const TOTAL = 2000;
+  const FADE = [1780, 1980];
+
+  const HOLD = 120;              // 一整块停多久
+  const REFINE = [120, 1560];    // 从「一格比整屏大」连续收到 5px
+  const CELL_END = 5;            // 首页 GRAIN 的一格
+  const CELL_K = 1.2;            // 首帧格宽 = max(vw, vh) × 1.2（保证整屏一块）
+
+  const clamp01 = (x) => (x < 0 ? 0 : x > 1 ? 1 : x);
+  const params = new URLSearchParams(location.search);
+  const easeName = params.get('ease') || 'settle';
+  const print = params.get('print') === '1';
+
+  /* 纯函数：只依赖 ms 与视口尺寸 */
+  function timeline(ms, vw, vh) {
+    const W = vw || innerWidth;
+    const H = vh || innerHeight;
+    const cell0 = Math.max(W, H) * CELL_K;
+
+    const p = clamp01((ms - REFINE[0]) / (REFINE[1] - REFINE[0]));
+    let f; // 收细进度
+    if (easeName === 'even') f = p;                          // 对数匀速
+    else if (easeName === 'creep') f = Math.pow(p, 2.4);     // 前慢后快
+    else f = 1 - Math.pow(1 - p, 2);                         // settle：前快后慢
+    const cell = cell0 * Math.pow(CELL_END / cell0, f);      // 对数插值：比例均匀
+
+    const r = clamp01((cell - CELL_END) / (48 - CELL_END));  // 1 = 粗段（≥48px），0 = 到家
+    return {
+      cellPx: cell,
+      /* 起始 8 阶：一格就是整屏时，阶数只决定「这块均值」的色准（8 阶已足够；3 阶会把它压成灰）。
+         到细段再长到 26 阶 = 首页。 */
+      levels: 8 + 18 * Math.pow(1 - r, 2.2),
+      octaves: r > 0.5 ? 2 : 3,
+      dither: 1 - Grain.sstep(0.02, 0.3, r),  // 粗段 0（干净色块），细段 1（首页网点）
+      blockDither: print ? clamp01((cell - 8) / 20) : 0,
+      state: ms < HOLD ? 0 : -1,
+      whole: cell > Math.max(W, H) ? 1 : 0,   // 1 = 整屏还在同一格里（供对比台/证据读）
+    };
+  }
+
+  mountBoot({
+    total: TOTAL,
+    fade: FADE,
+    timeline,
+    /* 首页入场：等第一块裂开、开始收细之后再起 */
+    entry: {
+      kicker: [240, 500],
+      brand: [380, 1450],
+      line: [560, 1600],
+      entries: [900, 320],
+      foot: [1400, 1680],
+    },
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,836 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>开屏 mock 3 · 合上又睁开</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="/fonts/noto/font.css" />
+    <link rel="stylesheet" href="/fonts/plex/400.css" />
+    <style>
+      :root {
+        --font-display: 'Noto Serif SC', 'Palatino Linotype', 'Iowan Old Style', Palatino,
+          Georgia, serif;
+        --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas,
+          'Microsoft YaHei UI', monospace;
+        --amber: #9a86c4;
+        --night: #0e0f1d;
+
+        /* 旧开屏的材质本色 */
+        --warm: #ebe7e2;
+        --cool: #dbe1eb;
+        --ink: #2b2c31;
+      }
+
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: var(--night);
+      }
+      body {
+        overflow: hidden;
+      }
+
+      /* ── 开屏层默认不挂出来：无 JS（data-boot 从不出现）与减动效都直接是首页静置的样子，
+            不会留一块死幕。head 里的内联脚本在首帧前决定要不要放 ── */
+      #boot {
+        display: none;
+      }
+      html[data-boot] #boot {
+        display: block;
+      }
+
+      /* ── 开屏层 ──────────────────────────────────────────────────────────
+         自下而上七层：夜（含雾）→ 缝里的微光 → 素幕 → 挖孔幕（含冷色子层）
+         → 材质（圆面 / 两道发丝弧 / 极淡树脂）→ 四周的冷 → 中庭的暖。
+         时间轴全部写在 JS 里，没有一处 @keyframes，__boot.seek 能确定地停在任何一毫秒。 */
+      #boot {
+        position: fixed;
+        inset: 0;
+        z-index: 6;
+        overflow: hidden;
+        pointer-events: none;
+        contain: paint;
+
+        /* 静态斜孔：色带的走向要**下斜 14°**（和首页那根线、和下面 rotate(14deg) 的微光同向）。
+           CSS 渐变角从「朝上」顺时针算，色带垂直于渐变方向 ⇒ 下斜 14° 的带子对应 194deg。
+           （写成 166deg 会得到一条上斜 14° 的带子，和微光正好镜像交叉成 X——这条踩过。）
+           孔的半宽写死在这里，从头到尾一个像素都不变；「睁」靠挖孔幕整体 scale 放大。
+           孔边是**硬边**：蒙版会被整体放大几百倍，任何以 px 计的羽化都会跟着放大成雾边。 */
+        --halo: 5px;
+        --slit: linear-gradient(
+          194deg,
+          transparent 0 calc(50% - var(--halo)),
+          #000 calc(50% - var(--halo)),
+          #000 calc(50% + var(--halo)),
+          transparent calc(50% + var(--halo))
+        );
+
+        --st: min(62vmin, 520px);
+      }
+
+      /* 只给「定位」这件事，不给 inset —— 免得 id 选择器的优先级把下面各层的
+         left / top 一起盖掉（圆面就是这样被顶到左上角去的） */
+      #boot > div,
+      #boot > i {
+        position: absolute;
+        display: block;
+      }
+      .b-hollow,
+      .b-plug,
+      .b-matte,
+      .b-gather,
+      .b-hold {
+        inset: 0;
+      }
+
+      /* ── 夜：一层压在首页上的靛夜。它不是另加的一片夜色，而是「同一片夜被压暗、起了雾」——
+            半透明，所以底下的首页一直在，只是看不清。缝里透出来的就是它本人；
+            睁的过程中这层雾散掉，首页那片流光就自然浮出来，两条夜之间没有色跳。
+            （若这层是不透明的，就得靠它自己淡掉来交还首页，中途必然出现
+             「夜里混进首页亮斑」的脏边。） ── */
+      .b-hollow {
+        background:
+          radial-gradient(52vw 42vw at 50% 46%, rgb(58 48 92 / 0.5) 0%, transparent 66%),
+          radial-gradient(44vw 38vw at 22% 74%, rgb(34 29 58 / 0.45) 0%, transparent 72%),
+          linear-gradient(168deg, rgb(20 21 36 / 0.95) 0%, rgb(14 15 29 / 0.965) 46%, rgb(17 18 34 / 0.95) 100%);
+      }
+      /* 雾：现代站里那张纹理，只留一丝化开。动的是图，不是蒙版 */
+      .b-mist {
+        inset: -20%;
+        right: -20%;
+        bottom: -20%;
+        background: url('/public/textures/mist.webp') center / cover no-repeat;
+        opacity: 0.16;
+        mix-blend-mode: screen;
+        will-change: transform;
+      }
+
+      /* ── 缝里的微光：只在斜孔里看得见（它压不到别处，被上面的幕挡着） ── */
+      .b-glint {
+        right: auto;
+        bottom: auto;
+        left: 50%;
+        top: 50%;
+        width: 240vmax;
+        height: 12px;
+        margin: -6px 0 0 -120vmax;
+        rotate: 14deg;
+        background: linear-gradient(
+          90deg,
+          transparent 10%,
+          rgb(120 112 168 / 0.1) 30%,
+          rgb(168 158 214 / 0.34) 42%,
+          rgb(214 205 246 / 0.72) 48%,
+          rgb(246 242 255 / 0.9) 50%,
+          rgb(214 205 246 / 0.72) 52%,
+          rgb(168 158 214 / 0.34) 58%,
+          rgb(120 112 168 / 0.1) 70%,
+          transparent 90%
+        );
+        /* 微光就占满缝的全高（缝约 10px 高），所以整条缝都是亮的 ——
+           这是一根「光本身」而不是缝里的一点反光。两端在 x 方向渐淡。 */
+        -webkit-mask: none;
+        mask: none;
+        opacity: 0;
+        will-change: transform, opacity;
+      }
+
+      /* ── 素幕：把斜孔填平的那一层。闭的后半段熄掉，缝就从白变成夜 ── */
+      .b-plug {
+        background: var(--warm);
+      }
+
+      /* ── 挖孔幕：暖白整面减去那条 14° 斜孔。整个动作只用 transform 的 scale ── */
+      .b-matte {
+        background: var(--warm);
+        transform-origin: 50% 50%;
+        -webkit-mask:
+          linear-gradient(#000 0 0),
+          var(--slit);
+        -webkit-mask-composite: source-out;
+        mask:
+          linear-gradient(#000 0 0),
+          var(--slit);
+        mask-composite: subtract;
+        /* 注意：这一层**不能**挂 will-change: transform。
+           挂了之后 Chrome 会把带 mask 的图层按较低分辨率栅格化成一张位图再放大，
+           孔边就变成一级一级的阶梯（实测 will-change: auto 时边缘是干净的两条直线）。 */
+      }
+      /* 冷色子层：跟着母层一起被挖孔，自己只淡入 —— 暖白幕「整体后退并变冷」靠它。
+         画在母层里而不是再挂一块蒙版：全屏 mask 一次只算一次。 */
+      .b-cool {
+        background: var(--cool);
+        opacity: 0;
+      }
+
+      /* ── 材质：冷灰圆面 + 两道发丝弧 + 极淡的树脂平移 ── */
+      .b-stage {
+        left: 50%;
+        top: 50%;
+        right: auto;
+        bottom: auto;
+        width: var(--st);
+        height: var(--st);
+        margin: calc(var(--st) / -2) 0 0 calc(var(--st) / -2);
+        will-change: transform, opacity;
+      }
+
+      .b-disc {
+        position: absolute;
+        inset: 5%;
+        border-radius: 50%;
+        overflow: hidden;
+        background: radial-gradient(circle at 38% 34%, #e3e5e7, #d3d7db 72%);
+        opacity: 0.55;
+      }
+      .b-resin {
+        position: absolute;
+        left: -45%;
+        top: -45%;
+        width: 190%;
+        height: 190%;
+        background: url('/public/textures/resin.webp') center / cover no-repeat;
+        opacity: 0.14;
+        will-change: transform;
+      }
+
+      .b-orbit {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 0;
+        height: 0;
+        will-change: rotate;
+      }
+      .b-orbit svg {
+        position: absolute;
+        left: calc(var(--w) / -2);
+        top: calc(var(--w) / -2);
+        width: var(--w);
+        height: var(--w);
+        max-width: none;
+        overflow: visible;
+      }
+      .b-orbit-a {
+        --w: calc(var(--st) * 1.28);
+      }
+      .b-orbit-b {
+        --w: calc(var(--st) * 1.05);
+      }
+      .b-arc {
+        fill: none;
+        stroke: color-mix(in srgb, var(--ink) 30%, transparent);
+        stroke-width: 1;
+        stroke-linecap: round;
+        vector-effect: non-scaling-stroke;
+      }
+      .b-orbit-b .b-arc {
+        stroke: color-mix(in srgb, var(--ink) 20%, transparent);
+      }
+      .b-star {
+        fill: color-mix(in srgb, var(--ink) 42%, transparent);
+      }
+
+      /* ── 四周的冷：闭的时候，「往中间收」这件事靠它读出来。
+            很浅 —— 最暗处也只是银蓝，不是黑。 ── */
+      .b-gather {
+        background: radial-gradient(
+          circle at 50% 50%,
+          transparent 0 30%,
+          rgb(86 94 116 / 0.07) 52%,
+          rgb(70 78 100 / 0.25) 78%,
+          rgb(56 64 86 / 0.38) 100%
+        );
+        opacity: 0;
+      }
+
+      /* ── 中庭的暖：收的过程中，最后一点暖白的光留在中心 ── */
+      .b-hold {
+        background: radial-gradient(
+          circle at 50% 50%,
+          rgb(255 252 246 / 0.68) 0 8%,
+          rgb(255 250 241 / 0.24) 22%,
+          transparent 44%
+        );
+        opacity: 0;
+      }
+
+      /* ── 假首页的窄屏修正（_shared/home-fragment.html 只读，只在这里覆写）──
+         片段把 EEG 画在 1440×900 的盒子里再 preserveAspectRatio="none" 拉满屏，
+         竖屏下横纵差 3.5 倍，14° 会被拉成 41°，直接穿过大字与第一个栏头。
+         这里把那盒子按等比重排（宽 = 1.6 × 高，水平居中）：viewBox 中心仍落在屏幕中心，
+         线回到真正的 14°。三个栏头也挪到线下。 */
+      @media (max-width: 899px) {
+        #home .h-eeg {
+          left: 0;
+          right: 0;
+          width: calc(100vh * 1.6);
+          height: 100vh;
+          margin: 0 auto;
+        }
+        #home .h-entries .h-entry:nth-child(1) {
+          top: calc(50vh + (min(100vw - 22px, 300px) - 50vw) * 0.2493 + 30px);
+        }
+        #home .h-entries .h-entry:nth-child(2) {
+          top: calc(50vh + (min(100vw - 22px, 300px) - 50vw) * 0.2493 + 76px);
+        }
+        #home .h-entries .h-entry:nth-child(3) {
+          top: calc(50vh + (min(100vw - 22px, 300px) - 50vw) * 0.2493 + 122px);
+        }
+        /* 窄屏下「下沉」与底部那排出处会挤在同一条基线上（390px 宽时直接叠字）。
+           把「下沉」抬到那排之上，两者各占一层。 */
+        #home .h-hint {
+          bottom: 62px;
+        }
+        #home .h-hint i {
+          height: 18px;
+        }
+      }
+    </style>
+    <script>
+      /* 首帧之前就决定要不要放。减动效 ⇒ 什么属性都不加，页面直接是首页静置的样子。
+         JS 起不来 ⇒ 2.8s 后把幕撤掉，不留死幕。 */
+      (function () {
+        var r = document.documentElement;
+        if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        r.dataset.boot = 'run';
+        setTimeout(function () {
+          if (!window.__boot) r.removeAttribute('data-boot');
+        }, 2800);
+      })();
+    </script>
+  </head>
+
+  <body>
+    <!-- ─────────────────────────────────────────────────────────────
+         假首页 · 交接标的（整块复制进你 index.html 的 <body> 末尾，别改 _shared 本身）
+
+         这不是真首页，只还原「一眼认出」的那几件：
+           靛夜底 + 像素化的流光（静态，一层底图 + 网点）+ 一根 14° 波形线
+           + 左上小字与大字 + 线下三个栏头 + 左下时刻 + 右下出口 + 底部「下沉」。
+         大字按站里的做法是「流光的一扇反相窗」——这里用 backdrop-filter 近似，
+         效果对得上就够了；真首页是 canvas 反相 + 字形遮罩。
+
+         它自带 window.HomeMock 三个旋钮，给你的开屏调用：
+           HomeMock.line(0..1)       脑电线「从中心往两端画出」的进度（0 = 一个点都没有）
+           HomeMock.focus(0..1)      大字的对焦（0 = blur 14px + 透明，1 = 清楚）
+           HomeMock.pixels(px)       流光底图的一个粗颗粒提示（1 = 不粗，8 = 很粗）——
+                                     只在你想「从粗到细」时用；不用就一直是 1
+         不调也行：默认 line=1 focus=1 pixels=1，即首页静置的样子。
+         若你的开屏完全接管了入场，就在自己的时间轴里调它们，别让两段各演一遍。
+         ───────────────────────────────────────────────────────────── -->
+
+    <div id="home" aria-label="首页（假）">
+      <div class="h-flow"></div>
+      <svg class="h-eeg" id="h-eeg" viewBox="0 0 1440 900" preserveAspectRatio="none" aria-hidden="true">
+        <path id="h-eeg-path" fill="none" stroke="#7f7a99" stroke-width="1.2" stroke-linecap="round" opacity=".62"></path>
+      </svg>
+
+      <div class="h-head">
+        <p class="h-kicker">个人网站</p>
+        <h1 class="h-brand">Traveritas</h1>
+      </div>
+
+      <div class="h-entries">
+        <a href="#" class="h-entry"><i></i><span class="no">01</span><b>断章</b><em>ESSAYS</em></a>
+        <a href="#" class="h-entry"><i></i><span class="no">02</span><b>闪念</b><em>MOMENTS</em></a>
+        <a href="#" class="h-entry"><i></i><span class="no">03</span><b>造物</b><em>PROJECTS</em></a>
+      </div>
+
+      <p class="h-clock">21:34 · 2026.10.18</p>
+      <nav class="h-exits"><a href="#">GitHub</a><a href="#">RSS</a><a href="#">◇ NEXUS</a></nav>
+      <p class="h-hint">下沉<i></i></p>
+    </div>
+
+    <style>
+      /* 只在你自己的 index.html 里用；类名都带 h- 前缀，不会撞到开屏自己的样式 */
+      #home {
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        overflow: hidden;
+        background: #0e0f1d;
+        color: #ece8f2;
+        --hx: 8vw;
+        --tan14: 0.249328;
+        font-family: var(--font-display, 'Noto Serif SC', serif);
+      }
+
+      /* 流光：三池夜色 + 一层网点（真站是 1/5 分辨率上采样的像素流光，这里用叠色近似） */
+      .h-flow {
+        position: absolute;
+        inset: 0;
+        background:
+          radial-gradient(58vw 46vw at 6% 18%, #b9c2cf 0%, rgb(185 194 207 / 0.55) 34%, transparent 68%),
+          radial-gradient(46vw 40vw at 46% 62%, rgb(29 23 41 / 0.9) 0%, transparent 70%),
+          radial-gradient(50vw 44vw at 88% 78%, rgb(13 21 36 / 0.95) 0%, transparent 72%),
+          radial-gradient(70vw 60vw at 70% 10%, rgb(40 36 64 / 0.7) 0%, transparent 70%),
+          #0e0f1d;
+        filter: saturate(0.92);
+        transition: filter 0.4s linear;
+      }
+      .h-flow::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background-image: radial-gradient(circle, rgb(236 232 242 / 0.1) 0 1px, transparent 1.2px);
+        background-size: 5px 5px;
+        opacity: 0.5;
+      }
+
+      .h-eeg {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        overflow: visible;
+        pointer-events: none;
+      }
+
+      .h-head {
+        position: absolute;
+        left: var(--hx);
+        bottom: calc(50vh + (50vw - var(--hx)) * var(--tan14) + 22px);
+      }
+      .h-kicker {
+        margin: 0 0 1.05rem 0.2em;
+        font: 500 13px/1 var(--font-display, serif);
+        letter-spacing: 0.62em;
+        color: #9a97b0;
+      }
+      .h-brand {
+        margin: 0;
+        font: 500 clamp(54px, 7.4vw, 128px)/0.86 var(--font-display, serif);
+        letter-spacing: 0.035em;
+        color: #f1edf6;
+        white-space: nowrap;
+        /* 真站里大字是「流光的一扇反相窗」（canvas 反相 + 字形遮罩）。
+           这里不真的反相：backdrop-filter 的矩形会把字周围切出一块亮板，反而失真。
+           写成一块偏冷、略透明的浅字，近似它被流光照亮的样子就够。 */
+        color: #eef0f7;
+      }
+
+      .h-entries {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+      }
+      .h-entries .h-entry {
+        position: absolute;
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+        pointer-events: auto;
+        text-decoration: none;
+        color: #e6e2ee;
+        transition: letter-spacing 0.5s ease;
+      }
+      /* 三个栏头挂在线下：左右位置对应将来三栏的位置，纵向跟着那根 14° 线走 */
+      .h-entries .h-entry:nth-child(1) { left: 33vw; top: calc(50vh + (33vw - 50vw) * var(--tan14) + 30px); }
+      .h-entries .h-entry:nth-child(2) { left: 52vw; top: calc(50vh + (52vw - 50vw) * var(--tan14) + 46px); }
+      .h-entries .h-entry:nth-child(3) { left: 71vw; top: calc(50vh + (71vw - 50vw) * var(--tan14) + 62px); }
+      .h-entry i {
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: #9a86c4;
+        box-shadow: 0 0 10px 1px #9a86c4;
+        align-self: center;
+      }
+      .h-entry .no { font: italic 400 13px/1 var(--font-display, serif); letter-spacing: 0.08em; color: #8d8aa3; }
+      .h-entry b { font: 600 19px/1 var(--font-display, serif); letter-spacing: 0.34em; }
+      .h-entry em { font: normal 400 9px/1 var(--font-mono, monospace); letter-spacing: 0.3em; color: #8d8aa3; }
+      .h-entry:hover b { letter-spacing: 0.44em; }
+
+      .h-clock,
+      .h-exits {
+        position: absolute;
+        bottom: 26px;
+        margin: 0;
+        font: 400 10px/1 var(--font-mono, monospace);
+        letter-spacing: 0.18em;
+        color: #827f98;
+      }
+      .h-clock { left: var(--hx); }
+      .h-exits { right: 7vw; display: flex; gap: 22px; }
+      .h-exits a { color: inherit; text-decoration: none; }
+
+      .h-hint {
+        position: absolute;
+        left: 50%;
+        bottom: 22px;
+        margin: 0;
+        transform: translateX(-50%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+        font: 500 11px/1 var(--font-display, serif);
+        letter-spacing: 0.6em;
+        padding-left: 0.6em;
+        color: #827f98;
+      }
+      .h-hint i { width: 1px; height: 26px; background: linear-gradient(rgb(236 230 244 / 0.5), transparent); }
+
+      @media (max-width: 899px) {
+        #home { --hx: 22px; }
+        .h-brand { font-size: clamp(44px, 13vw, 72px); }
+        .h-kicker { font-size: 12px; margin-bottom: 0.8rem; }
+        .h-entries .h-entry:nth-child(1) { left: 22px; top: calc(50vh - 30px); }
+        .h-entries .h-entry:nth-child(2) { left: 22px; top: calc(50vh + 16px); }
+        .h-entries .h-entry:nth-child(3) { left: 22px; top: calc(50vh + 62px); }
+        .h-clock { display: none; }
+        .h-exits { right: 22px; }
+      }
+    </style>
+
+    <script>
+      window.HomeMock = (() => {
+        const flow = document.querySelector('#home .h-flow');
+        const brand = document.querySelector('#home .h-brand');
+        const path = document.getElementById('h-eeg-path');
+        const W = 1440, H = 900, TAN = Math.tan((14 * Math.PI) / 180);
+        let reveal = 1, focus = 1, px = 1;
+        /* 14° 轴上的波形线：整条线 = 视口对角线那么长，按 reveal 从中心往两端露出 */
+        function draw() {
+          const half = Math.hypot(W, H) / 2 + 40;
+          const n = 220;
+          let d = '';
+          let last = null;
+          for (let i = 0; i <= n; i++) {
+            const s = i / n;
+            const t = (s * 2 - 1) * half; // 沿线坐标
+            const x = W / 2 + Math.cos(Math.atan(TAN)) * t;
+            const y = H / 2 + Math.sin(Math.atan(TAN)) * t;
+            const wob = 3.6 * (Math.sin(t * 0.5 + performance.now() / 2000) * 0.6 + Math.sin(t * 1.9) * 0.4);
+            const ox = -Math.sin(Math.atan(TAN)) * wob;
+            const oy = Math.cos(Math.atan(TAN)) * wob;
+            const p = [x + ox, y + oy];
+            d += (last ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1);
+            last = p;
+          }
+          path.setAttribute('d', d);
+          // 从中心往两端露：用线性渐变的遮罩近似（左半 + 右半各露 reveal 的一半）
+          const m = `linear-gradient(90deg, transparent ${50 - reveal * 50}%, #000 ${50 - reveal * 50}%, #000 ${50 + reveal * 50}%, transparent ${50 + reveal * 50}%)`;
+          path.style.maskImage = m;
+          path.style.webkitMaskImage = m;
+        }
+        let raf = 0;
+        const loop = () => { draw(); raf = requestAnimationFrame(loop); };
+        loop();
+        return {
+          line(v) { reveal = v; draw(); },
+          focus(v) { focus = v; brand.style.filter = v >= 1 ? '' : `blur(${((1 - v) * 14).toFixed(2)}px)`; brand.style.opacity = String(v); },
+          pixels(v) {
+            px = v;
+            // 粗颗粒提示：把底图按倍数放大再裁回去（等价于降采样），真站是 1/5 分辨率 canvas
+            if (v <= 1) { flow.style.transform = ''; flow.style.filter = 'saturate(0.92)'; return; }
+            flow.style.transform = `scale(${v.toFixed(2)})`;
+            flow.style.transformOrigin = '50% 45%';
+            flow.style.filter = `saturate(0.92) blur(${(v * 0.6).toFixed(2)}px)`;
+          },
+          stop() { if (raf) cancelAnimationFrame(raf); raf = 0; },
+        };
+      })();
+    </script>
+
+    <!-- 开屏层：安静 → 闭 → 停 → 睁 → 余 -->
+    <div id="boot" aria-hidden="true">
+      <div class="b-hollow"><i class="b-mist"></i></div>
+      <div class="b-glint"></div>
+      <div class="b-plug"></div>
+      <div class="b-matte"><i class="b-cool"></i></div>
+      <div class="b-stage">
+        <div class="b-disc"><i class="b-resin"></i></div>
+        <div class="b-orbit b-orbit-a">
+          <svg viewBox="-100 -100 200 200" aria-hidden="true">
+            <path class="b-arc" d="M74.79,5.58A75,75 0 1 1 74.79,-5.58" />
+            <path
+              class="b-star"
+              d="M0,-10C0.7,-2.6 2.6,-0.7 10,0C2.6,0.7 0.7,2.6 0,10C-0.7,2.6 -2.6,0.7 -10,0C-2.6,-0.7 -0.7,-2.6 0,-10Z"
+              transform="translate(75 0) scale(0.32)"
+            />
+          </svg>
+        </div>
+        <div class="b-orbit b-orbit-b">
+          <svg viewBox="-100 -100 200 200" aria-hidden="true">
+            <path class="b-arc" d="M89.75,6.72A90,90 0 1 1 89.75,-6.72" />
+          </svg>
+        </div>
+      </div>
+      <div class="b-gather"></div>
+      <div class="b-hold"></div>
+    </div>
+
+    <script>
+      /* ══ 合上又睁开 ═══════════════════════════════════════════════════════════
+         旧开屏的材质与机制都留着：暖白底、冷灰圆面、两道同心发丝弧、极淡的树脂平移，
+         以及那张挖了孔的幕用 scale 放大的机制。换掉的只有动作 ——
+         旧版是「破窗」（孔一直是个窗，从窗口把页面透出来），
+         这一版是「先合上、再睁开」：
+
+           安静 · 暖白的一片，圆面与两道弧在里面慢慢地转，树脂极缓地平移
+           闭   · 材质朝中心收、收没了；四周压上一层很浅的冷，中心留一点暖；
+                  素幕熄掉，那条静态的 14° 斜孔就从白变成了夜，微光在缝里长成一根发丝
+           停   · 什么都不动。画面上只剩这一条缝，缝里是夜与一点微光
+           睁   · 挖孔幕沿法线整体放大：夜从缝里铺开，幕同时后退（放大）并变冷
+           余   · 交还首页：字对焦、线从正中画出去，正好沿着那条缝的方向
+
+         首页那两段入场（1.6s 对焦、2.2s 画线）由这里接管，不会压在幕底下白演一遍。
+         全部时间轴在 JS 里，没有 @keyframes —— __boot.seek(ms) 确定地停在任何一毫秒。 */
+
+      /* ── 时间轴 ──
+             0 ──  240   安静
+           240 ──  840   闭（600）
+           840 ── 1040   停（200）
+          1040 ── 1840   睁（800）
+          1840 ── 2240   余（400）                                              */
+      (function () {
+        var boot = document.getElementById('boot');
+        var home = document.getElementById('home');
+        var HM = window.HomeMock;
+
+        /* 减动效 / 无 JS：什么都不放，直接就是首页静置的样子。
+           这里必须**提前返回**——否则下面的 apply(0) 会把 HomeMock 推到 0，
+           首页在减动效的人眼前变成一片空靛夜。 */
+        if (!document.documentElement.hasAttribute('data-boot') || !boot) {
+          if (HM) {
+            HM.line(1);
+            HM.focus(1);
+            HM.pixels(1);
+          }
+          window.__boot = {
+            ready: true,
+            total: 0,
+            pause: function () {},
+            seek: function () {},
+            resume: function () {},
+          };
+          return;
+        }
+
+        var TOTAL = 2240;
+        var QUIET = 240;
+        var CLOSE = 840;
+        var HOLD = 1040;
+        var OPEN = 1840;
+
+        function q(s, r) {
+          return (r || boot).querySelector(s);
+        }
+        function qa(s, r) {
+          return Array.prototype.slice.call((r || boot).querySelectorAll(s));
+        }
+
+        var E = {
+          hollow: q('.b-hollow'),
+          mist: q('.b-mist'),
+          glint: q('.b-glint'),
+          plug: q('.b-plug'),
+          matte: q('.b-matte'),
+          cool: q('.b-cool'),
+          stage: q('.b-stage'),
+          resin: q('.b-resin'),
+          orbits: qa('.b-orbit'),
+          gather: q('.b-gather'),
+          hold: q('.b-hold'),
+          flow: q('.h-flow', home),
+          kicker: q('.h-kicker', home),
+          entries: qa('.h-entry', home),
+          ebox: q('.h-entries', home),
+          clock: q('.h-clock', home),
+          exits: q('.h-exits', home),
+          hint: q('.h-hint', home),
+        };
+        E.dots = E.entries.map(function (n) {
+          return n.querySelector('i');
+        });
+
+        var clamp01 = function (v) {
+          return v < 0 ? 0 : v > 1 ? 1 : v;
+        };
+        var seg = function (t, a, b) {
+          return clamp01((t - a) / (b - a));
+        };
+        var outC = function (p) {
+          return 1 - Math.pow(1 - p, 3);
+        };
+        var outQ = function (p) {
+          return 1 - Math.pow(1 - p, 5);
+        };
+        var inC = function (p) {
+          return p * p * p;
+        };
+        var inOutC = function (p) {
+          return p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
+        };
+
+        /* 停住时挖孔幕的放大倍数：斜孔半宽 3.4px ⇒ 约 11px 的一道细缝 */
+        var S_HOLD = 1.6;
+        /* 睁到底：半宽 3.4 × 300 ≈ 1020px，远超视口半对角线，幕早已让开整个画面 */
+        var S_OPEN = 300;
+
+        /* 一档「浮上来」：位移 8px → 0，同时淡入 */
+        function rise(node, p, dist) {
+          node.style.opacity = p.toFixed(3);
+          node.style.translate = '0 ' + ((1 - p) * (dist || 8)).toFixed(1) + 'px';
+        }
+
+        function rest() {
+          [E.flow, E.kicker, E.clock, E.exits, E.hint].forEach(function (n) {
+            n.style.cssText = '';
+          });
+          E.entries.forEach(function (n) {
+            n.style.cssText = '';
+          });
+          E.dots.forEach(function (n) {
+            n.style.cssText = '';
+          });
+          E.ebox.style.pointerEvents = '';
+          if (HM) {
+            HM.line(1);
+            HM.focus(1);
+            HM.pixels(1);
+          }
+          boot.style.display = 'none';
+        }
+
+        function apply(t) {
+          if (t >= TOTAL) {
+            rest();
+            return;
+          }
+          boot.style.display = '';
+          E.ebox.style.pointerEvents = t >= CLOSE ? '' : 'none';
+
+          /* ── 材质里一直在动的两件：弧在转，树脂在平移。
+             它们只在「安静」与「闭」的那 840ms 里走；「停」与「睁」期间冻结，
+             于是那一段是真正的一动不动。 ── */
+          var td = Math.min(t, CLOSE);
+          E.orbits[0].style.rotate = (14 + td * 0.045).toFixed(2) + 'deg';
+          E.orbits[1].style.rotate = (-8 - td * 0.03).toFixed(2) + 'deg';
+          E.resin.style.transform =
+            'translate(' + (td * -0.004).toFixed(2) + '%, ' + (td * 0.003).toFixed(2) + '%)';
+
+          /* ── 闭 · 一：材质朝画面中心收 ──
+             收缩与淡出都在 CLOSE(840) 之前收干净，「停」那一拍不留任何残动 ── */
+          var pc = inOutC(seg(t, QUIET, 820));
+          var shrink = 1 - 0.975 * pc;
+          E.stage.style.transform = 'scale(' + shrink.toFixed(4) + ')';
+          E.stage.style.opacity = (1 - inC(seg(t, 520, 830))).toFixed(3);
+
+          /* 四周的冷：从外圈压进来，840 之后冻结，睁到一半再退干净 */
+          E.gather.style.opacity = (
+            0.9 *
+            outC(seg(t, QUIET, 840)) *
+            (1 - inOutC(seg(t, 1040, 1300)))
+          ).toFixed(3);
+
+          /* 中庭的暖：收的途中留在中心的一点光，缝成形之前就退掉 */
+          E.hold.style.opacity = (
+            0.9 * outC(seg(t, QUIET + 120, 640)) * (1 - inC(seg(t, 640, 840)))
+          ).toFixed(3);
+
+          /* ── 闭 · 二：素幕熄掉，缝从白变成夜 ── */
+          E.plug.style.opacity = (1 - inOutC(seg(t, 600, 830))).toFixed(3);
+
+          /* ── 闭 · 三：微光在缝里从正中往两端长成一根发丝 ──
+             长满与它自己的那一档呼吸都在 840 之前定住，「停」里它只是亮着。 ── */
+          E.glint.style.scale = Math.max(0.0015, outQ(seg(t, 640, 840))).toFixed(4) + ' 1';
+          E.glint.style.opacity = (
+            0.95 *
+            outC(seg(t, 640, 840)) *
+            (1 - inOutC(seg(t, 1060, 1440)))
+          ).toFixed(3);
+
+          /* ── 睁：斜孔沿法向整体放大；幕后退并变冷 ──
+             指数取 1.9：夜先铺得快，后半程只剩四角那点幕。
+             放大到 ~86× 时孔的边缘（相对屏幕的正切直线）已经离屏，
+             所以幕可以就在那一刻不透明地撤掉 —— 全程不出现半透明的幕边。 ── */
+          var po = seg(t, HOLD, OPEN);
+          var s = t < HOLD ? S_HOLD : S_HOLD + (S_OPEN - S_HOLD) * Math.pow(po, 1.9);
+          E.matte.style.transform = 'scale(' + s.toFixed(2) + ')';
+          E.matte.style.opacity = t >= HOLD + 0.62 * (OPEN - HOLD) ? '0' : '1';
+          E.cool.style.opacity = inOutC(seg(t, 700, 1520)).toFixed(3);
+
+          /* ── 夜：缝里的雾在走；睁到一半，夜让位给首页那片流光 ── */
+          E.mist.style.transform =
+            'translate3d(' +
+            (-t * 0.013).toFixed(1) +
+            'px,' +
+            (t * 0.007).toFixed(1) +
+            'px,0) scale(1.2)';
+          E.hollow.style.opacity = (1 - inOutC(seg(t, 1180, 1780))).toFixed(3);
+
+          /* ── 交还首页：三段入场都从这里发令 ── */
+          if (HM) {
+            HM.pixels(9 - 8 * inOutC(seg(t, 1080, 1620)));
+            HM.line(outC(seg(t, 1300, 1900)));
+            HM.focus(outC(seg(t, 1420, 1960)));
+          }
+
+          /* ── 余：栏头 / 时刻 / 出口 / 下沉 依次浮上来 ── */
+          rise(E.kicker, outC(seg(t, 1840, 2080)), 6);
+          E.entries.forEach(function (node, i) {
+            var st = 1820 + i * 60;
+            var p = outC(seg(t, st, st + 280));
+            rise(node, p, 9);
+            E.dots[i].style.scale = (1 + 1.3 * (1 - p)).toFixed(3);
+          });
+          rise(E.clock, outC(seg(t, 1880, 2120)), 6);
+          rise(E.exits, outC(seg(t, 1900, 2150)), 6);
+          rise(E.hint, outC(seg(t, 1940, 2190)), 6);
+        }
+
+        /* ── 时钟 ── */
+        var t = 0;
+        var t0 = 0;
+        var frozen = -1;
+        var raf = 0;
+
+        function frame(now) {
+          if (frozen >= 0) return;
+          t = now - t0;
+          if (t >= TOTAL) {
+            apply(TOTAL);
+            return;
+          }
+          apply(t);
+          raf = requestAnimationFrame(frame);
+        }
+
+        apply(0);
+        t0 = performance.now();
+        raf = requestAnimationFrame(frame);
+
+        window.__boot = {
+          ready: false,
+          total: TOTAL,
+          pause: function () {
+            if (frozen >= 0) return;
+            cancelAnimationFrame(raf);
+            frozen = t;
+          },
+          seek: function (ms) {
+            cancelAnimationFrame(raf);
+            t = Math.max(0, Math.min(TOTAL, +ms || 0));
+            frozen = t;
+            apply(t);
+          },
+          resume: function () {
+            if (frozen < 0) return;
+            frozen = -1;
+            if (t >= TOTAL) return;
+            t0 = performance.now() - t;
+            raf = requestAnimationFrame(frame);
+          },
+        };
+        document.fonts.ready.then(function () {
+          window.__boot.ready = true;
+        });
+      })();
+    </script>
+  </body>
+</html>

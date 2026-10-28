@@ -1,0 +1,794 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>开屏 5 · A 一颗星的余像</title>
+<link rel="icon" href="data:,">
+<script>
+  /* 首帧之前就定好放不放。data-boot 只由脚本加上 —— 无 JS 时 #boot 从不显示（不留死幕）；
+     脚本起不来时 2.8s 自己摘掉。 */
+  try {
+    var R = document.documentElement;
+    var off = matchMedia('(prefers-reduced-motion: reduce)').matches || /[?&]noboot=1/.test(location.search);
+    if (off) R.setAttribute('data-boot-skip', '');
+    else R.setAttribute('data-boot', '');
+    setTimeout(function () { if (!window.__boot) R.removeAttribute('data-boot'); }, 2800);
+  } catch (e) {}
+</script>
+<link rel="stylesheet" href="/fonts/noto/font.css">
+<link rel="stylesheet" href="/fonts/plex/400.css">
+<style>
+  :root {
+    --font-display: 'Noto Serif SC', 'Palatino Linotype', Palatino, serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
+    --amber: #9a86c4;
+  }
+  html, body { margin: 0; height: 100%; background: #0e0f1d; color: #ece8f2; }
+  body { overflow: hidden; }
+
+  /* ══ 开屏层 ══
+     只放 transform / opacity 的动画；没有整屏 mask / filter / backdrop-filter。
+     开屏自己不等任何资源：脚本跑到的那一帧就是第一帧。
+     无 JS / reduced-motion：data-boot 从不写上，这一层永远 display:none。 */
+  #boot {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: none;
+    overflow: hidden;
+    pointer-events: none;
+    contain: strict;
+  }
+  html[data-boot] #boot { display: block; }
+  html[data-boot-skip] #boot { display: none; }
+  @media (prefers-reduced-motion: reduce) { #boot { display: none; } }
+
+  /* 开屏里的那根 14° 线：与首页线同形（path 直接抄首页线），从中心沿轴展开。
+     展开 = rotate(-14°) scaleX(k) rotate(14°) —— 只动 transform。 */
+  .b-line {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    transform-origin: 50% 50%;
+    will-change: transform, opacity;
+  }
+  .b-line path { fill: none; stroke-linecap: round; }
+
+  /* 星：全站同一个四芒（光标星 / 星环 / 工具栏是同一枚）——主芒 + 梦态紫芯 + 45° 副芒 + 中心结 */
+  .st {
+    position: absolute;
+    left: calc(-0.5 * var(--s, 32px));
+    top: calc(-0.5 * var(--s, 32px));
+    width: var(--s, 32px);
+    height: var(--s, 32px);
+    display: block;
+    overflow: visible;
+  }
+  .st .st-main { fill: #f4effc; }
+  .st .st-core { fill: rgb(176 156 222 / 0.55); }
+  .st .st-minor { fill: rgb(154 134 196 / 0.4); }
+  .st .st-knot { fill: #fff; opacity: 0.92; }
+
+/* ══ A · 一颗星的余像 ══
+   整场开屏是一粒光的成像事件：星是那粒光，环是它的衍射，细长光脊沿 14°；
+   最后光脊就是首页的脑电线，星的余像就是首页那片流光（同一种光被同一张 5px 网点成像）。
+   没有一件是纯装饰：星与环是全站光标/星环的同一套符号，线是首页那根线，流光与网点是首页的底。 */
+
+/* 夜：首页同一片靛夜压深之后的样子（不是白幕，也不是另一套色） */
+.a-night {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(122vmax 92vmax at 50% 54%, #131528 0%, #0a0c18 44%, #05060c 100%);
+  opacity: 0.99;
+  will-change: opacity;
+}
+
+/* 余像：星留在视觉里的那一层。三团取首页三池的位置与色相，但不在最亮的时候抢戏 ——
+   它等环散开以后才浮上来，等首页的流光接住它时退掉。 */
+.a-after {
+  position: absolute;
+  inset: -8%;
+  opacity: 0;
+  will-change: transform, opacity;
+  background:
+    radial-gradient(62vmax 50vmax at 50% 57%, rgba(160, 140, 204, 0.3) 0%, rgba(100, 86, 146, 0.14) 36%, rgba(40, 36, 64, 0) 70%),
+    radial-gradient(40vmax 32vmax at 9% 16%, rgba(198, 206, 217, 0.14) 0%, rgba(198, 206, 217, 0) 72%),
+    radial-gradient(50vmax 40vmax at 89% 82%, rgba(48, 72, 112, 0.38) 0%, rgba(13, 21, 36, 0) 72%);
+}
+/* 余像也是同一种光：首页的流光天生带 5px 网点，这层网点一直留在余像里 */
+.a-after::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, rgb(236 232 242 / 0.5) 0 0.65px, transparent 1px);
+  background-size: 5px 5px;
+  opacity: 0.1;
+}
+
+/* 衍射环：三枚极细的同心环，一枚接一枚地撑开、淡掉（星的像不是点，是这套环） */
+.a-ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  will-change: transform, opacity;
+}
+.a-ring svg {
+  position: absolute;
+  left: -36vmin;
+  top: -36vmin;
+  width: 72vmin;
+  height: 72vmin;
+  overflow: visible;
+  fill: none;
+  stroke: rgba(224, 220, 242, 0.42);
+  stroke-width: 0.5;
+}
+.a-r2 svg {
+  stroke: rgba(238, 234, 250, 0.32);
+  stroke-width: 0.45;
+}
+.a-r3 svg {
+  stroke: rgba(208, 202, 230, 0.24);
+  stroke-width: 0.45;
+}
+
+/* 衍射脊：沿 14° 的一根细光脊（不是装饰线，是星在这个方向上的衍射） */
+.a-flarewrap {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  transform: rotate(14deg);
+  will-change: transform;
+}
+.a-flare {
+  position: absolute;
+  left: -35vmax;
+  top: -0.7px;
+  width: 70vmax;
+  height: 1.4px;
+  opacity: 0;
+  background: linear-gradient(90deg,
+    rgba(240, 236, 250, 0) 0%,
+    rgba(240, 236, 250, 0.34) 24%,
+    rgba(250, 247, 255, 0.85) 50%,
+    rgba(240, 236, 250, 0.34) 76%,
+    rgba(240, 236, 250, 0) 100%);
+  will-change: transform, opacity;
+}
+
+/* 星：站内光标星的同一枚四芒（主芒 + 紫芯 + 45° 副芒 + 中心结）。
+   梦态里它正转 14° —— 这 14° 不是编的，是全站星在梦态下的倾角，也是那根线的角度。 */
+.a-starw,
+.a-ghost {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  will-change: transform, opacity;
+}
+.a-starw { --s: clamp(30px, 4.4vmin, 54px); }
+.a-ghost { --s: clamp(38px, 5.6vmin, 68px); }
+.a-gsv .st-main { fill: rgba(160, 140, 204, 0.6); }
+.a-halo {
+  position: absolute;
+  left: -15vmin;
+  top: -15vmin;
+  width: 30vmin;
+  height: 30vmin;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(244, 239, 252, 0.38) 0%, rgba(160, 140, 204, 0.22) 32%, rgba(160, 140, 204, 0) 72%);
+  will-change: transform, opacity;
+}
+</style>
+<noscript><style>#boot { display: none; }</style></noscript>
+</head>
+<body>
+
+<div id="boot" aria-hidden="true">
+<i class="a-night" id="a-night"></i>
+<div class="a-after" id="a-after"></div>
+<div class="a-flarewrap"><i class="a-flare" id="a-flare"></i></div>
+<div class="a-ring a-r1" id="a-r1"><svg viewBox="-100 -100 200 200" aria-hidden="true"><circle cx="0" cy="0" r="100"/></svg></div>
+<div class="a-ring a-r2" id="a-r2"><svg viewBox="-100 -100 200 200" aria-hidden="true"><circle cx="0" cy="0" r="100"/></svg></div>
+<div class="a-ring a-r3" id="a-r3"><svg viewBox="-100 -100 200 200" aria-hidden="true"><circle cx="0" cy="0" r="100"/></svg></div>
+<div class="a-ghost" id="a-ghost"><svg class="st a-gsv" viewBox="-13 -13 26 26" aria-hidden="true"><path class="st-minor" transform="rotate(45) scale(0.55)" d="M0,-10C0.7,-2.6 2.6,-0.7 10,0C2.6,0.7 0.7,2.6 0,10C-0.7,2.6 -2.6,0.7 -10,0C-2.6,-0.7 -0.7,-2.6 0,-10Z"/><path class="st-main" d="M0,-10C0.7,-2.6 2.6,-0.7 10,0C2.6,0.7 0.7,2.6 0,10C-0.7,2.6 -2.6,0.7 -10,0C-2.6,-0.7 -0.7,-2.6 0,-10Z"/></svg></div>
+  <svg class="b-line" id="b-line" viewBox="0 0 1440 900" preserveAspectRatio="none" aria-hidden="true">
+    <path id="b-line-glow" stroke="#b3aacc" stroke-width="6" opacity="0"></path>
+    <path id="b-line-core" stroke="#7f7a99" stroke-width="1.2" opacity=".62"></path>
+  </svg>
+<div class="a-starw" id="a-starw"><i class="a-halo" id="a-halo"></i><svg class="st" viewBox="-13 -13 26 26" aria-hidden="true"><path class="st-minor" transform="rotate(45) scale(0.55)" d="M0,-10C0.7,-2.6 2.6,-0.7 10,0C2.6,0.7 0.7,2.6 0,10C-0.7,2.6 -2.6,0.7 -10,0C-2.6,-0.7 -0.7,-2.6 0,-10Z"/><path class="st-main" d="M0,-10C0.7,-2.6 2.6,-0.7 10,0C2.6,0.7 0.7,2.6 0,10C-0.7,2.6 -2.6,0.7 -10,0C-2.6,-0.7 -0.7,-2.6 0,-10Z"/><path class="st-core" transform="scale(0.52)" d="M0,-10C0.7,-2.6 2.6,-0.7 10,0C2.6,0.7 0.7,2.6 0,10C-0.7,2.6 -2.6,0.7 -10,0C-2.6,-0.7 -0.7,-2.6 0,-10Z"/><path class="st-knot" d="M0,-4.2L2.9,0L0,4.2L-2.9,0Z"/></svg></div>
+</div>
+
+<!-- ─────────────────────────────────────────────────────────────
+     假首页 · 交接标的（_shared/home-fragment.html 整块复制）
+     只改了两处：
+      ① 那根线的几何按视口真实像素画（viewBox 随视口走）——原片段按 1440×900 拉伸，
+         手机上会被压成 ~40°，而真站 canvas 里它是真实的 14°。
+      ② 给 #h-eeg-path 一个无 JS 的兜底 d。
+     其余与共享片段一致；终帧就是它静置的样子。
+     ───────────────────────────────────────────────────────────── -->
+
+<div id="home" aria-label="首页（假）">
+  <div class="h-flow"></div>
+  <svg class="h-eeg" id="h-eeg" viewBox="0 0 1440 900" preserveAspectRatio="none" aria-hidden="true">
+    <path id="h-eeg-path" d="M-143.2 237.2L-126.7 237.7L-111.3 242.7L-95.9 247.7L-79.3 248.3L-63.5 251.7L-48.9 259.6L-33.2 263.7L-17.0 265.4L-1.8 271.5L13.5 276.9L30.1 276.9L46.2 279.3L61.2 286.0L77.0 289.4L93.2 291.2L108.1 298.2L123.2 304.7L139.6 305.6L155.6 308.4L170.7 314.7L186.8 316.8L203.3 317.5L218.3 323.9L233.4 330.5L249.6 332.3L265.2 336.4L280.1 343.6L296.2 345.8L312.8 346.0L328.1 351.4L343.4 356.7L359.8 357.9L375.4 362.3L390.0 370.4L405.8 373.8L422.2 374.9L437.4 380.5L452.9 385.2L469.6 385.2L485.4 388.5L500.2 396.0L516.0 399.6L532.1 401.8L547.1 408.7L562.4 414.1L579.0 414.2L595.0 417.0L610.0 423.3L626.1 425.7L642.3 427.4L657.2 434.6L672.3 441.0L688.6 442.3L704.3 446.0L719.4 452.4L735.7 454.0L752.2 454.5L767.3 460.8L782.5 466.6L798.8 468.2L814.2 473.0L829.0 480.6L845.1 482.9L861.6 483.6L876.8 489.1L892.4 493.7L908.9 494.2L924.4 498.7L939.1 506.7L954.9 510.0L971.1 511.9L986.2 518.2L1001.8 522.7L1018.5 522.4L1034.3 525.8L1049.2 532.7L1065.2 535.5L1081.2 537.9L1096.0 545.4L1111.3 551.0L1127.9 551.4L1143.7 554.8L1158.8 560.9L1175.1 562.4L1191.4 563.9L1206.2 571.1L1221.4 577.1L1237.7 578.6L1253.2 583.2L1268.2 590.0L1284.5 591.3L1301.0 592.0L1316.2 598.0L1331.6 602.9L1347.9 604.2L1363.3 609.5L1378.0 617.3L1394.0 619.7L1410.4 621.1L1425.5 627.0L1441.2 630.9L1457.9 630.9L1473.4 635.4L1488.2 643.0L1504.1 645.9L1520.2 648.5L1535.0 655.6L1550.6 660.0L1567.3 659.8L1583.1 663.4" fill="none" stroke="#7f7a99" stroke-width="1.2" stroke-linecap="round" opacity=".62"></path>
+  </svg>
+
+  <div class="h-head">
+    <p class="h-kicker">个人网站</p>
+    <h1 class="h-brand">Traveritas</h1>
+  </div>
+
+  <div class="h-entries">
+    <a href="#" class="h-entry"><i></i><span class="no">01</span><b>断章</b><em>ESSAYS</em></a>
+    <a href="#" class="h-entry"><i></i><span class="no">02</span><b>闪念</b><em>MOMENTS</em></a>
+    <a href="#" class="h-entry"><i></i><span class="no">03</span><b>造物</b><em>PROJECTS</em></a>
+  </div>
+
+  <p class="h-clock">21:34 · 2026.10.18</p>
+  <nav class="h-exits"><a href="#">GitHub</a><a href="#">RSS</a><a href="#">◇ NEXUS</a></nav>
+  <p class="h-hint">下沉<i></i></p>
+</div>
+
+<style>
+  /* 只在你自己的 index.html 里用；类名都带 h- 前缀，不会撞到开屏自己的样式 */
+  #home {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    background: #0e0f1d;
+    color: #ece8f2;
+    --hx: 8vw;
+    --tan14: 0.249328;
+    font-family: var(--font-display, 'Noto Serif SC', serif);
+  }
+
+  /* 流光：三池夜色 + 一层网点（真站是 1/5 分辨率上采样的像素流光，这里用叠色近似） */
+  .h-flow {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(58vw 46vw at 6% 18%, #b9c2cf 0%, rgb(185 194 207 / 0.55) 34%, transparent 68%),
+      radial-gradient(46vw 40vw at 46% 62%, rgb(29 23 41 / 0.9) 0%, transparent 70%),
+      radial-gradient(50vw 44vw at 88% 78%, rgb(13 21 36 / 0.95) 0%, transparent 72%),
+      radial-gradient(70vw 60vw at 70% 10%, rgb(40 36 64 / 0.7) 0%, transparent 70%),
+      #0e0f1d;
+    filter: saturate(0.92);
+    transition: filter 0.4s linear;
+  }
+  .h-flow::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(circle, rgb(236 232 242 / 0.1) 0 1px, transparent 1.2px);
+    background-size: 5px 5px;
+    opacity: 0.5;
+  }
+
+  .h-eeg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    pointer-events: none;
+  }
+
+  .h-head {
+    position: absolute;
+    left: var(--hx);
+    bottom: calc(50vh + (50vw - var(--hx)) * var(--tan14) + 22px);
+  }
+  .h-kicker {
+    margin: 0 0 1.05rem 0.2em;
+    font: 500 13px/1 var(--font-display, serif);
+    letter-spacing: 0.62em;
+    color: #9a97b0;
+  }
+  .h-brand {
+    margin: 0;
+    font: 500 clamp(54px, 7.4vw, 128px)/0.86 var(--font-display, serif);
+    letter-spacing: 0.035em;
+    color: #f1edf6;
+    white-space: nowrap;
+    /* 真站里大字是「流光的一扇反相窗」（canvas 反相 + 字形遮罩）。
+       这里不真的反相：backdrop-filter 的矩形会把字周围切出一块亮板，反而失真。
+       写成一块偏冷、略透明的浅字，近似它被流光照亮的样子就够。 */
+    color: #eef0f7;
+  }
+
+  .h-entries {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+  .h-entries .h-entry {
+    position: absolute;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    pointer-events: auto;
+    text-decoration: none;
+    color: #e6e2ee;
+    transition: letter-spacing 0.5s ease;
+  }
+  /* 三个栏头挂在线下：左右位置对应将来三栏的位置，纵向跟着那根 14° 线走 */
+  .h-entries .h-entry:nth-child(1) { left: 33vw; top: calc(50vh + (33vw - 50vw) * var(--tan14) + 30px); }
+  .h-entries .h-entry:nth-child(2) { left: 52vw; top: calc(50vh + (52vw - 50vw) * var(--tan14) + 46px); }
+  .h-entries .h-entry:nth-child(3) { left: 71vw; top: calc(50vh + (71vw - 50vw) * var(--tan14) + 62px); }
+  .h-entry i {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: #9a86c4;
+    box-shadow: 0 0 10px 1px #9a86c4;
+    align-self: center;
+  }
+  .h-entry .no { font: italic 400 13px/1 var(--font-display, serif); letter-spacing: 0.08em; color: #8d8aa3; }
+  .h-entry b { font: 600 19px/1 var(--font-display, serif); letter-spacing: 0.34em; }
+  .h-entry em { font: normal 400 9px/1 var(--font-mono, monospace); letter-spacing: 0.3em; color: #8d8aa3; }
+  .h-entry:hover b { letter-spacing: 0.44em; }
+
+  .h-clock,
+  .h-exits {
+    position: absolute;
+    bottom: 26px;
+    margin: 0;
+    font: 400 10px/1 var(--font-mono, monospace);
+    letter-spacing: 0.18em;
+    color: #827f98;
+  }
+  .h-clock { left: var(--hx); }
+  .h-exits { right: 7vw; display: flex; gap: 22px; }
+  .h-exits a { color: inherit; text-decoration: none; }
+
+  .h-hint {
+    position: absolute;
+    left: 50%;
+    bottom: 22px;
+    margin: 0;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    font: 500 11px/1 var(--font-display, serif);
+    letter-spacing: 0.6em;
+    padding-left: 0.6em;
+    color: #827f98;
+  }
+  .h-hint i { width: 1px; height: 26px; background: linear-gradient(rgb(236 230 244 / 0.5), transparent); }
+
+  @media (max-width: 899px) {
+    #home { --hx: 22px; }
+    .h-brand { font-size: clamp(44px, 13vw, 72px); }
+    .h-kicker { font-size: 12px; margin-bottom: 0.8rem; }
+    .h-entries .h-entry:nth-child(1) { left: 22px; top: calc(50vh + 62px); }
+    .h-entries .h-entry:nth-child(2) { left: 22px; top: calc(50vh + 108px); }
+    .h-entries .h-entry:nth-child(3) { left: 22px; top: calc(50vh + 154px); }
+    .h-clock { display: none; }
+    .h-exits { right: 22px; }
+  }
+</style>
+
+<script>
+  window.HomeMock = (() => {
+    const flow = document.querySelector('#home .h-flow');
+    const brand = document.querySelector('#home .h-brand');
+    const path = document.getElementById('h-eeg-path');
+    const svg = document.getElementById('h-eeg');
+    const TAN = Math.tan((14 * Math.PI) / 180);
+    /* 线的几何按视口真实像素算：viewBox 跟着视口走，14° 在任何屏上都成立 */
+    let W = innerWidth, H = innerHeight;
+    let reveal = 1, focus = 1, px = 1;
+    /* 14° 轴上的波形线：整条线 = 视口对角线那么长，按 reveal 从中心往两端露出 */
+    function draw() {
+      W = innerWidth;
+      H = innerHeight;
+      const vb = '0 0 ' + W + ' ' + H;
+      if (svg.getAttribute('viewBox') !== vb) svg.setAttribute('viewBox', vb);
+      const half = Math.hypot(W, H) / 2 + 40;
+      const n = 220;
+      let d = '';
+      let last = null;
+      for (let i = 0; i <= n; i++) {
+        const s = i / n;
+        const t = (s * 2 - 1) * half; // 沿线坐标
+        const x = W / 2 + Math.cos(Math.atan(TAN)) * t;
+        const y = H / 2 + Math.sin(Math.atan(TAN)) * t;
+        const wob = 3.6 * (Math.sin(t * 0.5 + performance.now() / 2000) * 0.6 + Math.sin(t * 1.9) * 0.4);
+        const ox = -Math.sin(Math.atan(TAN)) * wob;
+        const oy = Math.cos(Math.atan(TAN)) * wob;
+        const p = [x + ox, y + oy];
+        d += (last ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1);
+        last = p;
+      }
+      path.setAttribute('d', d);
+      // 从中心往两端露：用线性渐变的遮罩近似（左半 + 右半各露 reveal 的一半）
+      const m = `linear-gradient(90deg, transparent ${50 - reveal * 50}%, #000 ${50 - reveal * 50}%, #000 ${50 + reveal * 50}%, transparent ${50 + reveal * 50}%)`;
+      path.style.maskImage = m;
+      path.style.webkitMaskImage = m;
+    }
+    let raf = 0;
+    const loop = () => { draw(); raf = requestAnimationFrame(loop); };
+    loop();
+    return {
+      line(v) { reveal = v; draw(); },
+      focus(v) { focus = v; brand.style.filter = v >= 1 ? '' : `blur(${((1 - v) * 14).toFixed(2)}px)`; brand.style.opacity = String(v); },
+      pixels(v) {
+        px = v;
+        // 粗颗粒提示：把底图按倍数放大再裁回去（等价于降采样），真站是 1/5 分辨率 canvas
+        if (v <= 1) { flow.style.transform = ''; flow.style.filter = 'saturate(0.92)'; return; }
+        flow.style.transform = `scale(${v.toFixed(2)})`;
+        flow.style.transformOrigin = '50% 45%';
+        flow.style.filter = `saturate(0.92) blur(${(v * 0.6).toFixed(2)}px)`;
+      },
+      stop() { if (raf) cancelAnimationFrame(raf); raf = 0; },
+    };
+  })();
+</script>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════
+   公共接缝 · 星 → 14° 线 → 首页静置
+
+   开屏里所有运动都是 Web Animations，只写 transform / opacity（合成线程）。
+   首页那根线的「从中心画出」由开屏接管：开屏层里放一份与首页线同形的线
+   （path 直接从首页线抄过来），从中心沿 14° 轴展开；交接时把它换回首页线，
+   两者同形，交接帧不动一格。首页大字那 1.6s 的对焦同样由开屏驱动，
+   不让它在夜底下白演一遍。
+   seek(ms) = 把所有 animation 的 currentTime 设成 ms，画面完全确定。
+   ═══════════════════════════════════════════════════════════════════════════ */
+(function () {
+  var root = document.documentElement;
+  var box = document.getElementById('boot');
+  var noop = function () {};
+
+  window.__bootKit = {
+    start: function (spec) {
+      var TOTAL = spec.total;
+      var HM = window.HomeMock;
+      var anims = [];
+      var cur = 0;
+      var paused = false;
+      var finished = false;
+      var resizeHooks = [];
+
+      /* 减少动效 / ?noboot=1：一帧不放，直接落首页 */
+      if (!box || root.hasAttribute('data-boot-skip')) {
+        window.__boot = { total: TOTAL, ready: true, skipped: true, pause: noop, seek: noop, resume: noop };
+        return;
+      }
+
+      var homeSvg = document.getElementById('h-eeg');
+      var homePath = document.getElementById('h-eeg-path');
+      var bline = document.getElementById('b-line');
+      var bcore = document.getElementById('b-line-core');
+      var bglow = document.getElementById('b-line-glow');
+      var brand = document.querySelector('#home .h-brand');
+
+      /* 停掉假首页自己的 rAF，把线摆到静置（满）——开屏不要它在夜底下白画 */
+      if (HM) { try { HM.stop(); HM.line(1); } catch (e) {} }
+
+      var EASE = {
+        out: 'cubic-bezier(.16,1,.3,1)',
+        io: 'cubic-bezier(.5,0,.22,1)',
+        soft: 'cubic-bezier(.33,.9,.24,1)',
+        in: 'cubic-bezier(.6,.02,.85,.4)'
+      };
+
+      /* 开屏线：一根安静、平滑的 14° 线（v = 视口真实像素，viewBox 跟着视口 1:1）。
+         它最后换上首页那根带脑电震颤的线 —— 交接时那一下「开始发颤」就是脑电线醒来的那一下。
+         用平滑线的原因：reveal 是把线沿自身轴从中心拉开，高频震颤被压缩后会糊成一团锯齿。 */
+      var TAN14 = Math.tan((14 * Math.PI) / 180);
+      var ANG14 = Math.atan(TAN14);
+      function bootD() {
+        var W = innerWidth, H = innerHeight;
+        var half = Math.hypot(W, H) / 2 + 40;
+        var n = 120, d = '';
+        for (var i = 0; i <= n; i++) {
+          var s = i / n;
+          var t = (s * 2 - 1) * half;
+          var x = W / 2 + Math.cos(ANG14) * t;
+          var y = H / 2 + Math.sin(ANG14) * t;
+          var wob = 3.1 * Math.sin(t * 0.012 + 0.7) + 1.1 * Math.sin(t * 0.029 + 2.1);
+          var ox = -Math.sin(ANG14) * wob;
+          var oy = Math.cos(ANG14) * wob;
+          d += (i ? 'L' : 'M') + (x + ox).toFixed(1) + ' ' + (y + oy).toFixed(1);
+        }
+        return d;
+      }
+      function syncLine() {
+        var d = bootD();
+        bcore.setAttribute('d', d);
+        bglow.setAttribute('d', d);
+        var vb = '0 0 ' + innerWidth + ' ' + innerHeight;
+        if (bline.getAttribute('viewBox') !== vb) bline.setAttribute('viewBox', vb);
+        if (homeSvg.getAttribute('viewBox') !== vb) homeSvg.setAttribute('viewBox', vb);
+      }
+
+      function track(el, keys) {
+        var fr = keys.map(function (k) {
+          var o = { offset: Math.min(1, Math.max(0, k[0] / TOTAL)), easing: k[2] || 'linear' };
+          for (var p in k[1]) o[p] = k[1][p];
+          return o;
+        });
+        if (fr[0].offset > 0) {
+          var first = { offset: 0, easing: 'linear' };
+          for (var p1 in fr[0]) if (p1 !== 'offset' && p1 !== 'easing') first[p1] = fr[0][p1];
+          fr.unshift(first);
+        }
+        if (fr[fr.length - 1].offset < 1) {
+          var last = { offset: 1, easing: 'linear' };
+          for (var p2 in fr[fr.length - 1]) if (p2 !== 'offset' && p2 !== 'easing') last[p2] = fr[fr.length - 1][p2];
+          fr.push(last);
+        }
+        fr.sort(function (a, b) { return a.offset - b.offset; });
+        var a = el.animate(fr, { duration: TOTAL, fill: 'both', easing: 'linear' });
+        a.pause();
+        a.currentTime = cur;
+        anims.push(a);
+        return a;
+      }
+
+      function axis(k) {
+        return 'rotate(14deg) scaleX(' + k.toFixed(5) + ') rotate(-14deg)';
+      }
+
+      var ctx = {
+        total: TOTAL,
+        track: track,
+        ease: EASE,
+        W: function () { return innerWidth; },
+        H: function () { return innerHeight; },
+        lineD: function () { return bcore.getAttribute('d') || ''; },
+        bootD: bootD,
+        lineLength: function () { return Math.hypot(innerWidth, innerHeight) + 80; },
+        onResize: function (fn) { resizeHooks.push(fn); },
+        syncLine: syncLine
+      };
+
+      /* ── 公共轨道 ─────────────────────────────────────────────────── */
+      var LINE = spec.line || [TOTAL * 0.62, TOTAL * 0.94];
+      var FOCUS = spec.focus || [TOTAL * 0.66, TOTAL * 0.95];
+      var HAND = spec.handoff || [TOTAL * 0.91, TOTAL * 0.95];
+
+      function common() {
+        syncLine();
+
+        /* 开屏线：先藏、再沿 14° 轴从中心展开（k = r(2−r)，与首页 reveal 同一条曲线） */
+        var keys = [
+          [0, { opacity: '0', transform: axis(0.004) }],
+          [LINE[0], { opacity: '0', transform: axis(0.004) }]
+        ];
+        var i;
+        for (i = 1; i <= 6; i++) {
+          var r = i / 6;
+          var k = r * (2 - r);
+          keys.push([LINE[0] + (LINE[1] - LINE[0]) * r, { opacity: '1', transform: axis(Math.max(0.004, k)) }]);
+        }
+        keys.push([HAND[0], { opacity: '1', transform: axis(1) }]);
+        keys.push([HAND[1], { opacity: '0', transform: axis(1) }]);
+        track(bline, keys);
+
+        /* 线的光晕：只在这一段有，交接前收回 0 —— 交接那一刻只剩与首页线同样的发丝 */
+        track(bglow, [
+          [0, { opacity: '0' }],
+          [LINE[0], { opacity: '0' }],
+          [LINE[0] + (LINE[1] - LINE[0]) * 0.34, { opacity: '0.5' }],
+          [HAND[0], { opacity: '0' }]
+        ]);
+
+        /* 首页线：先在夜里藏着，交接帧换成它 */
+        track(homeSvg, [
+          [0, { opacity: '0' }],
+          [HAND[0], { opacity: '0' }],
+          [HAND[1], { opacity: '1' }]
+        ]);
+
+        /* 大字：从 blur(14px) 里对上焦（与全站 w-home-focus 同一条曲线） */
+        var fd = Math.max(1, FOCUS[1] - FOCUS[0]);
+        track(brand, [
+          [FOCUS[0], { opacity: '0', filter: 'blur(14px)' }, 'cubic-bezier(.2,.7,.2,1)'],
+          [FOCUS[0] + fd * 0.6, { opacity: '1' }],
+          [FOCUS[1], { filter: 'blur(0px)' }]
+        ]);
+      }
+
+      function clearAnims() {
+        for (var i = 0; i < anims.length; i++) { try { anims[i].cancel(); } catch (e) {} }
+        anims = [];
+      }
+
+      function buildAll() {
+        clearAnims();
+        common();
+        spec.build(ctx);
+        armFinish();
+      }
+
+      function finish() {
+        if (finished) return;
+        finished = true;
+        clearAnims();
+        root.removeAttribute('data-boot');
+      }
+
+      function armFinish() {
+        var a = anims[0];
+        if (!a) return;
+        Promise.resolve(a.finished).then(function () {
+          if (!paused && !finished) finish();
+        }).catch(noop);
+      }
+
+      /* ── 统一控制口 ───────────────────────────────────────────────── */
+      var api = {
+        total: TOTAL,
+        ready: false,
+        pause: function () { paused = true; for (var i = 0; i < anims.length; i++) anims[i].pause(); },
+        seek: function (ms) {
+          cur = Math.max(0, Math.min(TOTAL, Number(ms) || 0));
+          if (root.hasAttribute('data-boot-skip')) return;
+          if (finished) { finished = false; buildAll(); }
+          root.setAttribute('data-boot', '');
+          for (var i = 0; i < anims.length; i++) { anims[i].pause(); anims[i].currentTime = cur; }
+        },
+        resume: function () {
+          if (finished) { finished = false; cur = 0; buildAll(); }
+          paused = false;
+          for (var i = 0; i < anims.length; i++) anims[i].play();
+        },
+        time: function () { return cur; }
+      };
+      window.__boot = api;
+
+      buildAll();
+      for (var j = 0; j < anims.length; j++) anims[j].play();
+
+      var rt = 0;
+      addEventListener('resize', function () {
+        clearTimeout(rt);
+        rt = setTimeout(function () {
+          var keep = cur;
+          if (HM) { try { HM.line(1); } catch (e) {} }
+          syncLine();
+          for (var i = 0; i < resizeHooks.length; i++) resizeHooks[i]();
+          if (!finished) {
+            buildAll();
+            api.seek(keep);
+          }
+        }, 180);
+      });
+
+      /* ready 等首页字体（最多 1500ms）。开屏自己不等任何资源。 */
+      requestAnimationFrame(function () {
+        var fonts = document.fonts ? document.fonts.ready : Promise.resolve();
+        var cap = new Promise(function (r) { setTimeout(r, 1500); });
+        Promise.race([fonts, cap]).then(function () {
+          requestAnimationFrame(function () { api.ready = true; });
+        });
+      });
+    }
+  };
+})();
+</script>
+
+<script>
+/* A · 一颗星的余像 · 总长 2200ms
+   0 ── 240   夜里一粒光将亮未亮
+   240 ─ 1080 星亮到满，三枚衍射环一枚接一枚撑开；一根细光脊沿 14° 从星心探出来
+   1080 ─ 1400 余像（三池位置上的紫雾）浮上来，星慢慢转向 14°
+   1360 ─ 2000 光脊长成首页那根脑电线；星把光交出去，自己退掉
+   1480 ─ 2060 大字从 blur(14px) 里对上焦；夜在 1280–1950 之间退成首页的靛夜
+   2006 ─ 2062 开屏线换回首页线（同形，交接帧不动）
+   2062 ─ 2200 首页静置
+*/
+(function () {
+  window.__bootKit.start({
+    total: 2200,
+    line: [1360, 2000],
+    focus: [1480, 2060],
+    handoff: [2006, 2062],
+    build: function (ctx) {
+      var t = ctx.track;
+      var E = ctx.ease;
+      var night = document.getElementById('a-night');
+      var after = document.getElementById('a-after');
+      var flare = document.getElementById('a-flare');
+      var r1 = document.getElementById('a-r1');
+      var r2 = document.getElementById('a-r2');
+      var r3 = document.getElementById('a-r3');
+      var ghost = document.getElementById('a-ghost');
+      var starw = document.getElementById('a-starw');
+      var halo = document.getElementById('a-halo');
+
+      t(night, [
+        [0, { opacity: '0.99' }],
+        [1280, { opacity: '0.99' }, E.io],
+        [1950, { opacity: '0' }]
+      ]);
+
+      t(after, [
+        [0, { opacity: '0', transform: 'scale(0.85)' }],
+        [700, { opacity: '0', transform: 'scale(0.85)' }, E.out],
+        [1250, { opacity: '0.5', transform: 'scale(1)' }],
+        [1600, { opacity: '0.44' }, E.io],
+        [1960, { opacity: '0', transform: 'scale(1.04)' }]
+      ]);
+
+      t(r1, [
+        [0, { opacity: '0', transform: 'scale(0.25)' }],
+        [100, { opacity: '0', transform: 'scale(0.25)' }, E.out],
+        [320, { opacity: '0.45', transform: 'scale(0.6)' }],
+        [760, { opacity: '0.3', transform: 'scale(1.05)' }, E.io],
+        [1200, { opacity: '0', transform: 'scale(1.55)' }]
+      ]);
+      t(r2, [
+        [0, { opacity: '0', transform: 'scale(0.2)' }],
+        [240, { opacity: '0', transform: 'scale(0.2)' }, E.out],
+        [520, { opacity: '0.32', transform: 'scale(0.55)' }],
+        [980, { opacity: '0.18', transform: 'scale(1)' }, E.io],
+        [1450, { opacity: '0', transform: 'scale(1.5)' }]
+      ]);
+      t(r3, [
+        [0, { opacity: '0', transform: 'scale(0.15)' }],
+        [420, { opacity: '0', transform: 'scale(0.15)' }, E.out],
+        [760, { opacity: '0.18', transform: 'scale(0.5)' }],
+        [1200, { opacity: '0.09', transform: 'scale(0.9)' }, E.io],
+        [1600, { opacity: '0', transform: 'scale(1.4)' }]
+      ]);
+
+      t(flare, [
+        [0, { opacity: '0', transform: 'scaleX(0.05)' }],
+        [240, { opacity: '0', transform: 'scaleX(0.05)' }, E.out],
+        [700, { opacity: '0.6', transform: 'scaleX(0.3)' }],
+        [1150, { opacity: '0.42', transform: 'scaleX(0.55)' }, E.io],
+        [1440, { opacity: '0', transform: 'scaleX(0.75)' }]
+      ]);
+
+      t(ghost, [
+        [0, { opacity: '0', transform: 'translate(0px,0px) rotate(0deg) scale(1)' }],
+        [520, { opacity: '0', transform: 'translate(0px,0px) rotate(0deg) scale(1)' }, E.out],
+        [880, { opacity: '0.16', transform: 'translate(14px,3.5px) rotate(-3deg) scale(1.25)' }],
+        [1260, { opacity: '0.09', transform: 'translate(32px,8px) rotate(-5deg) scale(1.45)' }, E.io],
+        [1580, { opacity: '0', transform: 'translate(42px,10.5px) rotate(-6deg) scale(1.55)' }]
+      ]);
+
+      t(starw, [
+        [0, { opacity: '0', transform: 'rotate(0deg) scale(0.3)' }],
+        [220, { opacity: '0', transform: 'rotate(0deg) scale(0.3)' }, E.out],
+        [520, { opacity: '0.98', transform: 'rotate(0.5deg) scale(1.06)' }],
+        [800, { opacity: '0.92', transform: 'rotate(2deg) scale(1)' }, E.io],
+        [1140, { opacity: '1', transform: 'rotate(6deg) scale(1.06)' }],
+        [1400, { opacity: '1', transform: 'rotate(12deg) scale(1.08)' }],
+        [1720, { opacity: '0.7', transform: 'rotate(14deg) scale(0.9)' }, E.io],
+        [1940, { opacity: '0', transform: 'rotate(14deg) scale(0.34)' }]
+      ]);
+
+      t(halo, [
+        [0, { opacity: '0', transform: 'scale(0.4)' }],
+        [300, { opacity: '0', transform: 'scale(0.4)' }, E.out],
+        [700, { opacity: '0.75', transform: 'scale(1)' }],
+        [1200, { opacity: '0.5', transform: 'scale(1.1)' }, E.io],
+        [1780, { opacity: '0', transform: 'scale(1.5)' }]
+      ]);
+    }
+  });
+})();
+</script>
+</body>
+</html>
+
+

@@ -1,0 +1,763 @@
+<!doctype html>
+<html lang="zh-CN" class="booting">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>开屏 mock 4 · 三池先聚，线后到</title>
+<link rel="icon" href="data:," />
+<link rel="stylesheet" href="/fonts/noto/font.css" />
+<link rel="stylesheet" href="/fonts/plex/400.css" />
+<style>
+  :root {
+    --font-display: 'Noto Serif SC', 'Palatino Linotype', 'Iowan Old Style', Palatino, Georgia, serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  }
+  html, body { margin: 0; height: 100%; background: #0e0f1d; }
+  body { overflow: hidden; }
+</style>
+</head>
+<body>
+
+<!-- ─────────────────────────────────────────────────────────────
+     假首页 · 交接标的（整块复制进你 index.html 的 <body> 末尾，别改 _shared 本身）
+
+     这不是真首页，只还原「一眼认出」的那几件：
+       靛夜底 + 像素化的流光（静态，一层底图 + 网点）+ 一根 14° 波形线
+       + 左上小字与大字 + 线下三个栏头 + 左下时刻 + 右下出口 + 底部「下沉」。
+     大字按站里的做法是「流光的一扇反相窗」——这里用 backdrop-filter 近似，
+     效果对得上就够了；真首页是 canvas 反相 + 字形遮罩。
+
+     它自带 window.HomeMock 三个旋钮，给你的开屏调用：
+       HomeMock.line(0..1)       脑电线「从中心往两端画出」的进度（0 = 一个点都没有）
+       HomeMock.focus(0..1)      大字的对焦（0 = blur 14px + 透明，1 = 清楚）
+       HomeMock.pixels(px)       流光底图的一个粗颗粒提示（1 = 不粗，8 = 很粗）——
+                                  只在你想「从粗到细」时用；不用就一直是 1
+     不调也行：默认 line=1 focus=1 pixels=1，即首页静置的样子。
+     若你的开屏完全接管了入场，就在自己的时间轴里调它们，别让两段各演一遍。
+     ───────────────────────────────────────────────────────────── -->
+
+<div id="home" aria-label="首页（假）">
+  <div class="h-flow"></div>
+  <!-- 本 mock 唯一插进 #home 的一行：三池的 canvas。必须夹在 .h-flow 之后、
+       线 / 字之前 —— 光在底，线和字在光上面（真站的 #w-light 也是这个层次）。 -->
+  <div id="veil" aria-hidden="true"><canvas id="pool" width="1" height="1"></canvas></div>
+  <svg class="h-eeg" id="h-eeg" viewBox="0 0 1440 900" preserveAspectRatio="none" aria-hidden="true">
+    <path id="h-eeg-path" fill="none" stroke="#7f7a99" stroke-width="1.2" stroke-linecap="round" opacity=".62"></path>
+  </svg>
+
+  <div class="h-head">
+    <p class="h-kicker">个人网站</p>
+    <h1 class="h-brand">Traveritas</h1>
+  </div>
+
+  <div class="h-entries">
+    <a href="#" class="h-entry"><i></i><span class="no">01</span><b>断章</b><em>ESSAYS</em></a>
+    <a href="#" class="h-entry"><i></i><span class="no">02</span><b>闪念</b><em>MOMENTS</em></a>
+    <a href="#" class="h-entry"><i></i><span class="no">03</span><b>造物</b><em>PROJECTS</em></a>
+  </div>
+
+  <p class="h-clock">21:34 · 2026.10.18</p>
+  <nav class="h-exits"><a href="#">GitHub</a><a href="#">RSS</a><a href="#">◇ NEXUS</a></nav>
+  <p class="h-hint">下沉<i></i></p>
+</div>
+
+<style>
+  /* 只在你自己的 index.html 里用；类名都带 h- 前缀，不会撞到开屏自己的样式 */
+  #home {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    background: #0e0f1d;
+    color: #ece8f2;
+    --hx: 8vw;
+    --tan14: 0.249328;
+    font-family: var(--font-display, 'Noto Serif SC', serif);
+  }
+
+  /* 流光：三池夜色 + 一层网点（真站是 1/5 分辨率上采样的像素流光，这里用叠色近似） */
+  .h-flow {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(58vw 46vw at 6% 18%, #b9c2cf 0%, rgb(185 194 207 / 0.55) 34%, transparent 68%),
+      radial-gradient(46vw 40vw at 46% 62%, rgb(29 23 41 / 0.9) 0%, transparent 70%),
+      radial-gradient(50vw 44vw at 88% 78%, rgb(13 21 36 / 0.95) 0%, transparent 72%),
+      radial-gradient(70vw 60vw at 70% 10%, rgb(40 36 64 / 0.7) 0%, transparent 70%),
+      #0e0f1d;
+    filter: saturate(0.92);
+    transition: filter 0.4s linear;
+  }
+  .h-flow::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(circle, rgb(236 232 242 / 0.1) 0 1px, transparent 1.2px);
+    background-size: 5px 5px;
+    opacity: 0.5;
+  }
+
+  .h-eeg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    pointer-events: none;
+  }
+
+  .h-head {
+    position: absolute;
+    left: var(--hx);
+    bottom: calc(50vh + (50vw - var(--hx)) * var(--tan14) + 22px);
+  }
+  .h-kicker {
+    margin: 0 0 1.05rem 0.2em;
+    font: 500 13px/1 var(--font-display, serif);
+    letter-spacing: 0.62em;
+    color: #9a97b0;
+  }
+  .h-brand {
+    margin: 0;
+    font: 500 clamp(54px, 7.4vw, 128px)/0.86 var(--font-display, serif);
+    letter-spacing: 0.035em;
+    color: #f1edf6;
+    white-space: nowrap;
+    /* 真站里大字是「流光的一扇反相窗」（canvas 反相 + 字形遮罩）。
+       这里不真的反相：backdrop-filter 的矩形会把字周围切出一块亮板，反而失真。
+       写成一块偏冷、略透明的浅字，近似它被流光照亮的样子就够。 */
+    color: #eef0f7;
+  }
+
+  .h-entries {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+  .h-entries .h-entry {
+    position: absolute;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    pointer-events: auto;
+    text-decoration: none;
+    color: #e6e2ee;
+    transition: letter-spacing 0.5s ease;
+  }
+  /* 三个栏头挂在线下：左右位置对应将来三栏的位置，纵向跟着那根 14° 线走 */
+  .h-entries .h-entry:nth-child(1) { left: 33vw; top: calc(50vh + (33vw - 50vw) * var(--tan14) + 30px); }
+  .h-entries .h-entry:nth-child(2) { left: 52vw; top: calc(50vh + (52vw - 50vw) * var(--tan14) + 46px); }
+  .h-entries .h-entry:nth-child(3) { left: 71vw; top: calc(50vh + (71vw - 50vw) * var(--tan14) + 62px); }
+  .h-entry i {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: #9a86c4;
+    box-shadow: 0 0 10px 1px #9a86c4;
+    align-self: center;
+  }
+  .h-entry .no { font: italic 400 13px/1 var(--font-display, serif); letter-spacing: 0.08em; color: #8d8aa3; }
+  .h-entry b { font: 600 19px/1 var(--font-display, serif); letter-spacing: 0.34em; }
+  .h-entry em { font: normal 400 9px/1 var(--font-mono, monospace); letter-spacing: 0.3em; color: #8d8aa3; }
+  .h-entry:hover b { letter-spacing: 0.44em; }
+
+  .h-clock,
+  .h-exits {
+    position: absolute;
+    bottom: 26px;
+    margin: 0;
+    font: 400 10px/1 var(--font-mono, monospace);
+    letter-spacing: 0.18em;
+    color: #827f98;
+  }
+  .h-clock { left: var(--hx); }
+  .h-exits { right: 7vw; display: flex; gap: 22px; }
+  .h-exits a { color: inherit; text-decoration: none; }
+
+  .h-hint {
+    position: absolute;
+    left: 50%;
+    bottom: 22px;
+    margin: 0;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    font: 500 11px/1 var(--font-display, serif);
+    letter-spacing: 0.6em;
+    padding-left: 0.6em;
+    color: #827f98;
+  }
+  .h-hint i { width: 1px; height: 26px; background: linear-gradient(rgb(236 230 244 / 0.5), transparent); }
+
+  @media (max-width: 899px) {
+    #home { --hx: 22px; }
+    .h-brand { font-size: clamp(44px, 13vw, 72px); }
+    .h-kicker { font-size: 12px; margin-bottom: 0.8rem; }
+    .h-entries .h-entry:nth-child(1) { left: 22px; top: calc(50vh - 30px); }
+    .h-entries .h-entry:nth-child(2) { left: 22px; top: calc(50vh + 16px); }
+    .h-entries .h-entry:nth-child(3) { left: 22px; top: calc(50vh + 62px); }
+    .h-clock { display: none; }
+    .h-exits { right: 22px; }
+  }
+</style>
+
+<script>
+  window.HomeMock = (() => {
+    const flow = document.querySelector('#home .h-flow');
+    const brand = document.querySelector('#home .h-brand');
+    const path = document.getElementById('h-eeg-path');
+    const W = 1440, H = 900, TAN = Math.tan((14 * Math.PI) / 180);
+    let reveal = 1, focus = 1, px = 1;
+    /* 14° 轴上的波形线：整条线 = 视口对角线那么长，按 reveal 从中心往两端露出 */
+    function draw() {
+      const half = Math.hypot(W, H) / 2 + 40;
+      const n = 220;
+      let d = '';
+      let last = null;
+      for (let i = 0; i <= n; i++) {
+        const s = i / n;
+        const t = (s * 2 - 1) * half; // 沿线坐标
+        const x = W / 2 + Math.cos(Math.atan(TAN)) * t;
+        const y = H / 2 + Math.sin(Math.atan(TAN)) * t;
+        const wob = 3.6 * (Math.sin(t * 0.5 + performance.now() / 2000) * 0.6 + Math.sin(t * 1.9) * 0.4);
+        const ox = -Math.sin(Math.atan(TAN)) * wob;
+        const oy = Math.cos(Math.atan(TAN)) * wob;
+        const p = [x + ox, y + oy];
+        d += (last ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1);
+        last = p;
+      }
+      path.setAttribute('d', d);
+      // 从中心往两端露：用线性渐变的遮罩近似（左半 + 右半各露 reveal 的一半）
+      const m = `linear-gradient(90deg, transparent ${50 - reveal * 50}%, #000 ${50 - reveal * 50}%, #000 ${50 + reveal * 50}%, transparent ${50 + reveal * 50}%)`;
+      path.style.maskImage = m;
+      path.style.webkitMaskImage = m;
+    }
+    let raf = 0;
+    const loop = () => { draw(); raf = requestAnimationFrame(loop); };
+    loop();
+    return {
+      line(v) { reveal = v; draw(); },
+      focus(v) { focus = v; brand.style.filter = v >= 1 ? '' : `blur(${((1 - v) * 14).toFixed(2)}px)`; brand.style.opacity = String(v); },
+      pixels(v) {
+        px = v;
+        // 粗颗粒提示：把底图按倍数放大再裁回去（等价于降采样），真站是 1/5 分辨率 canvas
+        if (v <= 1) { flow.style.transform = ''; flow.style.filter = 'saturate(0.92)'; return; }
+        flow.style.transform = `scale(${v.toFixed(2)})`;
+        flow.style.transformOrigin = '50% 45%';
+        flow.style.filter = `saturate(0.92) blur(${(v * 0.6).toFixed(2)}px)`;
+      },
+      stop() { if (raf) cancelAnimationFrame(raf); raf = 0; },
+    };
+  })();
+</script>
+
+<!-- ══════ 以上是 /_shared/home-fragment.html（原样，仅多插了一行 #veil） ══════ -->
+
+<style>
+  /* 三池的 canvas：夹在 .h-flow 与 .h-eeg 之间，absolute 无 z-index，靠 DOM 顺序压住流光、被线和字压住 */
+  #veil {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    will-change: opacity;
+  }
+  #veil canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+  }
+
+  /* 无 JS 时补的那根直线（只在 <noscript> 里出现）。
+     过屏幕中心、向右下倾 14°，与 y = 50vh + (x − 50vw)·tan14° 是同一根；
+     用一个 300vmax 的长条以中心为轴转过去，屏多大都够长。 */
+  .h-eeg-plain {
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    width: 300vmax;
+    height: 1px;
+    margin: -0.5px 0 0 -150vmax;
+    transform: rotate(14deg);
+    transform-origin: 50% 50%;
+    background: linear-gradient(90deg, transparent 22%, rgb(127 122 153 / 0.62) 38%, rgb(127 122 153 / 0.62) 62%, transparent 78%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* 开屏期间先按下不表（JS 一起手就把这些收进自己的时间轴；无 JS 时走 noscript） */
+  html.booting #home .h-flow,
+  html.booting #home .h-brand,
+  html.booting #home .h-kicker,
+  html.booting #home .h-entry,
+  html.booting #home .h-clock,
+  html.booting #home .h-exits,
+  html.booting #home .h-hint { opacity: 0; }
+
+  @media (prefers-reduced-motion: reduce) {
+    /* 不放：一帧都不抖，直接给首页 */
+    #veil { display: none; }
+  }
+</style>
+<noscript>
+  <style>
+    html.booting #home .h-flow,
+    html.booting #home .h-brand,
+    html.booting #home .h-kicker,
+    html.booting #home .h-entry,
+    html.booting #home .h-clock,
+    html.booting #home .h-exits,
+    html.booting #home .h-hint { opacity: 1 !important; }
+  </style>
+  <!-- 脑电线是 HomeMock 用 JS 画的波形（无 JS 时 path 的 d 是空的，等于缺一条）。
+       这里补一根直的：位置与倾斜照 y = 50vh + (x − 50vw)·tan14°，不抖，但也在。 -->
+  <div class="h-eeg-plain" aria-hidden="true"></div>
+</noscript>
+
+<script>
+/* ─────────────────────────────────────────────────────────────
+   开屏 · 三池先聚，线后到
+
+   0–950     聚：三池各自从一胚长开、亮出自己那一版夜色（essay 的冷白 / moment 的暖 / project 的青）
+   980–1420  收光：亮的那一版压回首页那种克制的浓度
+   1180–1780 线从 14° 轴的中点往两端画出来 —— 三池早就站好了，线是后到的
+   1420–1830 交接：canvas 溶回 .h-flow（两张是同图，所以只剩颗粒在化开）
+   1330–1780 大字对上焦（接管首页原有的 1.6s 对焦，不再白演一遍）
+   1360–1680 三个栏头挂到线下
+   1620–1900 时刻 / 出口 / 下沉
+   总长 2020
+
+   时间轴全部写在 JS 里，没有 @keyframes：seek(ms) 就是把 ms 喂给 render()
+   ───────────────────────────────────────────────────────────── */
+(() => {
+  'use strict';
+
+  const PX = 5;                         // 和真站 #w-light 同一个分辨率：1440×900 → 288×180
+  const A14 = (14 * Math.PI) / 180;
+  const TAN = Math.tan(A14);
+
+  const cl = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
+  const seg = (t, a, b) => (t <= a ? 0 : t >= b ? 1 : (t - a) / (b - a));
+  const eOut = (v) => 1 - (1 - v) * (1 - v) * (1 - v);
+  const eInOut = (v) => (v < 0.5 ? 4 * v * v * v : 1 - Math.pow(-2 * v + 2, 3) / 2);
+
+  const home = document.getElementById('home');
+  const flow = home.querySelector('.h-flow');
+  const kicker = home.querySelector('.h-kicker');
+  const entries = [...home.querySelectorAll('.h-entry')];
+  const clock = home.querySelector('.h-clock');
+  const exits = home.querySelector('.h-exits');
+  const hint = home.querySelector('.h-hint');
+  const veil = document.getElementById('veil');
+  const cv = document.getElementById('pool');
+  const ctx = cv.getContext('2d', { alpha: true });
+  const HM = window.HomeMock;
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ── 三池 + 一层夜气 ──
+     每条池在时间轴上有三个面目，连续地过去：
+
+       from → to     胚在离自己那一栏更近的地方（三团一开就彼此分开，不挤成一滩）
+       k0 → 1        半径
+       bStops → stops 轮廓：先硬（椭圆的等值线被 fbm 揉歪，边看得清），再滑到 CSS 那条
+       lit → col      颜色：聚着时亮出它自己那一版的夜色，落定时压回首页那个克制的值
+       coreA → 0      芯光
+
+     `to` / rx / ry / stops 逐条对上 .h-flow 那四层 radial-gradient（圆心是百分比、半径 vw），
+     stops 就是那层 gradient 的 color-stop 换算成 alpha —— 落定之后 canvas 与 .h-flow
+     是同一张图，交接只可能是颗粒在化开，不可能是形状在跳。
+
+     lit 三色取自 light.js 的 DREAM 调色板：essay 的亮冷白、moment 的暖、project 的青。
+     真站主页把这三池压得很低（它们只是「还没分开的夜色」）；开屏让它们短暂地亮一次，
+     再落回首页那种暗 —— 这就是「聚」这个动作的意义，也是它接得上首页的原因。 */
+  /* 数组顺序 = 叠的顺序，**第一个在最底、最后一个在最上** ——
+     和 .h-flow 那四层 background 的书写顺序严格一致（CSS 里先写的在下）。
+     顺序反了会出现很明显的错：essay 是唯一发亮的那池，它若压在最上面，
+     就没人去压暗它，左上会亮成一片白，和落地帧对不上。 */
+  const POOLS = [
+    { // 随笔 · 浅蓝灰，偏左上：唯一真正发亮的一池（CSS 第一层 = 最底）
+      from: [0.18, 0.24], to: [0.06, 0.18], rx: 0.58, ry: 0.46,
+      stops: [[0, 1.00], [0.34, 0.55], [0.68, 0]],
+      col: [185, 194, 207], lit: [202, 210, 222],
+      core: [232, 238, 245], coreA: 0.30,
+      off: [13, 53], k0: 0.26, a0: 0.90, warp: 1.20, recede: 0.72,
+      ph: [0.19, 0.61, 0.93, 0.37],
+    },
+    { // 瞬间 · 紫，正中偏下。聚着时透出一点 DREAM.moment 的暖
+      from: [0.44, 0.56], to: [0.46, 0.62], rx: 0.46, ry: 0.40,
+      stops: [[0, 0.90], [0.70, 0]],
+      col: [29, 23, 41], lit: [78, 52, 70],
+      core: [204, 140, 108], coreA: 0.34,
+      off: [71, 23], k0: 0.31, a0: 0.94, warp: 1.25, recede: 0.90,
+      ph: [0.85, 0.12, 0.44, 0.73],
+    },
+    { // 项目 · 深蓝，偏右下。聚着时透出一点 DREAM.project 的青
+      from: [0.74, 0.74], to: [0.88, 0.78], rx: 0.50, ry: 0.44,
+      stops: [[0, 0.95], [0.72, 0]],
+      col: [13, 21, 36], lit: [38, 68, 88],
+      core: [126, 176, 188], coreA: 0.34,
+      off: [29, 7], k0: 0.30, a0: 0.92, warp: 1.30, recede: 0.90,
+      ph: [0.31, 0.88, 0.52, 0.66],
+    },
+    { // 夜气：偏右上那一大片冷夜，压在最上（CSS 最后一层）
+      from: [0.66, 0.14], to: [0.70, 0.10], rx: 0.70, ry: 0.60,
+      stops: [[0, 0.70], [0.70, 0]],
+      col: [40, 36, 64], lit: [46, 42, 72],
+      core: [56, 50, 88], coreA: 0.0,
+      off: [63, 41], k0: 0.26, a0: 0.66, warp: 0.60, recede: 0.86,
+      ph: [0.62, 0.31, 0.77, 0.18],
+    },
+  ];
+
+  const T_GATHER = [0, 860];      // 聚：三池各自从一胚长开、透出自己那一版夜色
+  const T_CALM = [700, 1500];     // 收势：线一到，三池退到后面去（浓度乘 recede）
+  const T_LINE = [1240, 1760];    // 线「后到」：三池已经站好了才轮到你
+  const T_DIM = [1480, 1900];     // 收光：亮起来那一点点压回首页的克制值
+  const T_HAND = [1540, 1950];    // 交接：轮廓收平 + canvas 溶回 .h-flow
+  const TOTAL = 2080;
+
+  const LUTN = 512, LUTR = 1.6, LUTK = LUTN / LUTR;
+  const QL = 26;                        // 26 级量化，与 light.js 的 GRAIN.home 一致
+  const BAY = new Float32Array([0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5])
+    .map((v) => (v + 0.5) / 16);
+
+  /* ── 手写 fbm：照 light.js 的 h21 / vnoise / fbm 搬过来（少一层，够用且好算） ── */
+  function h21(x, y) {
+    let px = x * 123.34, py = y * 456.21;
+    px -= Math.floor(px);
+    py -= Math.floor(py);
+    const d = px * (px + 45.32) + py * (py + 45.32);
+    px += d; py += d;
+    return px * py - Math.floor(px * py);
+  }
+  function vnoise(x, y) {
+    const ix = Math.floor(x), iy = Math.floor(y);
+    const fx = x - ix, fy = y - iy;
+    const ux = fx * fx * (3 - 2 * fx), uy = fy * fy * (3 - 2 * fy);
+    const a = h21(ix, iy), b = h21(ix + 1, iy);
+    const c = h21(ix, iy + 1), d = h21(ix + 1, iy + 1);
+    const t1 = a + (b - a) * ux, t2 = c + (d - c) * ux;
+    return t1 + (t2 - t1) * uy;
+  }
+  function fbm(u, v) {
+    let s = 0, amp = 0.5, x = u, y = v;
+    for (let o = 0; o < 4; o++) {
+      s += amp * vnoise(x, y);
+      const nx = 0.8 * x - 0.6 * y;
+      const ny = 0.6 * x + 0.8 * y;
+      x = nx * 2.03 + 11.7;
+      y = ny * 2.03 + 11.7;
+      amp *= 0.5;
+    }
+    return s / 0.9375;                  // → 0..1
+  }
+
+  /* 两套 LUT 各自的 alpha 曲线：stops（落定后与 CSS 一致）与 bStops（聚着时的硬边轮廓）。
+     半径都按 0..LUTR 归一，噪声把等值线揉歪时是乘在半径上。 */
+  function lutOf(stops) {
+    const L = new Float32Array(LUTN + 1);
+    for (let i = 0; i <= LUTN; i++) {
+      const rho = (i / LUTN) * LUTR;
+      let a = 0;
+      if (rho <= stops[0][0]) a = stops[0][1];
+      else {
+        for (let k = 1; k < stops.length; k++) {
+          const p0 = stops[k - 1], p1 = stops[k];
+          if (rho <= p1[0]) { a = p0[1] + (p1[1] - p0[1]) * ((rho - p0[0]) / (p1[0] - p0[0])); break; }
+        }
+      }
+      L[i] = a;
+    }
+    return L;
+  }
+  for (const p of POOLS) p.L = lutOf(p.stops);
+
+  let W = 0, H = 0, CW = 0, CH = 0, NW = 0, NH = 0;
+  let img = null, nf = null, nf2 = null, lineY = null;
+
+  /* 噪声场按画布像素铺，四周留一圈 pad：池子从胚长开的那一段要取到画面外的值。
+     两套：低频那一套做「这池光本身在浓在淡」，高频那一套专门去啃等值线 ——
+     只有低频时，池边会是一条光滑的大弧线，读起来还是个圆。 */
+  const PAD = 96;
+  function buildNoise() {
+    NW = CW + PAD;
+    NH = CH + PAD;
+    nf = new Float32Array(NW * NH);
+    nf2 = new Float32Array(NW * NH);
+    const k = 1.55 / H;                 // uv 以屏高为单位，和 light.js 的 fbm(uv * 1.15) 同一档
+    for (let y = 0; y < NH; y++) {
+      const cy = (y - PAD / 2) * PX - H / 2;
+      for (let x = 0; x < NW; x++) {
+        const cx = (x - PAD / 2) * PX - W / 2;
+        nf[y * NW + x] = fbm(cx * k * 1.35, cy * k * 1.35);
+        nf2[y * NW + x] = fbm(cx * k * 4.2 + 31.7, cy * k * 4.2 - 12.4);
+      }
+    }
+  }
+
+  function size() {
+    W = Math.max(2, innerWidth);
+    H = Math.max(2, innerHeight);
+    CW = Math.max(2, Math.ceil(W / PX));
+    CH = Math.max(2, Math.ceil(H / PX));
+    cv.width = CW;
+    cv.height = CH;
+    img = ctx.createImageData(CW, CH);
+    lineY = new Float32Array(CW);
+    buildNoise();
+  }
+
+  /* ── 一帧：整个时间轴当成 t 的纯函数 ── */
+  function paint(t) {
+    const d = img.data;
+    d.fill(0);
+
+    // 收势（calm）：从 700 拉起、1500 收住，与线的前半程重叠，看着像「线把光按了下去」。
+    // 交接那一段（T_HAND）里它必须回到 0 —— 否则 canvas 退场时三池的 alpha 还停在
+    // 56%～90%，跨到 .h-flow 时整片会亮一下。回升与化开同时进行，合成后是单调的，不会闪。
+    const scored = eInOut(seg(t, T_CALM[0], T_CALM[1])) * (1 - eInOut(seg(t, T_HAND[0], T_HAND[1])));
+    const g = eOut(seg(t, T_GATHER[0], T_GATHER[1]));
+    const dim = eInOut(seg(t, T_DIM[0], T_DIM[1]));
+    const st = [];
+    for (let i = 0; i < POOLS.length; i++) {
+      const p = POOLS[i];
+      // 半径走一条更「压到后面」的曲线：前面六七成时间它们还只是三小团，
+      // 各自缩在自己那一栏的方向上（这时才读得出是「三池」），最后才胀到 CSS 那个尺寸
+      const k = p.k0 + (1 - p.k0) * Math.pow(g, 2.4);
+      st.push({
+        cx: (p.from[0] + (p.to[0] - p.from[0]) * g) * W,
+        cy: (p.from[1] + (p.to[1] - p.from[1]) * g) * H,
+        // 半径一律按屏宽算（CSS 里也是 vw），竖屏才不会压扁
+        rx: Math.max(1, p.rx * W * k),
+        ry: Math.max(1, p.ry * W * k),
+        am: 1,
+        // e2 已去掉：轮廓只有一套 LUT（stops），差别全交给半径与噪声
+        dim, L: p.L, off: p.off, col: p.col, lit: p.lit,
+        core: p.core, coreA: p.coreA, ph: p.ph, warp: p.warp, recede: p.recede,
+      });
+    }
+
+    // 聚的过程中边缘被揉得很毛；**交接那一段**才收平（落在 .h-flow 那张光滑的图上）
+    const settle = eInOut(seg(t, T_HAND[0], T_HAND[1]));
+    const amp = 0.50 + (0.07 - 0.50) * settle;   // 半径被噪声揉歪的程度
+    const gAmt = 1.45 + (0.42 - 1.45) * settle;  // Bayer 抖动强度
+    const mot = 0.40 + (0.18 - 0.40) * settle;   // 池子内部的浓淡
+
+    // 线两侧那点明暗差：跟着线的长度走，收线时退回 0
+    const rv = eInOut(seg(t, T_LINE[0], T_LINE[1]));
+    const shk = rv * (1 - eInOut(seg(t, 1700, 1920)));
+
+    for (let x = 0; x < CW; x++) lineY[x] = H / 2 + ((x + 0.5) * PX - W / 2) * TAN;
+
+    const n = st.length;
+    for (let y = 0; y < CH; y++) {
+      const yCss = (y + 0.5) * PX;
+      const row = y * CW;
+      for (let x = 0; x < CW; x++) {
+        const xCss = (x + 0.5) * PX;
+        let pr = 0, pg = 0, pb = 0, pa = 0;
+
+        for (let k = 0; k < n; k++) {
+          const p = st[k];
+          const dx = (xCss - p.cx) / p.rx;
+          const dy = (yCss - p.cy) / p.ry;
+          let ra = Math.sqrt(dx * dx + dy * dy);
+          if (ra > LUTR) continue;
+
+          // 角向的低阶谐波：把「圆」掰成有瓣的轮廓（cos2θ / sin2θ / cos4θ / sin4θ）
+          if (ra > 1e-4) {
+            const c2 = (dx * dx - dy * dy) / (ra * ra);
+            const s2 = (2 * dx * dy) / (ra * ra);
+            const c4 = 2 * c2 * c2 - 1;
+            const s4 = 2 * s2 * c2;
+            const ph = p.ph;
+            // 聚着时瓣更深（0.30 / 0.18），收光后只留一点点（0.10 / 0.055）——
+          // 后者与 CSS 的椭圆只差一点点，够不着人眼，但足够让它不读成一个正圆
+            const k2 = 0.10 + 0.20 * (1 - p.dim);
+            const k4 = 0.055 + 0.12 * (1 - p.dim);
+            ra *= 1 + k2 * (c2 * ph[0] + s2 * ph[1]) + k4 * (c4 * ph[2] + s4 * ph[3]);
+          }
+
+          // 再让 fbm 把等值线揉歪：这一下才是「不规则的光池」而不是一个圆。
+          // 低频（nf）给出大团块，高频（nf2）在边上咬出细的不齐；聚着时两种都开，落定时几乎关掉
+          const ni = (y + p.off[1]) * NW + (x + p.off[0]);
+          const nv = nf[ni];
+          const nh = nf2[ni];
+          ra /= 1 + (nv - 0.5) * amp * p.warp + (nh - 0.5) * amp * 0.62 * p.warp;
+
+          const li = (ra * LUTK) | 0;
+          if (li >= LUTN || li < 0) continue;
+
+          // 轮廓只有一套曲线（stops）。半径先小后大，小的时候轮廓还硬，
+          // 长大时被噪声揉开，最后收平回到 CSS 那条 —— 差别全在半径与噪声上，
+          // 不靠切一套「硬边」的 LUT（那套在半径涨起来之后会变成一块平板，正是之前发白的原因）
+          const base = p.L[li];
+          let a = base * (1 + (nv - 0.5) * mot) * p.am * (1 - (1 - p.recede) * scored);
+          if (a <= 0.0008) continue;
+          if (a > 1) a = 1;
+
+          // 芯光：聚着时最亮，收光后退回 0（CSS 那层 gradient 里没有这一档）
+          const ca = p.coreA * (1 - p.dim) * (1 - ra) * (1 - ra) * (0.7 + 0.6 * nv);
+          // 颜色：聚着时是 light.js 那一版亮色，落定时压回首页那个克制的值
+          const m = p.dim;
+          let cr = p.lit[0] + (p.col[0] - p.lit[0]) * m;
+          let cg = p.lit[1] + (p.col[1] - p.lit[1]) * m;
+          let cb = p.lit[2] + (p.col[2] - p.lit[2]) * m;
+          if (ca > 0.001) {
+            const cc = ca > 1 ? 1 : ca;
+            const ia = 1 - cc;
+            cr = p.core[0] * cc + cr * ia;
+            cg = p.core[1] * cc + cg * ia;
+            cb = p.core[2] * cc + cb * ia;
+          }
+
+          const inv = 1 - a;
+          pr = cr * a + pr * inv;
+          pg = cg * a + pg * inv;
+          pb = cb * a + pb * inv;
+          pa = a + pa * inv;
+        }
+
+        const i4 = (row + x) * 4;
+
+        // 线两侧：轴上方渗一点冷光，下方压一点影。只在线已经画到的那几列上出现。
+        let sh = 0;
+        if (shk > 0) {
+          const nx = Math.abs(xCss / W - 0.5) * 2;          // 0 = 中线，1 = 左右边
+          const cov = cl((rv - nx) / 0.22);
+          if (cov > 0) {
+            const s = yCss - lineY[x];
+            if (s > 0) {
+              const q = Math.min(1, s / 40);
+              const fade = 1 - Math.min(1, Math.max(0, (s - 40) / 230));
+              sh = -0.052 * q * fade;
+            } else {
+              const q = Math.max(0, 1 + s / 74);
+              sh = 0.026 * q * q;
+            }
+            sh *= shk * cov;
+          }
+        }
+
+        // ── 出图：**不透明** ──
+        // 三池是叠在 #0e0f1d 上的，这里就把那层底一并合进来、alpha 一律 255。
+        // 这样最后一张 canvas 与 .h-flow 是同一张图，「交接」只需把 canvas 的 opacity
+        // 从 1 推到 0 —— 底下已经是同一张画，不可能是溶解以外的任何东西。
+        // （若让 canvas 带自己的 alpha，和 .h-flow 叠在一起时会在中途变亮，那才会看见接缝。）
+        const upr = pa > 1e-4 ? pr / pa : 0;
+        const upg = pa > 1e-4 ? pg / pa : 0;
+        const upb = pa > 1e-4 ? pb / pa : 0;
+        const ia = 1 - pa;
+        const or = (upr * pa + 14 * ia) * (1 + sh);
+        const og = (upg * pa + 15 * ia) * (1 + sh);
+        const ob = (upb * pa + 29 * ia) * (1 + sh);
+
+        const bay = BAY[((y & 3) << 2) | (x & 3)];
+        const bq = (bay - 0.5) * gAmt;
+        let R = (or * (QL / 255) + 0.5 + bq) | 0;
+        let G = (og * (QL / 255) + 0.5 + bq) | 0;
+        let B = (ob * (QL / 255) + 0.5 + bq) | 0;
+        R = R < 0 ? 0 : R > QL ? QL : R;
+        G = G < 0 ? 0 : G > QL ? QL : G;
+        B = B < 0 ? 0 : B > QL ? QL : B;
+        d[i4] = (R * 255) / QL + 0.5;
+        d[i4 + 1] = (G * 255) / QL + 0.5;
+        d[i4 + 2] = (B * 255) / QL + 0.5;
+        d[i4 + 3] = 255;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+  }
+
+  /* ── 整条时间轴 ── */
+  function render(ms) {
+    const t = ms < 0 ? 0 : ms > TOTAL ? TOTAL : ms;
+
+    paint(t);
+
+    // 交接：canvas 溶回 .h-flow。两张是同图（几何与色值逐条对齐），所以这是溶解不是遮罩
+    const r = eInOut(seg(t, T_HAND[0], T_HAND[1]));
+    flow.style.opacity = r >= 1 ? '' : String(r);
+    veil.style.opacity = r >= 1 ? '0' : String(1 - r);
+
+    // 线从中心往两端画出来（三池早就站好了，线是后到的）
+    HM.line(eInOut(seg(t, T_LINE[0], T_LINE[1])));
+
+    // 大字对上焦
+    HM.focus(eOut(seg(t, 1380, 1830)));
+
+    // 小字与三个栏头挂到线下，边走边露
+    const kv = eOut(seg(t, 1380, 1660));
+    kicker.style.opacity = String(kv);
+    kicker.style.translate = `0px ${((1 - kv) * 4).toFixed(2)}px`;
+    for (let i = 0; i < entries.length; i++) {
+      const v = eOut(seg(t, 1420 + i * 70, 1680 + i * 70));
+      entries[i].style.opacity = String(v);
+      entries[i].style.translate = `0px ${((1 - v) * 7).toFixed(2)}px`;
+    }
+
+    // 时刻 / 出口 / 下沉
+    const mv = eOut(seg(t, 1680, 1980));
+    for (const el of [clock, exits, hint]) {
+      if (!el) continue;
+      el.style.opacity = String(mv);
+      el.style.translate = `0px ${((1 - mv) * 5).toFixed(2)}px`;
+    }
+  }
+
+  /* ── 播放：rAF 走在时间轴上，可停可 seek ── */
+  let t0 = 0, cur = 0, raf = 0, paused = false;
+
+  function loop() {
+    raf = 0;
+    if (paused) return;
+    cur = performance.now() - t0;
+    render(cur);
+    if (cur < TOTAL) raf = requestAnimationFrame(loop);
+  }
+
+  window.__boot = {
+    ready: false,
+    total: TOTAL,
+    pause() { paused = true; if (raf) cancelAnimationFrame(raf); raf = 0; },
+    seek(ms) { cur = ms; render(ms); },
+    resume() {
+      if (!paused) return;
+      paused = false;
+      if (cur < TOTAL) { t0 = performance.now() - cur; raf = requestAnimationFrame(loop); }
+    },
+  };
+
+  function start() {
+    size();
+    render(0);
+    document.documentElement.classList.remove('booting');
+    t0 = performance.now();
+    raf = requestAnimationFrame(loop);
+    window.__boot.ready = true;
+  }
+
+  let rz = 0;
+  addEventListener('resize', () => {
+    clearTimeout(rz);
+    rz = setTimeout(() => { size(); render(cur); }, 180);
+  });
+
+  if (reduce) {
+    veil.style.display = 'none';
+    document.documentElement.classList.remove('booting');
+    HM.line(1);
+    HM.focus(1);
+    window.__boot.ready = true;
+  } else if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(start);
+  } else {
+    start();
+  }
+})();
+</script>
+</body>
+</html>

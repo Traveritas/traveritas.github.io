@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>开屏 mock · 对照台</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/fonts/noto/font.css">
+<style>
+  :root {
+    --bg: #0e0f1d;
+    --fg: #ece8f2;
+    --soft: #b7b3c8;
+    --faint: #827f98;
+    --amber: #9a86c4;
+    --line: rgb(236 232 242 / 0.12);
+    --font-display: 'Noto Serif SC', serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font-display); }
+  body { padding: 34px clamp(16px, 4vw, 56px) 60px; }
+
+  h1 { margin: 0 0 6px; font-size: 22px; font-weight: 500; letter-spacing: 0.08em; }
+  .lede { margin: 0 0 22px; font-size: 13px; line-height: 1.9; color: var(--soft); max-width: 62em; }
+  .lede code { font-family: var(--font-mono); font-size: 0.92em; color: var(--amber); }
+
+  /* ── 控制条 ── */
+  .bar {
+    position: sticky; top: 0; z-index: 10;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 14px;
+    margin: 0 0 22px; padding: 12px 16px;
+    border: 1px solid var(--line); border-radius: 4px;
+    background: rgb(14 15 29 / 0.92);
+    backdrop-filter: blur(10px);
+  }
+  .bar button {
+    appearance: none; border: 1px solid var(--line); border-radius: 3px;
+    background: transparent; color: var(--fg); cursor: pointer;
+    padding: 7px 14px; font: 500 12px/1 var(--font-display); letter-spacing: 0.14em;
+    transition: border-color 0.2s, color 0.2s;
+  }
+  .bar button:hover { border-color: var(--amber); color: var(--amber); }
+  .bar button.on { border-color: var(--amber); color: var(--amber); }
+  .bar label { display: flex; align-items: center; gap: 8px; font: 400 11px/1 var(--font-mono); color: var(--faint); }
+  .bar input[type=range] { width: min(46vw, 420px); accent-color: var(--amber); }
+  .bar .t { font: 400 11px/1 var(--font-mono); color: var(--amber); min-width: 5.5em; }
+  .bar .hint { margin-left: auto; font: 400 11px/1.7 var(--font-mono); color: var(--faint); }
+
+  /* ── 五格对照 ── */
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 26px; }
+  .cell { border: 1px solid var(--line); border-radius: 4px; overflow: hidden; background: #0b0c16; }
+  .cell header { display: flex; align-items: baseline; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+  .cell header b { font: 500 13px/1 var(--font-display); letter-spacing: 0.2em; }
+  .cell header em { font: normal 400 10px/1 var(--font-mono); color: var(--faint); letter-spacing: 0.16em; }
+  .cell header .ms { margin-left: auto; font: 400 10px/1 var(--font-mono); color: var(--amber); }
+  .cell .frame { position: relative; aspect-ratio: 16 / 10; }
+  .cell iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: block; background: var(--bg); }
+  .cell .note { padding: 9px 14px 11px; font: 400 11px/1.75 var(--font-mono); color: var(--faint); border-top: 1px solid var(--line); }
+  .cell .note b { color: var(--soft); font-weight: 400; }
+
+  @media (max-width: 640px) {
+    body { padding-top: 22px; }
+    .bar .hint { display: none; }
+    .bar input[type=range] { width: 100%; }
+  }
+</style>
+</head>
+<body>
+
+<h1>开屏 mock · 对照台</h1>
+<p class="lede">
+  五版并排。视频式的「重播」是重新加载五个 iframe，于是它们**从同一时刻起步**——这一点单开一个页面做不到。
+  时间轴用归一化的滑杆一起拖：每格按自己的总时长换算，所以同一滑杆位置是「各自进度的同一百分比」，不是同一毫秒。
+  单开某一版看细节时，控制台里有 <code>__boot.seek(ms)</code> / <code>__boot.pause()</code> / <code>__boot.resume()</code>，可以钉在任何一毫秒。
+</p>
+
+<div class="bar">
+  <button id="replay">重播</button>
+  <button id="toggle">暂停</button>
+  <label>进度 <input id="scrub" type="range" min="0" max="1000" value="0"></label>
+  <span class="t" id="tlabel">0%</span>
+  <span class="hint">拖滑杆 = 逐帧看；暂停后拖，画面上不会再有运动</span>
+</div>
+
+<div class="grid" id="grid"></div>
+
+<script>
+  /* 每格：目录、名字、总时长（取 __boot.total，取不到就用这里的兜底）、一行成本说明 */
+  const MOCKS = [
+    ['1-line',  '一 · 一线先醒',  2000, '纯合成器｜8 个元素｜线 + 三池渗出'],
+    ['2-grain', '二 · 从粗到细',  2020, 'CPU 逐像素｜末段 7.8ms/帧｜最重'],
+    ['3-eye',   '三 · 合上又睁开', 2240, '纯合成器｜有 1 个纹理请求｜暖白 → 夜'],
+    ['4-pools', '四 · 三池先聚',  2080, 'CPU 逐像素｜几 ms/帧｜1/5 分辨率 canvas'],
+    ['5-night', '五 · 夜的一枚开口', 2040, '纯合成器｜零网络资源｜实测已做'],
+  ];
+
+  const grid = document.getElementById('grid');
+  const frames = [];
+
+  for (const [dir, name, fallbackTotal, note] of MOCKS) {
+    const cell = document.createElement('section');
+    cell.className = 'cell';
+    cell.innerHTML =
+      `<header><b>${name}</b><em>${dir}</em><span class="ms">${fallbackTotal}ms</span></header>` +
+      `<div class="frame"><iframe src="./${dir}/" loading="eager" title="${name}"></iframe></div>` +
+      `<p class="note">${note}</p>`;
+    grid.appendChild(cell);
+    frames.push({ dir, fallbackTotal, iframe: cell.querySelector('iframe') });
+  }
+
+  /* iframe 同源 → 直接够到里面的 window.__boot */
+  const boot = (f) => {
+    try { return f.iframe.contentWindow.__boot || null; } catch { return null; }
+  };
+  const total = (f) => {
+    const b = boot(f);
+    return (b && b.total) || f.fallbackTotal;
+  };
+
+  let playing = true;
+  const toggle = document.getElementById('toggle');
+  const scrub = document.getElementById('scrub');
+  const tlabel = document.getElementById('tlabel');
+
+  function setPlaying(v) {
+    playing = v;
+    toggle.textContent = v ? '暂停' : '播放';
+    toggle.classList.toggle('on', !v);
+    for (const f of frames) {
+      const b = boot(f);
+      if (!b) continue;
+      if (v) { if (b.resume) b.resume(); }
+      else { if (b.pause) b.pause(); }
+    }
+  }
+
+  toggle.addEventListener('click', () => setPlaying(!playing));
+
+  document.getElementById('replay').addEventListener('click', () => {
+    /* 重载 = 五个一起从 0 开始。等它们各自 ready 再把状态同步过来 */
+    scrub.value = 0;
+    tlabel.textContent = '0%';
+    for (const f of frames) {
+      f.iframe.contentWindow.location.reload();
+      f.iframe.addEventListener('load', () => {
+        /* 重载后的 iframe 是新的 window，__boot 也是新的 */
+        setTimeout(() => setPlaying(playing), 60);
+      }, { once: true });
+    }
+  });
+
+  /* 拖滑杆：按各自总时长换算成毫秒，再 seek。
+     第一次拖动会自动暂停——否则 rAF 会立刻把画面拉走，看不到你钉的那一帧 */
+  scrub.addEventListener('input', () => {
+    if (playing) setPlaying(false);
+    const pct = +scrub.value / 1000;
+    tlabel.textContent = (pct * 100).toFixed(0) + '%';
+    for (const f of frames) {
+      const b = boot(f);
+      if (b && b.seek) b.seek(pct * total(f));
+    }
+  });
+
+  /* 滑杆只做手动定位，不自动跟随：
+     五版各自的时间读数口不统一（有的只暴露 total，没有当前时刻），
+     强行凑一个「平均进度」只会给出假的读数。想看某一刻，拖就是了。 */
+</script>
+</body>
+</html>

@@ -1,0 +1,231 @@
+<!-- ─────────────────────────────────────────────────────────────
+     假首页 · 交接标的（整块复制进你 index.html 的 <body> 末尾，别改 _shared 本身）
+
+     这不是真首页，只还原「一眼认出」的那几件：
+       靛夜底 + 像素化的流光（静态，一层底图 + 网点）+ 一根 14° 波形线
+       + 左上小字与大字 + 线下三个栏头 + 左下时刻 + 右下出口 + 底部「下沉」。
+     大字按站里的做法是「流光的一扇反相窗」——这里用 backdrop-filter 近似，
+     效果对得上就够了；真首页是 canvas 反相 + 字形遮罩。
+
+     它自带 window.HomeMock 三个旋钮，给你的开屏调用：
+       HomeMock.line(0..1)       脑电线「从中心往两端画出」的进度（0 = 一个点都没有）
+       HomeMock.focus(0..1)      大字的对焦（0 = blur 14px + 透明，1 = 清楚）
+       HomeMock.pixels(px)       流光底图的一个粗颗粒提示（1 = 不粗，8 = 很粗）——
+                                 只在你想「从粗到细」时用；不用就一直是 1
+     不调也行：默认 line=1 focus=1 pixels=1，即首页静置的样子。
+     若你的开屏完全接管了入场，就在自己的时间轴里调它们，别让两段各演一遍。
+     ───────────────────────────────────────────────────────────── -->
+
+<div id="home" aria-label="首页（假）">
+  <div class="h-flow"></div>
+  <svg class="h-eeg" id="h-eeg" viewBox="0 0 1440 900" preserveAspectRatio="none" aria-hidden="true">
+    <path id="h-eeg-path" fill="none" stroke="#7f7a99" stroke-width="1.2" stroke-linecap="round" opacity=".62"></path>
+  </svg>
+
+  <div class="h-head">
+    <p class="h-kicker">个人网站</p>
+    <h1 class="h-brand">Traveritas</h1>
+  </div>
+
+  <div class="h-entries">
+    <a href="#" class="h-entry"><i></i><span class="no">01</span><b>断章</b><em>ESSAYS</em></a>
+    <a href="#" class="h-entry"><i></i><span class="no">02</span><b>闪念</b><em>MOMENTS</em></a>
+    <a href="#" class="h-entry"><i></i><span class="no">03</span><b>造物</b><em>PROJECTS</em></a>
+  </div>
+
+  <p class="h-clock">21:34 · 2026.10.18</p>
+  <nav class="h-exits"><a href="#">GitHub</a><a href="#">RSS</a><a href="#">◇ NEXUS</a></nav>
+  <p class="h-hint">下沉<i></i></p>
+</div>
+
+<style>
+  /* 只在你自己的 index.html 里用；类名都带 h- 前缀，不会撞到开屏自己的样式 */
+  #home {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    background: #0e0f1d;
+    color: #ece8f2;
+    --hx: 8vw;
+    --tan14: 0.249328;
+    font-family: var(--font-display, 'Noto Serif SC', serif);
+  }
+
+  /* 流光：三池夜色 + 一层网点（真站是 1/5 分辨率上采样的像素流光，这里用叠色近似） */
+  .h-flow {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(58vw 46vw at 6% 18%, #b9c2cf 0%, rgb(185 194 207 / 0.55) 34%, transparent 68%),
+      radial-gradient(46vw 40vw at 46% 62%, rgb(29 23 41 / 0.9) 0%, transparent 70%),
+      radial-gradient(50vw 44vw at 88% 78%, rgb(13 21 36 / 0.95) 0%, transparent 72%),
+      radial-gradient(70vw 60vw at 70% 10%, rgb(40 36 64 / 0.7) 0%, transparent 70%),
+      #0e0f1d;
+    filter: saturate(0.92);
+    transition: filter 0.4s linear;
+  }
+  .h-flow::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(circle, rgb(236 232 242 / 0.1) 0 1px, transparent 1.2px);
+    background-size: 5px 5px;
+    opacity: 0.5;
+  }
+
+  .h-eeg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    pointer-events: none;
+  }
+
+  .h-head {
+    position: absolute;
+    left: var(--hx);
+    bottom: calc(50vh + (50vw - var(--hx)) * var(--tan14) + 22px);
+  }
+  .h-kicker {
+    margin: 0 0 1.05rem 0.2em;
+    font: 500 13px/1 var(--font-display, serif);
+    letter-spacing: 0.62em;
+    color: #9a97b0;
+  }
+  .h-brand {
+    margin: 0;
+    font: 500 clamp(54px, 7.4vw, 128px)/0.86 var(--font-display, serif);
+    letter-spacing: 0.035em;
+    color: #f1edf6;
+    white-space: nowrap;
+    /* 真站里大字是「流光的一扇反相窗」（canvas 反相 + 字形遮罩）。
+       这里不真的反相：backdrop-filter 的矩形会把字周围切出一块亮板，反而失真。
+       写成一块偏冷、略透明的浅字，近似它被流光照亮的样子就够。 */
+    color: #eef0f7;
+  }
+
+  .h-entries {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+  .h-entries .h-entry {
+    position: absolute;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    pointer-events: auto;
+    text-decoration: none;
+    color: #e6e2ee;
+    transition: letter-spacing 0.5s ease;
+  }
+  /* 三个栏头挂在线下：左右位置对应将来三栏的位置，纵向跟着那根 14° 线走 */
+  .h-entries .h-entry:nth-child(1) { left: 33vw; top: calc(50vh + (33vw - 50vw) * var(--tan14) + 30px); }
+  .h-entries .h-entry:nth-child(2) { left: 52vw; top: calc(50vh + (52vw - 50vw) * var(--tan14) + 46px); }
+  .h-entries .h-entry:nth-child(3) { left: 71vw; top: calc(50vh + (71vw - 50vw) * var(--tan14) + 62px); }
+  .h-entry i {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: #9a86c4;
+    box-shadow: 0 0 10px 1px #9a86c4;
+    align-self: center;
+  }
+  .h-entry .no { font: italic 400 13px/1 var(--font-display, serif); letter-spacing: 0.08em; color: #8d8aa3; }
+  .h-entry b { font: 600 19px/1 var(--font-display, serif); letter-spacing: 0.34em; }
+  .h-entry em { font: normal 400 9px/1 var(--font-mono, monospace); letter-spacing: 0.3em; color: #8d8aa3; }
+  .h-entry:hover b { letter-spacing: 0.44em; }
+
+  .h-clock,
+  .h-exits {
+    position: absolute;
+    bottom: 26px;
+    margin: 0;
+    font: 400 10px/1 var(--font-mono, monospace);
+    letter-spacing: 0.18em;
+    color: #827f98;
+  }
+  .h-clock { left: var(--hx); }
+  .h-exits { right: 7vw; display: flex; gap: 22px; }
+  .h-exits a { color: inherit; text-decoration: none; }
+
+  .h-hint {
+    position: absolute;
+    left: 50%;
+    bottom: 22px;
+    margin: 0;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    font: 500 11px/1 var(--font-display, serif);
+    letter-spacing: 0.6em;
+    padding-left: 0.6em;
+    color: #827f98;
+  }
+  .h-hint i { width: 1px; height: 26px; background: linear-gradient(rgb(236 230 244 / 0.5), transparent); }
+
+  @media (max-width: 899px) {
+    #home { --hx: 22px; }
+    .h-brand { font-size: clamp(44px, 13vw, 72px); }
+    .h-kicker { font-size: 12px; margin-bottom: 0.8rem; }
+    .h-entries .h-entry:nth-child(1) { left: 22px; top: calc(50vh - 30px); }
+    .h-entries .h-entry:nth-child(2) { left: 22px; top: calc(50vh + 16px); }
+    .h-entries .h-entry:nth-child(3) { left: 22px; top: calc(50vh + 62px); }
+    .h-clock { display: none; }
+    .h-exits { right: 22px; }
+  }
+</style>
+
+<script>
+  window.HomeMock = (() => {
+    const flow = document.querySelector('#home .h-flow');
+    const brand = document.querySelector('#home .h-brand');
+    const path = document.getElementById('h-eeg-path');
+    const W = 1440, H = 900, TAN = Math.tan((14 * Math.PI) / 180);
+    let reveal = 1, focus = 1, px = 1;
+    /* 14° 轴上的波形线：整条线 = 视口对角线那么长，按 reveal 从中心往两端露出 */
+    function draw() {
+      const half = Math.hypot(W, H) / 2 + 40;
+      const n = 220;
+      let d = '';
+      let last = null;
+      for (let i = 0; i <= n; i++) {
+        const s = i / n;
+        const t = (s * 2 - 1) * half; // 沿线坐标
+        const x = W / 2 + Math.cos(Math.atan(TAN)) * t;
+        const y = H / 2 + Math.sin(Math.atan(TAN)) * t;
+        const wob = 3.6 * (Math.sin(t * 0.5 + performance.now() / 2000) * 0.6 + Math.sin(t * 1.9) * 0.4);
+        const ox = -Math.sin(Math.atan(TAN)) * wob;
+        const oy = Math.cos(Math.atan(TAN)) * wob;
+        const p = [x + ox, y + oy];
+        d += (last ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1);
+        last = p;
+      }
+      path.setAttribute('d', d);
+      // 从中心往两端露：用线性渐变的遮罩近似（左半 + 右半各露 reveal 的一半）
+      const m = `linear-gradient(90deg, transparent ${50 - reveal * 50}%, #000 ${50 - reveal * 50}%, #000 ${50 + reveal * 50}%, transparent ${50 + reveal * 50}%)`;
+      path.style.maskImage = m;
+      path.style.webkitMaskImage = m;
+    }
+    let raf = 0;
+    const loop = () => { draw(); raf = requestAnimationFrame(loop); };
+    loop();
+    return {
+      line(v) { reveal = v; draw(); },
+      focus(v) { focus = v; brand.style.filter = v >= 1 ? '' : `blur(${((1 - v) * 14).toFixed(2)}px)`; brand.style.opacity = String(v); },
+      pixels(v) {
+        px = v;
+        // 粗颗粒提示：把底图按倍数放大再裁回去（等价于降采样），真站是 1/5 分辨率 canvas
+        if (v <= 1) { flow.style.transform = ''; flow.style.filter = 'saturate(0.92)'; return; }
+        flow.style.transform = `scale(${v.toFixed(2)})`;
+        flow.style.transformOrigin = '50% 45%';
+        flow.style.filter = `saturate(0.92) blur(${(v * 0.6).toFixed(2)}px)`;
+      },
+      stop() { if (raf) cancelAnimationFrame(raf); raf = 0; },
+    };
+  })();
+</script>

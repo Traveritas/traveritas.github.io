@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>开屏 2a · 一段一段跳</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/fonts/noto/font.css">
+<link rel="stylesheet" href="/fonts/plex/400.css">
+<link rel="stylesheet" href="../_shared/base.css">
+<link rel="stylesheet" href="../_shared/home.css">
+<script>
+  /* 首帧前就定好：reduced-motion 不放，直接落首页，不留死幕 */
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    document.documentElement.dataset.bootSkip = '';
+  }
+</script>
+<noscript><style>.boot-face, .boot-dot { display: none !important; }</style></noscript>
+</head>
+<body>
+
+<!-- 假首页 · 交接标的（与 _shared/home-fragment.html 同一份，补了一条无 JS 时的直线） -->
+<div id="home" aria-label="首页（假）">
+  <div class="h-flow"></div>
+  <svg class="h-eeg" id="h-eeg" viewBox="0 0 1440 900" preserveAspectRatio="none" aria-hidden="true">
+    <path id="h-eeg-path" fill="none" stroke="#7f7a99" stroke-width="1.2" stroke-linecap="round" opacity=".62"
+          d="M -60 255.4 L 1500 644.6"></path>
+  </svg>
+
+  <div class="h-head">
+    <p class="h-kicker">个人网站</p>
+    <h1 class="h-brand">Traveritas</h1>
+  </div>
+
+  <div class="h-entries">
+    <a href="#" class="h-entry"><i></i><span class="no">01</span><b>断章</b><em>ESSAYS</em></a>
+    <a href="#" class="h-entry"><i></i><span class="no">02</span><b>闪念</b><em>MOMENTS</em></a>
+    <a href="#" class="h-entry"><i></i><span class="no">03</span><b>造物</b><em>PROJECTS</em></a>
+  </div>
+
+  <p class="h-clock">21:34 · 2026.10.18</p>
+  <nav class="h-exits"><a href="#">GitHub</a><a href="#">RSS</a><a href="#">◇ NEXUS</a></nav>
+  <p class="h-hint">下沉<i></i></p>
+</div>
+
+<script src="../_shared/homemock.js"></script>
+<script src="../_shared/grain.js"></script>
+<script src="../_shared/bootbase.js"></script>
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   A · 一段一段跳
+
+   规则：**硬切**。没有合拢、没有缓动 —— 每次跳级都是这一帧和上一帧换一个世界。
+   跳完就停住，停够时间让人看见「这一级长这样」，再跳下一级。
+
+   级数：6 级 = 5 次跳。格 56 → 36 → 22 → 13 → 9 → 5 屏 px；
+        量化 3 → 5 → 8 → 13 → 19 → 26 阶（末级 = 首页 GRAIN.home 的原值）。
+   节奏：停顿 300 → 250 → 210 → 180 → 160 → 600 ms（跳级间隔依次收紧，
+        世界越清楚、提级越快；最后一级停满 600ms 让大字对完焦）。
+   末级不是「接近首页」，就是首页那张 5px / 26 阶的网点；画布随后淡出，
+   交还给假首页自己的 .h-flow。
+
+   这条时间轴是纯函数：timeline(ms, vw) → { cellPx, levels, octaves, dither, state }
+   ══════════════════════════════════════════════════════════════════════════ */
+
+(function () {
+  'use strict';
+
+  const TOTAL = 2000;
+  const FADE = [1700, 1950];
+
+  /* 6 级，5 次跳。at = 硬切发生的毫秒 */
+  const CUTS = [
+    { at: 0,    cell: 56, levels: 3,  oct: 2, dither: 0 },   // 0  一片粗马赛克
+    { at: 300,  cell: 36, levels: 5,  oct: 2, dither: 0 },   // ①  跳
+    { at: 550,  cell: 22, levels: 8,  oct: 2, dither: 0 },   // ②  跳
+    { at: 760,  cell: 13, levels: 13, oct: 3, dither: 0 },   // ③  跳
+    { at: 940,  cell: 9,  levels: 19, oct: 3, dither: 0.6 }, // ④  跳：网点开始长出来
+    { at: 1100, cell: 5,  levels: 26, oct: 3, dither: 1 },   // ⑤  跳：落成首页的网点
+  ];
+
+  /* 纯函数：只依赖 ms 与视口宽。硬切 = 没有插值。 */
+  function timeline(ms, vw) {
+    let i = 0;
+    while (i + 1 < CUTS.length && ms >= CUTS[i + 1].at) i++;
+    const s = CUTS[i];
+    return {
+      cellPx: Grain.scaledCell(s.cell, vw), // 手机上粗段按视口收一点，末级仍是 5
+      levels: s.levels,
+      octaves: s.oct,
+      dither: s.dither,       // 画布像素上的抖动（末级 = 首页满强度）
+      state: i,           // 第几级（对比台据此标「这一帧跳了没有」）
+      hard: true,         // 这一版全是硬切
+    };
+  }
+
+  mountBoot({
+    total: TOTAL,
+    fade: FADE,
+    timeline,
+    /* 首页入场也踩在跳级的点上：第 1 跳时小字出来，第 2 跳起大字对焦，
+       第 3 跳脑电线开始画，第 4/5 跳三个栏头依次落位。 */
+    entry: {
+      kicker: [300, 560],
+      brand: [550, 1250],
+      line: [760, 1450],
+      entries: [940, 320],
+      foot: [1250, 1520],
+    },
+  });
+})();
+</script>
+</body>
+</html>
+
+
+
