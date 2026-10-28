@@ -10,6 +10,10 @@
    原点都在视口左上——界面里的每一块正好落在流光的那一块上。
    开屏结束前这张画布淡出、真界面带 blur 站起来（时间轴在 grain-boot.ts）。
 
+   主页大字是流光的「反相窗」（wander/inverse.ts）：真身是一张拷贝了字底下那片光的
+   小画布，靠 CSS 反相 + 字形遮罩才成形。栅格里没有 CSS，就用两张小画布把同样的工序
+   做一遍（遮罩单独累积，最後一次性 composition 到窗上）。
+
    字号比格还小的字，在这个分辨率下本来就不存在（最后才浮出来）——这是物理，不是 bug。
    不进栅格的（1–2px 级，或开屏期本来就藏着）：栏头前那颗琥珀点（伪元素）、
    底注下那根细竖线、NEXUS 的小菱形图标、工具星与光标。
@@ -59,6 +63,15 @@ export function createUiRaster(canvas: HTMLCanvasElement): UiRaster {
   const ctx = canvas.getContext('2d');
   const runs: Run[] = [];
   let eeg: HTMLCanvasElement | null = null;
+
+  /* 大字那扇窗：一张放反相的光、一张放字形遮罩（遮罩要一次画完再蒙，
+     不能边画边 destination-in——后一个字母会把前一个的交集清掉）。 */
+  const winLayer = document.createElement('canvas');
+  const wctx = winLayer.getContext('2d');
+  const maskLayer = document.createElement('canvas');
+  const mctx = maskLayer.getContext('2d');
+  let winCv: HTMLCanvasElement | null = null;
+  let boxRect: DOMRect | null = null;
 
   function groupOf(el: Element): RasterGroup {
     if (el.closest('.w-home-kicker')) return 'kicker';
@@ -131,6 +144,73 @@ export function createUiRaster(canvas: HTMLCanvasElement): UiRaster {
         });
       }
     }
+    const box = document.querySelector('.w-home-brand-box');
+    boxRect = box ? box.getBoundingClientRect() : null;
+  }
+
+  /* 大字那扇窗：把窗画布（= 字底下那片光）反相、hue-rotate 回来，再用一张字形遮罩蒙掉，
+     最后整张叠进栅格。窗还没建起来（没有 WebGL / 还没编译完）就返回 false，走普通字。 */
+  function drawBrandWin(
+    ctx: CanvasRenderingContext2D,
+    w: number,
+    h: number,
+    cell: number,
+    alpha: number,
+  ): boolean {
+    if (!wctx || !mctx || alpha < 0.004) return false;
+    if (!document.documentElement.classList.contains('w-win')) return false;
+    if (!boxRect) return false;
+    if (!winCv) winCv = document.getElementById('w-win') as HTMLCanvasElement | null;
+    if (!winCv || winCv.width < 4 || winCv.height < 4) return false;
+    if (winLayer.width !== w || winLayer.height !== h) {
+      winLayer.width = w;
+      winLayer.height = h;
+      maskLayer.width = w;
+      maskLayer.height = h;
+    }
+
+    /* 1）字形遮罩：所有大字一次画在同一张画布上（source-over 累积） */
+    mctx.setTransform(1, 0, 0, 1, 0, 0);
+    mctx.clearRect(0, 0, w, h);
+    mctx.setTransform(1 / cell, 0, 0, 1 / cell, 0, 0);
+    mctx.textBaseline = 'middle';
+    mctx.textAlign = 'left';
+    mctx.fillStyle = '#fff';
+    for (const run of runs) {
+      if (run.group !== 'brand') continue;
+      const text = run.node.nodeValue;
+      if (!text || !text.trim()) continue;
+      mctx.font = run.font;
+      try {
+        (mctx as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = run.ls;
+      } catch {
+        /* 老浏览器没有 canvas 字距：遮罩略紧，粗格下看不出来 */
+      }
+      mctx.fillText(text.trim(), run.x, run.y);
+    }
+
+    /* 2）窗：把那一小块流光拉进栅格画布，反相 + hue-rotate，再一次性蒙上遮罩 */
+    wctx.setTransform(1, 0, 0, 1, 0, 0);
+    wctx.clearRect(0, 0, w, h);
+    wctx.filter = 'invert(1) hue-rotate(180deg)';
+    try {
+      wctx.drawImage(winCv, boxRect.left / cell, boxRect.top / cell, boxRect.width / cell, boxRect.height / cell);
+    } catch {
+      wctx.filter = 'none';
+      return false;
+    }
+    wctx.filter = 'none';
+    wctx.globalCompositeOperation = 'destination-in';
+    wctx.drawImage(maskLayer, 0, 0);
+    wctx.globalCompositeOperation = 'source-over';
+
+    /* 3）叠进栅格 */
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = Math.min(1, alpha);
+    ctx.drawImage(winLayer, 0, 0);
+    ctx.globalAlpha = 1;
+    ctx.setTransform(1 / cell, 0, 0, 1 / cell, 0, 0);
+    return true;
   }
 
   function draw(cell: number, a: RasterAlpha): void {
@@ -163,7 +243,11 @@ export function createUiRaster(canvas: HTMLCanvasElement): UiRaster {
       }
     }
 
+    /* 大字：窗活着就按窗画（低分辨率的反相光），否则按墨色画 */
+    const brandWin = drawBrandWin(ctx, w, h, c, a.brand);
+
     for (const run of runs) {
+      if (brandWin && run.group === 'brand') continue;
       const alpha = a[run.group] * run.alpha;
       if (alpha < 0.004) continue;
       const text = run.node.nodeValue;

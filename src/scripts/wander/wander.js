@@ -79,7 +79,9 @@ export async function initWander(host) {
      第一张卡要等到 ~3.4s 才画；即便挪到 build 之后，只要它还在入场那段里，
      卡片就一直到 ~6s 才真正可见（LCP 5.1s）。
      现在它挪到最后：先让窗落位、灯稍后亮。light 在两处使用都是 `if (light)` 保护的，
-     未就绪时 #w-light 退回 CSS 渐变（wander.css 本来就备了这一手）。 */
+     未就绪时 #w-light 退回 CSS 渐变（wander.css 本来就备了这一手）。
+     例外是主页：大字是流光的「反相窗」（inverse.js），窗得在入场动画之前建好，
+     否则字会先以墨色出现、等光编译完才翻成窗。主页没有要赶首屏的卡，光就在下面直接起。 */
   let light = null;
   /* 开屏期由 GrainBoot 写：{ cellPx, lv, dither }（屏幕 px）与脑电线 reveal 0–1。
      开屏结束后都退回 null，交给日常渲染。 */
@@ -91,6 +93,7 @@ export async function initWander(host) {
     if (light) return;
     try { light = createLight(host.querySelector('#w-light'), PX, { wind: true }); } catch { /* 没有 WebGL2：退回 CSS 渐变 */ }
   };
+  if (host.dataset.scene === 'home') startLight();
 
   const ALL = await Faces.build(DATA);
   const ITEMS = SC.flatMap((s) => ALL[s]);
@@ -1137,6 +1140,7 @@ export async function initWander(host) {
     const pan = background(dt);
     const dimE = Math.max(dim, pullDim());
     if (light) light.draw({ t: lightT, pan, zoom: cam.z, mouse, dim: dimE, seam: seamGeom(), split, bias, lift, ring: ringOn ? ring : null, face, grain: bootGrain });
+    makeWin();
     if (win) win.step();
     if (ink) ink.step(frame);
     const regions = {};
@@ -1836,8 +1840,16 @@ export async function initWander(host) {
      底下那一小块流光反相、保住色相，按字形遮罩。同样要有 WebGL 才接；
      接不上时大字用 CSS 的墨色，不至于整块不见 ══ */
   const winCv = host.querySelector('#w-win');
-  const win = light && winCv && homeBrand ? createInverse({ light: host.querySelector('#w-light'), target: homeBrand, canvas: winCv, words: BRAND_WORDS }) : null;
-  if (win) win.warm();
+  /* 光现在是在入场编排之后才算就绪的（见文件头；主页已在前面直接起），
+     所以这里不在建的时候一次性判定，而是留一个「等光就绪再建」的口子，
+     由渲染循环每帧问一次：建起来之后不再问，也不会有第二扇。 */
+  let win = null;
+  const makeWin = () => {
+    if (win || !light || !winCv || !homeBrand) return;
+    win = createInverse({ light: host.querySelector('#w-light'), target: homeBrand, canvas: winCv, words: BRAND_WORDS });
+    win.warm();
+  };
+  makeWin();
 
   /* ══ 起步 ══ */
   root.dataset.wscene = mode === 'home' ? 'home' : scene;

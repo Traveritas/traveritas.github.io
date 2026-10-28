@@ -79,6 +79,8 @@
 >   「视口 ÷ 格」大小的画布——文字在 `1/cell` 变换下 `fillText`（等于真的按这个分辨率渲染），
 >   脑电线把 worker 的 `#site-eeg-canvas` 用 `drawImage` 缩下来（面积平均，细线断成点）。
 >   墨色：走 `background-clip: text` 的那类字（`data-ink-auto`，wander/ink.js）取它横向渐变的平均色。
+>   大字不走墨色：它是流光的「反相窗」，栅格里把 `#w-win` 那片光缩进格子、`invert + hue-rotate`，
+>   再用一张单独累积的字形遮罩蒙上去（遮罩不能逐字 `destination-in`——后一个字母会把前一个清掉）。
 >   画布原点 = 视口左上、格宽 = 背景格宽 → 界面里的每个块正好落在流光的那一块上。
 > - `src/components/chrome/GrainBoot.astro`：新增 `#grain-ui`（`image-rendering: pixelated`，只在 `html[data-grain-boot]` 下显示）；
 >   栅格期真界面 `visibility: hidden`（透明度仍由脚本逐帧写，栅格拿它当「字有多亮」），交接段 `html.grain-handover` 放回来。
@@ -95,9 +97,11 @@
 > 3. 不进栅格的：栏头前的琥珀点（伪元素）、底注下那根细竖线、NEXUS 的小菱形图标、工具星/光标（开屏期本来藏着）——
 >    它们在交接时一次性出现。
 > 4. `#w-heads` 是整屏盒子：`blur` 要挂在三个 `.w-rh` 上，不要挂在整屏（那等于每帧过滤一张 1440×900 的层）。
-> 5. `wander.js:1839` 的「反相窗」现在没建起来：`createInverse` 在 `light` 还是 `null` 时调用，`win === null`，
->    `html.w-win` 从不加，大字实际是普通墨色（`#w-win` 停在 300×150）。栅格里的大字因此用 `fillText`；
->    若日后把这扇窗接上，栅格要改成把那只窗画布缩进格子里。
+> 5. ~~`wander.js` 的「反相窗」没建起来~~ → **2026-10-28 已修**：根因是 `8cff727`（perf(wander)，10-27 21:44）
+>    把 `createLight()` 挪到入场编排之后，而 `createInverse` 仍在「建窗这一刻 `light` 必须是活的」上判定，
+>    于是 `win === null`、`html.w-win` 从不加、大字退回普通墨色（`#w-win` 停在 300×150）。
+>    修法：主页的光在入场前就编译（主页没有要抢首屏的卡），建窗改成「等光就绪的懒建」，由渲染循环每帧问一次；
+>    栅格里的大字也改成把那只窗画进格子（反相 + 字形遮罩；遮罩要一次画完再蒙，不能逐字 `destination-in`）。
 > 6. 开屏栅格依赖 `#site-eeg-canvas`（worker 渲染端）。若落到 SVG 兜底，那一段线不进栅格，会一直是细的。
 
 
