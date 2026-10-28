@@ -10,6 +10,7 @@
    ───────────────────────────────────────────────────────────── */
 import BaseLayout from '../layouts/BaseLayout.astro';
 import WanderIndex from '../components/wander/WanderIndex.astro';
+import GrainBoot from '../components/chrome/GrainBoot.astro';
 import { getCollection } from 'astro:content';
 import { fmtDate } from '../lib/format';
 
@@ -22,7 +23,33 @@ const projects = (await getCollection('projects', (p) => !p.data.draft)).sort(by
 const manifesto = '在即将醒来的那一瞬，世界究竟是在成形，还是正在融化？';
 ---
 
-<BaseLayout title="Traveritas的个人网站" dreamTitle="AveritA的昼梦叙集" description={manifesto} immersive eeg>
+<BaseLayout title="Traveritas的个人网站" dreamTitle="AveritA的昼梦叙集" description={manifesto} immersive eeg boot={false}>
+  <Fragment slot="head">
+    <script is:inline>
+      /* 主页颗粒开屏的「放不放」判定。必须在首帧前落定：
+         - 减弱动效 / 本会话已看过 / ?grain=0 → 不设 __grainBoot，BaseLayout 的 initBoot 会补 booted；
+         - ?grain=1 强制放一次，方便验收。
+         4.5s 兜底：脚本万一没起来，也不能把首页藏死。 */
+      (function () {
+        var r = document.documentElement;
+        var RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
+        var force = /[?&]grain=1/.test(location.search) || /[?&]boot=1/.test(location.search);
+        var off = /[?&]grain=0/.test(location.search);
+        var seen = false;
+        try { seen = sessionStorage.getItem('xm-boot-seen') === '1'; } catch (e) {}
+        if (RM || off || (seen && !force)) return;
+        window.__grainBoot = true;
+        r.setAttribute('data-grain-boot', '');
+        window.__grainFallback = setTimeout(function () {
+          if (!r.classList.contains('booted')) {
+            r.removeAttribute('data-grain-boot');
+            r.classList.add('booted');
+          }
+        }, 4500);
+      })();
+    </script>
+  </Fragment>
+  <GrainBoot />
   <WanderIndex scene="home" />
   <div class="w-fallback">
     <div class="container page-body">

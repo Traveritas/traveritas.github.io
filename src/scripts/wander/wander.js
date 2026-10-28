@@ -80,13 +80,21 @@ export async function initWander(host) {
      卡片就一直到 ~6s 才真正可见（LCP 5.1s）。
      现在它挪到最后：先让窗落位、灯稍后亮。light 在两处使用都是 `if (light)` 保护的，
      未就绪时 #w-light 退回 CSS 渐变（wander.css 本来就备了这一手）。 */
+  let light = null;
+  /* 开屏期由 GrainBoot 写：{ cellPx, lv, dither }（屏幕 px）与脑电线 reveal 0–1。
+     开屏结束后都退回 null，交给日常渲染。 */
+  let bootGrain = null;
+  let bootReveal = null;
+  /* 开屏期脑电群的显隐：首帧就藏住（不等 GrainBoot 起来），随 setReveal 亮起 */
+  let bootLineOpacity = document.documentElement.hasAttribute('data-grain-boot') ? 0 : null;
+  const startLight = () => {
+    if (light) return;
+    try { light = createLight(host.querySelector('#w-light'), PX, { wind: true }); } catch { /* 没有 WebGL2：退回 CSS 渐变 */ }
+  };
+
   const ALL = await Faces.build(DATA);
   const ITEMS = SC.flatMap((s) => ALL[s]);
 
-  let light = null;
-  const startLight = () => {
-    try { light = createLight(host.querySelector('#w-light'), PX, { wind: true }); } catch { /* 没有 WebGL2：退回 CSS 渐变 */ }
-  };
   const weather = createWeather(host.querySelector('#w-wx-back'), host.querySelector('#w-wx-front'));
 
   /* 每个场景一个容器：换场景、切视图时按斜缝裁（平时不裁——clip-path 会让窗的 backdrop-filter 只看得到容器里面） */
@@ -882,12 +890,12 @@ export async function initWander(host) {
     // 平了以后换成这里两根直的（就是两条缝），再转、再劈开。回来时反过来：合拢、转回去，再起伏
     const eo = eegGroup ? clamp(eegAmp * 3, 0, 1) : 0;
     if (eegGroup) {
-      const o = (eo * h).toFixed(3);
+      const o = (bootLineOpacity != null ? bootLineOpacity : eo * h).toFixed(3);
       if (eegGroup._o !== o) { eegGroup.style.opacity = o; eegGroup._o = o; }
       const half = Math.hypot(vw, vh) / 2 + 60;
       const dx = Math.cos(Math.atan(TAN)) * half;
       const dy = Math.sin(Math.atan(TAN)) * half;
-      const reveal = clamp((now() - revealT0) / 2200, 0, 1);
+      const reveal = bootReveal != null ? bootReveal : clamp((now() - revealT0) / 2200, 0, 1);
       const key = `${eegAmp.toFixed(3)}|${reveal.toFixed(3)}|${vw}|${vh}`;
       if (key !== eegKey && (eo > 0 || eegKey === '')) {
         eegKey = key;
@@ -1128,7 +1136,7 @@ export async function initWander(host) {
 
     const pan = background(dt);
     const dimE = Math.max(dim, pullDim());
-    if (light) light.draw({ t: lightT, pan, zoom: cam.z, mouse, dim: dimE, seam: seamGeom(), split, bias, lift, ring: ringOn ? ring : null, face });
+    if (light) light.draw({ t: lightT, pan, zoom: cam.z, mouse, dim: dimE, seam: seamGeom(), split, bias, lift, ring: ringOn ? ring : null, face, grain: bootGrain });
     if (win) win.step();
     if (ink) ink.step(frame);
     const regions = {};
@@ -1894,5 +1902,14 @@ export async function initWander(host) {
     freeze() { clock.speed = 0; },
     resume() { clock.last = performance.now(); clock.speed = 1; },
     advance(ms) { for (let k = 0; k < ms; k += 16) { const d = Math.min(16, ms - k); clock.t += d; step(clock.t, d / 1000); } },
+    /* 开屏期接口（GrainBoot 用；开屏结束后全部退回常规） */
+    setGrain(g) { bootGrain = g; },
+    setReveal(v) {
+      bootReveal = v;
+      bootLineOpacity = v == null ? null : v > 0 ? 1 : 0;
+    },
+    finishReveal() { bootReveal = null; bootLineOpacity = null; revealT0 = now() - 2200; },
+    get lightReady() { return !!light; },
+    startLightNow() { startLight(); },
   };
 }

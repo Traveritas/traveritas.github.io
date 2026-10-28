@@ -42,6 +42,10 @@ function preload(src: string) {
 }
 
 export function initBoot() {
+  /* 主页的颗粒开屏（GrainBoot）自己接管 booted 与整条时间轴，这里不再插手。
+     它由 index.astro 的 head 内联脚本在首帧前挂上 window.__grainBoot。 */
+  if ((window as unknown as { __grainBoot?: boolean }).__grainBoot) return;
+
   const veil = document.getElementById('bootveil');
   const root = document.documentElement;
   const markSeen = () => {

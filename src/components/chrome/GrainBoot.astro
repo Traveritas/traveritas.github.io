@@ -1,0 +1,86 @@
+---
+/* ─────────────────────────────────────────────────────────────
+   主页 · 颗粒开屏（二 · 从粗到细 B，第二版「整个界面」）
+
+   演出本体是 grain-boot.ts：真首页自己的 WebGL 流光从「一格比视口还大」连续收到
+   5 屏 px，同时界面（字 / 栏头 / 时刻 / 出口 / 底注 / 脑电线）被重画进一张和流光
+   「同格」的低分辨率画布（#grain-ui，见 grain-raster.ts），最后再带 blur 交回真界面。
+
+   这个组件负责三件事：
+     · 提供那张栅格画布 #grain-ui；
+     · 首帧前把首页的字与线压住（data-grain-boot，见下），栅格期真界面一律
+       visibility: hidden——它们的透明度仍由脚本写，栅格拿它当「字有多亮」；
+     · 交接段（html.grain-handover）把真界面放回来，脚本同时把 blur 收到 0。
+
+   不放开屏时（reduced-motion / 本会话已看过 / ?grain=0）什么都不做，
+   交给 BaseLayout 的 initBoot 照常补 html.booted。判定在 index.astro 的 <head> 内联脚本里。
+   ───────────────────────────────────────────────────────────── */
+---
+
+<canvas id="grain-ui" aria-hidden="true"></canvas>
+
+<script>
+  import { initGrainBoot } from '../../scripts/grain-boot';
+  initGrainBoot();
+</script>
+
+<style is:global>
+  /* 整屏同格的界面栅格：后备尺寸由脚本按当前格宽写（视口 ÷ 格），
+     CSS 只负责拉满视口 + 像素化上采样，于是它的每一块都落在流光的那一块上 */
+  #grain-ui {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 90;
+    pointer-events: none;
+    display: none;
+    opacity: 1;
+    image-rendering: pixelated;
+  }
+  html[data-grain-boot] #grain-ui {
+    display: block;
+  }
+
+  /* 开屏期：首页自己的字、栏头、底部与工具星先让位。线的展开由 __wander.setReveal 接管。
+     流光画布也先藏着，免得 WebGL 在首帧前闪一帧细流光。 */
+  html[data-grain-boot] #w-light,
+  html[data-grain-boot] .w-home-title,
+  html[data-grain-boot] .w-home-clock,
+  html[data-grain-boot] .w-home-exits,
+  html[data-grain-boot] .w-home-hint,
+  html[data-grain-boot] #w-heads,
+  html[data-grain-boot] #w-stage,
+  html[data-grain-boot] #ts,
+  html[data-grain-boot] #cursor-slot {
+    opacity: 0;
+  }
+  /* 开屏期不允许任何脚本站起来把它们重新点亮 */
+  html[data-grain-boot] #ts,
+  html[data-grain-boot] #ave,
+  html[data-grain-boot] #cursor-slot {
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+  html[data-grain-boot] #w-stage {
+    pointer-events: none;
+  }
+  /* 栅格期：真界面整体收起（透明度仍由脚本逐帧写，栅格用它当亮度）。
+     visibility 顺带把出口链接的点击也按住，不会点到看不见的东西。 */
+  html[data-grain-boot]:not(.grain-handover) .w-home-title,
+  html[data-grain-boot]:not(.grain-handover) .w-home-clock,
+  html[data-grain-boot]:not(.grain-handover) .w-home-exits,
+  html[data-grain-boot]:not(.grain-handover) .w-home-hint,
+  html[data-grain-boot]:not(.grain-handover) #w-heads,
+  html[data-grain-boot]:not(.grain-handover) #site-eeg-group {
+    visibility: hidden;
+  }
+  /* 大字：开屏自己写 filter/opacity；把 w-home-focus 的 CSS 动画压住 */
+  html[data-grain-boot] .w-home-brand-box {
+    animation: none !important;
+  }
+  /* 开屏结束后也不要补演一遍（否则摘下 data-grain-boot 的同一帧会从头对焦） */
+  html.grain-boot-done .w-home-brand-box {
+    animation: none !important;
+  }
+</style>
