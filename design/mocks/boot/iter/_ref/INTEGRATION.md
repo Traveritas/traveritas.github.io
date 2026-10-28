@@ -54,7 +54,7 @@
 > **2026-10-28 实装（用户选定 B「连续收细」，并按澄清改成「起始超粗」而不是叠纯色层）：**
 >
 > 已经接进 `src/`，没有覆盖层。改动：
-> - `src/pages/index.astro`：`boot={false}`；`<head>` 内联脚本在首帧前判定放不放，播放时设 `window.__grainBoot` + `html[data-grain-boot]`；4.5s 兜底防死幕。
+> - `src/pages/index.astro`：`boot={false}`；`<head>` 内联脚本在首帧前判定放不放，播放时设 `window.__grainBoot` + `html[data-grain-boot]`；4.5s 兜底防死幕（2026-10-28 已改成 12s 撤幕 + 加载幕，见 §7）。
 > - `src/components/chrome/GrainBoot.astro`：开屏期藏住首页的字 / 栏头 / 底部 / 工具星 / 光标 / 舞台，并压掉 `w-home-focus` 动画；结束加 `html.grain-boot-done` 防补演。
 > - `src/scripts/grain-boot.ts`：时间轴（0–120ms 一整块 → 120–1400ms 对数式收细到 5px / 26 阶；文字 420–1300；线 560–1380；`booted` 1350；1600 摘层）。`?grain-pause=1` 是验收用的暂停口，`window.__grainCtl` 可 `seek`。
 > - `src/scripts/wander/light.js`：shader 加 `uCell / uLv / uDither / uGrainOn`；开屏时每个像素只取**所在块的中心**（块比视口大时取视口中心），一个块一个颜色，等价于真正低分辨率渲染，不额外叠层。日常 `uGrainOn=0` 走原路径，逐像素不变。
@@ -68,7 +68,7 @@
 > 2. 单个块的颜色是块中心的点采样，不是盒均值；1024ms 前的块很大时，极少数情况下色相会跨量化阶轻微跳一格（当前 `uLv=16` 已把一跳压到 1/16）。
 > 3. ~~文字在粗块还没收完时就开始对焦（420ms 起）~~ → 第二版把界面放进同一张格，见下一条。
 > 4. `AGENTS.md` / `docs/design/content-typography.md` 还在描述旧 BootVeil；主页开屏已经换成 GrainBoot，文档待同步。
-> 5. 主页目前沿用「本会话首访才放」的判定（`sessionStorage['xm-boot-seen']`）；`?grain=1` 强制重播，`?grain=0` 关闭。
+> 5. 主页目前沿用「本会话首访才放」的判定（`sessionStorage['xm-boot-seen']`）；`?grain=1` 强制重播，`?grain=0` 关闭。（2026-10-28 同日改为每次进主页都放，见 §7）
 
 
 > **2026-10-28 实装 · 第二版「整个界面」（用户：不要只有背景收细，整个界面一起收细）：**
@@ -224,3 +224,43 @@ light.draw({
 - 二的 mock：`design/mocks/boot/iter/2-grain/`（对比页 + NOTES 由 grain-iter 产出）
 - 五的 mock：`design/mocks/boot/iter/5-night/`（对比页 + NOTES 由 night-iter 产出）
 - 相关代码：`src/scripts/wander/light.js`、`wander.js`、`src/styles/wander.css`、`src/components/chrome/BootVeil.astro`、`src/scripts/boot.ts`、`src/scripts/reality.ts`、`src/scripts/brand.ts`
+
+---
+
+## 7. 2026-10-28 · 加载幕与开门条件（慢加载时看到的是发白空页，不是「没有开屏」）
+
+**实测出来的问题**（`dist/` 用「把 .js 每次延迟 6s」的静态服务器托起来，headless Chrome 采样）：
+0–4.6s 整页是浅灰 `#f0f3f6`。首页地面全靠 WebGL 流光，流光要等脚本与编译；开屏期 CSS 又把
+`#w-light` 藏起来——于是那段时间是一张发白的空页，首页的字（`#ece8f2`）压在上面几乎看不见。
+4.5s 的旧兜底还会在脚本到达前摘掉 `data-grain-boot`：先露出这版白页，脚本到了再放一次残缺开屏
+（栅格层已 `display:none`、真界面没藏），然后写 `xm-boot-seen`——同会话再刷就不放了，只能用 `?grain=1`。
+快网也一样：开屏前 1.2–1.9s 是浅灰空白。
+
+**现在**：
+- `src/pages/index.astro`（`<head>` 内联）：首帧前给 `<html>` 加 `data-boot-load`，并把一条
+  `html[data-boot-load] #boot-load{display:block !important}` 追加进 `<head>`。元素的样式全内联，
+  不等样式表；元素默认 `display:none`，无脚本时不会留一块永久纯色，所以盖住它要 `!important`。
+  同时给 `html` 写夜色底色，样式表到之前也不白闪。兜底从「4.5s 破坏性摘幕」改成「12s 撤幕 +
+  `window.__grainLate`」；撤幕时一并摘 `data-grain-boot`、补 `booted`。
+- `src/components/chrome/GrainBoot.astro`：新增 `#boot-load`——`#0e0f1d` 纯色、`position:fixed`、
+  `z-index:300`（高于 BootVeil 200 / 光标 240）、`pointer-events:none`；CSS 里只有撤幕的 0.26s
+  opacity 过渡（RM 下关掉）。
+- `src/scripts/grain-boot.ts`：撤幕时机＝开门条件——wander 就绪（≤6s）+ 流光编译完（≤4s）+
+  字体到位（≤2.5s）。顺序是「先写开屏第 0 帧 → 再淡幕」，所以「纯色 → 一整块夜」之间没有空帧。
+  不放演出的访问（RM / `?grain=0`）也走这道幕，只是等地面就绪就揭。
+  `bail()` 不再写 `xm-boot-seen`——这次没放成，下次还放。
+- `src/styles/wander.css`：`html.w-on[data-hour='home'] body{background:#0e0f1d}`。幕之后、流光之前
+  的兜底地面（脚本起来了但流光没有时不再是浅灰）。没有脚本时不生效，目录照常可读。
+- 验收口：`?grain=1` 已无必要（每次进主页都放，留着也无害）；`?grain=0` 不放演出、`?load=0` 连幕也不盖、`?grain-pause=1` 停在第 0 帧。
+
+**实测（headless SwiftShader，1440×900，`dist/`）**：
+- 正常网：0–1.2s 纯夜色幕 → 1.2s 流光就绪 → 1.75s 开屏起播（幕同帧开始淡）→ 3.3s 收场，`xm-boot-seen` 落盘。
+- `.js` 每次延迟 2.5s：0–5.9s 纯夜色幕（不再发白）→ 6.1s 开屏 → 8.0s 收场。
+- `.js` 每次延迟 6s：0–12s 纯夜色幕 → 12.4s 兜底撤幕、页面亮起、`__grainLate`＝true；13s 地面出现；
+  迟到的脚本只补类、不再补放，`xm-boot-seen` 不写。
+
+**取舍**：
+1. 幕与开屏第 0 帧同色，淡出几乎看不出边界；以后要加「加载中」的内容，挂进 `#boot-load` 即可。
+2. 开屏改为每次进主页都放（2026-10-28 同日，用户要求；`xm-boot-seen` 主页不再读，仍写给其它页的 BootVeil）；幕则是「加载未完成」时在。
+3. 幕只挂在主页（GrainBoot）；其它页的会话首访开屏仍是旧的浅色 `BootVeil`。
+4. 门里等字体最多 2.5s：字体慢不会让幕一直等；起播后字体到了栅格会再量一次（原逻辑）。

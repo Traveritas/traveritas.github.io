@@ -26,26 +26,44 @@ const manifesto = '在即将醒来的那一瞬，世界究竟是在成形，还�
 <BaseLayout title="Traveritas的个人网站" dreamTitle="AveritA的昼梦叙集" description={manifesto} immersive eeg boot={false}>
   <Fragment slot="head">
     <script is:inline>
-      /* 主页颗粒开屏的「放不放」判定。必须在首帧前落定：
-         - 减弱动效 / 本会话已看过 / ?grain=0 → 不设 __grainBoot，BaseLayout 的 initBoot 会补 booted；
-         - ?grain=1 强制放一次，方便验收。
-         4.5s 兜底：脚本万一没起来，也不能把首页藏死。 */
+      /* 主页「加载幕 + 颗粒开屏」的判定。必须在首帧前落定：
+         - 加载幕（#boot-load，见 GrainBoot.astro）：页面永远先盖一层夜色纯色，直到地面（WebGL 流光）
+           画出来为止。不盖的话慢加载期间是一张浅灰空白——首页地面全靠 WebGL，流光要等脚本；
+           开屏期又把 #w-light 藏起来，于是字（#ece8f2）在浅灰上几乎看不见。?load=0 连幕也不盖。
+         - 颗粒开屏：每次进主页都放（2026-10-28 起；不再看 xm-boot-seen）。
+           减弱动效 / ?grain=0 → 不设 __grainBoot，BaseLayout 的 initBoot 会补 booted。
+         - 12s 兜底：脚本迟迟不来也不能让幕一直盖着。撤幕的同时摘掉 data-grain-boot 并记 __grainLate，
+           迟到的脚本只把页面点亮，不再补放一版残缺的开屏。 */
       (function () {
         var r = document.documentElement;
+        var q = location.search;
         var RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
-        var force = /[?&]grain=1/.test(location.search) || /[?&]boot=1/.test(location.search);
-        var off = /[?&]grain=0/.test(location.search);
-        var seen = false;
-        try { seen = sessionStorage.getItem('xm-boot-seen') === '1'; } catch (e) {}
-        if (RM || off || (seen && !force)) return;
-        window.__grainBoot = true;
-        r.setAttribute('data-grain-boot', '');
+        var off = /[?&]grain=0/.test(q);
+        var noVeil = /[?&]load=0/.test(q);
+
+        if (!noVeil) {
+          /* 幕的元素样式全内联（不等样式表）；显隐只由下面这条内联规则管。
+             元素默认 display:none（无脚本时不能留一块永久纯色），所以盖住它要 !important。 */
+          r.setAttribute('data-boot-load', '');
+          r.style.backgroundColor = '#0e0f1d'; /* 样式表到之前先别白闪 */
+          var s = document.createElement('style');
+          s.textContent = 'html[data-boot-load] #boot-load{display:block !important}';
+          document.head.appendChild(s);
+        }
+
+        if (!RM && !off) {
+          window.__grainBoot = true;
+          r.setAttribute('data-grain-boot', '');
+        }
+
         window.__grainFallback = setTimeout(function () {
-          if (!r.classList.contains('booted')) {
-            r.removeAttribute('data-grain-boot');
-            r.classList.add('booted');
-          }
-        }, 4500);
+          window.__grainLate = true;
+          var cv = document.getElementById('boot-load');
+          if (cv) cv.style.display = 'none';
+          r.removeAttribute('data-boot-load');
+          r.removeAttribute('data-grain-boot');
+          if (!r.classList.contains('booted')) r.classList.add('booted');
+        }, 12000);
       })();
     </script>
   </Fragment>

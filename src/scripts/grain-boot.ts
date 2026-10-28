@@ -18,7 +18,14 @@
      1540–1762    交接：栅格淡出、真界面带 blur 站起来（html.grain-handover）
      1780         摘层：还原 inline 样式、交给首页自己
 
-   判定（放不放）在 index.astro 的 <head> 内联脚本里（首帧前执行）；本文件只负责演出。
+   加载幕（2026-10-28 追加）：页面从首帧起盖着一层首页夜色的纯色（#boot-load，见 GrainBoot.astro），
+    直到「地面」画出来才揭。流光要等脚本与 WebGL 编译，在那之前 body 是浅灰 #f0f3f6，
+    首页的字压在上面几乎看不见——慢加载时看到的其实不是「没有开屏」，是一张发灰的空页。
+    开门条件：wander 就绪 + 流光编译完 + 字体到位（后两者各有上限）；门一开先写入开屏第 0 帧，
+    再把幕淡掉，于是「纯色 → 一整块夜」之间没有接缝。每次进主页都放演出（2026-10-28 起）；
+    不开演出时（减弱动效 / ?grain=0）也走这道幕，只是等地面就绪就揭，不跑时间轴。
+
+    判定（放不放）在 index.astro 的 <head> 内联脚本里（首帧前执行）；本文件只负责演出。
    window.__grainCtl（截图与验收用）：{ total, ready, pause(), seek(ms), resume() }
    ───────────────────────────────────────────────────────────── */
 
@@ -51,6 +58,8 @@ type GrainWindow = Window & {
   __wander?: WanderBootApi;
   __grainCtl?: GrainCtl;
   __grainFallback?: number;
+  /* 兜底已撤幕（脚本迟到）：不再补放开屏 */
+  __grainLate?: boolean;
 };
 
 const TOTAL = 1780;
@@ -59,6 +68,11 @@ const RISE0 = 120; // 起始粗格停住的时间
 const RISE1 = 1720; // 收细到 5 屏 px 的时间
 const HAND0 = 1540; // 交接开始：真界面露出来、栅格开始淡出
 const HAND1 = 1762; // 交接结束：栅格没了，字也回到 0 blur
+/* 加载幕：开门条件里「字体到位」最多等这么久（等不到也开门，栅格会在字体到了之后再量一次）；
+   淡出时长与 GrainBoot.astro 里 #boot-load 的 transition 对齐 */
+const FONT_WAIT = 2500;
+const COVER_FADE = 260;
+
 const BLUR_MAX = 3.0; // 交接起点的真实 blur（≈ 交接时的格宽的一半）
 
 /* 交接时要一起对焦的东西（真界面）；栅格期它们由 GrainBoot.astro 藏住。
@@ -84,7 +98,7 @@ const sstep = (a: number, b: number, x: number) => {
 
 export function initGrainBoot(): void {
   const w = window as GrainWindow;
-  if (!w.__grainBoot) return; // 不放（reduced-motion / 本会话已看过 / 强制关）：交给 initBoot
+  const play = !!w.__grainBoot; // 放不放开屏。不放也有事做：加载幕还等地面就绪才揭（见 run）
 
   const DOC = document.documentElement;
   const box = document.querySelector<HTMLElement>('.w-home-brand-box');
@@ -98,10 +112,13 @@ export function initGrainBoot(): void {
   const ts = document.getElementById('ts');
   const lightCv = document.getElementById('w-light');
   const rasterCv = document.getElementById('grain-ui') as HTMLCanvasElement | null;
-  const raster: UiRaster | null = rasterCv ? createUiRaster(rasterCv) : null;
+  const raster: UiRaster | null = play && rasterCv ? createUiRaster(rasterCv) : null;
+  /* 加载幕（#boot-load，样式内联在 GrainBoot.astro 里；?load=0 时不点亮，元素还在） */
+  const cover = document.getElementById('boot-load');
   const handEls = HAND_SEL.flatMap((s) => [...document.querySelectorAll<HTMLElement>(s)]);
 
   let wander: WanderBootApi | null = null;
+  let coverDown = false;
   let done = false;
   let booted = false;
   let handStarted = false;
@@ -151,12 +168,30 @@ export function initGrainBoot(): void {
     lastOp = 1;
   }
 
+  /* 只在放完之后写这一笔：主页自己不再读它（每次进主页都放），
+     但其它页的 BootVeil 靠它决定「会话首访才放碎晶开屏」。半路失败不写（见 bail）。 */
   function markSeen(): void {
     try {
       sessionStorage.setItem('xm-boot-seen', '1');
     } catch {
       /* 隐私模式静默 */
     }
+  }
+
+  /* 撤掉加载幕。撤之前手上应该已经有东西可看（开屏第 0 帧 / 地面），否则会露一帧空页。
+     head 里的兜底只负责「脚本根本没跑」：这里一动手就把它撤掉，免得它中途把幕摘了。 */
+  function liftCover(): void {
+    if (w.__grainFallback) {
+      clearTimeout(w.__grainFallback);
+      w.__grainFallback = undefined;
+    }
+    if (coverDown) return;
+    coverDown = true;
+    if (cover) cover.style.opacity = '0';
+    setTimeout(() => {
+      if (cover) cover.style.display = 'none';
+      DOC.removeAttribute('data-boot-load');
+    }, COVER_FADE + 30);
   }
 
   function cleanup(): void {
@@ -179,6 +214,7 @@ export function initGrainBoot(): void {
     wander?.setGrain(null);
     wander?.finishReveal();
     markSeen();
+    liftCover();
   }
 
   function bail(reason: string): void {
@@ -194,7 +230,8 @@ export function initGrainBoot(): void {
     raster?.clear();
     wander?.setGrain(null);
     wander?.finishReveal();
-    markSeen();
+    /* 半路起不来不写 xm-boot-seen：这次没放成，下次该放还得放 */
+    liftCover();
     done = true;
   }
 
@@ -349,12 +386,42 @@ export function initGrainBoot(): void {
     });
   }
 
+  /* 字体到位也是开门条件之一（栅格里的字按真字形量）。等不到也开门——栅格会在字体到了再量一次。 */
+  function waitFonts(timeout = FONT_WAIT): Promise<void> {
+    if (!document.fonts) return Promise.resolve();
+    return new Promise((resolve) => {
+      const t = setTimeout(resolve, timeout);
+      const done = () => {
+        clearTimeout(t);
+        resolve();
+      };
+      document.fonts.ready.then(done, done);
+    });
+  }
+
   async function run(): Promise<void> {
-    /* 脚本已经起来了：撤掉 head 里 4.5s 的兜底（它只负责「脚本根本没跑」） */
-    if (w.__grainFallback) {
-      clearTimeout(w.__grainFallback);
-      w.__grainFallback = undefined;
+    /* head 里的 12s 兜底已经先撤过幕：页面亮着，只把该补的类补上，不再补放一版残缺的开屏 */
+    if (w.__grainLate) {
+      DOC.classList.add('grain-boot-done');
+      DOC.removeAttribute('data-grain-boot');
+      DOC.classList.add('booted');
+      liftCover();
+      return;
     }
+
+    /* 这次不放演出：幕仍然要盖到地面画出来为止——慢加载时先露出的是一张浅灰空页。
+       ?load=0 没有幕，直接交给页面。 */
+    if (!play) {
+      if (!DOC.hasAttribute('data-boot-load')) return;
+      const g = await whenWander();
+      if (g) {
+        g.startLightNow();
+        await waitLight(g);
+      }
+      liftCover();
+      return;
+    }
+
     const api = await whenWander();
     if (!api) {
       bail('wander 没有就绪');
@@ -370,20 +437,28 @@ export function initGrainBoot(): void {
     raster?.sync();
     addEventListener('resize', onResize, { passive: true });
 
-    /* 真站的 WebGL 流光是 idle 才编译的；开屏要它，就现在编译（若 wander 已在开屏期
-       提前点亮，这里会立刻返回）。编译期间主线程被占住，页面停在「一整块夜」上。 */
+    /* 开门：地面（WebGL 流光）编译完 + 字体到位，两样各有上限。编译期间主线程被占住，
+       屏幕停在那层纯色上——这正是它该在的位置。 */
     api.startLightNow();
-    const ok = await waitLight(api);
-    if (!ok) {
+    const [lightOk] = await Promise.all([waitLight(api), waitFonts()]);
+    if (!lightOk) {
       // 没有 WebGL2：退回 CSS 渐变；仍然把界面按时间轴揭开，不把首页藏死
       console.warn('[grain-boot] 没有可用的 WebGL 流光，退化为栅格 + 文字入场');
+    }
+
+    /* 等门的时候兜底把幕撤了（12s 到了）：画面已经亮着，不再补放 */
+    if (w.__grainLate) {
+      bail('加载幕已按兜底撤下');
+      return;
     }
 
     raster?.sync();
     time = 0;
     startAt = performance.now();
     exposeCtl();
+    /* 先把开屏第 0 帧写进去，再揭幕：屏幕上就是「纯色 → 一整块夜」的接力，中间不露空页 */
     apply(0);
+    liftCover();
     /* 验收用：?grain-pause=1 起播即停在第 0ms，避免网络/字体等加载把时间跑过去 */
     if (/[?&]grain-pause=1/.test(location.search)) {
       paused = true;
