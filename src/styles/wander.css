@@ -2,17 +2,14 @@
 [data-wscene='essay'], [data-ink='essay'] {
   --w-bg: #c6ced9; --w-fg: #232830; --w-soft: #56606d; --w-faint: #8a94a2; --w-ink: #4f4a66; --w-chrome: #2b3038;
   --w-glass: 250 251 253; --w-glass-a: 0.62; --w-edge: 52 62 82; --w-edge-a: 0.24; --w-sheen: 255 255 255; --w-sheen-a: 0.5;
-  --w-panel-a: 0.986;
 }
 [data-wscene='project'], [data-ink='project'] {
   --w-bg: #0d1524; --w-fg: #e6ebf1; --w-soft: #a6b4c6; --w-faint: #71849c; --w-ink: #988bb6; --w-chrome: #dfe6ee;
   --w-glass: 16 26 42; --w-glass-a: 0.56; --w-edge: 168 206 226; --w-edge-a: 0.24; --w-sheen: 190 225 240; --w-sheen-a: 0.34;
-  --w-panel-a: 0.978;
 }
 [data-wscene='moment'], [data-ink='moment'] {
   --w-bg: #1d1729; --w-fg: #f0e9f4; --w-soft: #bcadca; --w-faint: #877a98; --w-ink: #9c92c8; --w-chrome: #efe6f2;
   --w-glass: 40 30 56; --w-glass-a: 0.54; --w-edge: 236 196 180; --w-edge-a: 0.24; --w-sheen: 250 215 200; --w-sheen-a: 0.34;
-  --w-panel-a: 0.978;
 }
 
 
@@ -329,25 +326,60 @@ html.w-reading .w-chrome > * { opacity: 0 !important; pointer-events: none; }
 
 /* ══ 阅读：长大了的窗 ══ */
 .w-rd { position: fixed; inset: 0; z-index: 20; color: var(--w-fg); }
+/* 这张纸的「浓淡」：0 → 1。开的时候从卡片的淡淡一层长到一张可以读的纸，
+   而不是在卡的位置上直接弹出一块白板（@property 注册成 <number> 才能被关键帧插值）。 */
+@property --w-panel-k {
+  syntax: '<number>';
+  inherits: false;
+  initial-value: 1;
+}
+/* 卡上的那一层（值偏移）在展开的头一段还留着，随后翻掉——这张纸是从卡上长出来的，不是新开一张 */
+@property --w-panel-ink {
+  syntax: '<number>';
+  inherits: false;
+  initial-value: 0;
+}
 .w-rd-win {
   position: absolute;
   overflow: hidden;
   border-radius: 3px; /* 与卡片（.w-card）同一个角：长大的过程里角不跳 */
-  /* 同一块纸，只是厚了：面是这一栏的纸色，形还是那两条 .6px 与一圈 .5px——
-     没有磨砂、没有投影、没有 1px 描边，和列表里的卡是一家。 */
-  background-color: rgb(var(--w-glass) / var(--w-panel-a));
+  /* 同一块纸，只是厚了：面是这一栏的纸色（上轻下实，与卡片同一个方向），形还是那两条 .6px 与一圈 .5px。
+     颜色不是一块平涂——上沿抬起来的白、下沿沉下去的那一点，让它在流光上像一张纸而不是一块板。
+     不透明度留在 .94–.975：底下的世界只剩一层极淡的影子（再薄，背后的字就会从正文底下读出来）。 */
+  --w-panel-k: 1;
+  --w-panel-ink: 0;
+  background-image:
+    linear-gradient(
+      180deg,
+      rgb(var(--w-ink-face) / calc(var(--w-ink-a) * var(--w-panel-ink))),
+      rgb(var(--w-ink-face) / calc(var(--w-ink-b) * var(--w-panel-ink)))
+    ),
+    linear-gradient(
+      180deg,
+      rgb(var(--w-panel-top) / calc(var(--w-panel-a) * var(--w-panel-k))),
+      rgb(var(--w-panel-bot) / calc(var(--w-panel-b) * var(--w-panel-k)))
+    );
   box-shadow:
     inset 0 0.6px 0 var(--w-edge-hi),
     0 0.6px 0 var(--w-edge-lo),
     0 0 0 0.5px var(--w-edge-ring);
   display: flex;
   flex-direction: column;
-  /* 它是从卡片那块「几乎看不见的纸」上长出来的：纸的位置先就位，颜色在头 0.24s 里浓起来
-     （再慢就成了半透明方块漂在半空——背景会从材料里透出来读） */
-  animation: w-rd-sheet 0.24s cubic-bezier(0.25, 0.8, 0.3, 1) both;
+  /* 0.42s：前 45% 把卡那一层翻掉、纸浓到能读，剩下的路程交给长（字最后才显影） */
+  animation: w-rd-sheet 0.42s cubic-bezier(0.3, 0, 0.2, 1) both;
 }
 @keyframes w-rd-sheet {
-  from { background-color: rgb(var(--w-glass) / calc(var(--w-panel-a) * 0.45)); }
+  0% {
+    --w-panel-k: 0.08;
+    --w-panel-ink: 1;
+  }
+  45% {
+    --w-panel-ink: 0.2;
+  }
+  100% {
+    --w-panel-k: 1;
+    --w-panel-ink: 0;
+  }
 }
 .w-rd-face { position: absolute; z-index: 3; left: 0; top: 0; width: 100%; background-size: 100% 100%; pointer-events: none; }
 .w-rd-tb {
@@ -432,21 +464,44 @@ html.w-reading .w-chrome > * { opacity: 0 !important; pointer-events: none; }
 .w-rd[data-wscene='essay'] { --bg: rgb(225 231 239); --bg-sunken: rgb(214 221 231); --fg: rgb(35 40 48); --fg-soft: rgb(86 96 109); --fg-faint: rgb(134 144 158); --line: color-mix(in srgb, var(--fg) 12%, transparent); }
 .w-rd[data-wscene='project'] { color-scheme: dark; --bg: rgb(20 27 41); --bg-sunken: rgb(14 20 31); --fg: rgb(230 233 239); --fg-soft: rgb(154 166 184); --fg-faint: rgb(108 120 138); --line: color-mix(in srgb, var(--fg) 15%, transparent); --frost: 165 180 215; --frost-a: 0.1; --hour-ink: color-mix(in srgb, var(--umber) 52%, #fff); }
 .w-rd[data-wscene='moment'] { color-scheme: dark; --bg: rgb(38 33 53); --bg-sunken: rgb(30 26 43); --fg: rgb(236 230 241); --fg-soft: rgb(169 159 186); --fg-faint: rgb(124 115 140); --line: color-mix(in srgb, var(--fg) 15%, transparent); --frost: 180 162 215; --frost-a: 0.1; --hour-ink: color-mix(in srgb, var(--umber) 52%, #fff); }
-/* 阅读窗的边：与它那一栏的卡同一套规矩（上亮、下暗、一圈极淡收口），只是这张纸厚一些 */
+/* 阅读窗的纸：与它那一栏同一套规矩——上沿轻（几乎是纸的白）、下沿实，
+   边还是那两条 .6px 与一圈收口。数值是这一栏的纸色，不是卡片那一层的值偏移
+   （卡片几乎看不见；这张纸要能承住正文，所以它是同一个方向上的「更厚一档」）。 */
 .w-rd[data-wscene='essay'] .w-rd-win {
+  --w-panel-top: 236 241 248;
+  --w-panel-bot: 215 223 235;
+  --w-panel-a: 0.968;
+  --w-panel-b: 0.982;
+  --w-ink-face: 23 28 40;
+  --w-ink-a: 0.018;
+  --w-ink-b: 0.092;
   --w-edge-hi: rgba(255, 255, 255, 0.5);
   --w-edge-lo: rgba(23, 28, 40, 0.34);
-  --w-edge-ring: rgba(23, 28, 40, 0.18);
+  --w-edge-ring: rgba(23, 28, 40, 0.2);
 }
 .w-rd[data-wscene='project'] .w-rd-win {
+  --w-panel-top: 30 40 60;
+  --w-panel-bot: 16 22 34;
+  --w-panel-a: 0.968;
+  --w-panel-b: 0.982;
+  --w-ink-face: 255 255 255;
+  --w-ink-a: 0.092;
+  --w-ink-b: 0.014;
   --w-edge-hi: rgba(255, 255, 255, 0.42);
   --w-edge-lo: rgba(0, 0, 0, 0.3);
-  --w-edge-ring: rgba(255, 255, 255, 0.13);
+  --w-edge-ring: rgba(255, 255, 255, 0.14);
 }
 .w-rd[data-wscene='moment'] .w-rd-win {
+  --w-panel-top: 44 36 62;
+  --w-panel-bot: 29 24 42;
+  --w-panel-a: 0.968;
+  --w-panel-b: 0.982;
+  --w-ink-face: 255 255 255;
+  --w-ink-a: 0.118;
+  --w-ink-b: 0.022;
   --w-edge-hi: rgba(255, 255, 255, 0.44);
   --w-edge-lo: rgba(0, 0, 0, 0.32);
-  --w-edge-ring: rgba(255, 255, 255, 0.12);
+  --w-edge-ring: rgba(255, 255, 255, 0.13);
 }
 .w-rd .md { margin-top: 36px; color: var(--w-fg); }
 .w-rd .prose { max-width: none; }
@@ -505,7 +560,6 @@ html.w-on .page-ambient, html.w-on .wash-backdrop { display: none; }
 [data-wscene='home'], [data-ink='home'] {
   --w-bg: #0e0f1d; --w-fg: #ece8f2; --w-soft: #b7b3c8; --w-faint: #827f98; --w-ink: #a195c1; --w-chrome: #e6e2ee;
   --w-glass: 22 22 40; --w-glass-a: 0.56; --w-edge: 214 206 236; --w-edge-a: 0.24; --w-sheen: 220 214 240; --w-sheen-a: 0.3;
-  --w-panel-a: 0.978;
 }
 .w-home {
   --home: 1;
