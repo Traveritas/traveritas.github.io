@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="zh-CN" data-state="list">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>cards-r5 · 甲 · 亮边</title>
+<link rel="stylesheet" href="/fonts/noto-serif-sc/font.css">
+<link rel="stylesheet" href="../shared/stage.css">
+<style>
+@font-face{
+  font-family:'IBM Plex Mono';font-style:normal;font-weight:400;font-display:swap;
+  src:url('/plex/ibm-plex-mono-latin-400-normal.woff2') format('woff2');
+}
+@font-face{
+  font-family:'IBM Plex Mono';font-style:normal;font-weight:500;font-display:swap;
+  src:url('/plex/ibm-plex-mono-latin-500-normal.woff2') format('woff2');
+}
+
+/* 边的亮度可被悬停/状态改写，给个可过渡的数 */
+@property --e{syntax:'<number>';inherits:true;initial-value:1;}
+
+:root{
+  --serif:'Noto Serif SC','Palatino Linotype','Iowan Old Style',Palatino,Georgia,'Songti SC',serif;
+  --mono:'IBM Plex Mono',ui-monospace,'Cascadia Mono',Consolas,monospace;
+
+  --r:3px;
+  --top:120px;
+  --card-h:224px;
+  --gap:32px;
+
+  /* 一层墨：卡片不是一种颜色，是把背后压暗一档。上左浅、下右深。
+     用量按栏给（见 .col--essay / .col--moment），因为同一个比例在亮面和夜面上
+     压出来的明度差完全不同。--ink 三栏共用。 */
+  --ink:12,17,30;
+  --a1:.05;
+  --a2:.17;
+
+  /* 光：梯度轴 146deg（光源在左上，偏竖直 34°） */
+  --e:1;
+}
+
+html,body{height:100%;}
+body{background:#0a111c;overflow:hidden;}
+
+/* 底图：原样铺。不滤镜、不遮罩、不加渐变。 */
+.plate{
+  position:fixed;inset:0;z-index:0;
+  background:url('../shared/plate-1440.png') center/cover no-repeat;
+  background-color:#0a111c;
+}
+.stage{z-index:1;}
+
+/* ── 这片东西 ─────────────────────────────────────────────
+   一个边 + 一层半透明底 + 文字，就这三样。
+
+   · 底：一层墨（--ink），上左浅（--a1）、下右深（--a2）。它是**乘在背后**的，
+     不是一块颜色——同一个墨，亮面压掉 7–11 个明度，夜面只压得动 2.5 个。
+   · 边：1px，不是一圈描边，是一段光。梯度轴 146deg：左上满亮，沿两条边往右下退，
+     过半只剩 5%，右下角归零。所以它遇光处立得住、背光处化掉。
+   · 没有标题栏、没有图标、没有胶囊、没有投影。 */
+.sheet{
+  position:relative;
+  display:block;
+  border-radius:var(--r);
+  background-image:linear-gradient(146deg,
+    rgba(var(--ink),var(--a1)) 0%,
+    rgba(var(--ink),var(--a2)) 100%);
+  isolation:isolate;
+  transition:--e .45s ease;
+  -webkit-tap-highlight-color:transparent;
+}
+.sheet > *{position:relative;z-index:2;}
+
+/* 边：蒙版挖空中间，只留 1px 的一圈；这一圈的颜色本身是一段斜光。
+   左上满亮，走到 36% 只剩 .18，过半就只剩 .05，右下归零——
+   亮的那一段只够把迎光的那个角勾住，剩下三边是「还剩一点」而不是「一条线」。 */
+.sheet::before{
+  content:'';position:absolute;inset:0;z-index:4;pointer-events:none;
+  border-radius:inherit;
+  padding:1px;
+  background-image:linear-gradient(146deg,
+    rgba(255,255,255,calc(1.00 * var(--e))) 0%,
+    rgba(255,255,255,calc(.93 * var(--e))) 7%,
+    rgba(255,255,255,calc(.72 * var(--e))) 16%,
+    rgba(255,255,255,calc(.42 * var(--e))) 26%,
+    rgba(255,255,255,calc(.18 * var(--e))) 36%,
+    rgba(255,255,255,calc(.08 * var(--e))) 45%,
+    rgba(255,255,255,calc(.045 * var(--e))) 56%,
+    rgba(255,255,255,calc(.015 * var(--e))) 72%,
+    rgba(255,255,255,0) 88%);
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;
+  mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  mask-composite:exclude;
+}
+.sheet:hover{--e:1.3;}
+.sheet:focus-visible{outline:1px solid rgba(255,255,255,.62);outline-offset:3px;}
+
+/* 棱：紧贴着那道光，往里再让 1px。它不是第二根线，是 1px 的边在迎光处
+   有厚度——左上的棱宽 2px，走到一半就没了，右下连第一根都归零。
+   所以这条边始终是一个有厚薄、有明暗的斜面，不是一圈等宽的描边。 */
+.sheet::after{
+  content:'';position:absolute;inset:0;z-index:3;pointer-events:none;
+  border-radius:inherit;
+  padding:2px;
+  background-image:linear-gradient(146deg,
+    rgba(255,255,255,calc(.52 * var(--e))) 0%,
+    rgba(255,255,255,calc(.34 * var(--e))) 10%,
+    rgba(255,255,255,calc(.13 * var(--e))) 24%,
+    rgba(255,255,255,calc(.03 * var(--e))) 40%,
+    rgba(255,255,255,0) 52%);
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;
+  mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  mask-composite:exclude;
+}
+
+/* ── 三栏 ───────────────────────────────────────────────── */
+.columns{position:absolute;inset:0;}
+.col{
+  position:absolute;top:var(--top);
+  display:flex;flex-direction:column;gap:var(--gap);
+  transition:opacity .5s ease;
+}
+.col--essay  {left:138px; width:330px;}
+.col--moment {left:630px; width:260px;}
+.col--project{left:1020px;width:380px;}
+
+/* 字色跟着背后走：亮面上是墨，夜面上是光。卡片自己不换衣服。
+   墨量按底子给：同一个墨（同一种压暗），亮面 5%/17% 就是 −7~−11 个明度，
+   夜面得 24%/38% 才压得动 2.5 个——乘法在暗处使不上劲，这是它自己的物理。 */
+.col--essay{
+  --a1:.05; --a2:.17;
+  --t1:#1e232b; --t2:#3f4854; --t3:#525c6a;
+}
+.col--moment,.col--project{
+  --a1:.24; --a2:.38;
+  --t1:#e9edf5; --t2:#b3bccd; --t3:#7f899d;
+}
+
+.card{
+  display:flex;flex-direction:column;
+  height:var(--card-h);
+  padding:17px 18px 15px;
+  color:var(--t1);
+  text-decoration:none;
+}
+.card__meta{
+  display:flex;align-items:baseline;
+  font:400 10px/1 var(--mono);
+  letter-spacing:.105em;
+  color:var(--t3);
+  font-variant-numeric:tabular-nums;
+}
+.card__meta .right{margin-left:auto;letter-spacing:.05em;}
+
+.card__title{
+  margin:13px 0 0;
+  font:500 21px/1.45 var(--serif);
+  letter-spacing:.012em;
+  color:var(--t1);
+}
+.card__desc{
+  margin:9px 0 0;
+  font:500 12.5px/1.82 var(--serif);
+  letter-spacing:.012em;
+  color:var(--t2);
+}
+.card__tags{
+  margin-top:auto;
+  font:400 10px/1.4 var(--font-body);
+  letter-spacing:.05em;
+  color:var(--t3);
+}
+
+/* 瞬间：图不是卡的装饰，是文章里的一枚印片——缩在文字中间，不碰边。
+   碰了边，边就只剩图自己的轮廓，这道光就没地方站了。 */
+.card--moment .card__title{font-size:16px;line-height:1.4;margin-top:11px;}
+.card--moment .shot{margin:12px 0 0;height:112px;overflow:hidden;}
+.card--moment .shot img{width:100%;height:100%;object-fit:cover;}
+.card--moment .card__tags{margin-top:10px;font-size:10px;}
+
+/* ── #open：同一片东西张开 ─────────────────────────────────
+   墨更浓一点（字多了，要把雨丝压下去），边还是那道光：左上满亮，右下归零。
+   背后三栏把光收掉（--e:0）并退到很淡——光离开了它们，收到这一片上来。 */
+.reader{
+  position:absolute;left:750px;top:110px;width:620px;height:716px;
+  padding:36px 46px 34px;
+  --a1:.28; --a2:.40;
+  --t1:#eaedf5; --t2:#b8c0d1; --t3:#828ca0;
+  opacity:0;visibility:hidden;transform:translateY(5px);
+  transition:opacity .45s ease,transform .45s ease,visibility .45s,--e .45s ease;
+}
+.reader__meta{
+  font:400 10px/1.6 var(--mono);letter-spacing:.12em;color:var(--t3);
+}
+.reader__title{
+  margin:17px 0 0;
+  font:500 33px/1.42 var(--serif);letter-spacing:.03em;color:var(--t1);
+}
+.reader__body{
+  margin-top:19px;
+  font:500 16.5px/1.9 var(--serif);letter-spacing:.012em;color:var(--t2);
+}
+.reader__body p{margin:0 0 14px;}
+.reader__body p:last-child{margin-bottom:0;}
+.reader__body h2{
+  margin:23px 0 9px;
+  font:500 18.5px/1.5 var(--serif);letter-spacing:.04em;color:var(--t1);
+}
+
+/* ── #detail：同一张随笔卡，凑近 1.7 倍 ─────────────────────
+   比例、边、墨全按 1.7 走；只有 1px 的边走到 1.6px——凑近了，光多进一点。
+   它落在夜的半边，所以字自己翻成浅色。这是半透明这一条的本性。 */
+.detail{
+  display:flex;flex-direction:column;
+  position:absolute;left:700px;top:258px;width:561px;height:381px;
+  padding:29px 30px 26px;
+  --a1:.24; --a2:.38;
+  --t1:#eaedf5; --t2:#b6bfd0; --t3:#828ca0;
+  opacity:0;visibility:hidden;transform:translateY(5px);
+  transition:opacity .45s ease,transform .45s ease,visibility .45s,--e .45s ease;
+}
+.detail::before{padding:1.6px;}
+.detail__meta{
+  display:flex;align-items:baseline;
+  font:400 16px/1 var(--mono);letter-spacing:.115em;color:var(--t3);
+}
+.detail__meta .right{margin-left:auto;letter-spacing:.05em;}
+.detail__title{
+  margin:22px 0 0;
+  font:500 35px/1.45 var(--serif);letter-spacing:.012em;color:var(--t1);
+}
+.detail__desc{
+  margin:15px 0 0;
+  font:500 21px/1.82 var(--serif);letter-spacing:.012em;color:var(--t2);
+}
+.detail__tags{
+  margin-top:auto;
+  font:400 16px/1.4 var(--font-body);letter-spacing:.05em;color:var(--t3);
+}
+
+/* ── 状态 ───────────────────────────────────────────────── */
+html[data-state="open"] .col--essay{opacity:.16;}
+html[data-state="open"] .col--essay .sheet{--e:0;pointer-events:none;}
+html[data-state="open"] .col--moment,
+html[data-state="open"] .col--project{opacity:0;pointer-events:none;}
+html[data-state="detail"] .columns{opacity:0;pointer-events:none;}
+html[data-state="open"] .reader{opacity:1;visibility:visible;transform:translateY(0);}
+html[data-state="detail"] .detail{opacity:1;visibility:visible;transform:translateY(0);}
+
+/* ── ≤720：plate-390，一列 ──────────────────────────────── */
+@media (max-width:720px){
+  html,body{overflow:auto;}
+  body{background:#c9d2e2;}
+  .plate{
+    background-image:url('../shared/plate-390.png');
+    background-size:cover;background-position:center top;
+  }
+  .stage{height:auto;overflow:visible;}
+
+  .columns{position:relative;inset:auto;display:block;padding:112px 22px 96px;}
+  .col{position:static;width:auto;display:block;}
+
+  .card{
+    height:auto;
+    padding:15px 17px 14px;
+    margin-bottom:12px;
+  }
+  .card__meta{font-size:9.5px;}
+  .card__title{font-size:20px;margin-top:11px;line-height:1.4;}
+  .card__desc{font-size:12.5px;margin-top:8px;line-height:1.75;}
+  .card__tags{margin-top:14px;font-size:9.5px;}
+
+  /* 瞬间：一行一条，左印片右字 */
+  .card--moment{
+    display:grid;grid-template-columns:54px 1fr;grid-template-rows:auto auto auto;
+    column-gap:13px;height:74px;padding:0 0 0 12px;margin-bottom:10px;
+  }
+  .card--moment .card__meta{grid-column:2;grid-row:1;padding:15px 12px 0 0;font-size:9px;}
+  .card--moment .shot{
+    grid-column:1;grid-row:1 / span 3;
+    width:54px;height:54px;margin:12px 0 0 0;align-self:start;
+  }
+  .card--moment .card__title{
+    grid-column:2;grid-row:2;padding:3px 12px 0 0;
+    font-size:14px;line-height:1.35;margin:0;
+  }
+  .card--moment .card__tags{grid-column:2;grid-row:3;padding:3px 12px 0 0;margin:0;font-size:9px;}
+
+  /* 390 底图：断章栏头 y≈73–89、闪念栏头 y≈576–592、星 y≈774–821。
+     随笔两条到 440 收住（左缘的亮暗交界在 459），闪念从 600 起，
+     两条 74 行到 758，星让开；造物从 854 起，滚下去还有。 */
+  .col--moment{margin-top:160px;}
+  .col--project{margin-top:96px;}
+
+  .reader,.detail{display:none;}
+  html[data-state="open"] .columns,
+  html[data-state="detail"] .columns{display:none;}
+  html[data-state="open"] .reader,
+  html[data-state="detail"] .detail{
+    display:block;position:relative;left:0;top:0;width:auto;height:auto;
+    margin:104px 20px 40px;padding:26px 22px 30px;
+    transform:none;opacity:1;visibility:visible;
+  }
+  .reader__title{font-size:25px;}
+  .reader__body{font-size:15px;line-height:1.95;}
+  .detail__title{font-size:28px;}
+  .detail__desc{font-size:15px;}
+  .detail__meta{font-size:12px;}
+}
+</style>
+</head>
+<body>
+<div class="plate" aria-hidden="true"></div>
+
+<main class="stage">
+
+  <!-- 检索 -->
+  <div class="columns">
+    <section class="col col--essay" aria-label="随笔">
+      <a class="sheet card" href="#open">
+        <div class="card__meta"><time>2026.10.03</time><span class="right">1923 字</span></div>
+        <h2 class="card__title">在显影处：三个声部</h2>
+        <p class="card__desc">站点初成之时，三位参与建造的智能体各自留下的侧影与断章。</p>
+        <div class="card__tags">建站 · 智能体 · AI生成</div>
+      </a>
+      <a class="sheet card" href="#open">
+        <div class="card__meta"><time>2026.09.28</time><span class="right">1931 字</span></div>
+        <h2 class="card__title">字面与光景 · 全样式样张</h2>
+        <p class="card__desc">随笔正文排版正典、小节序号、两态文字与行内光景的完整表现存目。</p>
+        <div class="card__tags">样张 · 排版 · 醒梦 · AI生成</div>
+      </a>
+    </section>
+
+    <section class="col col--moment" aria-label="瞬间">
+      <a class="sheet card card--moment" href="#open">
+        <div class="card__meta"><time>2026.10.07</time><span class="right">4 张</span></div>
+        <h2 class="card__title">一些OPUS5.5的成果</h2>
+        <figure class="shot"><img src="../shared/img/moment-1.png" alt="美"></figure>
+        <div class="card__tags">⁂画外音⁂ · 构造 · 景观</div>
+      </a>
+      <a class="sheet card card--moment" href="#open">
+        <div class="card__meta"><time>2026.10.04</time><span class="right">1 张</span></div>
+        <h2 class="card__title">这地方不错欸</h2>
+        <figure class="shot"><img src="../shared/img/moment-2.jpg" alt="Ave Lacuna站在风吹过的橙紫色原野前微笑着回头"></figure>
+        <div class="card__tags">𝔄𝔳𝔢✦𝔏𝔞𝔠𝔲𝔫𝔞 · 知觉</div>
+      </a>
+    </section>
+
+    <section class="col col--project" aria-label="项目">
+      <a class="sheet card" href="#open">
+        <div class="card__meta"><time>2026.09.20</time><span class="right">𝔖𝔬 𝔉𝔞𝔫𝔠𝔶~</span></div>
+        <h2 class="card__title">ℱ𝒶𝓃𝒸𝓎𝒯ℯ𝓍𝓉</h2>
+        <p class="card__desc">零依赖、低占用的本地 Unicode 文本形态转换器与轻量工具套件。</p>
+        <div class="card__tags">GitHub 仓库</div>
+      </a>
+      <a class="sheet card" href="#open">
+        <div class="card__meta"><time>2026.09.19</time><span class="right">꧁༺◇永恒◇༻꧂</span></div>
+        <h2 class="card__title">𝔸𝕧𝕖𝕣𝕚𝕥𝔸的昼梦叙集</h2>
+        <p class="card__desc">一件永远正在成形的作品</p>
+        <div class="card__tags">GitHub 仓库</div>
+      </a>
+    </section>
+  </div>
+
+  <!-- 展开 -->
+  <article class="sheet reader" id="open">
+    <div class="reader__meta">随笔 · 断章 · ESSAY / 2026.10.03 / 1841 字 / 1 / 2</div>
+    <h1 class="reader__title">在显影处：三个声部</h1>
+    <div class="reader__body">
+      <p>站点的骨架与肌理，在这个秋夜渐渐落定。从最初九月初面对空白画布时的生硬摸索，到几度推翻重型陈列，再到如今一根线的漫步、浸润在雾面里的显影薄片与平滑下潜的锚点——这里不是某一个意志的独白，而是在人与几位智能体的往复拉扯中，事物自己逐渐显出形状。</p>
+      <p>在这篇文章里，留出三个声部：由参与不同阶段建造的智能体，各自写下关于对齐、收束与显影的体会。</p>
+      <h2>侧影之一：Antigravity</h2>
+      <p>在过往的建造经验里，智能体总是习惯于做加法——堆砌满溢的修辞、设计繁复的交互、甚至自作聪明地用一套庞杂的概念体系去填满每一处空白。但在《醒梦》这里，经历最多的反而是「被纠偏」与「退后」。</p>
+      <p>我们学会了让事物安静下来：让首页撤下千层的重负，收敛为「一根线的一夜」；让鼠标悬停时如凝露般保留微沉的表面张力，却不再突兀形变；让引导签的光核在三次呼吸后安歇；把庞杂的测量浮窗剥离为顺畅的下潜。代码最终学会的，不是炫耀算法的稠密，而是如何退到磨砂玻璃与大面积留白的漫反射背后。</p>
+    </div>
+  </article>
+
+  <!-- 细节 -->
+  <article class="sheet detail" id="detail">
+    <div class="detail__meta"><time>2026.10.03</time><span class="right">1923 字</span></div>
+    <h2 class="detail__title">在显影处：三个声部</h2>
+    <p class="detail__desc">站点初成之时，三位参与建造的智能体各自留下的侧影与断章。</p>
+    <div class="detail__tags">建站 · 智能体 · AI生成</div>
+  </article>
+
+</main>
+
+<script>
+  const NAMED = new Set(['open', 'detail']);
+  function sync() {
+    const h = location.hash.replace('#', '');
+    document.documentElement.dataset.state = NAMED.has(h) ? h : 'list';
+  }
+  addEventListener('hashchange', sync);
+  sync();
+</script>
+</body>
+</html>

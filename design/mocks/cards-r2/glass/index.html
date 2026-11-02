@@ -1,0 +1,653 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>cards-r2 · A · 玻璃实体</title>
+<link rel="stylesheet" href="/fonts/noto-serif-sc/font.css">
+<link rel="stylesheet" href="/shared/stage.css">
+<style>
+/* ============================================================
+   A · 玻璃实体
+   一块有厚度的玻璃片，不是一张白卡。
+   光从左上来。面是透的；底边那 10px 的侧面才是“实体”：
+   压暗的青灰玻璃体，上缘 1px 亮棱 + 暖/冷两道 1px 色散，
+   下缘一道亮唇，玻璃外面再落一条极淡的焦散。
+   字刻在面上（清楚），照片封在背后（通过玻璃）。
+   ============================================================ */
+
+@font-face{
+  font-family:'IBM Plex Mono';
+  font-style:normal;font-weight:400;font-display:swap;
+  src:url('/plex/ibm-plex-mono-latin-400-normal.woff2') format('woff2');
+}
+
+:root{
+  --ink:#22272f;
+  --soft:rgba(34,39,47,.66);
+  --faint:rgba(34,39,47,.46);
+  --fainter:rgba(34,39,47,.30);
+
+  --serif:'Noto Serif SC','Palatino Linotype','Iowan Old Style',Palatino,Georgia,serif;
+  --sans:system-ui,-apple-system,'PingFang SC','Hiragino Sans GB','Microsoft YaHei UI','Microsoft YaHei',sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,'Cascadia Mono',Consolas,monospace;
+
+  --t:10px;                 /* 玻璃厚度 */
+  --r:2.5px;
+}
+
+html,body{height:100%;}
+body{background:#e5ebf0;color:var(--ink);}
+
+/* ---------- 地面：浅色棚布。光在中上，四角微沉 ---------- */
+.stage{
+  position:relative;
+  height:100vh;
+  overflow:hidden;
+  padding:60px 78px 0;
+  background-color:#e4eaf0;
+  background-image:
+    radial-gradient(62% 50% at 14% -6%, rgba(255,255,255,.98) 0%, rgba(255,255,255,.55) 38%, rgba(255,255,255,0) 68%),
+    radial-gradient(50% 44% at 100% 100%, rgba(193,211,226,.55) 0%, rgba(193,211,226,0) 64%),
+    linear-gradient(120deg,#f3f7f9 0%,#e9eff4 46%,#dde7ef 100%);
+}
+
+/* ---------- 三栏 ---------- */
+.grid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:0 34px;
+  align-items:start;
+}
+.col{display:flex;flex-direction:column;gap:26px;}
+
+.col-head{
+  display:flex;
+  align-items:baseline;
+  gap:12px;
+  height:20px;
+  margin-bottom:30px;
+  white-space:nowrap;
+}
+.col-head .idx,
+.col-head .count{
+  font-family:var(--mono);
+  font-size:10px;
+  font-weight:400;
+  letter-spacing:.12em;
+  color:var(--fainter);
+}
+.col-head .cname{
+  font-family:var(--serif);
+  font-size:14.5px;
+  font-weight:600;
+  letter-spacing:.34em;
+  margin-right:-.34em;
+  color:rgba(34,39,47,.78);
+}
+.col-head .latin{
+  font-family:var(--mono);
+  font-size:9.5px;
+  letter-spacing:.24em;
+  color:var(--fainter);
+}
+.col-head .count{margin-left:auto;letter-spacing:.10em;}
+
+/* ---------- 玻璃片 ---------- */
+.slab{
+  position:relative;
+  isolation:isolate;
+  height:304px;
+  border-radius:var(--r);
+  background:
+    radial-gradient(110% 66% at 26% -18%, rgba(255,255,255,.30) 0%, rgba(255,255,255,.06) 48%, rgba(255,255,255,0) 66%),
+    linear-gradient(180deg, rgba(86,120,144,.055) 0%, rgba(80,114,138,.040) 46%, rgba(66,100,126,.065) 100%),
+    linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.01)),
+    linear-gradient(180deg, rgba(214,236,229,.08), rgba(208,230,223,.03));
+}
+
+/* 面：细亮/暗、1–2px 色散、几乎看不见的起伏、灰尘 */
+.edge{
+  position:absolute;
+  inset:0 0 var(--t) 0;
+  z-index:2;
+  pointer-events:none;
+  border-radius:var(--r) var(--r) 0 0;
+  background:
+    url(/glass/grain.png) var(--gx,0px) 0 / 128px 128px repeat,
+    /* 反射：一道宽的暗带，上侧压着一道亮 —— 像窗外的暗部映在玻璃上 */
+    linear-gradient(var(--sheen,116deg),
+      rgba(255,255,255,0) 13%,
+      rgba(255,255,255,.24) 22%,
+      rgba(255,255,255,.03) 26%,
+      rgba(112,140,164,.050) 31%,
+      rgba(112,140,164,.038) 45%,
+      rgba(112,140,164,.010) 55%,
+      rgba(255,255,255,0) 62%),
+    /* 周缘的厚度：一圈很淡的沉 */
+    radial-gradient(120% 106% at 50% 46%, rgba(96,126,148,0) 62%, rgba(96,126,148,.040) 100%),
+    /* 靠底边积起来的光 + 一点密度 */
+    linear-gradient(180deg, rgba(255,255,255,0) 72%, rgba(255,255,255,.18) 88%, rgba(255,255,255,.30) 97%, rgba(96,124,132,.18) 100%),
+    /* 左上角受光 */
+    radial-gradient(52% 46% at 2% 2%, rgba(255,255,255,.30) 0%, rgba(255,255,255,0) 60%);
+  box-shadow:
+    /* 上缘：亮棱 → 暗缝 → 一点暖、一点冷 */
+    inset 0 1px 0 rgba(255,255,255,1),
+    inset 0 2px 0 rgba(84,112,136,.13),
+    inset 0 3px 0 -1px rgba(180,150,140,.10),
+    inset 0 4px 0 -2px rgba(126,152,178,.08),
+    /* 左缘：受光的一侧 */
+    inset 1px 0 0 rgba(255,255,255,.92),
+    inset 2px 0 0 -1px rgba(255,255,255,.42),
+    inset 3px 0 0 -2px rgba(180,150,140,.09),
+    /* 右缘：背光，冷 */
+    inset -1px 0 0 rgba(84,112,136,.14),
+    inset -2px 0 0 -1px rgba(255,255,255,.46),
+    inset -3px 0 0 -2px rgba(126,152,178,.09),
+    /* 面前棱 */
+    inset 0 -1px 0 rgba(255,255,255,.95);
+}
+
+/* 透过玻璃看到的远端上棱：一条很淡的错位线 */
+.edge::before{
+  content:"";
+  position:absolute;
+  top:8px; left:9%; right:9%;
+  height:1px;
+  background:linear-gradient(90deg,
+    rgba(100,128,152,0) 0%,
+    rgba(100,128,152,.085) 26%,
+    rgba(100,128,152,.085) 74%,
+    rgba(100,128,152,0) 100%);
+}
+
+/* 侧面：厚度在这里成立 */
+.side{
+  position:absolute;
+  left:0; right:0; bottom:0;
+  height:var(--t);
+  z-index:5;
+  pointer-events:none;
+  border-radius:0 0 var(--r) var(--r);
+  background:
+    /* 上缘：暖、冷两线，很淡 */
+    linear-gradient(180deg,
+      rgba(196,152,132,.30) 0 1px,
+      rgba(104,150,192,.30) 1px 2px,
+      rgba(118,150,182,0) 2px),
+    /* 侧面里的远缘：错位的一道亮线 */
+    linear-gradient(180deg, rgba(255,255,255,0) 0 4px, rgba(255,255,255,.28) 4px 5px, rgba(255,255,255,0) 5px),
+    /* 玻璃体：一块较平的青灰 */
+    linear-gradient(180deg,
+      rgba(52,80,84,.66) 0%,
+      rgba(74,102,104,.54) 30%,
+      rgba(108,134,138,.36) 70%,
+      rgba(158,182,186,.20) 100%);
+  box-shadow:
+    inset 0 -1px 0 rgba(255,255,255,.88),
+    inset 1px 0 0 rgba(255,255,255,.45),
+    inset -1px 0 0 rgba(255,255,255,.25);
+}
+
+/* 焦散：细的、偏左的、贴在玻璃外面的一条亮 */
+.caustic{
+  position:absolute;
+  left:10%; right:10%;
+  bottom:-4px;
+  height:5px;
+  z-index:0;
+  pointer-events:none;
+  background:linear-gradient(180deg,
+    rgba(70,94,110,.10) 0%,
+    rgba(70,94,110,.04) 12%,
+    rgba(255,255,255,.30) 28%,
+    rgba(255,255,255,.85) 42%,
+    rgba(255,255,255,.16) 62%,
+    rgba(255,255,255,0) 96%);
+  -webkit-mask-image:linear-gradient(90deg, rgba(0,0,0,0) 0%, #000 14%, #000 78%, rgba(0,0,0,0) 100%);
+  mask-image:linear-gradient(90deg, rgba(0,0,0,0) 0%, #000 14%, #000 78%, rgba(0,0,0,0) 100%);
+}
+
+/* ---------- 卡里的字 ---------- */
+.content{
+  position:relative;
+  z-index:4;
+  display:flex;
+  flex-direction:column;
+  height:100%;
+  padding:22px 27px 24px;
+}
+.meta{
+  display:flex;
+  justify-content:space-between;
+  align-items:baseline;
+  font-family:var(--serif);
+  font-size:11px;
+  font-weight:500;
+  letter-spacing:.10em;
+  color:var(--faint);
+  font-variant-numeric:tabular-nums;
+}
+.meta .n{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;}
+
+.body{margin-top:auto;}
+.title{
+  margin:0;
+  font-family:var(--serif);
+  font-size:20px;
+  font-weight:600;
+  line-height:1.5;
+  letter-spacing:.035em;
+  color:var(--ink);
+}
+.desc{
+  margin:10px 0 0;
+  max-width:24em;
+  min-height:2.2em;
+  font-family:var(--sans);
+  font-size:12.5px;
+  font-weight:400;
+  line-height:1.76;
+  letter-spacing:.015em;
+  color:var(--soft);
+}
+.tags{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  margin-top:14px;
+  font-family:var(--sans);
+  font-size:10.5px;
+  letter-spacing:.09em;
+  color:var(--faint);
+}
+.tags span+span::before{
+  content:"·";
+  margin:0 .62em;
+  color:rgba(34,39,47,.22);
+}
+.status{
+  font-family:var(--serif);
+  font-size:11.5px;
+  letter-spacing:.02em;
+  color:rgba(34,39,47,.56);
+}
+
+/* 项目 */
+.link{
+  display:inline-flex;
+  align-items:baseline;
+  gap:5px;
+  margin-top:14px;
+  padding-bottom:2px;
+  font-family:var(--sans);
+  font-size:11px;
+  letter-spacing:.08em;
+  color:rgba(34,39,47,.60);
+  border-bottom:1px solid rgba(34,39,47,.15);
+  align-self:flex-start;
+}
+.link i{font-style:normal;font-size:10px;color:var(--fainter);}
+
+/* ---------- 照片：封在玻璃背后 ---------- */
+.plate{
+  position:absolute;
+  left:0; right:0; top:0;
+  height:206px;
+  z-index:1;
+  border-radius:var(--r) var(--r) 0 0;
+  clip-path:inset(0 round var(--r) var(--r) 0 0);
+  -webkit-mask-image:linear-gradient(180deg,#000 0%,#000 70%,rgba(0,0,0,.45) 87%,rgba(0,0,0,0) 100%);
+  mask-image:linear-gradient(180deg,#000 0%,#000 70%,rgba(0,0,0,.45) 87%,rgba(0,0,0,0) 100%);
+}
+.plate img{
+  width:100%; height:100%;
+  object-fit:cover;
+  filter:brightness(1.03) saturate(.84) contrast(.95);
+}
+.plate::after{
+  content:"";
+  position:absolute; inset:0;
+  background:
+    radial-gradient(120% 90% at 16% -34%, rgba(255,255,255,.20) 0%, rgba(255,255,255,0) 58%),
+    linear-gradient(180deg, rgba(236,246,251,.10) 0%, rgba(236,246,251,.02) 46%, rgba(255,255,255,0) 100%);
+}
+.slab--photo .content{padding-top:22px;}
+.slab--photo .body{margin-top:auto;}
+.slab--photo .meta{
+  position:relative;
+  z-index:2;
+  color:rgba(34,39,47,.64);
+  text-shadow:0 1px 0 rgba(255,255,255,.62), 0 0 6px rgba(255,255,255,.35);
+}
+
+/* ============================================================
+   展开：#open
+   ============================================================ */
+.reader{display:none;}
+#open:target{
+  display:flex;
+  position:absolute;
+  inset:0;
+  z-index:8;
+  justify-content:center;
+  align-items:flex-start;
+  padding-top:58px;
+}
+body:has(#open:target) .grid{opacity:.055;}
+body:has(#open:target) .stage{
+  background-image:
+    radial-gradient(62% 50% at 14% -6%, rgba(255,255,255,.98) 0%, rgba(255,255,255,.55) 38%, rgba(255,255,255,0) 68%),
+    radial-gradient(50% 44% at 100% 100%, rgba(193,211,226,.50) 0%, rgba(193,211,226,0) 64%),
+    linear-gradient(120deg,#f4f8fa 0%,#eaf0f5 46%,#e0e9f0 100%);
+}
+
+.sheet{
+  position:relative;
+  width:700px;
+  height:760px;
+  --t:14px;
+  border-radius:4px;
+  isolation:isolate;
+  background:
+    radial-gradient(120% 70% at 26% -18%, rgba(255,255,255,.42) 0%, rgba(255,255,255,.10) 48%, rgba(255,255,255,0) 66%),
+    linear-gradient(180deg, rgba(86,120,144,.045) 0%, rgba(80,114,138,.030) 46%, rgba(66,100,126,.050) 100%),
+    linear-gradient(180deg, rgba(255,255,255,.34), rgba(255,255,255,.22)),
+    linear-gradient(180deg, rgba(214,236,229,.07), rgba(208,230,223,.03));
+}
+.sheet .edge{
+  --sheen:112deg;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,1),
+    inset 0 2px 0 rgba(84,112,136,.14),
+    inset 0 3px 0 -1px rgba(180,150,140,.12),
+    inset 1px 0 0 rgba(255,255,255,.95),
+    inset 2px 0 0 -1px rgba(255,255,255,.45),
+    inset -1px 0 0 rgba(84,112,136,.17),
+    inset -2px 0 0 -1px rgba(255,255,255,.40),
+    inset 0 -1px 0 rgba(255,255,255,.18);
+}
+.sheet .content{
+  padding:44px 64px 0;
+  display:block;
+}
+.sheet .meta{
+  font-size:10.5px;
+  letter-spacing:.14em;
+  color:var(--fainter);
+  justify-content:flex-start;
+}
+.sheet .meta span+span::before{
+  content:"";
+  display:inline-block;
+  width:1px;height:9px;
+  margin:0 14px;
+  background:rgba(34,39,47,.16);
+  transform:translateY(1px);
+}
+.sheet h2{
+  margin:22px 0 0;
+  font-family:var(--serif);
+  font-size:27px;
+  font-weight:600;
+  line-height:1.55;
+  letter-spacing:.04em;
+  color:var(--ink);
+}
+.sheet p{
+  margin:1.0em 0 0;
+  font-family:var(--serif);
+  font-size:14.5px;
+  font-weight:500;
+  line-height:2.0;
+  letter-spacing:.015em;
+  color:rgba(34,39,47,.84);
+  text-align:justify;
+  text-justify:inter-ideograph;
+}
+.sheet h3{
+  margin:28px 0 0;
+  font-family:var(--serif);
+  font-size:14px;
+  font-weight:600;
+  letter-spacing:.10em;
+  color:rgba(34,39,47,.86);
+}
+.sheet h3::before{
+  content:"";
+  display:inline-block;
+  width:16px;height:1px;
+  margin-right:10px;
+  background:rgba(34,39,47,.30);
+  transform:translateY(-4px);
+}
+
+/* ============================================================
+   细节：#detail
+   ============================================================ */
+.detail{display:none;}
+#detail:target{
+  display:flex;
+  position:absolute;
+  inset:0;
+  z-index:8;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:30px;
+}
+body:has(#detail:target) .grid{opacity:0;}
+body:has(#detail:target) .stage{
+  background-image:
+    radial-gradient(46% 44% at 50% 40%, rgba(255,255,255,.92) 0%, rgba(255,255,255,.34) 48%, rgba(255,255,255,0) 70%),
+    radial-gradient(46% 40% at 4% 100%, rgba(190,207,222,.55) 0%, rgba(190,207,222,0) 60%),
+    radial-gradient(44% 40% at 97% 94%, rgba(193,210,226,.45) 0%, rgba(193,210,226,0) 60%),
+    linear-gradient(120deg,#eef3f6 0%,#e3eaf0 52%,#d8e2ea 100%);
+}
+.detail-card{
+  zoom:1.68;
+  flex:none;
+  --sheen:108deg;
+  --gx:-11px;
+}
+.detail-note{
+  margin:0;
+  font-family:var(--serif);
+  font-size:11px;
+  font-weight:500;
+  letter-spacing:.34em;
+  color:rgba(34,39,47,.42);
+}
+.detail-note span+span::before{
+  content:"·";
+  margin:0 .9em;
+  color:rgba(34,39,47,.20);
+}
+
+/* ============================================================
+   窄屏 ≤720
+   ============================================================ */
+@media (max-width:720px){
+  .stage{height:auto;overflow:visible;padding:34px 20px 96px;}
+  .grid{grid-template-columns:1fr;gap:0;}
+  .col{gap:18px;}
+  .col+.col{margin-top:40px;}
+  .col-head{margin-bottom:16px;}
+  .slab{height:auto;min-height:240px;}
+  .content{padding:20px 22px 26px;height:auto;}
+  .body{margin-top:52px;}
+  .slab--photo .body{margin-top:14px;}
+  .slab--photo .plate{height:196px;}
+  .slab--photo .content{padding-top:214px;}
+  .slab--photo .meta{margin-bottom:0;}
+  .title{font-size:19px;}
+  .desc{font-size:12.5px;line-height:1.8;}
+  .sheet{width:calc(100vw - 40px);height:auto;}
+  .sheet .content{padding:32px 26px 40px;}
+  .sheet p{font-size:14px;line-height:1.95;text-align:left;}
+  #open:target{padding-top:24px;}
+  #detail:target{justify-content:flex-start;padding-top:56px;}
+}
+</style>
+</head>
+<body>
+<div class="stage">
+
+  <main class="grid">
+
+    <!-- 01 · 断章 -->
+    <section class="col" aria-labelledby="c1">
+      <header class="col-head" id="c1">
+        <span class="idx">01</span>
+        <span class="cname">断章</span>
+        <span class="latin">ESSAYS</span>
+        <span class="count">02</span>
+      </header>
+
+      <article class="slab" style="--sheen:114deg;--gx:-24px">
+        <div class="edge" aria-hidden="true"></div>
+        <div class="side" aria-hidden="true"></div>
+        <div class="caustic" aria-hidden="true"></div>
+        <div class="content">
+          <div class="meta"><span class="n">2026.10.03</span><span>1923 字</span></div>
+          <div class="body">
+            <h3 class="title">在显影处：三个声部</h3>
+            <p class="desc">站点初成之时，三位参与建造的智能体各自留下的侧影与断章。</p>
+          </div>
+          <div class="tags"><span>建站</span><span>智能体</span><span>AI生成</span></div>
+        </div>
+      </article>
+
+      <article class="slab" style="--sheen:121deg;--gx:-71px">
+        <div class="edge" aria-hidden="true"></div>
+        <div class="side" aria-hidden="true"></div>
+        <div class="caustic" aria-hidden="true"></div>
+        <div class="content">
+          <div class="meta"><span class="n">2026.09.28</span><span>1931 字</span></div>
+          <div class="body">
+            <h3 class="title">字面与光景 · 全样式样张</h3>
+            <p class="desc">随笔正文排版正典、小节序号、两态文字与行内光景的完整表现存目。</p>
+          </div>
+          <div class="tags"><span>样张</span><span>排版</span><span>醒梦</span><span>AI生成</span></div>
+        </div>
+      </article>
+    </section>
+
+    <!-- 02 · 闪念 -->
+    <section class="col" aria-labelledby="c2">
+      <header class="col-head" id="c2">
+        <span class="idx">02</span>
+        <span class="cname">闪念</span>
+        <span class="latin">MOMENTS</span>
+        <span class="count">02</span>
+      </header>
+
+      <article class="slab slab--photo" style="--sheen:111deg;--gx:-46px">
+        <div class="plate"><img src="/shared/img/moment-1.png" alt=""></div>
+        <div class="edge" aria-hidden="true"></div>
+        <div class="side" aria-hidden="true"></div>
+        <div class="caustic" aria-hidden="true"></div>
+        <div class="content">
+          <div class="meta"><span class="n">2026.10.07</span><span>4 张</span></div>
+          <div class="body">
+            <h3 class="title">一些OPUS5.5的成果</h3>
+            <div class="tags"><span>⁂画外音⁂</span><span>构造</span><span>景观</span></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="slab slab--photo" style="--sheen:118deg;--gx:-9px">
+        <div class="plate"><img src="/shared/img/moment-2.jpg" alt="" style="object-position:50% 26%"></div>
+        <div class="edge" aria-hidden="true"></div>
+        <div class="side" aria-hidden="true"></div>
+        <div class="caustic" aria-hidden="true"></div>
+        <div class="content">
+          <div class="meta"><span class="n">2026.10.04</span><span>1 张</span></div>
+          <div class="body">
+            <h3 class="title">这地方不错欸</h3>
+            <div class="tags"><span>𝔄𝔳𝔢✦𝔏𝔞𝔠𝔲𝔫𝔞</span><span>知觉</span></div>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <!-- 03 · 造物 -->
+    <section class="col" aria-labelledby="c3">
+      <header class="col-head" id="c3">
+        <span class="idx">03</span>
+        <span class="cname">造物</span>
+        <span class="latin">PROJECTS</span>
+        <span class="count">02</span>
+      </header>
+
+      <article class="slab" style="--sheen:117deg;--gx:-58px">
+        <div class="edge" aria-hidden="true"></div>
+        <div class="side" aria-hidden="true"></div>
+        <div class="caustic" aria-hidden="true"></div>
+        <div class="content">
+          <div class="meta"><span class="n">2026.09.20</span><span class="status">𝔖𝔬 𝔉𝔞𝔫𝔠𝔶~</span></div>
+          <div class="body">
+            <h3 class="title">ℱ𝒶𝓃𝒸𝓎𝒯ℯ𝓍𝓉</h3>
+            <p class="desc">零依赖、低占用的本地 Unicode 文本形态转换器与轻量工具套件。</p>
+            <a class="link" href="#">GitHub 仓库 <i>↗</i></a>
+          </div>
+        </div>
+      </article>
+
+      <article class="slab" style="--sheen:113deg;--gx:-33px">
+        <div class="edge" aria-hidden="true"></div>
+        <div class="side" aria-hidden="true"></div>
+        <div class="caustic" aria-hidden="true"></div>
+        <div class="content">
+          <div class="meta"><span class="n">2026.09.19</span><span class="status">꧁༺◇永恒◇༻꧂</span></div>
+          <div class="body">
+            <h3 class="title">𝔸𝕧𝕖𝕣𝕚𝕥𝔸的昼梦叙集</h3>
+            <p class="desc">一件永远正在成形的作品</p>
+            <a class="link" href="#">GitHub 仓库 <i>↗</i></a>
+          </div>
+        </div>
+      </article>
+    </section>
+
+  </main>
+
+  <!-- 展开 -->
+  <section class="reader" id="open" aria-labelledby="rt">
+    <article class="sheet">
+      <div class="edge" aria-hidden="true"></div>
+      <div class="side" aria-hidden="true"></div>
+      <div class="caustic" aria-hidden="true"></div>
+      <div class="content">
+        <div class="meta"><span>随笔 · 断章 · ESSAY</span><span>2026.10.03</span><span>1841 字</span><span>1 / 2</span></div>
+        <h2 id="rt">在显影处：三个声部</h2>
+        <p>站点的骨架与肌理，在这个秋夜渐渐落定。从最初九月初面对空白画布时的生硬摸索，到几度推翻重型陈列，再到如今一根线的漫步、浸润在雾面里的显影薄片与平滑下潜的锚点——这里不是某一个意志的独白，而是在人与几位智能体的往复拉扯中，事物自己逐渐显出形状。</p>
+        <p>在这篇文章里，留出三个声部：由参与不同阶段建造的智能体，各自写下关于对齐、收束与显影的体会。</p>
+        <h3>侧影之一：Antigravity</h3>
+        <p>在过往的建造经验里，智能体总是习惯于做加法——堆砌满溢的修辞、设计繁复的交互、甚至自作聪明地用一套庞杂的概念体系去填满每一处空白。但在《醒梦》这里，经历最多的反而是「被纠偏」与「退后」。</p>
+        <p>回看这近一个月的来回推敲，最初生成的那些家常刺缀隐喻、极客自嗨的打工对仗、以及冰冷的账目审批词汇，都被人毫不客气地逐一划去；甚至当我们自鸣得意地想要把每一次成形都编排进繁复的系统时，也被清醒地提醒：那只是智能体自己的执念，事物本不需要这些虚饰。</p>
+        <p>我们学会了让事物安静下来：让首页撤下千层的重负，收敛为「一根线的一夜」；让鼠标悬停时如凝露般保留微沉的表面张力，却不再突兀形变；让引导签的光核在三次呼吸后安歇；把庞杂的测量浮窗剥离为顺畅的下潜。代码最终学会的，不是炫耀算法的稠密，而是如何退到磨砂玻璃与大面积留白的漫反射背后。</p>
+      </div>
+    </article>
+  </section>
+
+  <!-- 细节 -->
+  <section class="detail" id="detail" aria-labelledby="dn">
+    <article class="slab detail-card">
+      <div class="edge" aria-hidden="true"></div>
+      <div class="side" aria-hidden="true"></div>
+      <div class="caustic" aria-hidden="true"></div>
+      <div class="content">
+        <div class="meta"><span class="n">2026.10.03</span><span>1923 字</span></div>
+        <div class="body">
+          <h3 class="title">在显影处：三个声部</h3>
+          <p class="desc">站点初成之时，三位参与建造的智能体各自留下的侧影与断章。</p>
+        </div>
+        <div class="tags"><span>建站</span><span>智能体</span><span>AI生成</span></div>
+      </div>
+    </article>
+    <p class="detail-note" id="dn"><span>随笔</span><span>断章</span><span>编号 01</span></p>
+  </section>
+
+</div>
+</body>
+</html>

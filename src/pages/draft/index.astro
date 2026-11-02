@@ -1,0 +1,234 @@
+---
+/* ─────────────────────────────────────────────────────────────
+   草稿 · 卡片（/draft/）——把 design/mocks/cards-r7 里两套已经认可的卡片做法
+   接进站内，做一个可回滚的真实路由（说明见 design/mocks/cards-r8-BRIEF.md）。
+
+   · 背景：站内真实的 WanderIndex（scene="essay"）在那片空间里照常起来——流光、三栏栏头、
+     导航、左下星、Ave 都在；只是它自己的 canvas 卡片层（#w-stage）被这一页藏掉。
+   · 三栏：DOM 卡片从真实收藏里取（只取非 draft），位置由 src/scripts/draft/layout.ts
+     读 [data-w-head] 的 rect 现算——不写死坐标。
+   · 材料：?v=halftone（默认，4×4 Bayer 网点）/ ?v=value（值偏移 + 两条 .6px 的边）。
+   · 不可读的一点也不读：卡片本身就是标题 / 日期 / 简介 / 标签，没有脚本时是一列正常流的名录。
+   ───────────────────────────────────────────────────────────── */
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import WanderIndex from '../../components/wander/WanderIndex.astro';
+import { getCollection } from 'astro:content';
+import { getImage } from 'astro:assets';
+import type { ImageMetadata } from 'astro';
+import { countChars } from '../../lib/format';
+import '../../styles/draft.css';
+
+const pad = (n: number) => String(n).padStart(2, '0');
+const day = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const dot = (d: Date) => `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())}`;
+const newest = <T extends { id: string; data: { date: Date } }>(a: T, b: T) =>
+  b.data.date.valueOf() - a.data.date.valueOf() || b.id.localeCompare(a.id);
+
+/* 三栏 + 面板头：版块名照站上的叫法（随笔 / 瞬间 / 项目 · ESSAY / MOMENT / PROJECT） */
+type Scene = 'essay' | 'moment' | 'project';
+const LABEL: Record<Scene, [string, string]> = {
+  essay: ['随笔', 'ESSAY'],
+  moment: ['瞬间', 'MOMENT'],
+  project: ['项目', 'PROJECT'],
+};
+
+interface Card {
+  key: string;
+  kind: 'article' | 'project' | 'moment';
+  scene: Scene;
+  href: string;
+  title: string;
+  desc: string;
+  show: string;
+  date: string;
+  right: string;
+  tagsText: string;
+  meta: string;
+  links: { label: string; href: string }[];
+  html: string;
+  img: { src: string; w: number; h: number; alt: string } | null;
+}
+
+const articles: Card[] = (await getCollection('articles', (a) => !a.data.draft)).sort(newest).map((a) => ({
+  key: `article:${a.id}`,
+  kind: 'article',
+  scene: 'essay',
+  href: `/articles/${a.id}/`,
+  title: a.data.title,
+  desc: a.data.description ?? '',
+  show: dot(a.data.date),
+  date: day(a.data.date),
+  right: `${countChars(a.body ?? '').toLocaleString('en-US')} 字`,
+  tagsText: a.data.tags.join(' · '),
+  meta: '',
+  links: [],
+  html: '',
+  img: null,
+}));
+
+const projects: Card[] = (await getCollection('projects', (p) => !p.data.draft)).sort(newest).map((p) => ({
+  key: `project:${p.id}`,
+  kind: 'project',
+  scene: 'project',
+  href: `/projects/${p.id}/`,
+  title: p.data.title,
+  desc: p.data.description ?? '',
+  show: dot(p.data.date),
+  date: day(p.data.date),
+  right: p.data.status,
+  tagsText: p.data.links.map((l) => l.label).join(' · '),
+  meta: '',
+  links: p.data.links.map((l) => ({ label: l.label, href: l.href })),
+  html: '',
+  img: null,
+}));
+
+type Pic = ImageMetadata | { src: ImageMetadata; alt: string };
+const isMeta = (x: Pic): x is ImageMetadata => 'format' in x;
+
+const moments: Card[] = await Promise.all(
+  (await getCollection('moments', (m) => !m.data.draft)).sort(newest).map(async (m) => {
+    const pics = m.data.images as Pic[];
+    let img: Card['img'] = null;
+    if (pics.length) {
+      const meta = isMeta(pics[0]) ? pics[0] : pics[0].src;
+      const alt = isMeta(pics[0]) ? '' : pics[0].alt;
+      const w = Math.min(720, meta.width);
+      const out = await getImage({ src: meta, width: w, format: 'webp' });
+      img = { src: out.src, w, h: Math.round((meta.height * w) / meta.width), alt };
+    }
+    return {
+      key: `moment:${m.id}`,
+      kind: 'moment',
+      scene: 'moment',
+      href: `/moments/#${m.id}`,
+      title: m.data.title ?? '',
+      desc: '',
+      show: dot(m.data.date),
+      date: day(m.data.date),
+      right: pics.length ? `${pics.length} 张` : '',
+      tagsText: m.data.tags.join(' · '),
+      meta: '',
+      links: [],
+      html: m.rendered?.html ?? '',
+      img,
+    };
+  }),
+);
+
+/* 面板头：版块 · 英文 / 日期 / 右侧那一项（字数、状态、张数） */
+const withMeta = (list: Card[]): Card[] =>
+  list.map((c) => ({
+    ...c,
+    meta: [LABEL[c.scene].join(' · '), c.show, c.right].filter(Boolean).join(' / '),
+  }));
+
+const essays = withMeta(articles);
+const ghosts = withMeta(moments);
+const works = withMeta(projects);
+
+const payload = JSON.stringify({ essay: essays, moment: ghosts, project: works }).replace(/</g, '\\u003c');
+
+const INK: Record<Scene, string> = { essay: 'day', moment: 'dusk', project: 'deep' };
+const COLS: { scene: Scene; list: Card[]; label: string }[] = [
+  { scene: 'essay', list: essays, label: '随笔' },
+  { scene: 'moment', list: ghosts, label: '瞬间' },
+  { scene: 'project', list: works, label: '项目' },
+];
+---
+
+<BaseLayout title="草稿 · 卡片" noindex immersive>
+  <Fragment slot="head">
+    <script is:inline>
+      /* 哪一套材料：?v=halftone（默认）| ?v=value。在首帧前写死，免得先画一版再跳 */
+      (function () {
+        var v = '';
+        try {
+          v = (new URLSearchParams(location.search).get('v') || '').toLowerCase();
+        } catch (e) {}
+        document.documentElement.dataset.dv = v === 'value' ? 'value' : 'halftone';
+      })();
+    </script>
+  </Fragment>
+
+  <h1 class="d-vh">草稿 · 卡片</h1>
+
+  {/* 这片空间照常起来——它只当背景 */}
+  <WanderIndex scene="essay" />
+
+  <div class="d-board" id="d-board">
+    {
+      COLS.map((col) => (
+        <section class="d-col" data-d-col={col.scene} aria-label={col.label}>
+          {col.list.map((it) => (
+            <button
+              type="button"
+              class:list={['d-card', `d-ink-${INK[it.scene]}`, { 'd-card--moment': it.kind === 'moment' }]}
+              data-d-card
+              data-key={it.key}
+              data-ink={INK[it.scene]}
+              aria-haspopup="dialog"
+              aria-expanded="false"
+            >
+              <span class="d-card__meta">
+                <time datetime={it.date}>{it.show}</time>
+                <span class="d-card__r">{it.right}</span>
+              </span>
+              {it.img && (
+                <span class="d-card__shot">
+                  <img src={it.img.src} width={it.img.w} height={it.img.h} alt={it.img.alt} loading="lazy" decoding="async" />
+                </span>
+              )}
+              {it.kind === 'moment' ? (
+                <span class="d-card__cap">
+                  {it.title && <span class="d-card__title">{it.title}</span>}
+                  {it.tagsText && <span class="d-card__tags">{it.tagsText}</span>}
+                </span>
+              ) : (
+                <>
+                  {it.title && <span class="d-card__title">{it.title}</span>}
+                  {it.desc && <span class="d-card__desc">{it.desc}</span>}
+                  {it.tagsText && <span class="d-card__tags">{it.tagsText}</span>}
+                </>
+              )}
+            </button>
+          ))}
+        </section>
+      ))
+    }
+  </div>
+
+  {/* 那块会长大的纸：两套材料共用这一个壳，材料由 html[data-dv] 决定 */}
+  <div class="d-sheet" id="d-sheet" role="dialog" aria-modal="true" aria-labelledby="d-sheet-title" hidden>
+    <div class="d-sheet__in">
+      <div class="d-sheet__head">
+        <p class="d-sheet__meta" id="d-sheet-meta"></p>
+        <button type="button" class="d-sheet__close" id="d-sheet-close" aria-label="收起">—</button>
+      </div>
+      <h2 class="d-sheet__title" id="d-sheet-title"></h2>
+      <div class="d-sheet__body" id="d-sheet-body"></div>
+      <div class="d-sheet__foot" id="d-sheet-foot"></div>
+    </div>
+  </div>
+
+  <script type="application/json" id="d-data" set:html={payload} />
+
+  <script is:inline>
+    /* 把这片空间自己的 canvas 卡片层藏掉（只藏这一页；不改 wander.js）。
+       它盖在整幅视口上，不藏的话 DOM 卡片点不到、滚轮也会被它接走。 */
+    (function () {
+      var stage = document.getElementById('w-stage');
+      if (stage) stage.style.visibility = 'hidden';
+      /* 脚本起不来（模块被拦、报错）也别把卡片一直扣着：7s 后交回正常流 */
+      setTimeout(function () {
+        var r = document.documentElement;
+        if (!r.classList.contains('d-on')) r.classList.add('d-on');
+      }, 7000);
+    })();
+  </script>
+
+  <script>
+    import { initDraft } from '../../scripts/draft/index';
+    initDraft();
+  </script>
+</BaseLayout>

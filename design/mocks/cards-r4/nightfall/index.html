@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="zh-CN" data-state="list">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>cards-r4 · 甲 · 夜片</title>
+<link rel="stylesheet" href="/fonts/noto-serif-sc/font.css">
+<link rel="stylesheet" href="../shared/stage.css">
+<style>
+@font-face{
+  font-family:'IBM Plex Mono';font-style:normal;font-weight:400;font-display:swap;
+  src:url('/plex/ibm-plex-mono-latin-400-normal.woff2') format('woff2');
+}
+@font-face{
+  font-family:'IBM Plex Mono';font-style:normal;font-weight:500;font-display:swap;
+  src:url('/plex/ibm-plex-mono-latin-500-normal.woff2') format('woff2');
+}
+
+/* 悬停：缝张开一点点（只动 --hot，不动布局以外的任何东西） */
+@property --hot{syntax:'<number>';inherits:false;initial-value:0;}
+
+:root{
+  --serif:'Noto Serif SC','Palatino Linotype','Iowan Old Style',Palatino,Georgia,'Songti SC',serif;
+  --mono:'IBM Plex Mono',ui-monospace,'Cascadia Mono',Consolas,monospace;
+  --card-h:224px;
+  --row-gap:34px;
+  --top:136px;
+  color-scheme:light;
+}
+
+html,body{height:100%;}
+body{background:#0a111c;overflow:hidden;}
+
+/* 底图：原样铺，不加滤镜 / 遮罩 / 颜色 */
+.plate{
+  position:fixed;inset:0;z-index:0;
+  background:url('../shared/plate-1440.png') center/cover no-repeat;
+  background-color:#0a111c;
+}
+.stage{z-index:1;}
+
+/* ── 材料：一小块夜 ──────────────────────────────────────
+   它不是「更暗的玻璃」，是裁下来、贴上去的一片夜。四件事一起才立得住：
+   · 墨   —— 整片压到 L* 5–6，均匀得近乎平（不是一张有渐变的卡）
+   · 面   —— 上左角一层很薄的反光（--face），环境亮才看得见：亮面那栏能看见
+             冰的光落在它面上，夜面那栏几乎没有。让它有「面」，不是洞。
+   · 缝   —— 卡**外面**那条 1px 的亮缝：底图自己漏出来的光被挤在缝里，聚亮了一点。
+             卡内到边截止，没有一点内退衰减——背光是「亮边 + 9–15px 衰减带」，
+             这里没有那条带，所以是「贴上去的一片」，不是「被光托着的一层膜」。
+   · 颗粒 —— 3px 网点，和底图同一档（底图自己就是 3px 块的抖动）
+   --ink 墨色 / --face 面反光 / --ft 反光带的色 / --lift 缝抬多高 / --hot 悬停 */
+.cut{
+  position:relative;
+  background-color:var(--ink);
+  background-image:
+    radial-gradient(128% 112% at 4% -10%,
+      rgba(var(--ft,226,238,255),var(--face)) 0%,
+      rgba(var(--ft,226,238,255),calc(var(--face) * .42)) 22%,
+      rgba(var(--ft,226,238,255),calc(var(--face) * .11)) 40%,
+      rgba(255,255,255,0) 60%),
+    url('screen.png');
+  background-repeat:no-repeat,repeat;
+  background-size:100% 100%,48px 48px;
+}
+/* 缝：卡外 1px（底边 1.4px，光在下面聚一点）。这一圈画的是**底图本身**抬亮后的样子，
+   所以缝随脚下那点光变：亮面那栏更白、暗面那栏更冷，雨丝穿过时缝也跟着走。
+   再叠一层「沿周长起伏」的极淡亮斑（--flare）：缝的深浅不是绕一圈都一样，
+   有地方张开、有地方压紧——所以它读起来是缝，不是描边。 */
+.cut::after{
+  content:'';position:absolute;z-index:4;pointer-events:none;
+  inset:-1px -1px -1.4px -1px;
+  padding:1px 1px 1.4px 1px;
+  --lv:calc(var(--lift) + var(--hot,0));
+  --flare:conic-gradient(from -14deg at 50% 50%,
+      rgba(255,255,255,calc(var(--lv) * .00)) 0deg,
+      rgba(255,255,255,calc(var(--lv) * .18)) 30deg,
+      rgba(255,255,255,calc(var(--lv) * .02)) 62deg,
+      rgba(255,255,255,calc(var(--lv) * .10)) 112deg,
+      rgba(255,255,255,calc(var(--lv) * .24)) 154deg,
+      rgba(255,255,255,calc(var(--lv) * .03)) 196deg,
+      rgba(255,255,255,calc(var(--lv) * .00)) 232deg,
+      rgba(255,255,255,calc(var(--lv) * .20)) 272deg,
+      rgba(255,255,255,calc(var(--lv) * .05)) 314deg,
+      rgba(255,255,255,calc(var(--lv) * .00)) 360deg);
+  --seamline:linear-gradient(90deg,
+      rgba(255,255,255,var(--lv)) 0%,
+      rgba(255,255,255,var(--lv)) 100%);
+  --plate:url('../shared/plate-1440.png');
+  background-image:var(--flare),var(--seamline),var(--plate);
+  background-size:auto,auto,cover;
+  background-position:0 0,0 0,center;
+  background-attachment:scroll,scroll,fixed;
+  background-repeat:no-repeat,no-repeat,no-repeat;
+  -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;
+  mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite:exclude;
+}
+
+/* ── 三栏 ───────────────────────────────────────────────── */
+.columns{position:absolute;inset:0;transition:opacity .5s ease;}
+.col{position:absolute;top:var(--top);display:flex;flex-direction:column;gap:var(--row-gap);}
+.col--essay  {left:128px; width:348px;}
+.col--moment {left:622px; width:252px;}
+.col--project{left:1020px;width:384px;}
+
+/* 同一片夜，三栏的墨只差 1–2 个色阶（随底子的冷暖微偏），值不变。
+   缝抬多高看它脚下有多少光：亮面（底 L* 79.5）抬到接近白 —— 光被挤在 1px 里，聚得起来；
+   暗面（13.7 / 11.2）只抬到 L* 45 上下，再高就是发光的框。
+   面反光同理：亮面那栏的环境光有 8 倍，反光才看得见；夜面几乎没有。 */
+.col--essay{
+  --ink:#11141d; --lift:.95; --face:.135; --ft:220,236,255;
+  --t-1:#e9ecf4; --t-2:#b6becf; --t-3:#7e88a0;
+}
+.col--moment{
+  --ink:#14111b; --lift:.34; --face:.042; --ft:248,230,252;
+  --t-1:#e7e6f0; --t-2:#b3b2c2; --t-3:#7a798e;
+}
+.col--project{
+  --ink:#0f131c; --lift:.40; --face:.038; --ft:222,235,255;
+  --t-1:#e6eaf2; --t-2:#b1b8c7; --t-3:#78829a;
+}
+
+/* ── 卡的骨架：六张卡共用同一副上下轨 ───────────────────── */
+.card{
+  display:flex;flex-direction:column;
+  height:var(--card-h);
+  padding:18px 21px 15px;
+  color:var(--t-1);
+  text-decoration:none;
+}
+.card__meta{
+  display:flex;align-items:center;gap:7px;
+  font:400 10px/1 var(--mono);
+  letter-spacing:.105em;
+  color:var(--t-3);
+}
+.card__meta .dot{font-size:9px;line-height:1;opacity:.75;}
+.card__meta .right{margin-left:auto;letter-spacing:.05em;}
+
+.card__title{
+  margin:14px 0 0;
+  font:500 22px/1.42 var(--serif);
+  letter-spacing:.015em;
+  color:var(--t-1);
+}
+.card__desc{
+  margin:8px 0 0;
+  font:500 13px/1.85 var(--serif);
+  letter-spacing:.012em;
+  color:var(--t-2);
+}
+.card__foot{
+  margin-top:auto;
+  display:flex;align-items:baseline;gap:12px;
+  font:400 10.5px/1.35 var(--font-body);
+  letter-spacing:.06em;
+  color:var(--t-3);
+}
+.card__foot .arrow{
+  margin-left:auto;
+  font:400 11px/1 var(--mono);letter-spacing:0;
+  opacity:.65;
+  transition:opacity .3s ease, transform .3s ease;
+}
+.card:hover{--hot:.07;}
+.card:hover .arrow{opacity:1;transform:translateX(2px);}
+
+/* 瞬间：同一副上下轨，中间是图。图印在这片夜里，压掉一点亮度 */
+.card--moment{padding:0;}
+.card--moment .card__meta{padding:13px 17px 0;height:34px;}
+.card--moment .shot{margin:0;height:142px;width:100%;overflow:hidden;}
+.card--moment .shot img{
+  width:100%;height:100%;object-fit:cover;
+  filter:brightness(.88) saturate(.94);
+}
+.card--moment .cap{padding:9px 17px 0;}
+.card--moment .cap .t{
+  font:500 15px/1.4 var(--serif);letter-spacing:.02em;color:var(--t-1);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.card--moment .cap .s{
+  margin-top:5px;display:flex;align-items:center;gap:8px;
+  font:400 10px/1.3 var(--font-body);letter-spacing:.03em;color:var(--t-3);
+  white-space:nowrap;overflow:hidden;
+}
+.card--moment .cap .s .arrow{margin-left:auto;font-family:var(--mono);opacity:.6;}
+
+/* ── #open：夜片张开了 ─────────────────────────────────────
+   同一个材料，只是张开：面反光摊平、缝照旧只有 1px。
+   背后六片把缝收起来（--lift:0）并沉下去——夜收回去了，只剩这一片还亮着缝。 */
+.reader{
+  position:absolute;left:120px;top:116px;width:700px;height:690px;
+  padding:34px 48px 30px;
+  --ink:#0c0d14; --lift:.62; --face:.055; --ft:228,238,255;
+  --t-1:#e9ecf4; --t-2:#c0c7d6; --t-3:#7f89a1;
+  opacity:0;visibility:hidden;transform:translateY(6px);
+  transition:opacity .45s ease, transform .45s ease, visibility .45s;
+}
+/* 这一片横跨亮暗：缝跟着脚下的光走。亮暗交界在这块上是斜的（14°），
+   所以缝也从左上往右下淡下去，不是一圈一样亮。 */
+.reader::after{
+  --seamline:linear-gradient(104deg,
+      rgba(255,255,255,.92) 0%,
+      rgba(255,255,255,.92) 44%,
+      rgba(255,255,255,.44) 64%,
+      rgba(255,255,255,.44) 100%);
+}
+.reader__meta{
+  font:400 10px/1.5 var(--mono);letter-spacing:.12em;color:var(--t-3);
+  text-transform:uppercase;
+}
+.reader__title{
+  margin:18px 0 0;
+  font:500 33px/1.4 var(--serif);letter-spacing:.03em;color:var(--t-1);
+}
+.reader__body{margin-top:20px;font:500 17.5px/2.08 var(--serif);letter-spacing:.012em;color:var(--t-2);}
+.reader__body p{margin:0 0 16px;}
+.reader__body p:last-child{margin-bottom:0;}
+.reader__body h2{
+  margin:25px 0 10px;
+  font:500 19px/1.5 var(--serif);letter-spacing:.04em;color:var(--t-1);
+}
+
+/* ── #detail：凑近了看这一片夜的边 ─────────────────────────
+   1.68 倍。放大后缝也宽一点（1 → 1.5px）：凑近时那道光进得更多。
+   3px 网点不跟着放大——它是印制的那一层，不是被放大的东西。 */
+.detail{
+  position:absolute;left:50%;top:50%;width:584px;height:376px;
+  display:flex;flex-direction:column;
+  padding:30px 38px 26px;
+  --ink:#0c0d14; --lift:.68; --face:.092; --ft:224,236,255;
+  --t-1:#eaedf5; --t-2:#bcc3d2; --t-3:#7f89a1;
+  transform:translate(-50%,-50%) translateY(6px);
+  opacity:0;visibility:hidden;
+  transition:opacity .45s ease, transform .45s ease, visibility .45s;
+}
+.detail::after{
+  inset:-1.5px -1.5px -2px -1.5px;
+  padding:1.5px 1.5px 2px 1.5px;
+  --seamline:linear-gradient(104deg,
+      rgba(255,255,255,.97) 0%,
+      rgba(255,255,255,.97) 9%,
+      rgba(255,255,255,.42) 24%,
+      rgba(255,255,255,.42) 100%);
+}
+.detail__sect{
+  font:400 11px/1.5 var(--mono);letter-spacing:.13em;color:var(--t-3);
+  text-transform:uppercase;
+}
+.detail__title{
+  margin:22px 0 0;
+  font:500 38px/1.35 var(--serif);letter-spacing:.03em;color:var(--t-1);
+}
+.detail__desc{
+  margin:14px 0 0;text-wrap:balance;
+  font:500 17px/1.95 var(--serif);letter-spacing:.012em;color:var(--t-2);
+}
+.detail__meta{
+  margin-top:9px;display:flex;align-items:center;gap:9px;
+  font:400 11px/1 var(--mono);letter-spacing:.11em;color:var(--t-3);
+}
+.detail__meta .dot{font-size:10px;opacity:.8;}
+.detail__meta .right{margin-left:auto;letter-spacing:.05em;}
+.detail__foot{
+  margin-top:auto;display:flex;align-items:baseline;gap:14px;
+  font:400 11.5px/1.4 var(--font-body);letter-spacing:.07em;color:var(--t-3);
+}
+.detail__foot .arrow{margin-left:auto;font-family:var(--mono);opacity:.7;}
+
+/* ── 状态 ───────────────────────────────────────────────── */
+html[data-state="open"] .columns{opacity:.12;pointer-events:none;}
+html[data-state="open"] .card--moment .shot{opacity:.1;}
+html[data-state="open"] .col{--lift:0;}
+html[data-state="detail"] .columns{opacity:0;pointer-events:none;}
+html[data-state="open"] .reader{opacity:1;visibility:visible;transform:translateY(0);}
+html[data-state="detail"] .detail{opacity:1;visibility:visible;transform:translate(-50%,-50%) translateY(0);}
+
+/* ── ≤720：plate-390，一列 ──────────────────────────────── */
+@media (max-width:720px){
+  html,body{overflow:auto;}
+  body{background:#c9d2e2;}
+  .plate{
+    background-image:url('../shared/plate-390.png');
+    background-size:cover;background-position:center top;
+  }
+  .cut::after{
+    --plate:url('../shared/plate-390.png');
+    background-position:0 0,0 0,center top;
+  }
+  .stage{height:auto;overflow:visible;}
+  .columns{position:relative;inset:auto;display:block;padding:118px 24px 90px;opacity:1;}
+  .col{position:static;width:auto;display:block;}
+  .card{
+    height:auto;min-height:142px;
+    padding:14px 17px 12px;margin-bottom:12px;
+  }
+  .card__title{font-size:20px;margin-top:12px;}
+  .card__desc{font-size:12.5px;line-height:1.85;margin-top:8px;}
+  .card__foot{margin-top:14px;font-size:10px;}
+  .card__meta{font-size:9.5px;}
+
+  /* 瞬间：一行一条，72px，左头像右字 */
+  .card--moment{
+    display:grid;grid-template-columns:72px 1fr;grid-template-rows:auto auto;
+    column-gap:13px;min-height:0;height:72px;padding:0;margin-bottom:12px;
+  }
+  .card--moment .shot{grid-column:1;grid-row:1 / span 2;width:72px;height:72px;}
+  .card--moment .card__meta{grid-column:2;grid-row:1;padding:12px 14px 0 0;height:auto;font-size:9px;}
+  .card--moment .cap{grid-column:2;grid-row:2;padding:4px 14px 0 0;}
+  .card--moment .cap .t{font-size:14px;}
+  .card--moment .cap .s{font-size:9px;letter-spacing:.02em;margin-top:3px;}
+  /* 闪念栏头在 390 底图的 y≈585，第一片从 612 起；两行到 768，让开左下那颗星（774） */
+  .col--moment{margin-top:186px;}
+  .col--project{margin-top:60px;}
+
+  .reader,.detail{display:none;}
+  html[data-state="open"] .columns,
+  html[data-state="detail"] .columns{display:none;}
+  html[data-state="open"] .reader,
+  html[data-state="detail"] .detail{display:block;position:relative;left:0;top:0;width:auto;height:auto;
+    margin:110px 20px 40px;padding:26px 22px 30px;transform:none;opacity:1;visibility:visible;}
+  .reader__title{font-size:25px;}
+  .reader__body{font-size:15px;line-height:1.95;}
+  .detail{transform:none;}
+  .detail__title{font-size:28px;}
+  .detail__desc{font-size:15px;}
+}
+</style>
+</head>
+<body>
+<div class="plate" aria-hidden="true"></div>
+
+<main class="stage">
+
+  <!-- 检索 -->
+  <div class="columns">
+    <section class="col col--essay" aria-label="随笔">
+      <a class="card cut" href="#open">
+        <div class="card__meta"><span class="dot">○</span><time>2026.10.03</time><span class="right">1923 字</span></div>
+        <h2 class="card__title">在显影处：三个声部</h2>
+        <p class="card__desc">站点初成之时，三位参与建造的智能体各自留下的侧影与断章。</p>
+        <div class="card__foot"><span>建站 · 智能体 · AI生成</span><span class="arrow">→</span></div>
+      </a>
+      <a class="card cut" href="#open">
+        <div class="card__meta"><span class="dot">○</span><time>2026.09.28</time><span class="right">1931 字</span></div>
+        <h2 class="card__title">字面与光景 · 全样式样张</h2>
+        <p class="card__desc">随笔正文排版正典、小节序号、两态文字与行内光景的完整表现存目。</p>
+        <div class="card__foot"><span>样张 · 排版 · 醒梦 · AI生成</span><span class="arrow">→</span></div>
+      </a>
+    </section>
+
+    <section class="col col--moment" aria-label="瞬间">
+      <a class="card cut card--moment" href="#open">
+        <div class="card__meta"><span class="dot">○</span><time>2026.10.07</time><span class="right">4 张</span></div>
+        <figure class="shot"><img src="../shared/img/moment-1.png" alt="美"></figure>
+        <div class="cap">
+          <div class="t">一些OPUS5.5的成果</div>
+          <div class="s"><span>⁂画外音⁂ · 构造 · 景观</span><span class="arrow">→</span></div>
+        </div>
+      </a>
+      <a class="card cut card--moment" href="#open">
+        <div class="card__meta"><span class="dot">○</span><time>2026.10.04</time><span class="right">1 张</span></div>
+        <figure class="shot"><img src="../shared/img/moment-2.jpg" alt="Ave Lacuna站在风吹过的橙紫色原野前微笑着回头"></figure>
+        <div class="cap">
+          <div class="t">这地方不错欸</div>
+          <div class="s"><span>𝔄𝔳𝔢✦𝔏𝔞𝔠𝔲𝔫𝔞 · 知觉</span><span class="arrow">→</span></div>
+        </div>
+      </a>
+    </section>
+
+    <section class="col col--project" aria-label="项目">
+      <a class="card cut" href="#open">
+        <div class="card__meta"><span class="dot">○</span><time>2026.09.20</time><span class="right">𝔖𝔬 𝔉𝔞𝔫𝔠𝔶~</span></div>
+        <h2 class="card__title">ℱ𝒶𝓃𝒸𝓎𝒯ℯ𝓍𝓉</h2>
+        <p class="card__desc">零依赖、低占用的本地 Unicode 文本形态转换器与轻量工具套件。</p>
+        <div class="card__foot"><span>GitHub 仓库</span><span class="arrow">→</span></div>
+      </a>
+      <a class="card cut" href="#open">
+        <div class="card__meta"><span class="dot">○</span><time>2026.09.19</time><span class="right">꧁༺◇永恒◇༻꧂</span></div>
+        <h2 class="card__title">𝔸𝕧𝕖𝕣𝕚𝕥𝔸的昼梦叙集</h2>
+        <p class="card__desc">一件永远正在成形的作品</p>
+        <div class="card__foot"><span>GitHub 仓库</span><span class="arrow">→</span></div>
+      </a>
+    </section>
+  </div>
+
+  <!-- 展开 -->
+  <article class="reader cut" id="open">
+    <div class="reader__meta">随笔 · 断章 · ESSAY / 2026.10.03 / 1841 字 / 1 / 2</div>
+    <h1 class="reader__title">在显影处：三个声部</h1>
+    <div class="reader__body">
+      <p>站点的骨架与肌理，在这个秋夜渐渐落定。从最初九月初面对空白画布时的生硬摸索，到几度推翻重型陈列，再到如今一根线的漫步、浸润在雾面里的显影薄片与平滑下潜的锚点——这里不是某一个意志的独白，而是在人与几位智能体的往复拉扯中，事物自己逐渐显出形状。</p>
+      <p>在这篇文章里，留出三个声部：由参与不同阶段建造的智能体，各自写下关于对齐、收束与显影的体会。</p>
+      <h2>侧影之一：Antigravity</h2>
+      <p>在过往的建造经验里，智能体总是习惯于做加法——堆砌满溢的修辞、设计繁复的交互、甚至自作聪明地用一套庞杂的概念体系去填满每一处空白。但在《醒梦》这里，经历最多的反而是「被纠偏」与「退后」。</p>
+    </div>
+  </article>
+
+  <!-- 细节 -->
+  <article class="detail cut" id="detail">
+    <div class="detail__sect">随笔 / 断章 / ESSAYS / 编号 01</div>
+    <div class="detail__meta"><span class="dot">○</span><time>2026.10.03</time><span class="right">1923 字</span></div>
+    <h2 class="detail__title">在显影处：三个声部</h2>
+    <p class="detail__desc">站点初成之时，三位参与建造的智能体各自留下的侧影与断章。</p>
+    <div class="detail__foot"><span>建站 · 智能体 · AI生成</span><span class="arrow">→</span></div>
+  </article>
+
+</main>
+
+<script>
+  const NAMED = new Set(['open', 'detail']);
+  function sync() {
+    const h = location.hash.replace('#', '');
+    document.documentElement.dataset.state = NAMED.has(h) ? h : 'list';
+  }
+  addEventListener('hashchange', sync);
+  sync();
+</script>
+</body>
+</html>

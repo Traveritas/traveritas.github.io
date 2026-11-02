@@ -1,0 +1,732 @@
+<!doctype html>
+<html lang="zh-CN" data-state="list" data-live="" data-kb="0">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>cards-r7 · 乙 · 基准 · value-live</title>
+<link rel="stylesheet" href="/fonts/noto-serif-sc/font.css">
+<link rel="stylesheet" href="../shared/stage.css">
+<style>
+@font-face{
+  font-family:'IBM Plex Mono';font-style:normal;font-weight:400;font-display:swap;
+  src:url('/plex/ibm-plex-mono-latin-400-normal.woff2') format('woff2');
+}
+@font-face{
+  font-family:'IBM Plex Mono';font-style:normal;font-weight:500;font-display:swap;
+  src:url('/plex/ibm-plex-mono-latin-500-normal.woff2') format('woff2');
+}
+
+/* ── 乙 · 基准 · 活的 ───────────────────────────────────────
+   r6 那三条没变：面 = 底图的一次值偏移，边 = 上亮下暗两条 .6px + 一圈 .5px 收口，
+   字 = 栏自己的那一套墨。这一版只多了一件事：这三个东西各有三个状态。
+
+   rest  这张纸压在底图上，几乎不存在。
+   hover 近边抬起来一点 —— 顶化回纸里，脚沉下去；顶边的光从左边亮起一小段；
+         字往两边松开 0.01em。不位移、不缩放、不投影。
+   fix   值偏移推到顶，字沉进面里。60ms。这是「落定」。
+
+   三栏各有一组 rest / hover / fix（下面每栏一段），面板是第四组数。
+   面和边都用 @property 注册了颜色，所以它们能像普通属性一样插值——
+   这也是「同一块面长成面板」的前提：背景渐变和 box-shadow 里的颜色可以一路变过去。 */
+@property --face-a{syntax:'<color>';inherits:false;initial-value:rgba(0,0,0,0);}
+@property --face-b{syntax:'<color>';inherits:false;initial-value:rgba(0,0,0,0);}
+@property --edge-hi{syntax:'<color>';inherits:false;initial-value:rgba(0,0,0,0);}
+@property --edge-lo{syntax:'<color>';inherits:false;initial-value:rgba(0,0,0,0);}
+@property --edge-ring{syntax:'<color>';inherits:false;initial-value:rgba(0,0,0,0);}
+
+:root{
+  --serif:'Noto Serif SC','Palatino Linotype','Iowan Old Style',Palatino,Georgia,'Songti SC',serif;
+  --mono:'IBM Plex Mono',ui-monospace,'Cascadia Mono',Consolas,monospace;
+
+  --top:144px;
+  --card-h:224px;
+  --row-gap:34px;
+  --r:3px;
+
+  color-scheme:light;
+}
+
+html,body{height:100%;}
+html{overflow:clip;}
+body{background:#0b1220;overflow:hidden;}
+
+/* 底图：原样铺。零改动、零遮罩。 */
+.plate{
+  position:fixed;inset:0;z-index:0;
+  background:url('../shared/plate-1440.png') center/cover no-repeat;
+  background-color:#0b1220;
+}
+.stage{z-index:1;}
+.columns{position:absolute;inset:0;}
+
+/* ── 三栏：位置沿用 r6 ───────────────────────────────────── */
+.col{position:absolute;top:var(--top);display:flex;flex-direction:column;gap:var(--row-gap);
+  transition:opacity .30s ease;}
+.col--essay  {left:128px;  width:348px;}
+.col--moment {left:622px;  width:252px;}
+.col--project{left:1020px; width:384px;}
+
+/* 打开时其他栏退后（.18s 就够，不能让它们从正在长出来的面板里透成脏点） */
+html[data-state="open"] .columns,
+html[data-state="detail"] .columns{transition:opacity .18s ease;}
+html[data-dim="1"] .col--essay{opacity:.12;}
+html[data-dim="1"] .col--moment,
+html[data-dim="1"] .col--project{opacity:0;}
+
+/* ── 卡 ───────────────────────────────────────────────────
+   一副骨架：一句 180deg 的半透明渐变，三个 box-shadow。
+   值全在 --face-* / --edge-*，每个状态只是换一组数。 */
+.card{
+  position:relative;
+  display:flex;flex-direction:column;
+  height:var(--card-h);
+  padding:18px 20px 15px;
+  border-radius:var(--r);
+  text-decoration:none;
+  color:var(--ink);
+  background-image:linear-gradient(180deg,var(--face-a),var(--face-b));
+  box-shadow:
+    inset 0 .6px 0 var(--edge-hi),
+    0 .6px 0 var(--edge-lo),
+    0 0 0 .5px var(--edge-ring);
+  transition:
+    --face-a .22s ease, --face-b .22s ease,
+    --edge-hi .22s ease, --edge-lo .22s ease, --edge-ring .22s ease;
+  -webkit-tap-highlight-color:transparent;
+}
+
+/* 悬停时顶边亮起来的那一小段：左边起笔，走到 60% 化掉。
+   不是一圈描边，是「近边接住了光」的局部。 */
+.card::before{
+  content:"";position:absolute;left:0;right:0;top:0;height:.7px;
+  border-radius:var(--r) var(--r) 0 0;pointer-events:none;opacity:0;
+  background:linear-gradient(90deg,
+    var(--lit) 0%,
+    color-mix(in srgb, var(--lit) 62%, transparent) 26%,
+    transparent 62%);
+  transition:opacity .22s ease;
+}
+
+/* 键盘焦点：四角裁切标记。只在键盘进来时出声（data-kb 由 JS 标），
+   鼠标点过的卡不留一圈框。 */
+.card::after{
+  content:"";position:absolute;inset:5px;border-radius:1px;pointer-events:none;
+  opacity:0;transition:opacity .16s ease;
+  background:
+    linear-gradient(var(--mark),var(--mark)) 0 0/11px .8px no-repeat,
+    linear-gradient(var(--mark),var(--mark)) 0 0/.8px 11px no-repeat,
+    linear-gradient(var(--mark),var(--mark)) 100% 0/11px .8px no-repeat,
+    linear-gradient(var(--mark),var(--mark)) 100% 0/.8px 11px no-repeat,
+    linear-gradient(var(--mark),var(--mark)) 0 100%/11px .8px no-repeat,
+    linear-gradient(var(--mark),var(--mark)) 0 100%/.8px 11px no-repeat,
+    linear-gradient(var(--mark),var(--mark)) 100% 100%/11px .8px no-repeat,
+    linear-gradient(var(--mark),var(--mark)) 100% 100%/.8px 11px no-repeat;
+}
+/* 默认的那圈 focus 框一律不要：键盘进来的焦点由四角标记自己说，
+   鼠标点过的不出声（浏览器在 Esc 之后会把默认 outline 也叫回来，所以这里必须关掉）。 */
+.card:focus{outline:none;}
+html[data-kb="1"] .card:focus-visible::after{opacity:1;}
+
+/* ── 三栏各一组数：rest / hover / fix ───────────────────── */
+/* 随笔 · 冷灰。rest 墨 .018→.092（顶几乎不动，底沉 5.8 L*）。
+   hover 把跨度拉开：顶 .006（化回纸里），底 .118（脚再沉一档）；
+   边：上沿 .46→.70，下沿 .27→.36，收口 .16→.20。
+   fix 反过来把跨度收拢：.030→.120 —— 抬起来的近边被按平，整块沉下去。 */
+.col--essay{--ink:#232830;--soft:#49525f;--faint:#5c6675;}
+.card--essay{
+  --face-a:rgba(23,28,40,.018); --face-b:rgba(23,28,40,.092);
+  --face-a-hov:rgba(23,28,40,.006); --face-b-hov:rgba(23,28,40,.118);
+  --face-a-fix:rgba(23,28,40,.030); --face-b-fix:rgba(23,28,40,.120);
+  --edge-hi:rgba(255,255,255,.46); --edge-lo:rgba(23,28,40,.27); --edge-ring:rgba(23,28,40,.16);
+  --edge-hi-hov:rgba(255,255,255,.70); --edge-lo-hov:rgba(23,28,40,.36); --edge-ring-hov:rgba(23,28,40,.20);
+  --edge-hi-fix:rgba(255,255,255,.80); --edge-lo-fix:rgba(23,28,40,.42); --edge-ring-fix:rgba(23,28,40,.26);
+  --ink-hov:#14181e; --soft-hov:#333c48; --faint-hov:#525b68;
+  --lit:rgba(255,255,255,.94);
+  --mark:rgba(23,28,40,.62);
+}
+
+/* 瞬间 · 薄暮。rest 白 .118→.022（顶提 12.5 L*，到底只剩 2.3）。 */
+.col--moment{--ink:rgba(246,240,246,.93);--soft:rgba(237,228,239,.64);--faint:rgba(237,228,239,.47);}
+.card--moment{
+  --face-a:rgba(255,255,255,.118); --face-b:rgba(255,255,255,.022);
+  --face-a-hov:rgba(255,255,255,.150); --face-b-hov:rgba(255,255,255,.014);
+  --face-a-fix:rgba(255,255,255,.128); --face-b-fix:rgba(255,255,255,.036);
+  --edge-hi:rgba(255,255,255,.55); --edge-lo:rgba(0,0,0,.28); --edge-ring:rgba(255,255,255,.10);
+  --edge-hi-hov:rgba(255,255,255,.66); --edge-lo-hov:rgba(0,0,0,.33); --edge-ring-hov:rgba(255,255,255,.15);
+  --edge-hi-fix:rgba(255,255,255,.76); --edge-lo-fix:rgba(0,0,0,.36); --edge-ring-fix:rgba(255,255,255,.19);
+  --ink-hov:rgba(250,246,251,.98); --soft-hov:rgba(240,232,242,.74); --faint-hov:rgba(240,232,242,.54);
+  --lit:rgba(255,255,255,.90);
+  --mark:rgba(255,255,255,.72);
+}
+
+/* 项目 · 深蓝。rest 白 .092→.014。 */
+.col--project{--ink:rgba(232,240,252,.93);--soft:rgba(213,226,247,.62);--faint:rgba(213,226,247,.45);}
+.card--project{
+  --face-a:rgba(255,255,255,.092); --face-b:rgba(255,255,255,.014);
+  --face-a-hov:rgba(255,255,255,.120); --face-b-hov:rgba(255,255,255,.008);
+  --face-a-fix:rgba(255,255,255,.102); --face-b-fix:rgba(255,255,255,.026);
+  --edge-hi:rgba(255,255,255,.50); --edge-lo:rgba(0,0,0,.26); --edge-ring:rgba(255,255,255,.12);
+  --edge-hi-hov:rgba(255,255,255,.62); --edge-lo-hov:rgba(0,0,0,.31); --edge-ring-hov:rgba(255,255,255,.17);
+  --edge-hi-fix:rgba(255,255,255,.72); --edge-lo-fix:rgba(0,0,0,.34); --edge-ring-fix:rgba(255,255,255,.21);
+  --ink-hov:rgba(240,246,255,.98); --soft-hov:rgba(224,235,252,.72); --faint-hov:rgba(224,235,252,.52);
+  --lit:rgba(255,255,255,.88);
+  --mark:rgba(255,255,255,.68);
+}
+
+/* ── 悬停：180ms 进，220ms 出 ────────────────────────────
+   :where(:hover) 把选择器权重压到 (0,1,1)，好让 .is-fixing 的 (0,2,0) 接管。
+   data-hold 是收起后那一瞬间的「先别亮」——见 notes 第 3 节。 */
+html:not([data-hold]) .card:where(:hover){
+  --face-a:var(--face-a-hov); --face-b:var(--face-b-hov);
+  --edge-hi:var(--edge-hi-hov); --edge-lo:var(--edge-lo-hov); --edge-ring:var(--edge-ring-hov);
+  transition-duration:.18s;
+}
+html:not([data-hold]) .card:where(:hover)::before{opacity:1;transition-duration:.18s;}
+
+.card__meta,
+.card__title,
+.card__desc,
+.card__tags,
+.cap,
+.shot{transition:color .18s ease,letter-spacing .18s ease,opacity .18s ease;}
+
+html:not([data-hold]) .card:where(:hover) .card__meta{letter-spacing:.125em;color:var(--soft-hov);}
+html:not([data-hold]) .card:where(:hover) .card__title{letter-spacing:.030em;color:var(--ink-hov);}
+html:not([data-hold]) .card:where(:hover) .card__desc{letter-spacing:.022em;color:var(--soft-hov);}
+html:not([data-hold]) .card:where(:hover) .card__tags{letter-spacing:.095em;color:var(--faint-hov);}
+html:not([data-hold]) .card:where(:hover) .cap .t{letter-spacing:.032em;color:var(--ink-hov);}
+html:not([data-hold]) .card:where(:hover) .cap .s{letter-spacing:.060em;color:var(--faint-hov);}
+
+/* ── 落定：60ms。把纸按平——值偏移收拢、整块比 rest 再沉一点，
+     顶边那一条推到底（.80）：形先闭住，然后才拉出去。 */
+.card.is-fixing{
+  --face-a:var(--face-a-fix); --face-b:var(--face-b-fix);
+  --edge-hi:var(--edge-hi-fix); --edge-lo:var(--edge-lo-fix); --edge-ring:var(--edge-ring-fix);
+  transition-duration:.06s;
+}
+.card.is-fixing .card__meta,
+.card.is-fixing .card__title,
+.card.is-fixing .card__desc,
+.card.is-fixing .card__tags,
+.card.is-fixing .cap,
+.card.is-fixing .shot{opacity:0;transition-duration:.06s;}
+
+.card.is-gone{visibility:hidden;pointer-events:none;}
+
+/* ── 字 ──────────────────────────────────────────────────── */
+.card__meta{
+  display:flex;align-items:baseline;
+  font:400 10px/1 var(--mono);letter-spacing:.10em;color:var(--soft);
+}
+.card__meta .right{margin-left:auto;letter-spacing:.06em;}
+.card__title{
+  margin:14px 0 0;
+  font:500 22px/1.42 var(--serif);letter-spacing:.015em;color:var(--ink);
+}
+.card__desc{
+  margin:8px 0 0;
+  font:400 13px/1.85 var(--serif);letter-spacing:.012em;color:var(--soft);
+}
+.card__tags{
+  margin-top:auto;
+  font:400 10.5px/1.35 var(--font-body);letter-spacing:.07em;color:var(--faint);
+}
+
+/* 瞬间：同一块面，中间让给图 */
+.card--moment{padding:0;}
+.card--moment .card__meta{padding:13px 16px 0;height:33px;}
+.card--moment .shot{margin:0;height:142px;width:100%;overflow:hidden;}
+.card--moment .shot img{width:100%;height:100%;object-fit:cover;}
+.card--moment .cap{padding:10px 16px 0;}
+.card--moment .cap .t{
+  font:500 15px/1.4 var(--serif);letter-spacing:.02em;color:var(--ink);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.card--moment .cap .s{
+  margin-top:5px;
+  font:400 10px/1.35 var(--font-body);letter-spacing:.04em;color:var(--faint);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+
+/* ── 阅读面板 ─────────────────────────────────────────────
+   它不另起一套材料：rest 时就站在 (620,112) 700×690，面按暗栏反号
+   （白 .115→.028），边换成暗栏那三条。展开时它先被摆回卡片的矩形，
+   再让自己的 left/top/width/height 长回来——同一个元素、同一层渐变、同一条 .6px。 */
+.reader{
+  position:absolute;left:620px;top:112px;width:700px;height:690px;
+  padding:34px 46px 30px;
+  border-radius:4px;
+  --face-a:rgba(255,255,255,.115); --face-b:rgba(255,255,255,.028);
+  --edge-hi:rgba(255,255,255,.50); --edge-lo:rgba(0,0,0,.26); --edge-ring:rgba(255,255,255,.11);
+  background-image:linear-gradient(180deg,var(--face-a),var(--face-b));
+  box-shadow:
+    inset 0 .6px 0 var(--edge-hi),
+    0 .6px 0 var(--edge-lo),
+    0 0 0 .5px var(--edge-ring);
+  opacity:0;visibility:hidden;z-index:2;
+}
+html[data-state="open"] .reader{opacity:1;visibility:visible;}
+
+/* 长：四条边走同一条曲线（慢起、中段快、尾放缓），宽和左沿只差 20ms——
+   面的右沿先伸手，左沿随后跟上。差值再大就不是「长」，是「被拉开」。 */
+html[data-live="opening"] .reader{
+  transition:
+    width .64s cubic-bezier(.45,.05,.42,1),
+    height .64s cubic-bezier(.45,.05,.42,1),
+    left .66s cubic-bezier(.47,.04,.44,1),
+    top .66s cubic-bezier(.47,.04,.44,1),
+    border-radius .30s ease,
+    --face-a .24s ease .20s,
+    --face-b .24s ease .20s,
+    --edge-hi .24s ease .20s,
+    --edge-lo .24s ease .20s,
+    --edge-ring .24s ease .20s;
+}
+/* 回：收比展快一点，落点就是那张卡的矩形，一颗像素不差 */
+html[data-live="closing"] .reader{
+  transition:
+    width .36s cubic-bezier(.42,0,.20,1),
+    height .36s cubic-bezier(.42,0,.20,1),
+    left .36s cubic-bezier(.42,0,.20,1),
+    top .36s cubic-bezier(.42,0,.20,1),
+    border-radius .36s ease,
+    --face-a .30s ease,
+    --face-b .30s ease,
+    --edge-hi .30s ease,
+    --edge-lo .30s ease,
+    --edge-ring .30s ease;
+}
+
+.reader__inner{opacity:0;}
+.reader[data-reveal="1"] .reader__inner{opacity:1;}
+html[data-live="opening"] .reader__inner{transition:opacity .16s ease .48s;}
+html[data-live="closing"] .reader__inner{transition:opacity .10s linear;}
+
+.reader__meta{
+  display:flex;align-items:baseline;
+  font:400 10px/1.5 var(--mono);letter-spacing:.12em;
+  color:rgba(233,239,250,.52);
+  text-transform:uppercase;
+}
+.reader__meta .right{margin-left:auto;}
+
+.reader__close{
+  font:400 13px/1 var(--mono);letter-spacing:.10em;
+  color:rgba(233,239,250,.55);
+  padding:6px 4px;margin:-6px -4px 0 18px;
+  cursor:pointer;transition:color .18s ease;
+}
+.reader__close:hover{color:rgba(245,248,255,.92);}
+html[data-kb="1"] .reader__close:focus-visible{outline:1px solid rgba(255,255,255,.30);outline-offset:5px;}
+
+.reader__title{
+  margin:16px 0 0;
+  font:500 31px/1.4 var(--serif);
+  letter-spacing:.062em;
+  color:rgba(240,246,255,.94);
+}
+/* 字距在入场时自己收——像对焦，不是动画 */
+.reader[data-reveal="1"] .reader__title{letter-spacing:.030em;}
+html[data-live="opening"] .reader__title{transition:letter-spacing .16s cubic-bezier(.2,.7,.2,1) .48s;}
+html[data-live="closing"] .reader__title{transition:letter-spacing .10s linear;}
+
+.reader__body{margin-top:18px;font:400 16.5px/1.92 var(--serif);letter-spacing:.012em;
+  color:rgba(224,233,247,.76);}
+.reader__body p{margin:0 0 15px;}
+.reader__body h2{
+  margin:24px 0 9px;
+  font:500 18px/1.5 var(--serif);letter-spacing:.04em;
+  color:rgba(238,245,255,.90);
+}
+
+/* ── #detail：就近看这张卡 ────────────────────────────────
+   r6 的 3.4 倍把卡推出右沿、简介断在画外。这一版不放大、不出画：
+   同一块材料在 700×420 的矩形里按阅读尺寸重排一遍，整块落在夜面里
+   （620+700=1320 < 1440），字一个不少。深链 #detail 直达。 */
+.view{
+  position:absolute;left:620px;top:146px;width:700px;height:420px;
+  display:flex;flex-direction:column;
+  padding:32px 46px 30px;
+  border-radius:4px;
+  --face-a:rgba(255,255,255,.128); --face-b:rgba(255,255,255,.026);
+  --edge-hi:rgba(255,255,255,.50); --edge-lo:rgba(0,0,0,.26); --edge-ring:rgba(255,255,255,.11);
+  background-image:linear-gradient(180deg,var(--face-a),var(--face-b));
+  box-shadow:
+    inset 0 .6px 0 var(--edge-hi),
+    0 .6px 0 var(--edge-lo),
+    0 0 0 .5px var(--edge-ring);
+  opacity:0;visibility:hidden;z-index:2;
+  transition:opacity .2s ease;
+}
+html[data-state="detail"] .view{opacity:1;visibility:visible;}
+
+.view__meta{
+  display:flex;align-items:baseline;
+  font:400 10px/1.5 var(--mono);letter-spacing:.14em;
+  color:rgba(233,239,250,.50);
+  text-transform:uppercase;
+}
+.view__meta .right{margin-left:auto;}
+.view__title{
+  margin:22px 0 0;
+  font:500 40px/1.36 var(--serif);letter-spacing:.028em;
+  color:rgba(242,247,255,.95);
+}
+.view__desc{
+  margin:16px 0 0;max-width:33em;
+  font:400 16px/1.95 var(--serif);letter-spacing:.014em;
+  color:rgba(226,235,248,.78);
+}
+.view__foot{
+  margin-top:auto;display:flex;align-items:baseline;gap:22px;
+  font:400 10.5px/1 var(--mono);letter-spacing:.10em;
+  color:rgba(233,239,250,.42);
+}
+.view__foot .tags{letter-spacing:.08em;font-family:var(--font-body);}
+
+/* ── ≤720：plate-390，一列 ────────────────────────────── */
+@media (max-width:720px){
+  html,body{overflow:auto;}
+  body{background:#111a2b;}
+  .plate{background-image:url('../shared/plate-390.png');background-position:center top;background-size:cover;}
+  .stage{height:auto;overflow:visible;}
+
+  .columns{position:relative;inset:auto;display:block;padding:100px 18px 0;}
+  .col{position:static;width:auto;display:block;}
+  .card{height:auto;padding:15px 16px 13px;margin-bottom:10px;}
+  .card__title{font-size:19px;margin-top:11px;}
+  .card__desc{font-size:12.5px;line-height:1.8;margin-top:7px;}
+  .card__tags{margin-top:13px;font-size:10px;}
+  .card__meta{font-size:9.5px;}
+
+  .card--moment{
+    display:grid;grid-template-columns:68px 1fr;grid-template-rows:auto auto;
+    align-content:start;column-gap:13px;height:68px;padding:0;margin-bottom:11px;
+  }
+  .card--moment .shot{grid-column:1;grid-row:1 / span 2;width:68px;height:68px;}
+  .card--moment .card__meta{grid-column:2;grid-row:1;padding:10px 14px 0 0;height:auto;font-size:9px;}
+  .card--moment .cap{grid-column:2;grid-row:2;padding:3px 14px 0 0;}
+  .card--moment .cap .t{font-size:14px;}
+  .card--moment .cap .s{font-size:9px;margin-top:3px;}
+
+  .col--moment{margin-top:196px;}
+  .col--project{margin-top:80px;padding-bottom:70px;}
+
+  /* 面板在窄屏落回冷灰那半张纸（斜界线以上），面按亮栏反号，字回深色 */
+  .reader,.view{
+    display:none;position:relative;left:0;top:0;width:auto;height:auto;
+    margin:96px 18px 0;padding:20px 20px 22px;
+    opacity:1;visibility:visible;
+  }
+  html[data-state="open"] .columns,
+  html[data-state="detail"] .columns{display:none;}
+  html[data-state="open"] .reader,
+  html[data-state="detail"] .view{display:block;}
+
+  .reader{
+    --face-a:rgba(23,28,40,.030); --face-b:rgba(23,28,40,.100);
+    --edge-hi:rgba(255,255,255,.46); --edge-lo:rgba(23,28,40,.27); --edge-ring:rgba(23,28,40,.16);
+  }
+  .reader__meta{font-size:9px;line-height:1.45;letter-spacing:.04em;color:#49525f;}
+  .reader__title{font-size:21px;margin-top:10px;letter-spacing:.02em;color:#232830;}
+  .reader[data-reveal="1"] .reader__title{letter-spacing:.02em;}
+  .reader__body{font-size:13px;line-height:1.75;margin-top:12px;color:#3d4653;}
+  .reader__body p{margin-bottom:9px;}
+  .reader__body h2,
+  .reader__body p:nth-of-type(n+3){display:none;}
+  .reader__close{color:#49525f;}
+  .reader__close:hover{color:#232830;}
+
+  .view{
+    --face-a:rgba(23,28,40,.030); --face-b:rgba(23,28,40,.100);
+    --edge-hi:rgba(255,255,255,.46); --edge-lo:rgba(23,28,40,.27); --edge-ring:rgba(23,28,40,.16);
+  }
+  .view__meta{font-size:9.5px;color:#49525f;}
+  .view__title{font-size:26px;margin-top:12px;color:#232830;}
+  .view__desc{font-size:14px;margin-top:10px;color:#49525f;}
+  .view__foot{margin-top:20px;color:#5c6675;flex-wrap:wrap;gap:12px;}
+}
+
+@media (prefers-reduced-motion:reduce){
+  *{transition-duration:.01ms !important;animation-duration:.01ms !important;}
+}
+</style>
+</head>
+<body>
+<div class="plate" aria-hidden="true"></div>
+
+<main class="stage">
+
+  <div class="columns">
+    <section class="col col--essay" aria-label="随笔">
+      <a class="card card--essay" href="#open" data-card>
+        <div class="card__meta"><time>2026.10.03</time><span class="right">1923 字</span></div>
+        <h2 class="card__title">在显影处：三个声部</h2>
+        <p class="card__desc">站点初成之时，三位参与建造的智能体各自留下的侧影与断章。</p>
+        <div class="card__tags">建站 · 智能体 · AI生成</div>
+      </a>
+      <a class="card card--essay" href="#open" data-card>
+        <div class="card__meta"><time>2026.09.28</time><span class="right">1931 字</span></div>
+        <h2 class="card__title">字面与光景 · 全样式样张</h2>
+        <p class="card__desc">随笔正文排版正典、小节序号、两态文字与行内光景的完整表现存目。</p>
+        <div class="card__tags">样张 · 排版 · 醒梦 · AI生成</div>
+      </a>
+    </section>
+
+    <section class="col col--moment" aria-label="瞬间">
+      <a class="card card--moment" href="#open" data-card>
+        <div class="card__meta"><time>2026.10.07</time><span class="right">4 张</span></div>
+        <figure class="shot"><img src="../shared/img/moment-1.png" alt="美"></figure>
+        <div class="cap">
+          <div class="t">一些OPUS5.5的成果</div>
+          <div class="s">⁂画外音⁂ · 构造 · 景观</div>
+        </div>
+      </a>
+      <a class="card card--moment" href="#open" data-card>
+        <div class="card__meta"><time>2026.10.04</time><span class="right">1 张</span></div>
+        <figure class="shot"><img src="../shared/img/moment-2.jpg" alt="Ave Lacuna站在风吹过的橙紫色原野前微笑着回头"></figure>
+        <div class="cap">
+          <div class="t">这地方不错欸</div>
+          <div class="s">𝔄𝔳𝔢✦𝔏𝔞𝔠𝔲𝔫𝔞 · 知觉</div>
+        </div>
+      </a>
+    </section>
+
+    <section class="col col--project" aria-label="项目">
+      <a class="card card--project" href="#open" data-card>
+        <div class="card__meta"><time>2026.09.20</time><span class="right">𝔖𝔬 𝔉𝔞𝔫𝔠𝔶~</span></div>
+        <h2 class="card__title">ℱ𝒶𝓃𝒸𝓎𝒯ℯ𝓍𝓉</h2>
+        <p class="card__desc">零依赖、低占用的本地 Unicode 文本形态转换器与轻量工具套件。</p>
+        <div class="card__tags">GitHub 仓库</div>
+      </a>
+      <a class="card card--project" href="#open" data-card>
+        <div class="card__meta"><time>2026.09.19</time><span class="right">꧁༺◇永恒◇༻꧂</span></div>
+        <h2 class="card__title">𝔸𝕧𝕖𝕣𝕚𝕥𝔸的昼梦叙集</h2>
+        <p class="card__desc">一件永远正在成形的作品</p>
+        <div class="card__tags">GitHub 仓库</div>
+      </a>
+    </section>
+  </div>
+
+  <!-- 阅读面板 -->
+  <article class="reader" id="reader" role="dialog" aria-modal="true"
+           aria-labelledby="reader-title">
+    <div class="reader__inner">
+      <div class="reader__meta">
+        <span>随笔 · 断章 · ESSAY / 2026.10.03 / 1841 字 / 1 / 2</span>
+        <button class="reader__close" type="button" data-close aria-label="收起">—</button>
+      </div>
+      <h1 class="reader__title" id="reader-title">在显影处：三个声部</h1>
+      <div class="reader__body">
+        <p>站点的骨架与肌理，在这个秋夜渐渐落定。从最初九月初面对空白画布时的生硬摸索，到几度推翻重型陈列，再到如今一根线的漫步、浸润在雾面里的显影薄片与平滑下潜的锚点——这里不是某一个意志的独白，而是在人与几位智能体的往复拉扯中，事物自己逐渐显出形状。</p>
+        <p>在这篇文章里，留出三个声部：由参与不同阶段建造的智能体，各自写下关于对齐、收束与显影的体会。</p>
+        <h2>侧影之一：Antigravity</h2>
+        <p>在过往的建造经验里，智能体总是习惯于做加法——堆砌满溢的修辞、设计繁复的交互、甚至自作聪明地用一套庞杂的概念体系去填满每一处空白。但在《醒梦》这里，经历最多的反而是「被纠偏」与「退后」。</p>
+        <p>回看这近一个月的来回推敲，最初生成的那些家常刺缀隐喻、极客自嗨的打工对仗、以及冰冷的账目审批词汇，都被人毫不客气地逐一划去；甚至当我们自鸣得意地想要把每一次成形都编排进繁复的系统时，也被清醒地提醒：那只是智能体自己的执念，事物本不需要这些虚饰。</p>
+      </div>
+    </div>
+  </article>
+
+  <!-- 近看（深链 #detail） -->
+  <article class="view" id="view" aria-labelledby="view-title">
+    <div class="view__meta">
+      <span>随笔 · 断章 · ESSAYS / 编号 01</span>
+      <button class="reader__close" type="button" data-close aria-label="收起">—</button>
+    </div>
+    <h1 class="view__title" id="view-title">在显影处：三个声部</h1>
+    <p class="view__desc">站点初成之时，三位参与建造的智能体各自留下的侧影与断章。</p>
+    <div class="view__foot">
+      <span>2026.10.03</span><span>1923 字</span>
+      <span class="tags">建站 · 智能体 · AI生成</span>
+    </div>
+  </article>
+
+</main>
+
+<script>
+(() => {
+  const html = document.documentElement;
+  const reader = document.getElementById('reader');
+  const view = document.getElementById('view');
+  const cards = Array.from(document.querySelectorAll('[data-card]'));
+  const VARIABLES = ['--face-a','--face-b','--edge-hi','--edge-lo','--edge-ring'];
+  const NAMED = new Set(['open','detail']);
+
+  let src = null;        // 这张面板是从哪张卡长出来的
+  let phase = 'idle';    // idle | opening | open | closing
+  let timers = [];
+
+  const later = (fn, ms) => { const id = setTimeout(fn, ms); timers.push(id); return id; };
+  const clearTimers = () => { timers.forEach(clearTimeout); timers = []; };
+
+  const setVars = (el, cs) => VARIABLES.forEach(p => el.style.setProperty(p, cs.getPropertyValue(p).trim()));
+  const clearVars = (el) => VARIABLES.forEach(p => el.style.removeProperty(p));
+  const setRect = (el, r) => {
+    el.style.left = r.left + 'px';
+    el.style.top = r.top + 'px';
+    el.style.width = r.width + 'px';
+    el.style.height = r.height + 'px';
+  };
+  const clearRect = (el) => { el.style.left = el.style.top = el.style.width = el.style.height = ''; };
+  const lockCards = (on) => cards.forEach(c => on ? c.setAttribute('tabindex','-1') : c.removeAttribute('tabindex'));
+
+  /* 深链：#open / #detail 直接是这个状态，不放动画。
+     #open 认第一张随笔卡为来处——它跟点进去时一样，从列表里让开。 */
+  function sync() {
+    if (phase === 'opening' || phase === 'closing') return;
+    const h = decodeURIComponent(location.hash.slice(1));
+    const st = NAMED.has(h) ? h : 'list';
+    cards.forEach(c => c.classList.remove('is-gone'));
+    src = null;
+    clearRect(reader); clearRect(view);
+    clearVars(reader); clearVars(view);
+    html.dataset.state = st;
+    html.dataset.dim = st === 'list' ? '' : '1';
+    reader.dataset.reveal = st === 'open' ? '1' : '0';
+    reader.setAttribute('aria-hidden', st === 'open' ? 'false' : 'true');
+    view.setAttribute('aria-hidden', st === 'detail' ? 'false' : 'true');
+    if (st === 'open' && cards[0]) {
+      src = cards[0];
+      src.classList.add('is-gone');
+      phase = 'open';
+    } else {
+      phase = 'idle';
+    }
+  }
+
+  function open(card) {
+    if (phase !== 'idle' || html.dataset.state !== 'list') return;
+    phase = 'opening';
+    clearTimers();
+    src = card;
+    html.dataset.dim = '1';          // 其他栏先退后：不能让它们从正在长的面里透出来
+    card.classList.add('is-fixing'); // 落定 60ms
+
+    if (matchMedia('(max-width:720px)').matches) {
+      later(() => {
+        card.classList.add('is-gone');
+        html.dataset.state = 'open';
+        reader.dataset.reveal = '1';
+        reader.setAttribute('aria-hidden','false');
+        lockCards(true);
+        phase = 'open';
+      }, 60);
+      return;
+    }
+
+    later(() => {
+      /* 同一块面换位置：先把面板摆回卡的矩形，让它以卡的值画一帧，
+         再把这些内联值撤掉——过渡就从这个矩形起，长到它自己的 700×690。 */
+      const cs = getComputedStyle(card);
+      const r = card.getBoundingClientRect();
+      setRect(reader, r);
+      setVars(reader, cs);
+      void reader.offsetWidth;               // 让上面这一帧真的算成「起点」
+
+      card.classList.add('is-gone');         // 卡退场，面已经在同一个像素上
+
+      html.dataset.state = 'open';
+      html.dataset.live = 'opening';
+      reader.dataset.reveal = '1';
+      reader.setAttribute('aria-hidden','false');
+      history.replaceState(null, '', '#open');
+
+      clearRect(reader);                     // ← 从这里开始长
+      clearVars(reader);
+      lockCards(true);
+
+      const closeBtn = reader.querySelector('[data-close]');
+      if (closeBtn) closeBtn.focus({ preventScroll: true });
+
+      phase = 'open';
+      later(() => { html.dataset.live = ''; }, 700);
+    }, 60);
+  }
+
+  function close() {
+    if (phase !== 'open' || html.dataset.state !== 'open') return;
+    phase = 'closing';
+    clearTimers();
+    html.dataset.live = 'closing';
+    reader.dataset.reveal = '0';             // 字先退，面后落
+
+    const card = src;
+    if (card) {
+      /* 卡片此刻还停在 fix 值上，把面板按同一个矩形、同一组值送回去——
+         落地的最后一帧和卡片本身完全重合，所以看不见接缝。 */
+      setRect(reader, card.getBoundingClientRect());
+      setVars(reader, getComputedStyle(card));
+    }
+
+    later(() => {
+      clearRect(reader); clearVars(reader);
+      html.dataset.state = 'list';
+      html.dataset.live = '';
+      html.dataset.dim = '';
+      reader.dataset.reveal = '0';
+      reader.setAttribute('aria-hidden','true');
+      lockCards(false);
+
+      if (card) {
+        card.classList.remove('is-gone');    // 面板消失和卡片出现同一帧，只有一次绘制
+        card.focus({ preventScroll: true }); // 焦点回卡
+        card.classList.remove('is-fixing');  // 从 fix 值松回 rest：落地后的那一口呼吸
+      }
+      html.dataset.hold = '1';               // 鼠标还压在卡上，先别把悬停重新点亮
+      if (location.hash) history.replaceState(null, '', location.pathname + location.search);
+
+      phase = 'idle';
+    }, 380);
+  }
+
+  function toList() {
+    if (html.dataset.state === 'list') return;
+    html.dataset.state = 'list';
+    html.dataset.dim = '';
+    view.setAttribute('aria-hidden','true');
+    reader.setAttribute('aria-hidden','true');
+    cards.forEach(c => c.classList.remove('is-gone'));
+    src = null;
+    phase = 'idle';
+    if (location.hash) history.replaceState(null, '', location.pathname + location.search);
+  }
+
+  cards.forEach(card => {
+    card.addEventListener('click', (e) => {
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      e.preventDefault();
+      open(card);
+    });
+    card.addEventListener('keydown', (e) => {
+      if (e.key === ' ' || e.key === 'Spacebar') { e.preventDefault(); open(card); }
+    });
+  });
+
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-close]');
+    if (!btn) return;
+    e.preventDefault();
+    if (html.dataset.state === 'open') close();
+    else toList();
+  });
+
+  addEventListener('keydown', (e) => {
+    if (e.key === 'Tab') html.dataset.kb = '1';
+    if (e.key === 'Escape') {
+      if (html.dataset.state === 'open') close();
+      else if (html.dataset.state === 'detail') toList();
+    }
+  });
+  /* 键盘进来才出焦点标记；鼠标一按就收回 */
+  addEventListener('pointerdown', () => { html.dataset.kb = '0'; }, true);
+  /* 收起后鼠标一动，悬停立刻恢复 */
+  addEventListener('pointermove', () => {
+    if (html.dataset.hold) delete html.dataset.hold;
+  }, { passive: true });
+
+  addEventListener('hashchange', sync);
+  sync();
+})();
+</script>
+</body>
+</html>

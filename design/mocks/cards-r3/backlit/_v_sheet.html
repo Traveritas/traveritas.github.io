@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="zh-CN" data-state="list">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>cards-r3 · 乙 · 背光</title>
+<link rel="stylesheet" href="/fonts/noto-serif-sc/font.css">
+<link rel="stylesheet" href="../shared/stage.css">
+<style>
+@font-face{
+  font-family:'IBM Plex Mono';font-style:normal;font-weight:400;font-display:swap;
+  src:url('/plex/ibm-plex-mono-latin-400-normal.woff2') format('woff2');
+}
+@font-face{
+  font-family:'IBM Plex Mono';font-style:normal;font-weight:500;font-display:swap;
+  src:url('/plex/ibm-plex-mono-latin-500-normal.woff2') format('woff2');
+}
+
+:root{
+  --serif:'Noto Serif SC','Palatino Linotype','Iowan Old Style',Palatino,Georgia,'Songti SC',serif;
+  --mono:'IBM Plex Mono',ui-monospace,'Cascadia Mono',Consolas,monospace;
+  --card-h:224px;
+  --row-gap:34px;
+  --top:136px;
+  color-scheme:light;
+}
+
+html,body{height:100%;}
+body{background:#0a111c;overflow:hidden;}
+
+/* 底图：原样铺，不加滤镜 / 遮罩 / 颜色 */
+.plate{
+  position:fixed;inset:0;z-index:0;
+  background:url('../shared/plate-1440.png') center/cover no-repeat;
+  background-color:#0a111c;
+}
+.stage{z-index:1;}
+
+/* ── 材料：一层比底图亮一点点的膜 ───────────────────────── */
+.lit{
+  position:relative;
+  background:var(--fill, rgba(255,255,255,var(--lift)));
+  box-shadow:0 0 11px rgba(255,255,255,var(--halo)), 0 0 34px rgba(255,255,255,calc(var(--halo) * .55));
+  color:var(--ink);
+}
+/* 颗粒：1px 的白/黑点，均值中性，只给表面一点齿 */
+.lit::before{
+  content:'';position:absolute;inset:0;pointer-events:none;z-index:2;
+  background-image:url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAHdUlEQVR42p2b0XLjMAwDRSn//80+3LSTuLZEAruHm2nTxpZJEMQCyvV1Xb8xxjiOY1zXNbr3Y4xxXdfj/fpdfd3X1vHq7++XurZeV+dTf6/m3Y1xf37ef9QJrp+rxSU3UwvuXnXRaly3qu46Ndasy1/HcRzH83pYB16/dzeqn9f/1+vWxSgkrj8rUhsS1jlWNE63yHWCHfS765xpqBOqqJKmtu6zolSZjkLnVDtdd1udzrqjZLfqxAlRbrNS1KE53k5QDeacETm+xBco35PORRlAdeL1url2jLN7xb2y+Pp5tVG6XvmVbj4VhcocFbrObmIqJNVBnK11i6br6RTd5tHh0L2ncl71hp0Xr7tbT8ZFgDp+Alu1wYTW1VHW+R9jjB9BetfOUjKSxHHn5NJoQeiYXUipXvm1awIdXUQgO1fmQWajnK8L34rUzQ7GLq47xtUtnBas+EY3BvmdziE6hz3VILT7xP4Un0hOhAjZroMjFri+TkpYnE2RTW7yCEVjKaJ0SCP0dCg4k2yO7HGdhIKnSlQ6uKrrkoPoFqwOtc0FFEPrwpg75c4x0ufrRnYkp4O1Q1adbzvPMcbvS4jbCUEuMyTPrvjETmikjToVdAjq7lU1AwX1HWfn+IMayx7QdV2/ZFHuZBUvp8WSnTrUpNqDU6YmpapKvHB2vetQKfJ05kJ8pUYhUrqO4/jPBInokDDiOES3+A5BNHZKwBIkdOicpLvV3XaMkBIdYm9KDktT74QMyYSoiwIuGUkV3zRcJYpyKogk0Wi95qw/TpSdLnLs2DgpykTBpfmkJKwbe9IpKAfUwSkRICnJUgqvc8DOeTqH/ocAdYrE+50qkzi11DySbDDJNxSST9LfiO7SyVAqS2GX5qLoahr/pSDiJHlQhxIB0/GB6iGUcOFQRryA1vRShNTpunxdqbOqzkCaQCKldZtHfkqZ91QDkXbfVWNcLpEkL0pLUAyTkJEkXI8oUPU8SkkV/VWboiahHBwRlzSyUGr9OPQ7GUqrMW5hX8vWlNW5xCtNzvp7ztR5ke1SfZFyBNL9kwKLQ1Yiqpykpe2crOMMTtpWJuEIUVrLVPzlJHiS1uboZ5L7J1BV11O0cbUDFEUJVq4slcrWCVXuwmciwLr5vkp6tTRG7CzR8NJQt6PyuIyTnLSb1+wo71bkdGZCJMXl7bTJVOmhyEGkbh17Oq7fxcm0kaluYJW+E7bnCBplfkkJbqZ9NalqS51lZDp1UxSN3VWeiB+8eMBu84EqgrrCh+sSI/lbdYnttOc9FKEdnS+pI7qUl5IkR5OTOkLnZClNfkQBsrO0Qyu1bcUPdpqtXDnccZK2TY6SI9fbl1SAXVtdctrdb5WzdUlaysVAhw8E3ksZYRJFHCJWlLJlmPUZmm6qXM4ZB6JmPmlfvi1mfKvPE626aqxsvOqCWcu0iRVnyQadWZGqJqK81dbUtVht+vJCdHiE2GTeold+W6SM0s6wV0jRJo8JZVe0hFSLvJCQLLDKs67miFVgJJnAJIMjxqvlFD7aJffOY1EmPzS8Oz6eomTKEWYoL9eM4ntJdxaSeOpFqD8SndqpDLvZJqvFhlHbHZb3dKyFClCjsYmiEqixyRo7VSElb9wRRaXO6joo7JLqji1SF+JEDmOLzKX4/yJ70gLtUlPQJsLJLDpVB2XaroHFVxPInV5ENnaMY0/QcSRCvVkmarvqT79nZ5/JYi4By+6yEDk6tEis1PdSdPVtNq8kwztqlRk3lOdtEpNlUbvyIzrKKe2/TQhoiq23JA7HU7qaKlsnrayuEbGHbnetcso9E0XihSFpOcB3EKclkjm5DJCFw2qGHM63pz2+Hdx252aUobcc8BUP9gNmydBivp60ifEXTn8S9ncsUvXtrve51SNA9RemlRodtrYkt7ARKhxvL8b6x89LPaVoV1VmQAAAABJRU5ErkJggg==");
+  background-repeat:repeat;
+}
+/* 边：四边都有亮线，但沿边不均匀——上最亮，左次之，右下最弱 */
+.lit::after{
+  content:'';position:absolute;inset:0;pointer-events:none;z-index:3;
+  background:
+    linear-gradient(90deg,
+      rgba(255,255,255,calc(var(--rim-a) * .24)) 0%,
+      rgba(255,255,255,var(--rim-a)) 10%,
+      rgba(255,255,255,calc(var(--rim-a) * .46)) 41%,
+      rgba(255,255,255,calc(var(--rim-a) * .92)) 71%,
+      rgba(255,255,255,calc(var(--rim-a) * .34)) 100%) 0 0/100% 1px no-repeat,
+    linear-gradient(180deg,
+      rgba(255,255,255,calc(var(--rim-a) * .30)) 0%,
+      rgba(255,255,255,calc(var(--rim-a) * .10)) 100%) 0 0/100% 3px no-repeat,
+    linear-gradient(180deg,
+      rgba(255,255,255,var(--rim-a)) 0%,
+      rgba(255,255,255,calc(var(--rim-a) * .34)) 58%,
+      rgba(255,255,255,calc(var(--rim-a) * .18)) 100%) 0 0/1px 100% no-repeat,
+    linear-gradient(180deg,
+      rgba(255,255,255,calc(var(--rim-a) * .60)) 0%,
+      rgba(255,255,255,calc(var(--rim-a) * .34)) 55%,
+      rgba(255,255,255,calc(var(--rim-a) * .26)) 100%) 100% 0/1px 100% no-repeat,
+    linear-gradient(90deg,
+      rgba(255,255,255,calc(var(--rim-a) * .26)) 0%,
+      rgba(255,255,255,calc(var(--rim-a) * .52)) 28%,
+      rgba(255,255,255,calc(var(--rim-a) * .34)) 78%,
+      rgba(255,255,255,calc(var(--rim-a) * .26)) 100%) 0 100%/100% 1px no-repeat;
+}
+
+/* ── 三栏 ───────────────────────────────────────────────── */
+.columns{
+  position:absolute;inset:0;
+  transition:opacity .5s ease;
+}
+.col{position:absolute;top:var(--top);display:flex;flex-direction:column;gap:var(--row-gap);}
+.col--essay  {left:128px; width:348px;}
+.col--moment {left:622px; width:252px;}
+.col--project{left:1020px;width:384px;}
+
+/* 三栏底子的明度不同（L*≈79.7 / 13.1 / 9.8），
+   要让「比底图亮一样多」，白膜的 alpha 必须分开给。 */
+.col--essay{
+  --lift:.194; --rim-a:.70; --halo:.05;
+  --ink:#1b222c; --ink-soft:#3c4754; --meta:#505b69;
+}
+.col--moment{
+  --lift:.042; --rim-a:.18; --halo:.05;
+  --ink:#eef1f7; --ink-soft:#c4ccda; --meta:#98a3b5;
+}
+.col--project{
+  --lift:.040; --rim-a:.17; --halo:.045;
+  --ink:#eef1f7; --ink-soft:#c4ccda; --meta:#9aa5b7;
+}
+
+/* ── 卡的骨架：六张卡共用同一副上下轨 ───────────────────── */
+.card{
+  display:flex;flex-direction:column;
+  height:var(--card-h);
+  padding:18px 21px 15px;
+  color:var(--ink);
+  text-decoration:none;
+  transition:background-color .4s ease;
+}
+.card__meta{
+  display:flex;align-items:center;gap:7px;
+  font:400 10px/1 var(--mono);
+  letter-spacing:.105em;
+  color:var(--meta);
+}
+.card__meta .dot{font-size:9px;line-height:1;opacity:.8;}
+.card__meta .right{margin-left:auto;letter-spacing:.05em;}
+
+.card__title{
+  margin:14px 0 0;
+  font:500 22px/1.42 var(--serif);
+  letter-spacing:.015em;
+  color:var(--ink);
+}
+.card__desc{
+  margin:8px 0 0;
+  font:500 13px/1.85 var(--serif);
+  letter-spacing:.012em;
+  color:var(--ink-soft);
+}
+.card__foot{
+  margin-top:auto;
+  display:flex;align-items:baseline;gap:12px;
+  font:400 10.5px/1.35 var(--font-body);
+  letter-spacing:.06em;
+  color:var(--meta);
+}
+.card__foot .arrow{
+  margin-left:auto;
+  font:400 11px/1 var(--mono);letter-spacing:0;
+  opacity:.7;
+  transition:opacity .3s ease, transform .3s ease;
+}
+.card:hover .arrow{opacity:1;transform:translateX(2px);}
+.card:hover{background:rgba(255,255,255,calc(var(--lift) + .015));}
+
+/* 瞬间：同一副上下轨，中间是图 */
+.card--moment{padding:0;}
+.card--moment .card__meta{padding:13px 17px 0;height:34px;}
+.card--moment .shot{margin:0;height:142px;width:100%;overflow:hidden;}
+.card--moment .shot img{width:100%;height:100%;object-fit:cover;}
+.card--moment .cap{padding:9px 17px 0;}
+.card--moment .cap .t{
+  font:500 15px/1.4 var(--serif);letter-spacing:.02em;color:var(--ink);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.card--moment .cap .s{
+  margin-top:5px;display:flex;align-items:center;gap:8px;
+  font:400 10px/1.3 var(--font-body);letter-spacing:.03em;color:var(--meta);
+  white-space:nowrap;overflow:hidden;
+}
+.card--moment .cap .s .arrow{margin-left:auto;font-family:var(--mono);opacity:.6;}
+
+/* ── #open：光收进一张纸 ─────────────────────────────────── */
+.reader{
+  position:absolute;left:128px;top:118px;width:664px;height:716px;
+  padding:36px 46px 34px;
+  opacity:0;visibility:hidden;transform:translateY(8px);
+  transition:opacity .45s ease, transform .45s ease, visibility .45s;
+  --fill:rgba(216,223,236,.955); --rim-a:.78; --halo:.10;
+  --ink:#1f262f; --ink-soft:#2e3742; --meta:#2f3843;
+  overflow:hidden;
+}
+.reader__meta{
+  font:400 10px/1.5 var(--mono);letter-spacing:.12em;color:var(--meta);
+  text-transform:uppercase;
+}
+.reader__title{
+  margin:18px 0 0;
+  font:500 33px/1.4 var(--serif);letter-spacing:.03em;color:var(--ink);
+}
+.reader__body{margin-top:22px;font:500 17px/2.02 var(--serif);letter-spacing:.012em;color:var(--ink-soft);}
+.reader__body p{margin:0 0 16px;}
+.reader__body p:last-child{margin-bottom:0;}
+.reader__body h2{
+  margin:25px 0 10px;
+  font:500 19px/1.5 var(--serif);letter-spacing:.04em;color:var(--ink);
+}
+
+/* ── #detail：同一张卡靠近了看，光也升起来 ─────────────── */
+.detail{
+  position:absolute;left:50%;top:50%;width:620px;height:376px;
+  display:flex;flex-direction:column;
+  padding:38px 46px 30px;
+  transform:translate(-50%,-50%) translateY(8px);
+  opacity:0;visibility:hidden;
+  transition:opacity .45s ease, transform .45s ease, visibility .45s;
+  --fill:rgba(216,223,236,.955); --rim-a:.80; --halo:.10;
+  --ink:#20272f; --ink-soft:#2f3842; --meta:#333c48;
+  overflow:hidden;
+}
+.detail__sect{
+  font:400 10px/1.5 var(--mono);letter-spacing:.13em;color:var(--meta);
+  text-transform:uppercase;
+}
+.detail__title{
+  margin:20px 0 0;
+  font:500 40px/1.35 var(--serif);letter-spacing:.03em;color:var(--ink);
+}
+.detail__desc{
+  margin:14px 0 0;
+  font:500 17px/1.95 var(--serif);letter-spacing:.012em;color:var(--ink-soft);
+}
+.detail__foot{
+  margin-top:auto;display:flex;align-items:baseline;gap:14px;
+  font:400 11px/1.4 var(--font-body);letter-spacing:.08em;color:var(--meta);
+}
+.detail__foot .arrow{margin-left:auto;font-family:var(--mono);opacity:.7;}
+
+/* ── 状态 ───────────────────────────────────────────────── */
+html[data-state="open"] .columns,
+html[data-state="detail"] .columns{opacity:0;pointer-events:none;}
+html[data-state="open"] .reader{opacity:1;visibility:visible;transform:translateY(0);}
+html[data-state="detail"] .detail{opacity:1;visibility:visible;transform:translate(-50%,-50%) translateY(0);}
+
+/* ── ≤720：plate-390，一列 ──────────────────────────────── */
+@media (max-width:720px){
+  html,body{overflow:auto;}
+  body{background:#c9d2e2;}
+  .plate{
+    background-image:url('../shared/plate-390.png');
+    background-size:cover;background-position:center top;
+  }
+  .stage{height:auto;overflow:visible;}
+  .columns{position:relative;inset:auto;display:block;padding:118px 24px 90px;}
+  .col{position:static;width:auto;display:block;}
+  .card{
+    height:auto;min-height:172px;
+    padding:15px 17px 14px;margin-bottom:18px;
+  }
+  .card__title{font-size:20px;margin-top:12px;}
+  .card__desc{font-size:12.5px;line-height:1.85;margin-top:8px;}
+  .card__foot{margin-top:14px;font-size:10px;}
+  .card__meta{font-size:9.5px;}
+
+  .card--moment{
+    display:grid;grid-template-columns:76px 1fr;grid-template-rows:auto auto;
+    column-gap:13px;min-height:0;height:76px;padding:0;margin-bottom:12px;
+  }
+  .card--moment .shot{grid-column:1;grid-row:1 / span 2;width:76px;height:76px;}
+  .card--moment .card__meta{grid-column:2;grid-row:1;padding:12px 14px 0 0;height:auto;font-size:9px;}
+  .card--moment .cap{grid-column:2;grid-row:2;padding:4px 14px 0 0;}
+  .card--moment .cap .t{font-size:14px;}
+  .card--moment .cap .s{font-size:9px;letter-spacing:.02em;margin-top:3px;}
+  .col--moment{margin-top:134px;}
+  .col--project{margin-top:76px;}
+
+  .reader,.detail{display:none;}
+  html[data-state="open"] .columns,
+  html[data-state="detail"] .columns{display:none;}
+  html[data-state="open"] .reader,
+  html[data-state="detail"] .detail{display:block;position:relative;left:0;top:0;width:auto;height:auto;
+    margin:110px 20px 40px;padding:26px 22px 30px;transform:none;opacity:1;visibility:visible;}
+  .reader__title{font-size:25px;}
+  .reader__body{font-size:15px;line-height:1.95;}
+  .detail{transform:none;}
+  .detail__title{font-size:28px;}
+  .detail__desc{font-size:15px;}
+}
+</style>
+</head>
+<body>
+<div class="plate" aria-hidden="true"></div>
+
+<main class="stage">
+
+  <!-- 检索 -->
+  <div class="columns">
+    <section class="col col--essay" aria-label="随笔">
+      <a class="card lit" href="#open">
+        <div class="card__meta"><span class="dot">○</span><time>2026.10.03</time><span class="right">1923 字</span></div>
+        <h2 class="card__title">在显影处：三个声部</h2>
+        <p class="card__desc">站点初成之时，三位参与建造的智能体各自留下的侧影与断章。</p>
+        <div class="card__foot"><span>建站 · 智能体 · AI生成</span><span class="arrow">→</span></div>
+      </a>
+      <a class="card lit" href="#open">
+        <div class="card__meta"><span class="dot">○</span><time>2026.09.28</time><span class="right">1931 字</span></div>
+        <h2 class="card__title">字面与光景 · 全样式样张</h2>
+        <p class="card__desc">随笔正文排版正典、小节序号、两态文字与行内光景的完整表现存目。</p>
+        <div class="card__foot"><span>样张 · 排版 · 醒梦 · AI生成</span><span class="arrow">→</span></div>
+      </a>
+    </section>
+
+    <section class="col col--moment" aria-label="瞬间">
+      <a class="card lit card--moment" href="#open">
+        <div class="card__meta"><span class="dot">○</span><time>2026.10.07</time><span class="right">4 张</span></div>
+        <figure class="shot"><img src="../shared/img/moment-1.png" alt="美"></figure>
+        <div class="cap">
+          <div class="t">一些OPUS5.5的成果</div>
+          <div class="s"><span>⁂画外音⁂ · 构造 · 景观</span><span class="arrow">→</span></div>
+        </div>
+      </a>
+      <a class="card lit card--moment" href="#open">
+        <div class="card__meta"><span class="dot">○</span><time>2026.10.04</time><span class="right">1 张</span></div>
+        <figure class="shot"><img src="../shared/img/moment-2.jpg" alt="Ave Lacuna站在风吹过的橙紫色原野前微笑着回头"></figure>
+        <div class="cap">
+          <div class="t">这地方不错欸</div>
+          <div class="s"><span>𝔄𝔳𝔢✦𝔏𝔞𝔠𝔲𝔫𝔞 · 知觉</span><span class="arrow">→</span></div>
+        </div>
+      </a>
+    </section>
+
+    <section class="col col--project" aria-label="项目">
+      <a class="card lit" href="#open">
+        <div class="card__meta"><span class="dot">○</span><time>2026.09.20</time><span class="right">𝔖𝔬 𝔉𝔞𝔫𝔠𝔶~</span></div>
+        <h2 class="card__title">ℱ𝒶𝓃𝒸𝓎𝒯ℯ𝓍𝓉</h2>
+        <p class="card__desc">零依赖、低占用的本地 Unicode 文本形态转换器与轻量工具套件。</p>
+        <div class="card__foot"><span>GitHub 仓库</span><span class="arrow">→</span></div>
+      </a>
+      <a class="card lit" href="#open">
+        <div class="card__meta"><span class="dot">○</span><time>2026.09.19</time><span class="right">꧁༺◇永恒◇༻꧂</span></div>
+        <h2 class="card__title">𝔸𝕧𝕖𝕣𝕚𝕥𝔸的昼梦叙集</h2>
+        <p class="card__desc">一件永远正在成形的作品</p>
+        <div class="card__foot"><span>GitHub 仓库</span><span class="arrow">→</span></div>
+      </a>
+    </section>
+  </div>
+
+  <!-- 展开 -->
+  <article class="reader lit" id="open">
+    <div class="reader__meta">随笔 · 断章 · ESSAY / 2026.10.03 / 1841 字 / 1 / 2</div>
+    <h1 class="reader__title">在显影处：三个声部</h1>
+    <div class="reader__body">
+      <p>站点的骨架与肌理，在这个秋夜渐渐落定。从最初九月初面对空白画布时的生硬摸索，到几度推翻重型陈列，再到如今一根线的漫步、浸润在雾面里的显影薄片与平滑下潜的锚点——这里不是某一个意志的独白，而是在人与几位智能体的往复拉扯中，事物自己逐渐显出形状。</p>
+      <p>在这篇文章里，留出三个声部：由参与不同阶段建造的智能体，各自写下关于对齐、收束与显影的体会。</p>
+      <h2>侧影之一：Antigravity</h2>
+      <p>在过往的建造经验里，智能体总是习惯于做加法——堆砌满溢的修辞、设计繁复的交互、甚至自作聪明地用一套庞杂的概念体系去填满每一处空白。但在《醒梦》这里，经历最多的反而是「被纠偏」与「退后」。</p>
+    </div>
+  </article>
+
+  <!-- 细节 -->
+  <article class="detail lit" id="detail">
+    <div class="detail__sect">随笔 / 断章 / ESSAYS / 编号 01</div>
+    <h2 class="detail__title">在显影处：三个声部</h2>
+    <p class="detail__desc">站点初成之时，三位参与建造的智能体各自留下的侧影与断章。</p>
+    <div class="detail__foot">
+      <span>2026.10.03</span><span>1923 字</span><span>建站 · 智能体 · AI生成</span>
+      <span class="arrow">→</span>
+    </div>
+  </article>
+
+</main>
+
+<script>
+  const NAMED = new Set(['open', 'detail']);
+  function sync() {
+    const h = location.hash.replace('#', '');
+    document.documentElement.dataset.state = NAMED.has(h) ? h : 'list';
+  }
+  addEventListener('hashchange', sync);
+  sync();
+</script>
+</body>
+</html>

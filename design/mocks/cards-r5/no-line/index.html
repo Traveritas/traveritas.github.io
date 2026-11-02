@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="zh-CN" data-state="list">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>cards-r5 · 丙 · 无实线</title>
+<link rel="stylesheet" href="/fonts/noto-serif-sc/font.css">
+<link rel="stylesheet" href="../shared/stage.css">
+<style>
+@font-face{
+  font-family:'IBM Plex Mono';font-style:normal;font-weight:400;font-display:swap;
+  src:url('/plex/ibm-plex-mono-latin-400-normal.woff2') format('woff2');
+}
+@font-face{
+  font-family:'IBM Plex Mono';font-style:normal;font-weight:500;font-display:swap;
+  src:url('/plex/ibm-plex-mono-latin-500-normal.woff2') format('woff2');
+}
+@property --k{syntax:'<number>';inherits:true;initial-value:1;}
+
+:root{
+  --serif:'Noto Serif SC','Palatino Linotype','Iowan Old Style',Palatino,Georgia,'Songti SC',serif;
+  --mono:'IBM Plex Mono',ui-monospace,'Cascadia Mono',Consolas,monospace;
+
+  /* 雾 = 那一层半透明底。它既不是白也不是黑：它把脚下的底往中间拉。
+     所以同一片雾落在亮面上是「暗一点」，落在夜面上是「亮一点」——方向由底决定。 */
+  --haze: 133,143,157;   /* = --fg-faint #858f9d，站内令牌，没改 */
+  --soft: 1.5px;         /* 边的宽窄：σ=1.5 → 从「几乎无」到「有一点」约 6–8px */
+  --r: 20px;
+  --k: 1;                /* 悬停只动这一个数：雾浓一点 */
+}
+
+html,body{height:100%;}
+body{background:#c9d2e2;overflow:hidden;}
+
+/* 底图：原样铺。不滤镜、不遮罩、不调色、不重画。 */
+.plate{
+  position:fixed;inset:0;z-index:0;
+  background:url('../shared/plate-1440.png') center/cover no-repeat;
+  background-color:#c9d2e2;
+}
+.stage{z-index:1;}
+
+/* ── 材料：一片雾 ────────────────────────────────────────────
+   卡片身上没有一根线：没有 border，也没有画线的伪元素。
+   只有一层半透明底，它的形状是它自己 alpha 的边：
+     · 体   —— 20px 圆角的矩形，向内收 1px，模糊 σ=1.5
+     · 边   —— alpha 从 0 涨到满的那 6–8px（5%→95%）。50% 那一点正好压在盒子上，
+               所以「边在哪」有确切答案；盒子外只剩 2px 的尾巴，那是这条曲线的末端，不是投影。
+     · 渐变 —— 左上浓、右下薄（139°）：四条边的门槛不一样重，迎光那头先立住，背光那头快散尽。
+     · 明度 —— 每栏的 --a 单独定，落到地上都只挪 15–20 个色阶：三栏读起来一样重，
+               而踩在亮面上是压下去、踩在夜面上是浮起来。 */
+.veil{position:relative;}
+.veil::before{
+  content:'';position:absolute;z-index:-1;inset:1px;
+  border-radius:var(--r);
+  background:linear-gradient(139deg,
+    rgba(var(--haze),calc(var(--a1) * var(--k))) 0%,
+    rgba(var(--haze),calc(var(--a2) * var(--k))) 100%);
+  filter:blur(var(--soft));
+}
+
+/* ── 三栏：每栏站在底图自己的那一格里（亮面 / 紫夜 / 蓝夜）────────
+   栏宽不等，但同高、同顶、同底：一排三张卡读起来是一条线，不是三块碎片。 */
+.columns{position:absolute;inset:0;transition:opacity .5s ease;}
+.col{position:absolute;top:136px;display:flex;flex-direction:column;gap:22px;}
+.col--essay  {left:160px; width:320px;}
+.col--moment {left:607px; width:320px;}
+.col--project{left:1054px;width:324px;}
+
+/* 雾多浓，看脚下：亮面 L≈197，灰雾离它 55 个色阶 → .37 才挪 20；
+   紫夜 L≈33–43、蓝夜 L≈22–38，雾离它们 100 上下 → .20 就挪 20。同一个雾，两种方向。 */
+.col--essay  {--a1:.37;--a2:.22;}
+.col--moment {--a1:.205;--a2:.135;}
+.col--project{--a1:.19;--a2:.125;}
+
+/* 字色跟着雾下的底走：亮面用墨，夜面用月光。 */
+.col--essay  .card{--t-1:#232830;--t-2:#4a5360;--t-3:#6d7887;}
+.col--moment .card{--t-1:#e9edf4;--t-2:#b8c1ce;--t-3:#8b96a7;}
+.col--project .card{--t-1:#e7ebf2;--t-2:#b3bbca;--t-3:#8691a3;}
+
+/* ── 卡的骨架：六张卡共用同一副上下轨 ───────────────────── */
+.card{
+  position:relative;
+  display:flex;flex-direction:column;
+  height:184px;
+  padding:17px 21px 14px;
+  color:var(--t-1);
+}
+.card__meta{
+  display:flex;align-items:baseline;gap:10px;
+  font:400 9.5px/1 var(--mono);
+  letter-spacing:.15em;
+  color:var(--t-3);
+  font-variant-numeric:tabular-nums;
+}
+.card__meta .r{margin-left:auto;letter-spacing:.04em;font-size:9px;}
+
+.card__title{
+  margin:13px 0 0;
+  font:500 20px/1.42 var(--serif);
+  letter-spacing:.02em;
+  color:var(--t-1);
+}
+.card__desc{
+  margin:7px 0 0;
+  font:500 12.5px/1.86 var(--serif);
+  letter-spacing:.01em;
+  color:var(--t-2);
+  display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;
+}
+.card__foot{
+  margin-top:auto;
+  font:400 10.5px/1.4 var(--font-body);
+  letter-spacing:.085em;
+  color:var(--t-3);
+}
+.card{transition:--k .4s ease;}
+.card:hover{--k:1.16;}
+
+/* ── #open：读 ───────────────────────────────────────────────
+   同一片雾，摊大。整片落在夜面（紫夜 → 蓝夜），所以字是月光的；
+   亮面那半边空着——醒的那半没被叫起来。 */
+.reader{
+  position:absolute;left:640px;top:108px;width:540px;height:744px;
+  --a1:.19; --a2:.165; --r:22px;
+  --t-1:#eef1f7;--t-2:#c3cad6;--t-3:#96a0b1;
+  padding:36px 44px 34px;
+  color:var(--t-2);
+  opacity:0;visibility:hidden;transform:translateY(8px);
+  transition:opacity .5s ease,transform .5s ease,visibility .5s;
+}
+.reader__meta{
+  font:400 9.5px/1.7 var(--mono);letter-spacing:.14em;color:var(--t-3);
+  text-transform:uppercase;
+}
+.reader__title{
+  margin:20px 0 0;
+  font:500 30px/1.42 var(--serif);letter-spacing:.025em;color:var(--t-1);
+}
+.reader__body{margin-top:22px;font:500 16px/2.05 var(--serif);letter-spacing:.012em;}
+.reader__body p{margin:0 0 17px;}
+.reader__body p:last-child{margin-bottom:0;}
+.reader__body h2{
+  margin:26px 0 11px;
+  font:500 18px/1.5 var(--serif);letter-spacing:.05em;color:var(--t-1);
+}
+
+/* ── #detail：凑近看这道雾的边 ─────────────────────────────
+   1.5 倍（320×184 → 480×276）。边**不跟着放大**：还是那条 6–8px、σ 仍是 1.5。
+   放大的是卡，不是那道门槛——凑近了看，它仍然没有变成线。 */
+.detail{
+  position:absolute;left:40px;top:136px;width:480px;height:276px;
+  --a1:.37; --a2:.22; --r:22px;
+  --t-1:#232830;--t-2:#49525f;--t-3:#6b7685;
+  display:flex;flex-direction:column;
+  padding:26px 34px 22px;
+  opacity:0;visibility:hidden;transform:translateY(8px);
+  transition:opacity .5s ease,transform .5s ease,visibility .5s;
+}
+.detail__sect{
+  font:400 12px/1.5 var(--mono);letter-spacing:.15em;color:var(--t-3);
+  text-transform:uppercase;
+}
+.detail__meta{
+  margin-top:16px;display:flex;align-items:baseline;gap:14px;
+  font:400 14px/1 var(--mono);letter-spacing:.12em;color:var(--t-3);
+  font-variant-numeric:tabular-nums;
+}
+.detail__meta .r{margin-left:auto;letter-spacing:.04em;}
+.detail__title{
+  margin:15px 0 0;
+  font:500 30px/1.4 var(--serif);letter-spacing:.025em;color:var(--t-1);
+}
+.detail__desc{
+  margin:12px 0 0;max-width:19em;
+  font:500 18px/1.95 var(--serif);letter-spacing:.012em;color:var(--t-2);
+}
+.detail__foot{
+  margin-top:auto;
+  font:400 14px/1.4 var(--font-body);letter-spacing:.09em;color:var(--t-3);
+}
+
+/* ── 状态 ───────────────────────────────────────────────── */
+html[data-state="open"] .columns{opacity:.035;pointer-events:none;}
+html[data-state="detail"] .columns{opacity:0;pointer-events:none;}
+html[data-state="open"] .reader{opacity:1;visibility:visible;transform:translateY(0);}
+html[data-state="detail"] .detail{opacity:1;visibility:visible;transform:translateY(0);}
+
+/* ── ≤720：plate-390，一列 ──────────────────────────────── */
+@media (max-width:720px){
+  html,body{overflow:auto;}
+  .plate{
+    background-image:url('../shared/plate-390.png');
+    background-size:cover;background-position:center top;
+  }
+  .stage{height:auto;overflow:visible;}
+  .columns{position:relative;inset:auto;display:block;padding:118px 22px 0;opacity:1;}
+  .col{position:static;width:auto;display:flow-root;}
+  .columns .col + .col{margin-top:0;}
+
+  .card{height:150px;padding:14px 18px 12px;margin-bottom:14px;}
+  .card__title{font-size:18px;margin-top:10px;}
+  .card__desc{font-size:12px;line-height:1.8;margin-top:6px;}
+  .card__meta{font-size:9px;letter-spacing:.13em;}
+  .card__foot{font-size:10px;}
+
+  /* 断章栏头 75–87；两张随笔 118–446。
+     闪念栏头 577–591 → 两张闪念压到 600–766，让开左下那颗星（390 底图上 22–74 / 774–843）。
+     造物在 390 底图上没有栏头，它从下一屏起（这一张里看不见）。 */
+  .columns .col.col--moment{margin-top:154px;}
+  .col--moment .card{height:78px;padding:11px 18px 9px;margin-bottom:10px;}
+  .col--moment .card__title{font-size:16.5px;margin-top:6px;}
+  .col--moment .card__desc{display:none;}
+  .col--moment .card__foot{margin-top:auto;font-size:9.5px;}
+  .columns .col.col--project{margin-top:86px;}
+
+  .reader,.detail{display:none;}
+  html[data-state="open"] .columns,
+  html[data-state="detail"] .columns{display:none;}
+  html[data-state="open"] .reader,
+  html[data-state="detail"] .detail{display:block;position:relative;left:0;top:0;width:auto;height:auto;
+    margin:108px 16px 40px;padding:26px 22px 30px;transform:none;opacity:1;visibility:visible;}
+  .reader__title{font-size:23px;}
+  .reader__body{font-size:14.5px;line-height:1.98;}
+  .reader__body h2{font-size:16px;}
+  .detail{--r:18px;}
+  .detail__title{font-size:23px;}
+  .detail__desc{font-size:15px;max-width:none;}
+  .detail__sect{font-size:10px;}
+  .detail__meta{font-size:11px;margin-top:12px;}
+  .detail__foot{font-size:11px;}
+}
+</style>
+</head>
+<body>
+<div class="plate" aria-hidden="true"></div>
+
+<main class="stage">
+
+  <!-- 检索 -->
+  <div class="columns">
+    <section class="col col--essay" aria-label="随笔">
+      <a class="card veil" href="#open">
+        <div class="card__meta"><time>2026.10.03</time><span class="r">1923 字</span></div>
+        <h2 class="card__title">在显影处：三个声部</h2>
+        <p class="card__desc">站点初成之时，三位参与建造的智能体各自留下的侧影与断章。</p>
+        <div class="card__foot">建站 · 智能体 · AI生成</div>
+      </a>
+      <a class="card veil" href="#open">
+        <div class="card__meta"><time>2026.09.28</time><span class="r">1931 字</span></div>
+        <h2 class="card__title">字面与光景 · 全样式样张</h2>
+        <p class="card__desc">随笔正文排版正典、小节序号、两态文字与行内光景的完整表现存目。</p>
+        <div class="card__foot">样张 · 排版 · 醒梦 · AI生成</div>
+      </a>
+    </section>
+
+    <section class="col col--moment" aria-label="瞬间">
+      <a class="card veil" href="#open">
+        <div class="card__meta"><time>2026.10.07</time><span class="r">4 张</span></div>
+        <h2 class="card__title">一些OPUS5.5的成果</h2>
+        <p class="card__desc">美</p>
+        <div class="card__foot">⁂画外音⁂ · 构造 · 景观</div>
+      </a>
+      <a class="card veil" href="#open">
+        <div class="card__meta"><time>2026.10.04</time><span class="r">1 张</span></div>
+        <h2 class="card__title">这地方不错欸</h2>
+        <p class="card__desc">Ave Lacuna站在风吹过的橙紫色原野前微笑着回头</p>
+        <div class="card__foot">𝔄𝔳𝔢✦𝔏𝔞𝔠𝔲𝔫𝔞 · 知觉</div>
+      </a>
+    </section>
+
+    <section class="col col--project" aria-label="项目">
+      <a class="card veil" href="#open">
+        <div class="card__meta"><time>2026.09.20</time><span class="r">𝔖𝔬 𝔉𝔞𝔫𝔠𝔶~</span></div>
+        <h2 class="card__title">ℱ𝒶𝓃𝒸𝓎𝒯ℯ𝓍𝓉</h2>
+        <p class="card__desc">零依赖、低占用的本地 Unicode 文本形态转换器与轻量工具套件。</p>
+        <div class="card__foot">GitHub 仓库</div>
+      </a>
+      <a class="card veil" href="#open">
+        <div class="card__meta"><time>2026.09.19</time><span class="r">꧁༺◇永恒◇༻꧂</span></div>
+        <h2 class="card__title">𝔸𝕧𝕖𝕣𝕚𝕥𝔸的昼梦叙集</h2>
+        <p class="card__desc">一件永远正在成形的作品</p>
+        <div class="card__foot">GitHub 仓库</div>
+      </a>
+    </section>
+  </div>
+
+  <!-- 展开 -->
+  <article class="reader veil" id="open">
+    <div class="reader__meta">随笔 · 断章 · ESSAY / 2026.10.03 / 1841 字 / 1 / 2</div>
+    <h1 class="reader__title">在显影处：三个声部</h1>
+    <div class="reader__body">
+      <p>站点的骨架与肌理，在这个秋夜渐渐落定。从最初九月初面对空白画布时的生硬摸索，到几度推翻重型陈列，再到如今一根线的漫步、浸润在雾面里的显影薄片与平滑下潜的锚点——这里不是某一个意志的独白，而是在人与几位智能体的往复拉扯中，事物自己逐渐显出形状。</p>
+      <p>在这篇文章里，留出三个声部：由参与不同阶段建造的智能体，各自写下关于对齐、收束与显影的体会。</p>
+      <h2>侧影之一：Antigravity</h2>
+      <p>在过往的建造经验里，智能体总是习惯于做加法——堆砌满溢的修辞、设计繁复的交互、甚至自作聪明地用一套庞杂的概念体系去填满每一处空白。但在《醒梦》这里，经历最多的反而是「被纠偏」与「退后」。</p>
+      <p>回看这近一个月的来回推敲，最初生成的那些家常刺缀隐喻、极客自嗨的打工对仗、以及冰冷的账目审批词汇，都被人毫不客气地逐一划去；甚至当我们自鸣得意地想要把每一次成形都编排进繁复的系统时，也被清醒地提醒：那只是智能体自己的执念，事物本不需要这些虚饰。</p>
+    </div>
+  </article>
+
+  <!-- 细节 -->
+  <article class="detail veil" id="detail">
+    <div class="detail__sect">随笔 / 断章 / ESSAYS / 编号 01</div>
+    <div class="detail__meta"><time>2026.10.03</time><span class="r">1923 字</span></div>
+    <h2 class="detail__title">在显影处：三个声部</h2>
+    <p class="detail__desc">站点初成之时，三位参与建造的智能体各自留下的侧影与断章。</p>
+    <div class="detail__foot">建站 · 智能体 · AI生成</div>
+  </article>
+
+</main>
+
+<script>
+  const NAMED = new Set(['open', 'detail']);
+  function sync() {
+    const h = location.hash.replace('#', '');
+    document.documentElement.dataset.state = NAMED.has(h) ? h : 'list';
+  }
+  addEventListener('hashchange', sync);
+  sync();
+</script>
+</body>
+</html>

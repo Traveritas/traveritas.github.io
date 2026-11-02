@@ -1,0 +1,485 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>印相纸 · print</title>
+<link rel="stylesheet" href="/fonts/noto-serif-sc/font.css">
+<link rel="stylesheet" href="/shared/stage.css">
+<style>
+/* ─────────────────────────────────────────────────────────────
+   丙 · 印相纸 print
+
+   一张 35mm 印相摆在浅色的台面上：照片是这张纸的主体，
+   字是相纸边缘的题注——小、靠边、克制。
+   没有框，“卡片”这层东西不存在；只有相纸的切边、切边上一线
+   折过来的光，和照片印到哪儿算哪儿的那道软边。
+
+   没有照片的条目，就是一张曝过光、什么都没显出来的相纸：
+   台面的光落在纸上，字压在下半部，上面大片是空的。
+   ───────────────────────────────────────────────────────────── */
+
+@font-face{
+  font-family:'IBM Plex Mono';font-style:normal;font-weight:400;font-display:swap;
+  src:url('/plex/ibm-plex-mono-latin-400-normal.woff2') format('woff2');
+}
+@font-face{
+  font-family:'IBM Plex Mono';font-style:normal;font-weight:500;font-display:swap;
+  src:url('/plex/ibm-plex-mono-latin-500-normal.woff2') format('woff2');
+}
+
+:root{
+  --ink:#3a352e;
+  --ink-2:#6a6357;
+  --ink-3:#8a8172;
+  --mono:'IBM Plex Mono',ui-monospace,'Cascadia Mono',Consolas,monospace;
+
+  /* 极轻的颗粒。一层，同时盖住照片和纸边——颗粒跨过印相与白边，
+     它才像印在纸里的，而不是滤在图片上的。 */
+  --grain:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.78' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0.34 0.33 0.33 0 0 0.34 0.33 0.33 0 0 0.34 0.33 0.33 0 0 0 0 0 0 1'/%3E%3CfeComponentTransfer%3E%3CfeFuncR type='discrete' tableValues='0.96 1'/%3E%3CfeFuncG type='discrete' tableValues='0.96 1'/%3E%3CfeFuncB type='discrete' tableValues='0.96 1'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23g)'/%3E%3C/svg%3E");
+}
+
+html,body{background:#e4e8ea;}
+body{color:var(--ink);}
+
+/* 台面：一层从左上斜下来的冷光，和四周很轻的落影。纸比台面亮，也比台面暖。 */
+.stage{
+  position:relative;width:100vw;height:100vh;overflow:hidden;isolation:isolate;
+  background:
+    radial-gradient(86% 64% at 24% -12%, #f4f7f8 0%, rgba(244,247,248,0) 58%),
+    radial-gradient(64% 52% at 100% 0%, rgba(242,245,246,.6), rgba(242,245,246,0) 62%),
+    linear-gradient(102deg, rgba(255,255,255,0) 16%, rgba(255,255,255,.5) 38%, rgba(255,255,255,.1) 53%, rgba(255,255,255,0) 68%),
+    radial-gradient(128% 104% at 50% 44%, rgba(0,0,0,0) 36%, rgba(80,91,98,.16) 100%),
+    linear-gradient(174deg,#e8ecee 0%,#e1e6e9 56%,#d9dfe3 100%);
+}
+
+/* ── 三栏 ─────────────────────────────────────────────────── */
+
+.table{position:absolute;inset:0;z-index:0;pointer-events:none;
+  background-image:var(--grain);background-size:200px 200px;
+  opacity:.16;mix-blend-mode:multiply;}
+
+.list{
+  position:absolute;inset:0;z-index:2;
+  padding:52px 84px 0;
+  transition:opacity .45s ease;
+}
+.cols{display:grid;grid-template-columns:repeat(3,1fr);gap:60px;align-items:start;}
+
+.chead{
+  display:flex;align-items:baseline;gap:11px;
+  height:18px;padding-bottom:12px;margin-bottom:20px;position:relative;
+  color:var(--ink-3);
+}
+.chead::after{
+  content:'';position:absolute;left:0;right:0;bottom:0;height:1px;
+  background:linear-gradient(90deg, rgba(58,53,46,.14), rgba(58,53,46,.055) 62%, rgba(58,53,46,.012));
+}
+.chead .no{font-family:var(--mono);font-size:9px;letter-spacing:.18em;color:#7d7466;}
+.chead .nm{font-family:var(--font-display);font-weight:500;font-size:13px;letter-spacing:.34em;color:#3f3a32;}
+.chead .en{font-family:var(--mono);font-size:7.5px;letter-spacing:.22em;color:var(--ink-3);opacity:.92;}
+.chead .ct{margin-left:auto;font-family:var(--mono);font-size:9px;letter-spacing:.16em;color:#7d7466;}
+
+.cards{display:flex;flex-direction:column;gap:30px;}
+
+/* ── 相纸 ─────────────────────────────────────────────────── */
+
+.sheet{
+  --k:1;
+  position:relative;
+  width:100%;
+  height:calc(324px * var(--k));
+  overflow:hidden;
+  font-family:var(--font-display);
+  color:var(--ink);
+
+  /* 纸：不是一块平色。斜着有一道很宽的受光，右下角颜色沉下去一点，
+     再叠两团几乎看不出的涂布不匀。 */
+  background:
+    radial-gradient(38% 34% at 16% 64%, rgba(210,197,173,.16), rgba(210,197,173,0) 74%),
+    radial-gradient(46% 40% at 80% 18%, rgba(255,254,249,.55), rgba(255,254,249,0) 74%),
+    radial-gradient(66% 56% at 102% 106%, rgba(188,174,148,.19), rgba(188,174,148,0) 68%),
+    radial-gradient(62% 52% at 104% 102%, rgba(138,155,170,.09), rgba(138,155,170,0) 70%),
+    linear-gradient(112deg, rgba(255,255,252,0) 0%, rgba(255,255,252,.42) 26%, rgba(255,255,252,.1) 45%, rgba(255,255,252,0) 64%),
+    radial-gradient(112% 86% at 16% -20%, #fdfbf5 0%, rgba(253,251,245,0) 56%),
+    linear-gradient(160deg, #fbf8f2 0%, #f5f0e4 50%, #ebe4d5 100%);
+
+  /* 切边：上左受光，下右背光；外面一线是光从纸的厚边上折过去 */
+  box-shadow:
+    inset 0 0 0 .5px rgba(120,106,82,.09),
+    0 0 0 .5px rgba(112,100,80,.2),
+    0 0 2px rgba(255,250,236,.5),
+    0 1px 1px rgba(74,84,92,.12),
+    0 2px 4px -1px rgba(74,84,92,.09),
+    4px 18px 34px -26px rgba(70,80,88,.85);
+}
+
+/* 颗粒 */
+/* 颗粒：极轻。乘上去的暗点，跨过照片和纸边，所以像印在纸里。 */
+.grain{
+  position:absolute;inset:0;z-index:10;pointer-events:none;
+  background-image:var(--grain);background-size:200px 200px;
+  opacity:1;mix-blend-mode:multiply;
+}
+
+/* 照片：铺到相纸的三条边，只有下沿是印出来的 */
+.plate{
+  position:absolute;left:0;right:0;top:0;
+  height:calc(228px * var(--k));
+  overflow:hidden;z-index:1;
+  background:#e9e2d4;
+  -webkit-mask-image:linear-gradient(180deg,#000 0%,#000 calc(100% - 30px),rgba(0,0,0,.55) calc(100% - 14px),transparent 100%);
+          mask-image:linear-gradient(180deg,#000 0%,#000 calc(100% - 30px),rgba(0,0,0,.55) calc(100% - 14px),transparent 100%);
+}
+.plate img{
+  width:100%;height:100%;object-fit:cover;object-position:var(--pos,50% 46%);
+  transform:scale(1.012);
+  filter:saturate(.8) contrast(.99) brightness(.94);
+}
+.plate .warm{
+  position:absolute;inset:0;
+  background:linear-gradient(180deg, rgba(252,244,228,.14) 0%, rgba(248,238,220,.05) 46%, rgba(240,227,204,.12) 100%);
+}
+.plate .lift{position:absolute;inset:0;background:#f7efdf;mix-blend-mode:screen;opacity:.035;}
+.plate .dens{
+  position:absolute;inset:0;
+  background:radial-gradient(124% 126% at 28% 6%, rgba(0,0,0,0) 38%, rgba(84,72,52,.2) 100%);
+}
+/* 印到纸上的那道边：往下十几像素就交还给纸，不留一条切线 */
+.plate::after{
+  content:'';position:absolute;left:0;right:0;bottom:0;height:calc(16px * var(--k));
+  background:linear-gradient(180deg, rgba(240,231,214,0) 0%, rgba(242,234,220,.3) 66%, rgba(246,239,226,.6) 100%);
+}
+
+/* ── 字：相纸边上的题注 ────────────────────────────────────── */
+
+.edge{
+  position:absolute;left:calc(24px * var(--k));right:calc(24px * var(--k));
+  top:calc(17px * var(--k));z-index:6;
+  display:flex;justify-content:space-between;align-items:baseline;
+  font-family:var(--mono);font-size:calc(8px * var(--k));letter-spacing:.16em;color:var(--ink-3);
+  font-variant-numeric:tabular-nums;
+}
+.edge .st{font-family:var(--font-display);font-size:calc(9.5px * var(--k));letter-spacing:.1em;}
+
+.capb{
+  position:absolute;left:calc(24px * var(--k));right:calc(24px * var(--k));
+  top:calc(194px * var(--k));z-index:6;
+}
+.s-photo .capb{top:calc(242px * var(--k));}
+
+.ttl{
+  margin:0;font-family:var(--font-display);font-weight:500;
+  font-size:calc(21.5px * var(--k));line-height:1.46;letter-spacing:.045em;color:var(--ink);
+}
+.s-photo .ttl{font-size:calc(17.5px * var(--k));letter-spacing:.03em;}
+.ttl .cnt{
+  float:right;margin-left:calc(12px * var(--k));padding-top:calc(6px * var(--k));
+  font-family:var(--mono);font-size:calc(8px * var(--k));font-weight:400;
+  letter-spacing:.16em;color:var(--ink-3);
+}
+
+.dsc{
+  margin:calc(9px * var(--k)) 0 0;
+  font-family:var(--font-display);font-weight:500;
+  font-size:calc(11.6px * var(--k));line-height:1.86;letter-spacing:.028em;color:#6e675b;
+}
+
+.note{
+  margin:calc(7px * var(--k)) 0 0;
+  font-family:var(--font-display);font-weight:500;
+  font-size:calc(11px * var(--k));line-height:1.68;letter-spacing:.05em;color:#746b5d;
+}
+
+.foot{
+  position:absolute;left:calc(24px * var(--k));right:calc(24px * var(--k));
+  bottom:calc(15px * var(--k));z-index:6;
+  display:flex;justify-content:space-between;align-items:baseline;gap:calc(16px * var(--k));
+  font-family:var(--font-display);font-size:calc(9.5px * var(--k));
+  letter-spacing:.08em;color:#7e7567;
+}
+.foot .date{font-family:var(--mono);font-size:calc(8px * var(--k));letter-spacing:.14em;font-variant-numeric:tabular-nums;}
+.foot .lnk{display:inline-flex;align-items:baseline;gap:calc(8px * var(--k));color:#6e675b;letter-spacing:.1em;}
+.foot .lnk::before{content:'';width:calc(13px * var(--k));height:1px;background:currentColor;opacity:.42;}
+
+/* ── 展开：相册里的一页 ───────────────────────────────────── */
+
+.open{
+  position:absolute;inset:0;z-index:30;opacity:0;visibility:hidden;pointer-events:none;
+}
+.page{
+  position:absolute;inset:22px;overflow:hidden;
+  background:
+    radial-gradient(40% 36% at 18% 66%, rgba(214,202,180,.11), rgba(214,202,180,0) 72%),
+    linear-gradient(112deg, rgba(255,255,252,0) 4%, rgba(255,255,252,.18) 32%, rgba(255,255,252,0) 58%),
+    radial-gradient(100% 76% at 18% -12%, #fbf8f1 0%, rgba(251,248,241,0) 58%),
+    linear-gradient(166deg,#fbf8f2 0%,#f5f0e4 52%,#ebe4d5 100%);
+  box-shadow:
+    inset 1px 1px 0 rgba(255,255,253,.85),
+    inset -.5px -.5px 0 rgba(122,108,84,.12),
+    0 0 0 .5px rgba(255,253,246,.9),
+    0 0 3px rgba(255,250,236,.5),
+    0 2px 3px -1px rgba(86,76,58,.14),
+    0 24px 60px -42px rgba(86,76,58,.6);
+}
+.oplate{
+  position:absolute;left:0;right:0;top:0;height:400px;overflow:hidden;
+  -webkit-mask-image:linear-gradient(180deg,#000 0%,#000 99%,rgba(0,0,0,.8) 99.6%,transparent 100%);
+          mask-image:linear-gradient(180deg,#000 0%,#000 99%,rgba(0,0,0,.8) 99.6%,transparent 100%);
+}
+.oplate img{
+  width:100%;height:100%;object-fit:cover;object-position:50% 44%;
+  filter:saturate(.78) contrast(1.01) brightness(.91) blur(.4px);
+}
+.oplate .warm{
+  position:absolute;inset:0;
+  background:linear-gradient(180deg, rgba(252,244,228,.15) 0%, rgba(248,238,220,.05) 50%, rgba(239,226,203,.13) 100%);
+}
+.oplate .lift{position:absolute;inset:0;background:#f7efdf;mix-blend-mode:screen;opacity:.035;}
+.oplate .dens{
+  position:absolute;inset:0;
+  background:radial-gradient(122% 130% at 26% 6%, rgba(0,0,0,0) 38%, rgba(92,80,60,.17) 100%);
+}
+
+.obody{position:absolute;left:96px;right:96px;top:452px;}
+.ometa{
+  display:flex;align-items:baseline;
+  font-family:var(--mono);font-size:8.5px;letter-spacing:.18em;color:var(--ink-3);
+  font-variant-numeric:tabular-nums;
+}
+.ometa .cn{font-family:var(--font-display);font-size:10.5px;letter-spacing:.16em;color:#7a7363;}
+.ometa .sl{opacity:.5;margin:0 12px;}
+.ometa .r{margin-left:auto;}
+.ometa .r span + span{margin-left:22px;}
+
+.otitle{
+  margin:15px 0 0;max-width:16em;
+  font-family:var(--font-display);font-weight:500;
+  font-size:41px;line-height:1.38;letter-spacing:.04em;color:#332f29;
+}
+.orule{
+  height:1px;margin:25px 0 23px;
+  background:linear-gradient(90deg, rgba(58,53,46,.2), rgba(58,53,46,.07) 38%, rgba(58,53,46,0) 84%);
+}
+.obody-cols{
+  column-count:2;column-gap:56px;
+  column-rule:1px solid rgba(58,53,46,.065);
+  font-family:var(--font-display);font-weight:500;
+  font-size:14.8px;line-height:2.0;letter-spacing:.025em;color:#4a453d;
+  text-align:justify;text-justify:inter-ideograph;
+}
+.obody-cols p{margin:0 0 17px;}
+.obody-cols h3{
+  margin:4px 0 9px;font-size:15.5px;font-weight:600;letter-spacing:.07em;color:#3a352e;
+  break-after:avoid;
+}
+.ofolio{
+  position:absolute;right:30px;bottom:22px;
+  font-family:var(--mono);font-size:8px;letter-spacing:.2em;color:rgba(58,53,46,.4);
+}
+
+/* ── 细节：把第一张随笔放大 ───────────────────────────────── */
+
+.detail{
+  position:absolute;inset:0;z-index:30;opacity:0;visibility:hidden;pointer-events:none;
+  display:grid;place-items:center;
+}
+.detail .sheet{
+  --k:1.72;
+  width:calc(384px * var(--k));
+  height:calc(324px * var(--k));
+  box-shadow:
+    inset 0 0 0 .5px rgba(120,106,82,.09),
+    0 0 0 .5px rgba(112,100,80,.22),
+    0 0 2px rgba(255,250,236,.55),
+    0 1px 1px rgba(74,84,92,.12),
+    0 3px 5px -1px rgba(74,84,92,.09),
+    6px 34px 62px -48px rgba(70,80,88,.9);
+}
+.detail .grain{background-size:calc(200px * 1.72) calc(200px * 1.72);}
+
+.dmark{
+  position:absolute;top:50px;
+  font-family:var(--mono);font-size:8.5px;letter-spacing:.2em;color:rgba(58,53,46,.42);
+  font-variant-numeric:tabular-nums;
+}
+.dmark.l{left:84px;}
+.dmark.r{right:84px;}
+
+/* ── 状态 ─────────────────────────────────────────────────── */
+
+#open:target{opacity:1;visibility:visible;pointer-events:auto;}
+#detail:target{opacity:1;visibility:visible;pointer-events:auto;}
+body:has(#open:target) .list,
+body:has(#detail:target) .list{opacity:0;visibility:hidden;}
+
+/* ── 窄屏 ─────────────────────────────────────────────────── */
+
+@media (max-width:720px){
+  .list{padding:30px 20px 40px;overflow-y:auto;height:100%;}
+  .cols{grid-template-columns:1fr;gap:44px;}
+  .chead{margin-bottom:18px;}
+  .cards{gap:26px;}
+  .sheet{--k:.98;}
+  .page{inset:12px;}
+  .oplate{height:36vh;}
+  .obody{left:30px;right:30px;top:calc(36vh + 24px);}
+  .otitle{font-size:30px;}
+  .obody-cols{column-count:1;font-size:14.5px;}
+  .dmark{top:22px;}
+  .dmark.l{left:20px;}
+  .dmark.r{right:20px;}
+  .detail .sheet{--k:1.05;width:calc(384px * 1.05);height:calc(324px * 1.05);}
+}
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="table"></div>
+
+  <main class="list">
+    <div class="cols">
+
+      <!-- 01 断章 -->
+      <section class="col">
+        <header class="chead">
+          <span class="no">01</span><span class="nm">断章</span><span class="en">ESSAYS</span><span class="ct">02</span>
+        </header>
+        <div class="cards">
+
+          <article class="sheet s-blank">
+            <div class="edge"><span class="tl">1 / 2</span><span class="tr">1923 字</span></div>
+            <div class="capb">
+              <h2 class="ttl">在显影处：三个声部</h2>
+              <p class="dsc">站点初成之时，三位参与建造的智能体<br>各自留下的侧影与断章。</p>
+            </div>
+            <div class="foot"><span class="tags">建站 · 智能体 · AI生成</span><span class="date">2026.10.03</span></div>
+            <div class="grain"></div>
+          </article>
+
+          <article class="sheet s-blank">
+            <div class="edge"><span class="tl">2 / 2</span><span class="tr">1931 字</span></div>
+            <div class="capb">
+              <h2 class="ttl">字面与光景 · 全样式样张</h2>
+              <p class="dsc">随笔正文排版正典、小节序号、<br>两态文字与行内光景的完整表现存目。</p>
+            </div>
+            <div class="foot"><span class="tags">样张 · 排版 · 醒梦 · AI生成</span><span class="date">2026.09.28</span></div>
+            <div class="grain"></div>
+          </article>
+
+        </div>
+      </section>
+
+      <!-- 02 闪念 -->
+      <section class="col">
+        <header class="chead">
+          <span class="no">02</span><span class="nm">闪念</span><span class="en">MOMENTS</span><span class="ct">02</span>
+        </header>
+        <div class="cards">
+
+          <article class="sheet s-photo">
+            <div class="plate" style="--pos:50% 62%">
+              <img src="/shared/img/moment-1.png" alt="">
+              <span class="warm"></span><span class="lift"></span><span class="dens"></span>
+            </div>
+            <div class="capb">
+              <h2 class="ttl"><span class="cnt">1 / 4</span>一些OPUS5.5的成果</h2>
+              <p class="note">美</p>
+            </div>
+            <div class="foot"><span class="tags">⁂画外音⁂ · 构造 · 景观</span><span class="date">2026.10.07</span></div>
+            <div class="grain"></div>
+          </article>
+
+          <article class="sheet s-photo">
+            <div class="plate" style="--pos:42% 22%">
+              <img src="/shared/img/moment-2.jpg" alt="">
+              <span class="warm"></span><span class="lift"></span><span class="dens"></span>
+            </div>
+            <div class="capb">
+              <h2 class="ttl"><span class="cnt">1 / 1</span>这地方不错欸</h2>
+              <p class="note">Ave Lacuna站在风吹过的橙紫色原野前微笑着回头</p>
+            </div>
+            <div class="foot"><span class="tags">𝔄𝔳𝔢✦𝔏𝔞𝔠𝔲𝔫𝔞 · 知觉</span><span class="date">2026.10.04</span></div>
+            <div class="grain"></div>
+          </article>
+
+        </div>
+      </section>
+
+      <!-- 03 造物 -->
+      <section class="col">
+        <header class="chead">
+          <span class="no">03</span><span class="nm">造物</span><span class="en">PROJECTS</span><span class="ct">02</span>
+        </header>
+        <div class="cards">
+
+          <article class="sheet s-blank">
+            <div class="edge"><span class="tl">1 / 2</span><span class="st">𝔖𝔬 𝔉𝔞𝔫𝔠𝔶~</span></div>
+            <div class="capb">
+              <h2 class="ttl">ℱ𝒶𝓃𝒸𝓎𝒯ℯ𝓍𝓉</h2>
+              <p class="dsc">零依赖、低占用的本地 Unicode<br>文本形态转换器与轻量工具套件。</p>
+            </div>
+            <div class="foot"><span class="lnk">GitHub 仓库</span><span class="date">2026.09.20</span></div>
+            <div class="grain"></div>
+          </article>
+
+          <article class="sheet s-blank">
+            <div class="edge"><span class="tl">2 / 2</span><span class="st">꧁༺◇永恒◇༻꧂</span></div>
+            <div class="capb">
+              <h2 class="ttl">𝔸𝕧𝕖𝕣𝕚𝕥𝔸的昼梦叙集</h2>
+              <p class="dsc">一件永远正在成形的作品</p>
+            </div>
+            <div class="foot"><span class="lnk">GitHub 仓库</span><span class="date">2026.09.19</span></div>
+            <div class="grain"></div>
+          </article>
+
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- 展开 -->
+  <section id="open" class="open">
+    <div class="page">
+      <div class="oplate">
+        <img src="/shared/img/moment-1.png" alt="">
+        <span class="warm"></span><span class="lift"></span><span class="dens"></span>
+      </div>
+      <div class="obody">
+        <div class="ometa">
+          <span class="cn">随笔 · 断章</span><span class="sl">/</span><span>ESSAYS</span>
+          <span class="r"><span>2026.10.03</span><span>1841 字</span><span>1 / 2</span></span>
+        </div>
+        <h1 class="otitle">在显影处：三个声部</h1>
+        <div class="orule"></div>
+        <div class="obody-cols">
+          <p>站点的骨架与肌理，在这个秋夜渐渐落定。从最初九月初面对空白画布时的生硬摸索，到几度推翻重型陈列，再到如今一根线的漫步、浸润在雾面里的显影薄片与平滑下潜的锚点——这里不是某一个意志的独白，而是在人与几位智能体的往复拉扯中，事物自己逐渐显出形状。</p>
+          <p>在这篇文章里，留出三个声部：由参与不同阶段建造的智能体，各自写下关于对齐、收束与显影的体会。</p>
+          <h3>侧影之一：Antigravity</h3>
+          <p>在过往的建造经验里，智能体总是习惯于做加法——堆砌满溢的修辞、设计繁复的交互、甚至自作聪明地用一套庞杂的概念体系去填满每一处空白。但在《醒梦》这里，经历最多的反而是「被纠偏」与「退后」。</p>
+        </div>
+      </div>
+      <div class="ofolio">01</div>
+      <div class="grain"></div>
+    </div>
+  </section>
+
+  <!-- 细节 -->
+  <section id="detail" class="detail">
+    <div class="dmark l">01 · 断章 · ESSAYS</div>
+    <div class="dmark r">1.72×</div>
+    <article class="sheet s-blank">
+      <div class="edge"><span class="tl">1 / 2</span><span class="tr">1923 字</span></div>
+      <div class="capb">
+        <h2 class="ttl">在显影处：三个声部</h2>
+        <p class="dsc">站点初成之时，三位参与建造的智能体<br>各自留下的侧影与断章。</p>
+      </div>
+      <div class="foot"><span class="tags">建站 · 智能体 · AI生成</span><span class="date">2026.10.03</span></div>
+      <div class="grain"></div>
+    </article>
+  </section>
+
+</div>
+</body>
+</html>

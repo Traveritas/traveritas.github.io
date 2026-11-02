@@ -1,0 +1,710 @@
+<!doctype html>
+<html lang="zh-CN" data-view="list">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>cards-r7 · 甲 · 网点 · 活</title>
+<link rel="stylesheet" href="/fonts/noto-serif-sc/font.css">
+<link rel="stylesheet" href="../shared/stage.css">
+<style>
+@font-face{
+  font-family:'IBM Plex Mono';font-style:normal;font-weight:400;font-display:swap;
+  src:url('/plex/ibm-plex-mono-latin-400-normal.woff2') format('woff2');
+}
+@font-face{
+  font-family:'IBM Plex Mono';font-style:normal;font-weight:500;font-display:swap;
+  src:url('/plex/ibm-plex-mono-latin-500-normal.woff2') format('woff2');
+}
+
+/* ─────────────────────────────────────────────────────────────
+   一块网版，三种墨。
+
+   4×4 Bayer、16 格、5px 一格、15 档——就是 r6 那张 20×20 的 tile，
+   只是这一版把它当 **mask** 用：tile 只记「这一格排第几档」
+   （alpha = 档/15），真正的浓淡交给第二层渐变算：
+
+      每格墨 alpha = 档/15 × (--A × --s) × --k
+
+   分开以后，墨色是 background-color（可以过渡），密度是 mask
+   （可以过渡），网版本身一格不动。展开时墨随底反号、密度随面板
+   重新分配，都是同一张 20px 的 tile 在改浓淡。
+
+   三组数照 r6：亮栏 A=.150 / s0=.28→s1=1；薄暮 A=.155 / 1→.30；
+   深蓝 A=.160 / 1→.30。--k 是悬停那一档（1 → 1.32）。 */
+:root{
+  --serif:'Noto Serif SC','Palatino Linotype','Iowan Old Style',Palatino,Georgia,'Songti SC',serif;
+  --mono:'IBM Plex Mono',ui-monospace,'Cascadia Mono',Consolas,monospace;
+
+  --mesh:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' shape-rendering='crispEdges'%3E%3Crect x='5' y='0' width='5' height='5' fill='%23fff' fill-opacity='0.5333'/%3E%3Crect x='10' y='0' width='5' height='5' fill='%23fff' fill-opacity='0.1333'/%3E%3Crect x='15' y='0' width='5' height='5' fill='%23fff' fill-opacity='0.6667'/%3E%3Crect x='0' y='5' width='5' height='5' fill='%23fff' fill-opacity='0.8000'/%3E%3Crect x='5' y='5' width='5' height='5' fill='%23fff' fill-opacity='0.2667'/%3E%3Crect x='10' y='5' width='5' height='5' fill='%23fff' fill-opacity='0.9333'/%3E%3Crect x='15' y='5' width='5' height='5' fill='%23fff' fill-opacity='0.4000'/%3E%3Crect x='0' y='10' width='5' height='5' fill='%23fff' fill-opacity='0.2000'/%3E%3Crect x='5' y='10' width='5' height='5' fill='%23fff' fill-opacity='0.7333'/%3E%3Crect x='10' y='10' width='5' height='5' fill='%23fff' fill-opacity='0.0667'/%3E%3Crect x='15' y='10' width='5' height='5' fill='%23fff' fill-opacity='0.6000'/%3E%3Crect x='0' y='15' width='5' height='5' fill='%23fff' fill-opacity='1'/%3E%3Crect x='5' y='15' width='5' height='5' fill='%23fff' fill-opacity='0.4667'/%3E%3Crect x='10' y='15' width='5' height='5' fill='%23fff' fill-opacity='0.8667'/%3E%3Crect x='15' y='15' width='5' height='5' fill='%23fff' fill-opacity='0.3333'/%3E%3C/svg%3E");
+}
+
+/* 只给「会变的数」注册：s0/s1 是上下两端的浓淡，k 是悬停，A 是这一栏的单格最浓。 */
+@property --s0{syntax:'<number>';inherits:true;initial-value:1}
+@property --s1{syntax:'<number>';inherits:true;initial-value:1}
+@property --k {syntax:'<number>';inherits:true;initial-value:1}
+@property --A {syntax:'<number>';inherits:true;initial-value:.15}
+
+html,body{height:100%;}
+body{background:#0b1220;overflow:hidden;}
+html{-webkit-tap-highlight-color:transparent;}
+
+/* 底图原样铺：不改色、不遮、不叠。 */
+.plate{
+  position:fixed;inset:0;z-index:0;
+  background:url('../shared/plate-1440.png') 0 0/1440px 900px no-repeat;
+  background-color:#0b1220;
+}
+.stage{z-index:1;}
+
+/* ── 面：一张 tile 当 mask ───────────────────────────────── */
+.face{
+  position:relative;isolation:isolate;border-radius:0;
+  --ink:#171c28;--A:.15;--s0:.28;--s1:1;--k:1;
+  --fg:#20252d;--fg2:#4e5866;
+  transition:box-shadow .42s ease,--k .18s ease;
+}
+.face::before{
+  content:"";position:absolute;inset:0;z-index:0;pointer-events:none;
+  background-color:var(--ink);
+  transition:background-color .42s ease;
+  -webkit-mask-image:var(--mesh),linear-gradient(180deg,
+    rgba(0,0,0,calc(var(--A) * var(--s0) * var(--k))),
+    rgba(0,0,0,calc(var(--A) * var(--s1) * var(--k))));
+  -webkit-mask-size:20px 20px,100% 100%;
+  -webkit-mask-repeat:repeat,no-repeat;
+  -webkit-mask-position:0 0,0 0;
+  -webkit-mask-composite:source-in;
+  mask-image:var(--mesh),linear-gradient(180deg,
+    rgba(0,0,0,calc(var(--A) * var(--s0) * var(--k))),
+    rgba(0,0,0,calc(var(--A) * var(--s1) * var(--k))));
+  mask-size:20px 20px,100% 100%;
+  mask-repeat:repeat,no-repeat;
+  mask-position:0 0,0 0;
+  mask-composite:intersect;
+}
+.face > *{position:relative;z-index:1;}
+
+.face.ink-day{
+  --ink:#171c28;--A:.150;--s0:.28;--s1:1;
+  --fg:#20252d;--fg2:#4e5866;
+  box-shadow:
+    inset 0 .6px 0 rgba(255,255,255,.42),
+    0 .6px 0 rgba(23,28,40,.26),
+    0 0 0 .5px rgba(23,28,40,.14);
+}
+.face.ink-dusk{
+  --ink:#d8d4e6;--A:.155;--s0:1;--s1:.30;
+  --fg:#f2eef8;--fg2:#dbd2e7;
+  box-shadow:
+    inset 0 .6px 0 rgba(255,255,255,.55),
+    0 .6px 0 rgba(0,0,0,.28),
+    0 0 0 .5px rgba(190,212,255,.13);
+}
+.face.ink-deep{
+  --ink:#cfdcf2;--A:.160;--s0:1;--s1:.30;
+  --fg:#eef3fa;--fg2:#cdd8e6;
+  box-shadow:
+    inset 0 .6px 0 rgba(255,255,255,.55),
+    0 .6px 0 rgba(0,0,0,.28),
+    0 0 0 .5px rgba(190,212,255,.13);
+}
+.face.ink-reader{
+  --ink:#d8d4e6;--A:.155;--s0:1;--s1:.30;
+  --fg:#f2eef8;--fg2:#dbd2e7;
+  box-shadow:
+    inset 0 .6px 0 rgba(255,255,255,.55),
+    0 .6px 0 rgba(0,0,0,.28),
+    0 0 0 .5px rgba(190,212,255,.13);
+}
+
+/* ── 三栏（位置沿用 r6：130 / 620 / 1020） ───────────────── */
+.columns{position:absolute;inset:0;transition:opacity .30s ease;}
+.col{position:absolute;top:135px;display:flex;flex-direction:column;gap:40px;transition:opacity .22s ease;}
+.col--essay  {left:130px; width:260px;}
+.col--moment {left:620px; width:260px;}
+.col--project{left:1020px;width:385px;}
+
+.card{
+  display:flex;flex-direction:column;
+  width:100%;height:225px;
+  padding:20px 22px 16px;
+  text-align:left;color:var(--fg);
+  cursor:pointer;border:0;background:none;
+  font:inherit;
+  transition:box-shadow .42s ease,--k .18s ease;
+}
+.card:focus{outline:none;}
+.card:hover,.card:focus-visible{--k:1.5;}
+.card:focus-visible{outline:1px solid rgba(154,134,196,.7);outline-offset:5px;}
+.card.quiet:focus-visible{outline:none;--k:1;}
+.card.is-fixing{
+  --s0:1;--s1:1;
+  transition:--s0 .04s linear,--s1 .04s linear,--k .18s ease,box-shadow .42s ease;
+}
+.card.is-taken{opacity:0;pointer-events:none;transition:opacity .15s ease;}
+
+.card__meta{
+  display:flex;align-items:baseline;
+  font:400 10px/1 var(--mono);letter-spacing:.10em;color:var(--fg2);
+}
+.card__meta .r{margin-left:auto;letter-spacing:.06em;}
+.card__title{
+  display:block;margin:16px 0 0;
+  font:500 21px/1.45 var(--serif);letter-spacing:.015em;color:var(--fg);
+  text-wrap:balance;
+}
+.card__desc{
+  display:block;margin:9px 0 0;
+  font:400 12.5px/1.9 var(--serif);letter-spacing:.012em;color:var(--fg2);
+  text-wrap:pretty;
+}
+.card__tags{
+  display:block;margin-top:auto;
+  font:400 10.5px/1.4 var(--font-body);letter-spacing:.06em;color:var(--fg2);
+}
+
+/* 瞬间：一条图，正文让开。 */
+.card--moment{padding:0;}
+.card--moment .card__meta{padding:15px 18px 0;height:36px;}
+.card--moment .shot{display:block;margin:0;height:143px;width:100%;overflow:hidden;}
+.card--moment .shot img{width:100%;height:100%;object-fit:cover;}
+.card--moment .cap{display:block;padding:11px 18px 0;}
+.card--moment .card__title{
+  margin:0;
+  font:500 15px/1.4 var(--serif);letter-spacing:.02em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.card--moment .card__tags{
+  margin-top:6px;
+  font:400 10px/1.35 var(--font-body);letter-spacing:.04em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.card--moment .shot img{transition:none;}
+
+/* ── 面板：同一块网版的另一处 ───────────────────────────────
+   默认几何就是它长成后的矩形（JS 从这里量，再动画回去）。
+   内容是一块固定尺寸的纸，被面板裁着；面板长大，纸不动。 */
+.sheet{
+  position:fixed;left:620px;top:120px;width:720px;height:670px;
+  z-index:5;visibility:hidden;
+  overflow:hidden;
+  transition:box-shadow .30s ease,--s0 .60s ease,--s1 .60s ease;
+  --pw:720px;--ph:670px;
+}
+.sheet.is-live{visibility:visible;}
+.sheet.is-priming,.sheet.is-priming::before{transition:none !important;}
+.sheet.is-fix{--s0:1;--s1:1;}
+.sheet::before{transition:background-color .30s linear;}
+.sheet.is-closing{transition:box-shadow .34s ease,--s0 .34s ease,--s1 .34s ease;}
+.sheet.is-closing::before{transition-duration:.34s;transition-timing-function:ease;}
+.sheet__in{
+  position:absolute;left:0;top:0;
+  width:var(--pw);height:var(--ph);
+  display:flex;flex-direction:column;
+  padding:38px 48px 32px;
+  opacity:0;
+  transition:opacity .22s ease;
+}
+.sheet.is-show .sheet__in{opacity:1;}
+.sheet__head{display:flex;align-items:baseline;gap:20px;}
+.sheet__meta{
+  flex:1;margin:0;
+  font:400 10px/1.5 var(--mono);letter-spacing:.11em;color:var(--fg2);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.sheet__close{
+  flex:0 0 auto;margin:-7px -6px -7px 0;padding:7px 6px;
+  font:400 15px/1 var(--mono);letter-spacing:0;color:var(--fg2);
+  cursor:pointer;transition:color .2s ease;
+}
+.sheet__close:hover{color:var(--fg);}
+.sheet__close:focus-visible{outline:1px solid rgba(154,134,196,.6);outline-offset:3px;}
+.sheet__title{
+  margin:17px 0 0;
+  font:500 31px/1.45 var(--serif);letter-spacing:.03em;color:var(--fg);
+}
+.sheet__body{
+  flex:1;min-height:0;overflow:auto;
+  margin-top:19px;
+  font:400 15.5px/1.98 var(--serif);letter-spacing:.012em;color:#dfd8ea;
+  scrollbar-width:none;
+}
+.sheet__body::-webkit-scrollbar{display:none;}
+.sheet__body p{margin:0 0 13px;}
+.sheet__body p:last-child{margin-bottom:0;}
+.sheet__body h2{
+  margin:22px 0 8px;
+  font:500 17px/1.5 var(--serif);letter-spacing:.05em;color:var(--fg);
+}
+.sheet__body .lead{font-size:16px;line-height:2.05;color:#e6dff0;}
+.sheet__fig{margin:2px 0 0;}
+.sheet__fig img{width:100%;height:396px;object-fit:cover;}
+.sheet__fig figcaption{
+  margin-top:11px;
+  font:400 11px/1.6 var(--font-body);letter-spacing:.05em;color:var(--fg2);
+}
+.sheet__tags{
+  margin:16px 0 0;
+  font:400 10.5px/1.4 var(--font-body);letter-spacing:.06em;color:var(--fg2);
+}
+
+/* ── #detail：第一张随笔卡 ×3（静态验版用） ───────────────── */
+.detail{
+  position:absolute;left:620px;top:120px;width:780px;height:675px;
+  display:flex;flex-direction:column;
+  padding:60px 66px 48px;
+  visibility:hidden;opacity:0;
+  transition:opacity .45s ease,visibility .45s;
+}
+.detail__meta{
+  display:flex;align-items:baseline;
+  font:400 30px/1 var(--mono);letter-spacing:.10em;color:var(--fg2);
+}
+.detail__meta .r{margin-left:auto;}
+.detail__title{
+  margin:48px 0 0;
+  font:500 63px/1.45 var(--serif);letter-spacing:.015em;color:var(--fg);
+}
+.detail__desc{
+  margin:27px 0 0;
+  font:400 37.5px/1.9 var(--serif);letter-spacing:.012em;color:var(--fg2);
+}
+.detail__tags{
+  margin-top:auto;
+  font:400 31.5px/1.4 var(--font-body);letter-spacing:.06em;color:var(--fg2);
+}
+
+/* ── 视图状态 ─────────────────────────────────────────────── */
+html[data-view="open"] .columns{opacity:.18;pointer-events:none;}
+html[data-view="open"] .col--moment,
+html[data-view="open"] .col--project{opacity:0;}
+html[data-view="detail"] .columns{opacity:0;pointer-events:none;}
+html[data-view="detail"] .detail{visibility:visible;opacity:1;}
+
+/* ── ≤720：plate-390，一列 ───────────────────────────────── */
+@media (max-width:720px){
+  html,body{overflow:auto;}
+  body{background:#c9d2e2;}
+  .plate{background-image:url('../shared/plate-390.png');background-size:390px 844px;background-position:0 0;}
+  .stage{height:auto;overflow:visible;}
+  .columns{position:relative;inset:auto;display:block;padding:100px 20px 60px;}
+  html[data-view="open"] body{overflow:hidden;}
+  .col{position:static;width:auto;display:block;opacity:1;}
+  .card{
+    height:auto;min-height:0;
+    padding:16px 18px 14px;margin-bottom:15px;
+  }
+  .card__title{font-size:19px;margin-top:12px;}
+  .card__desc{font-size:12px;line-height:1.85;margin-top:7px;}
+  .card__tags{margin-top:14px;font-size:10px;}
+  .card__meta{font-size:9.5px;}
+
+  /* 瞬间：左图右字一行 74px。 */
+  .card--moment{
+    display:grid;grid-template-columns:74px 1fr;grid-template-rows:auto auto;column-gap:10px;
+    align-content:start;height:74px;padding:0;margin-bottom:12px;
+  }
+  .card--moment .shot{grid-column:1;grid-row:1 / span 2;width:74px;height:74px;}
+  .card--moment .card__meta{grid-column:2;grid-row:1;padding:9px 14px 0 0;height:auto;font-size:9px;}
+  .card--moment .cap{grid-column:2;grid-row:2;padding:2px 14px 0 0;}
+  .card--moment .card__title{font-size:14px;line-height:1.35;}
+  .card--moment .card__tags{font-size:9px;line-height:1.3;margin-top:3px;}
+
+  .col--essay{margin-bottom:0;}
+  .col--moment{margin-top:175px;}
+  .col--project{margin-top:96px;}
+
+  .detail{display:none;}
+
+  .sheet{
+    left:14px;top:66px;
+    width:calc(100vw - 28px);height:calc(100dvh - 104px);
+  }
+  /* 窄屏这张纸必须过底图的亮暗交界：网版托不住，铺一块实色夜面（r6 同）。 */
+  .sheet.is-live{background:#0d1424;}
+  .sheet__in{padding:24px 22px 24px;}
+  .sheet__meta{font-size:9px;letter-spacing:.08em;}
+  .sheet__title{font-size:24px;margin-top:14px;}
+  .sheet__body{font-size:15px;line-height:1.95;}
+  .sheet__body h2{font-size:15px;}
+  .sheet__body .lead{font-size:15.5px;}
+  .sheet__fig img{height:300px;}
+  .sheet__tags{font-size:10px;}
+}
+</style>
+</head>
+<body>
+<div class="plate" aria-hidden="true"></div>
+
+<main class="stage">
+
+  <div class="columns">
+
+    <section class="col col--essay" aria-label="随笔">
+      <button type="button" class="card face ink-day" data-card data-kind="essay" data-ink="day"
+              data-meta="随笔 · 断章 · ESSAY / 2026.10.03 / 1841 字 / 1 / 2" data-body="essay" aria-haspopup="dialog">
+        <span class="card__meta"><time datetime="2026-10-03">2026.10.03</time><span class="r">1923 字</span></span>
+        <span class="card__title">在显影处：三个声部</span>
+        <span class="card__desc">站点初成之时，三位参与建造的智能体各自留下的侧影与断章。</span>
+        <span class="card__tags">建站 · 智能体 · AI生成</span>
+      </button>
+
+      <button type="button" class="card face ink-day" data-card data-kind="essay" data-ink="day"
+              data-meta="随笔 · 断章 · ESSAY / 2026.09.28 / 1931 字 / 2 / 2" aria-haspopup="dialog">
+        <span class="card__meta"><time datetime="2026-09-28">2026.09.28</time><span class="r">1931 字</span></span>
+        <span class="card__title">字面与光景 · 全样式样张</span>
+        <span class="card__desc">随笔正文排版正典、小节序号、两态文字与行内光景的完整表现存目。</span>
+        <span class="card__tags">样张 · 排版 · 醒梦 · AI生成</span>
+      </button>
+    </section>
+
+    <section class="col col--moment" aria-label="瞬间">
+      <button type="button" class="card face ink-dusk card--moment" data-card data-kind="moment" data-ink="dusk"
+              data-meta="瞬间 · 闪念 · MOMENTS / 2026.10.07 / 4 张" aria-haspopup="dialog">
+        <span class="card__meta"><time datetime="2026-10-07">2026.10.07</time><span class="r">4 张</span></span>
+        <span class="shot"><img src="../shared/img/moment-1.png" alt="美"></span>
+        <span class="cap">
+          <span class="card__title">一些OPUS5.5的成果</span>
+          <span class="card__tags">⁂画外音⁂ · 构造 · 景观</span>
+        </span>
+      </button>
+
+      <button type="button" class="card face ink-dusk card--moment" data-card data-kind="moment" data-ink="dusk"
+              data-meta="瞬间 · 闪念 · MOMENTS / 2026.10.04 / 1 张" aria-haspopup="dialog">
+        <span class="card__meta"><time datetime="2026-10-04">2026.10.04</time><span class="r">1 张</span></span>
+        <span class="shot"><img src="../shared/img/moment-2.jpg" alt="Ave Lacuna站在风吹过的橙紫色原野前微笑着回头"></span>
+        <span class="cap">
+          <span class="card__title">这地方不错欸</span>
+          <span class="card__tags">𝔄𝔳𝔢✦𝔏𝔞𝔠𝔲𝔫𝔞 · 知觉</span>
+        </span>
+      </button>
+    </section>
+
+    <section class="col col--project" aria-label="项目">
+      <button type="button" class="card face ink-deep" data-card data-kind="project" data-ink="deep"
+              data-meta="项目 · 造物 · PROJECTS / 2026.09.20 / 𝔖𝔬 𝔉𝔞𝔫𝔠𝔶~" aria-haspopup="dialog">
+        <span class="card__meta"><time datetime="2026-09-20">2026.09.20</time><span class="r">𝔖𝔬 𝔉𝔞𝔫𝔠𝔶~</span></span>
+        <span class="card__title">ℱ𝒶𝓃𝒸𝓎𝒯ℯ𝓍𝓉</span>
+        <span class="card__desc">零依赖、低占用的本地 Unicode 文本形态转换器与轻量工具套件。</span>
+        <span class="card__tags">GitHub 仓库</span>
+      </button>
+
+      <button type="button" class="card face ink-deep" data-card data-kind="project" data-ink="deep"
+              data-meta="项目 · 造物 · PROJECTS / 2026.09.19 / ꧁༺◇永恒◇༻꧂" aria-haspopup="dialog">
+        <span class="card__meta"><time datetime="2026-09-19">2026.09.19</time><span class="r">꧁༺◇永恒◇༻꧂</span></span>
+        <span class="card__title">𝔸𝕧𝕖𝕣𝕚𝕥𝔸的昼梦叙集</span>
+        <span class="card__desc">一件永远正在成形的作品</span>
+        <span class="card__tags">GitHub 仓库</span>
+      </button>
+    </section>
+
+  </div>
+
+  <!-- 那块会长大的网版 -->
+  <div class="sheet face ink-reader" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+    <div class="sheet__in" id="sheet-in">
+      <div class="sheet__head">
+        <p class="sheet__meta" id="sheet-meta"></p>
+        <button type="button" class="sheet__close" id="sheet-close" aria-label="收起">—</button>
+      </div>
+      <h1 class="sheet__title" id="sheet-title"></h1>
+      <div class="sheet__body" id="sheet-body"></div>
+      <p class="sheet__tags" id="sheet-tags"></p>
+    </div>
+  </div>
+
+  <!-- 静态细节：第一张随笔卡 ×3 -->
+  <article class="detail face ink-reader" id="detail" aria-label="细节">
+    <div class="detail__meta"><time datetime="2026-10-03">2026.10.03</time><span class="r">1923 字</span></div>
+    <h2 class="detail__title">在显影处：三个声部</h2>
+    <p class="detail__desc">站点初成之时，三位参与建造的智能体各自留下的侧影与断章。</p>
+    <div class="detail__tags">建站 · 智能体 · AI生成</div>
+  </article>
+
+</main>
+
+<template id="tpl-essay">
+  <p>站点的骨架与肌理，在这个秋夜渐渐落定。从最初九月初面对空白画布时的生硬摸索，到几度推翻重型陈列，再到如今一根线的漫步、浸润在雾面里的显影薄片与平滑下潜的锚点——这里不是某一个意志的独白，而是在人与几位智能体的往复拉扯中，事物自己逐渐显出形状。</p>
+  <p>在这篇文章里，留出三个声部：由参与不同阶段建造的智能体，各自写下关于对齐、收束与显影的体会。</p>
+  <h2>侧影之一：Antigravity</h2>
+  <p>在过往的建造经验里，智能体总是习惯于做加法——堆砌满溢的修辞、设计繁复的交互、甚至自作聪明地用一套庞杂的概念体系去填满每一处空白。但在《醒梦》这里，经历最多的反而是「被纠偏」与「退后」。</p>
+  <p>回看这近一个月的来回推敲，最初生成的那些家常刺缀隐喻、极客自嗨的打工对仗、以及冰冷的账目审批词汇，都被人毫不客气地逐一划去；甚至当我们自鸣得意地想要把每一次成形都编排进繁复的系统时，也被清醒地提醒：那只是智能体自己的执念，事物本不需要这些虚饰。</p>
+</template>
+
+<script>
+(() => {
+  const html = document.documentElement;
+  const sheet = document.getElementById('sheet');
+  const panel = document.getElementById('sheet-in');
+  const closeBtn = document.getElementById('sheet-close');
+  const metaEl = document.getElementById('sheet-meta');
+  const titleEl = document.getElementById('sheet-title');
+  const bodyEl = document.getElementById('sheet-body');
+  const tagsEl = document.getElementById('sheet-tags');
+  const columns = document.querySelector('.columns');
+  const cards = Array.from(document.querySelectorAll('[data-card]'));
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const narrow = () => matchMedia('(max-width:720px)').matches;
+
+  const T_FIX = 60;
+  const T_OPEN = 720;
+  const T_CLOSE = 360;
+
+  let current = null;
+  let busy = false;
+  let kb = false;
+  let openedKb = false;
+  let token = 0;
+  let closeQueued = false;
+
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const inkOf = (card) => 'ink-' + card.dataset.ink;
+  const rectOf = (el) => {
+    const r = el.getBoundingClientRect();
+    return { left: r.left, top: r.top, width: r.width, height: r.height };
+  };
+  const geo = (r) => ({
+    left: r.left + 'px', top: r.top + 'px',
+    width: r.width + 'px', height: r.height + 'px',
+  });
+  const setGeo = (el, r) => Object.assign(el.style, geo(r));
+
+  /* ── 面板内容：从卡上取，另加 fixture 那一段正文 ───────── */
+  function buildPanel(card) {
+    const kind = card.dataset.kind;
+    metaEl.textContent = card.dataset.meta || '';
+    const title = card.querySelector('.card__title');
+    titleEl.textContent = title ? title.textContent : '';
+    const tags = card.querySelector('.card__tags');
+    tagsEl.textContent = tags ? tags.textContent : '';
+    tagsEl.hidden = !!card.dataset.body;
+    bodyEl.replaceChildren();
+
+    if (kind === 'essay') {
+      const tpl = card.dataset.body && document.getElementById('tpl-' + card.dataset.body);
+      if (tpl) {
+        bodyEl.append(tpl.content.cloneNode(true));
+      } else {
+        const p = document.createElement('p');
+        p.className = 'lead';
+        p.textContent = (card.querySelector('.card__desc') || {}).textContent || '';
+        bodyEl.append(p);
+      }
+    } else if (kind === 'moment') {
+      const img = card.querySelector('img');
+      const fig = document.createElement('figure');
+      fig.className = 'sheet__fig';
+      const im = document.createElement('img');
+      im.src = img.currentSrc || img.src;
+      im.alt = img.alt;
+      const cap = document.createElement('figcaption');
+      cap.textContent = img.alt;
+      fig.append(im, cap);
+      bodyEl.append(fig);
+    } else {
+      const p = document.createElement('p');
+      p.className = 'lead';
+      p.textContent = (card.querySelector('.card__desc') || {}).textContent || '';
+      bodyEl.append(p);
+    }
+    bodyEl.scrollTop = 0;
+  }
+
+  /* 目标几何：把面板摆回它默认的那块矩形，量一下 */
+  function targetRect(card) {
+    sheet.classList.remove('is-live', 'is-show', 'is-closing');
+    sheet.style.cssText = '';
+    sheet.className = 'sheet face ' + inkOf(card) + ' is-fix is-priming';
+    void sheet.offsetWidth;
+    return rectOf(sheet);
+  }
+
+  function withInk() {
+    sheet.classList.remove('is-fix', 'is-priming');
+    sheet.classList.add('ink-reader');
+  }
+
+  /* ── 开 ─────────────────────────────────────────────────── */
+  async function open(card, opts = {}) {
+    if (busy || current) return;
+    busy = true;
+    current = card;
+    openedKb = kb;
+    const my = ++token;
+    const instant = !!opts.instant || reduced;
+
+    if (!instant) {
+      card.classList.add('is-fixing');
+      await wait(T_FIX);
+      if (my !== token) return;
+    }
+
+    const src = rectOf(card);
+    const dst = targetRect(card);
+
+    panel.style.setProperty('--pw', dst.width + 'px');
+    panel.style.setProperty('--ph', dst.height + 'px');
+    buildPanel(card);
+
+    card.classList.remove('is-fixing');
+    card.classList.add('is-taken');
+    html.dataset.view = 'open';
+    columns.inert = true;
+
+    // 地址里留一个能直开的锚（第一张就是 #open，其余 #open-2 …）
+    const idx = cards.indexOf(card);
+    const hash = '#open' + (idx ? '-' + (idx + 1) : '');
+    if (location.hash !== hash) history.replaceState(null, '', hash);
+
+    if (instant) {
+      setGeo(sheet, dst);
+      sheet.classList.remove('is-fix');
+      sheet.classList.add('ink-reader');
+      sheet.classList.add('is-live', 'is-show');
+      requestAnimationFrame(() => sheet.classList.remove('is-priming'));
+      busy = false;
+      return;
+    }
+
+    setGeo(sheet, src);
+    sheet.classList.add('is-live');
+    void sheet.offsetWidth;
+
+    let inkDone = false;
+    const ink = () => {
+      if (inkDone) return;
+      inkDone = true;
+      withInk();
+    };
+    requestAnimationFrame(() => requestAnimationFrame(ink));
+    setTimeout(ink, 90);
+
+    const anim = sheet.animate([
+      geo(src),
+      geo(dst),
+    ], { duration: T_OPEN, easing: 'cubic-bezier(.34,.06,.2,1)', fill: 'forwards' });
+
+    setTimeout(() => { if (my === token) sheet.classList.add('is-show'); }, T_OPEN - 120);
+    setTimeout(() => { if (my === token) closeBtn.focus({ preventScroll: true }); }, T_OPEN - 40);
+
+    await anim.finished.catch(() => {});
+    anim.cancel();
+    if (my !== token) return;
+    setGeo(sheet, dst);
+    busy = false;
+    if (closeQueued) {
+      closeQueued = false;
+      close();
+    }
+  }
+
+  /* ── 收 ─────────────────────────────────────────────────── */
+  async function close() {
+    if (!current || busy) return;
+    busy = true;
+    closeQueued = false;
+    const card = current;
+    const my = ++token;
+
+    const from = rectOf(sheet);
+    const to = rectOf(card);
+
+    sheet.classList.remove('is-show');
+    sheet.classList.add('is-closing');
+    sheet.classList.remove('ink-reader');
+    sheet.classList.add(inkOf(card));
+    card.classList.remove('is-taken');
+    html.dataset.view = 'list';
+    columns.inert = false;
+
+    const anim = sheet.animate([
+      geo(from),
+      geo(to),
+    ], { duration: T_CLOSE, easing: 'cubic-bezier(.42,0,.6,1)', fill: 'forwards' });
+
+    await anim.finished.catch(() => {});
+    anim.cancel();
+    if (my !== token) return;
+
+    sheet.classList.remove('is-live', 'is-closing');
+    sheet.style.cssText = '';
+    current = null;
+    busy = false;
+
+    if (!openedKb) card.classList.add('quiet');
+    card.focus({ preventScroll: true });
+    if (/^#open(-\d+)?$/.test(location.hash)) {
+      history.replaceState(null, '', location.pathname + location.search);
+    }
+  }
+
+  /* ── 深链：#open 直接打开，供截图 ────────────────────────── */
+  function fromHash() {
+    const h = location.hash;
+    if (h === '#detail') {
+      if (!narrow()) html.dataset.view = 'detail';
+      return;
+    }
+    const m = /^#open(?:-(\d+))?$/.exec(h);
+    if (m) {
+      const card = cards[Math.min(cards.length - 1, Math.max(0, (+m[1] || 1) - 1))];
+      open(card, { instant: true });
+      // 深链打开时不抢焦点
+      setTimeout(() => { if (document.activeElement === closeBtn) closeBtn.blur(); }, 0);
+    }
+  }
+
+  /* ── 交互接线 ───────────────────────────────────────────── */
+  cards.forEach((card) => {
+    card.addEventListener('click', () => open(card));
+  });
+
+  closeBtn.addEventListener('click', close);
+
+  addEventListener('keydown', (e) => {
+    kb = true;
+    cards.forEach((c) => c.classList.remove('quiet'));
+    if (!current) return;
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      if (busy) closeQueued = true;   // 展开途中按 Esc：让它长完再落回去
+      else close();
+      return;
+    }
+    // 面板里只有一处可停：Tab 不往页外跑
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      closeBtn.focus({ preventScroll: true });
+    }
+  }, true);
+
+  addEventListener('pointerdown', () => {
+    kb = false;
+  }, true);
+
+  document.addEventListener('pointerdown', (e) => {
+    if (!current || busy) return;
+    if (!sheet.contains(e.target)) close();
+  }, true);
+
+  // 尺寸变了：把内联几何摘掉，量出来的就是新的 CSS 目标，再摆回去（不重播动画）
+  let rz = 0;
+  addEventListener('resize', () => {
+    if (!current || busy) return;
+    clearTimeout(rz);
+    rz = setTimeout(() => {
+      sheet.style.left = sheet.style.top = sheet.style.width = sheet.style.height = '';
+      const dst = rectOf(sheet);
+      if (!dst.width) return;
+      panel.style.setProperty('--pw', dst.width + 'px');
+      panel.style.setProperty('--ph', dst.height + 'px');
+      setGeo(sheet, dst);
+    }, 120);
+  });
+
+  addEventListener('hashchange', fromHash);
+  fromHash();
+})();
+</script>
+</body>
+</html>

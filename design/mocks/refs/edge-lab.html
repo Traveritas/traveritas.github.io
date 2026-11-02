@@ -1,0 +1,413 @@
+<!doctype html>
+<!--
+  边技术实验台 · refs 专用（不是生产页，不进 src）
+  目的：把调研到的「边」技法，原样搬到我们自己的底图（cards-r5 的 plate-1440）上，
+  每张 300×200，同一份内容，只换边的做法，左栏冷灰 / 右栏深蓝各来一遍。
+
+  用法（浏览器直接开）：
+    edge-lab.html                 网格总览（6 个做法 × 明暗两栏）
+    edge-lab.html?v=a3           只看某一做法（明暗并排）
+    edge-lab.html?v=b&bg=dark    单片放大 2 倍，看 1.25px 线的像素
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>边 · 技术实验台</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: #cfd6de;
+    font-family: 'Noto Serif SC', Georgia, 'Songti SC', serif;
+    color: #232830;
+  }
+
+  /* ── 底图：直接用 cards-r5 的生产截图，不改不盖 ───────────── */
+  /* 每格自己裁一块底图贴上来：light 取左栏，dark 取右栏，卡片周围露出来的就是真底 */
+  .cell {
+    position: relative;
+    width: 340px;
+    height: 240px;
+    background-image: url(../cards-r5/shared/plate-1440.png);
+    background-size: 1440px 900px;
+    background-repeat: no-repeat;
+  }
+  .cell[data-bg='light'] { background-position: -110px -320px; }
+  .cell[data-bg='dark']  { background-position: -1090px -320px; }
+
+  /* ── 卡片本体：只有一个底、一个边、文字 ──────────────────── */
+  .card {
+    --r: 3px;
+    position: absolute;
+    left: 20px;
+    top: 20px;
+    width: 300px;
+    height: 200px;
+    border-radius: var(--r);
+    padding: 14px 16px;
+    isolation: isolate;
+  }
+  .card h3 {
+    margin: 10px 0 0;
+    font-size: 15px;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+  }
+  .card p {
+    margin: 7px 0 0;
+    font-family: system-ui, 'Microsoft YaHei UI', sans-serif;
+    font-size: 10.5px;
+    line-height: 1.65;
+    color: #56606d;
+    max-width: 15em;
+  }
+  .card .meta {
+    position: absolute;
+    left: 16px;
+    top: 13px;
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 8.5px;
+    letter-spacing: 0.04em;
+    color: #858f9d;
+  }
+  .card[data-bg='dark'] p { color: #a9a2bd; }
+  .card[data-bg='dark'] h3 { color: #e9e4f2; }
+  .card[data-bg='dark'] .meta { color: #8d86a3; }
+
+  /* 左下那颗 1.25px 的星（照 Toolstar 的画法缩到 22px） */
+  .star {
+    position: absolute;
+    left: 14px;
+    bottom: 12px;
+    width: 22px;
+    height: 22px;
+    fill: none;
+    stroke: #56606d;
+    stroke-width: 1.25;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+    overflow: visible;
+  }
+  .card[data-bg='dark'] .star { stroke: #b7aed0; }
+
+  /* ── 甲 · 现状：一条 1px 边 + 一层半透白 ─────────────────── */
+  .v-now {
+    background: rgba(255, 255, 255, 0.14);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.28);
+  }
+  .v-now[data-bg='light'] { box-shadow: 0 0 0 1px rgba(35, 40, 48, 0.10); }
+
+  /* ── 乙 · 双层描边（最便宜的「厚度」）：0.6px 亮内线 + 0.6px 暗外线 ── */
+  .v-a1 {
+    background: rgba(255, 255, 255, 0.10);
+    box-shadow:
+      inset 0 0 0 0.6px rgba(255, 255, 255, 0.52),
+      0 0 0 0.6px rgba(23, 28, 40, 0.22),
+      0 0.6px 0.6px rgba(23, 28, 40, 0.10);
+  }
+  .v-a1[data-bg='light'] {
+    background: rgba(35, 40, 48, 0.035);
+    box-shadow:
+      inset 0 0 0 0.6px rgba(255, 255, 255, 0.72),
+      0 0 0 0.6px rgba(23, 28, 40, 0.16);
+  }
+
+  /* ── 丙 · 定向环：两圈各 0.6px，用 mask-composite 抠出环带，
+     渐变让「迎光的一侧亮、背光的一侧暗」，中途允许归零（边会消失一段） ── */
+  .v-a2::before,
+  .v-a2::after {
+    content: '';
+    position: absolute;
+    border-radius: inherit;
+    pointer-events: none;
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    -webkit-mask-composite: xor;
+  }
+  /* 内亮线：从内容盒里让出 0.6px */
+  .v-a2::before {
+    inset: 0;
+    padding: 0.6px;
+    background: linear-gradient(
+      150deg,
+      rgba(255, 255, 255, 0.62),
+      rgba(255, 255, 255, 0.18) 38%,
+      rgba(255, 255, 255, 0) 52%,
+      rgba(255, 255, 255, 0.10) 100%
+    );
+  }
+  /* 外暗线：贴在卡片外面 0.6px */
+  .v-a2::after {
+    inset: -0.6px;
+    padding: 0.6px;
+    background: linear-gradient(
+      150deg,
+      rgba(23, 28, 40, 0) 30%,
+      rgba(23, 28, 40, 0.10) 55%,
+      rgba(23, 28, 40, 0.30)
+    );
+  }
+  .v-a2 { background: rgba(255, 255, 255, 0.10); }
+  .v-a2[data-bg='light'] { background: rgba(35, 40, 48, 0.035); }
+
+  /* ── 丁 · 提亮环：边 = 卡片外面那 1.25px 的底图被提亮（网点跟着亮） ── */
+  .v-a3::before {
+    content: '';
+    position: absolute;
+    inset: -1.25px;
+    padding: 1.25px;
+    border-radius: calc(var(--r) + 1.25px);
+    pointer-events: none;
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    -webkit-mask-composite: xor;
+    backdrop-filter: brightness(1.42) saturate(1.12) contrast(1.06);
+    -webkit-backdrop-filter: brightness(1.42) saturate(1.12) contrast(1.06);
+  }
+  .v-a3 {
+    background: rgba(255, 255, 255, 0.10);
+    box-shadow: inset 0 0 0 0.5px rgba(23, 28, 40, 0.20);
+  }
+  .v-a3[data-bg='light'] {
+    background: rgba(35, 40, 48, 0.035);
+    box-shadow: inset 0 0 0 0.5px rgba(23, 28, 40, 0.12);
+  }
+
+  /* ── 戊 · 在同一张底上对色值：填充是底的值偏移，不是一层白膜 ── */
+  .v-a5 {
+    background: rgba(23, 28, 40, 0.055);
+    box-shadow:
+      inset 0 0 0 0.5px rgba(23, 28, 40, 0.16),
+      inset 0 10px 18px -12px rgba(23, 28, 40, 0.22);
+  }
+  .v-a5[data-bg='light'] {
+    background: rgba(23, 28, 40, 0.03);
+    box-shadow:
+      inset 0 0 0 0.5px rgba(23, 28, 40, 0.12),
+      inset 0 10px 18px -12px rgba(23, 28, 40, 0.14);
+  }
+  .v-a5[data-bg='dark'] {
+    background: rgba(255, 255, 255, 0.075);
+    box-shadow:
+      inset 0 0 0 0.5px rgba(255, 255, 255, 0.16),
+      inset 0 10px 18px -12px rgba(0, 0, 0, 0.45);
+  }
+  .v-a5::before {
+    content: '';
+    position: absolute;
+    inset: -1.25px;
+    padding: 1.25px;
+    border-radius: calc(var(--r) + 1.25px);
+    pointer-events: none;
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    -webkit-mask-composite: xor;
+    backdrop-filter: brightness(1.38) saturate(1.1);
+    -webkit-backdrop-filter: brightness(1.38) saturate(1.1);
+  }
+
+  /* ── 壬 · 合力：面上一道极缓的明暗 + 分边不同权重的 0.6px 双线 ──
+     不用伪元素、不用 mask、不用 filter：三个 inset/outset shadow 各自只管一条边，
+     上亮、左次亮、下暗，右边留给底图自己说。 */
+  .v-win {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.02)),
+      rgba(23, 28, 40, 0.02);
+    box-shadow:
+      inset 0 0.6px 0 rgba(255, 255, 255, 0.60),
+      inset 0.6px 0 0 rgba(255, 255, 255, 0.30),
+      0 0.6px 0 rgba(23, 28, 40, 0.20);
+  }
+  .v-win[data-bg='light'] {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(23, 28, 40, 0.05)),
+      rgba(23, 28, 40, 0.02);
+    box-shadow:
+      inset 0 0.6px 0 rgba(255, 255, 255, 0.55),
+      inset 0.6px 0 0 rgba(255, 255, 255, 0.22),
+      0 0.6px 0 rgba(23, 28, 40, 0.22),
+      0 0 0.6px rgba(23, 28, 40, 0.12);
+  }
+
+  /* ── 癸 · 反号：填充是底图的值偏移，偏移方向随明暗栏反号 ──
+     亮栏 = 薄暗片（往下压），暗栏 = 薄亮片（往上提）；两边共用同一条「上亮下暗」的边。 */
+  .v-win2[data-bg='light'] {
+    background: linear-gradient(180deg, rgba(23, 28, 40, 0.015), rgba(23, 28, 40, 0.085));
+    box-shadow:
+      inset 0 0.6px 0 rgba(255, 255, 255, 0.42),
+      0 0 0 0.5px rgba(23, 28, 40, 0.14),
+      0 0.6px 0 rgba(23, 28, 40, 0.26);
+  }
+  .v-win2[data-bg='dark'] {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.015));
+    box-shadow:
+      inset 0 0.6px 0 rgba(255, 255, 255, 0.55),
+      0 0 0 0.5px rgba(255, 255, 255, 0.10),
+      0 0.6px 0 rgba(0, 0, 0, 0.28);
+  }
+
+
+  /* ── 子 · 噪点咬边：把 1.25px 的环喂给 feTurbulence + feDisplacementMap ── */
+  .v-rough::before {
+    content: '';
+    position: absolute;
+    inset: -0.6px;
+    padding: 1.25px;
+    border-radius: calc(var(--r) + 0.6px);
+    pointer-events: none;
+    background: linear-gradient(150deg, rgba(255,255,255,.55), rgba(255,255,255,.12) 45%, rgba(23,28,40,.28));
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    -webkit-mask-composite: xor;
+    filter: url(#rough);
+  }
+  .v-rough { background: rgba(255,255,255,.07); }
+  .v-rough[data-bg='light'] { background: rgba(23,28,40,.03); }
+
+  /* ── 己 · 反面教材：玻璃拟物（内高光 + 模糊 + 白描边） ────── */
+  .v-e {
+    background: rgba(255, 255, 255, 0.18);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.55),
+      0 8px 24px rgba(0, 0, 0, 0.18);
+    backdrop-filter: blur(6px) saturate(1.4);
+    -webkit-backdrop-filter: blur(6px) saturate(1.4);
+  }
+
+  /* ── 庚 · 网点收口：最后 3px 不做实边，交给 3px 网点（半调） ── */
+  .v-c {
+    background: rgba(255, 255, 255, 0.075);
+    box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.14);
+  }
+  .v-c[data-bg='light'] {
+    background: rgba(35, 40, 48, 0.03);
+    box-shadow: inset 0 0 0 0.5px rgba(23, 28, 40, 0.10);
+  }
+  .v-c::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    padding: 5px;
+    border-radius: inherit;
+    pointer-events: none;
+    background-image: radial-gradient(circle, currentColor 1.4px, transparent 1.6px);
+    background-size: 5px 5px;
+    background-position: 0 0;
+    color: rgba(255, 255, 255, 0.55);
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    -webkit-mask-composite: xor;
+  }
+  .v-c[data-bg='light']::after { color: rgba(23, 28, 40, 0.42); }
+
+  /* ── 辛 · 亚像素色散：星的 1.25px 线复制两份，各偏 0.4px，加色叠加 ── */
+  .v-b .star { position: absolute; }
+  .v-b .star-ghost {
+    position: absolute;
+    left: 14px;
+    bottom: 12px;
+    width: 22px;
+    height: 22px;
+    fill: none;
+    stroke-width: 1.25;
+    stroke-linejoin: round;
+    pointer-events: none;
+    mix-blend-mode: plus-lighter;
+    opacity: 0.75;
+  }
+  .v-b .g1 { stroke: #c9a6ff; transform: translate(-0.4px, -0.25px); }
+  .v-b .g2 { stroke: #8fd6ff; transform: translate(0.4px, 0.25px); }
+
+  /* ── 版面 ─────────────────────────────────────────────── */
+  .wrap { padding: 26px 30px 40px; }
+  h1 { font-size: 15px; font-weight: 500; margin: 0 0 4px; letter-spacing: 0.02em; }
+  .lede { font-size: 11px; color: #56606d; margin: 0 0 18px; font-family: system-ui, sans-serif; }
+  .grid { display: flex; flex-wrap: wrap; gap: 0 6px; }
+  .tag {
+    position: absolute;
+    left: 20px;
+    bottom: -2px;
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 8.5px;
+    color: #56606d;
+    letter-spacing: 0.02em;
+  }
+  .cell { margin-bottom: 20px; }
+  .cell .tag { bottom: 2px; }
+
+  /* 单片放大 */
+  .solo .wrap { padding: 0; }
+  .solo h1, .solo .lede { display: none; }
+  .solo .cell { margin: 0; }
+  .solo .grid { gap: 0; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <filter id="rough" x="-10%" y="-10%" width="120%" height="120%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.55" numOctaves="2" result="n" />
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="1.6" xChannelSelector="R" yChannelSelector="G" />
+    </filter>
+  </defs>
+</svg>
+<div class="wrap">
+  <h1>边 · 技术实验台</h1>
+  <p class="lede" id="lede">同一张 300×200 卡、同一份内容，只换边的做法。左栏冷灰（亮底）、右栏深蓝（暗底）。</p>
+  <div class="grid" id="grid"></div>
+</div>
+<script>
+  const STAR =
+    '<path d="M11 2.6 19.8 18.2H2.2Z"/><path d="M11 19.4 2.2 3.8h17.6Z"/>' +
+    '<circle cx="11" cy="11" r="1" />';
+
+  const VARIANTS = [
+    ['now', '现状 · 1px 边 + 白膜'],
+    ['a1', '乙 · 双层描边 box-shadow'],
+    ['a2', '丙 · 定向环 mask-composite'],
+    ['a3', '丁 · 提亮环 backdrop-filter'],
+    ['a5', '戊 · 同底对色值 + 提亮环'],
+    ['e', '己 · 玻璃拟物（反面）'],
+    ['win', '壬 · 合力：面梯度 + 分边双线'],
+    ['win2', '癸 · 反号填充 + 上亮下暗'],
+    ['c', '庚 · 网点收口 5px'],
+    ['b', '辛 · 亚星色散 0.4px'],
+    ['rough', '子 · 噪点咬边 turbulence'],
+  ];
+
+  const card = (v, bg) => `
+    <article class="card v-${v}" data-bg="${bg}">
+      <div class="meta">2026.10.03 · 1923 字</div>
+      <h3>在显影处：三个声部</h3>
+      <p>站点初成之时，三位参与建造的智能体各自留下的侧影与断章。</p>
+      <svg class="star" viewBox="0 0 22 22">${STAR}</svg>
+      ${v === 'b' ? `<svg class="star-ghost g1" viewBox="0 0 22 22">${STAR}</svg><svg class="star-ghost g2" viewBox="0 0 22 22">${STAR}</svg>` : ''}
+    </article>`;
+
+  const q = new URLSearchParams(location.search);
+  const only = q.get('v');
+  const bgOnly = q.get('bg');
+  if (q.has('solo')) document.body.classList.add('solo');
+
+  const grid = document.getElementById('grid');
+  const list = only ? VARIANTS.filter(([v]) => v === only) : VARIANTS;
+  const bgs = bgOnly ? [bgOnly] : ['light', 'dark'];
+  for (const [v, name] of list) {
+    for (const bg of bgs) {
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      cell.dataset.bg = bg;
+      cell.innerHTML = card(v, bg) + `<div class="tag">${name} · ${bg}</div>`;
+      grid.appendChild(cell);
+    }
+  }
+  if (only) document.getElementById('lede').textContent = list[0][1] + ' · 明暗两栏并排';
+</script>
+</body>
+</html>

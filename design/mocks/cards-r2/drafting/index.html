@@ -1,0 +1,1012 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>B · 图纸 · drafting</title>
+<link rel="stylesheet" href="/fonts/noto-serif-sc/font.css">
+<link rel="stylesheet" href="/shared/stage.css">
+<style>
+  @font-face {
+    font-family: 'Plex';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('/plex/ibm-plex-mono-latin-400-normal.woff2') format('woff2');
+  }
+  @font-face {
+    font-family: 'Plex';
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url('/plex/ibm-plex-mono-latin-500-normal.woff2') format('woff2');
+  }
+
+  :root {
+    --ink: #1f252d;
+    --ink2: #4f5a67;
+    --ink3: #79838f;
+    --ink4: #97a1ad;
+    --rule: rgba(52, 48, 42, 0.2);
+    --rule2: rgba(52, 48, 42, 0.11);
+    --rule3: rgba(52, 48, 42, 0.06);
+    --tick: rgba(52, 48, 42, 0.26);
+    --amber: #9a86c4;
+    --serif: 'Noto Serif SC', 'Songti SC', SimSun, serif;
+    --mono: 'Plex', ui-monospace, Consolas, monospace;
+
+    --side: 84px;
+    --pad: 52px;
+    --c1: 391px;
+    --c2: 461px;
+    --c3: 316px;
+  }
+
+  *,
+  *::before,
+  *::after { box-sizing: border-box; }
+
+  html { background: #e2e8f0; }
+
+  body {
+    margin: 0;
+    color: var(--ink);
+    font-family: var(--serif);
+    font-weight: 500;
+    background:
+      radial-gradient(1150px 760px at 16% -18%, rgba(255, 255, 255, 0.85), transparent 60%),
+      radial-gradient(1000px 720px at 98% 112%, rgba(186, 198, 215, 0.55), transparent 64%),
+      linear-gradient(172deg, #eef2f6 0%, #e1e7ef 54%, #e4eaf1 100%);
+    background-attachment: fixed;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  a { color: inherit; text-decoration: none; }
+
+  .hash {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 1px;
+    height: 1px;
+    pointer-events: none;
+  }
+
+  /* ── 空间：线比纸长，纸半透地压在线上面 ─────────────────────── */
+  .space {
+    position: relative;
+    min-height: 100vh;
+    padding-bottom: 58px;
+  }
+  .guide {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    z-index: 0;
+    width: 1px;
+    background: var(--rule2);
+  }
+  .guide.a { left: calc(var(--side) + var(--pad) + var(--c1)); }
+  .guide.b { left: calc(var(--side) + var(--pad) + var(--c1) + var(--c2)); }
+
+  .sheet {
+    position: relative;
+    z-index: 1;
+    margin: 58px var(--side) 0;
+    padding: 0 var(--pad) 26px;
+    min-height: 784px;
+    background:
+      radial-gradient(920px 560px at 24% -6%, rgba(255, 255, 255, 0.5), transparent 62%),
+      linear-gradient(
+        180deg,
+        rgba(255, 253, 245, 0.72) 0%,
+        rgba(253, 250, 240, 0.62) 48%,
+        rgba(250, 247, 237, 0.52) 100%
+      );
+  }
+  /* 切边：外一道暗，内一道亮（纸的厚度） */
+  .sheet::before {
+    content: '';
+    position: absolute;
+    top: 1px;
+    left: 1px;
+    right: 1px;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.85);
+    pointer-events: none;
+  }
+  .sheet::after {
+    content: '';
+    position: absolute;
+    top: 1px;
+    left: 1px;
+    bottom: 1px;
+    width: 1px;
+    background: rgba(255, 255, 255, 0.6);
+    pointer-events: none;
+  }
+
+  /* 纸的边：四处各自断在不同地方 */
+  .edge { position: absolute; z-index: 2; background: var(--rule); pointer-events: none; }
+  .edge.t { top: 0; left: 0; right: 0; height: 1px; }
+  .edge.l {
+    top: 0;
+    left: 0;
+    width: 1px;
+    height: 100%;
+    background: linear-gradient(180deg, var(--rule) 0%, var(--rule) 70%, transparent 94%);
+  }
+  .edge.r {
+    top: 0;
+    right: 0;
+    width: 1px;
+    height: 100%;
+    background: linear-gradient(180deg, var(--rule) 0%, var(--rule) 88%, transparent 100%);
+  }
+  .edge.b {
+    bottom: 0;
+    left: 46px;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent 0%, var(--rule) 8%, var(--rule) 100%);
+  }
+
+  /* 顶边与两边的刻度 */
+  .ruler {
+    position: absolute;
+    top: 1px;
+    left: 0;
+    right: 0;
+    height: 9px;
+    z-index: 2;
+    pointer-events: none;
+  }
+  .ruler i {
+    position: absolute;
+    inset: 0;
+    background-repeat: repeat-x;
+  }
+  .ruler .minor {
+    background-image: repeating-linear-gradient(90deg, var(--tick) 0 1px, transparent 1px 24px);
+    -webkit-mask-image: linear-gradient(180deg, #000 0 4px, transparent 4px);
+    mask-image: linear-gradient(180deg, #000 0 4px, transparent 4px);
+  }
+  .ruler .major {
+    background-image: repeating-linear-gradient(90deg, var(--tick) 0 1px, transparent 1px 96px);
+    -webkit-mask-image: linear-gradient(180deg, #000 0 8px, transparent 8px);
+    mask-image: linear-gradient(180deg, #000 0 8px, transparent 8px);
+  }
+  /* 刻度的底线：把顶边收成一条量带 */
+  .ruler .base {
+    top: 8px;
+    bottom: auto;
+    height: 1px;
+    background: rgba(52, 48, 42, 0.09);
+  }
+
+  .vruler {
+    position: absolute;
+    left: 28px;
+    top: 1px;
+    bottom: 54px;
+    width: 1px;
+    z-index: 2;
+    background: var(--rule2);
+    pointer-events: none;
+  }
+  .vruler i {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 5px;
+    background-repeat: repeat-y;
+  }
+  .vruler .minor {
+    background-image: repeating-linear-gradient(180deg, var(--tick) 0 1px, transparent 1px 24px);
+    -webkit-mask-image: linear-gradient(90deg, #000 0 3px, transparent 3px);
+    mask-image: linear-gradient(90deg, #000 0 3px, transparent 3px);
+  }
+  .vruler .major {
+    background-image: repeating-linear-gradient(180deg, var(--tick) 0 1px, transparent 1px 96px);
+    -webkit-mask-image: linear-gradient(90deg, #000 0 8px, transparent 8px);
+    mask-image: linear-gradient(90deg, #000 0 8px, transparent 8px);
+  }
+  .vruler.r { left: auto; right: 28px; }
+  .vruler.r i { left: auto; right: 0; }
+  .vruler.r .minor {
+    -webkit-mask-image: linear-gradient(270deg, #000 0 3px, transparent 3px);
+    mask-image: linear-gradient(270deg, #000 0 3px, transparent 3px);
+  }
+  .vruler.r .major {
+    -webkit-mask-image: linear-gradient(270deg, #000 0 8px, transparent 8px);
+    mask-image: linear-gradient(270deg, #000 0 8px, transparent 8px);
+  }
+
+  /* 纸角：一小段琥珀色的对位记 */
+  .crop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 18px;
+    height: 18px;
+    z-index: 3;
+    pointer-events: none;
+  }
+  .crop::before,
+  .crop::after { content: ''; position: absolute; background: var(--amber); opacity: 0.62; }
+  .crop::before { top: 0; left: 0; width: 18px; height: 1px; }
+  .crop::after { top: 0; left: 0; width: 1px; height: 18px; }
+
+  /* 图纸登记行 */
+  .reg {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding-top: 18px;
+    font: 400 9.5px/1 var(--mono);
+    letter-spacing: 0.22em;
+    color: var(--ink4);
+    text-transform: uppercase;
+  }
+
+  /* ── 视图切换（:target） ─────────────────────────────────── */
+  .view { display: none; }
+  .view.list { display: block; }
+  body:has(#open:target) .view.list,
+  body:has(#detail:target) .view.list { display: none; }
+  body:has(#open:target) .view.open { display: block; }
+  body:has(#detail:target) .view.detail { display: flex; }
+  body:has(#open:target) .guide.a { bottom: auto; height: 172px; }
+
+  /* ── 检索：三栏 ──────────────────────────────────────────── */
+  .cols {
+    position: relative;
+    z-index: 2;
+    display: grid;
+    grid-template-columns: var(--c1) var(--c2) var(--c3);
+    padding-top: 30px;
+  }
+  /* 栏头下面那条横线，在两根竖线前断开 */
+  .cols::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      var(--rule) 0 379px,
+      transparent 379px 403px,
+      var(--rule) 403px 840px,
+      transparent 840px 864px,
+      var(--rule) 864px 1168px
+    );
+  }
+
+  .col {
+    position: relative;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    padding-right: 38px;
+  }
+  .col + .col { padding-left: 40px; }
+  .col:last-child { padding-right: 0; }
+
+  .chead {
+    display: flex;
+    align-items: baseline;
+    gap: 13px;
+    padding-bottom: 16px;
+  }
+  .chead .no {
+    font: 400 23px/0.86 var(--mono);
+    letter-spacing: 0;
+    color: #8d97a3;
+  }
+  .chead h2 {
+    margin: 0;
+    font: 500 18px/1 var(--serif);
+    letter-spacing: 0.12em;
+    color: var(--ink);
+  }
+  .chead .en {
+    font: 400 9px/1 var(--mono);
+    letter-spacing: 0.26em;
+    text-transform: uppercase;
+    color: #8b95a2;
+  }
+  .chead .cnt {
+    margin-left: auto;
+    align-self: center;
+    font: 400 9.5px/1 var(--mono);
+    letter-spacing: 0.08em;
+    color: var(--ink4);
+  }
+
+  .entries { flex: 1; padding-top: 32px; }
+
+  /* 一条目录的登记线：号 · 线 · 日期 */
+  .rl {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    font: 400 9.5px/1 var(--mono);
+    letter-spacing: 0.1em;
+    color: var(--ink3);
+  }
+  .rl i {
+    flex: 1;
+    height: 1px;
+    background: rgba(52, 48, 42, 0.14);
+  }
+  .rl time { letter-spacing: 0.08em; color: var(--ink3); }
+
+  .e { position: relative; }
+  .e + .e { margin-top: 58px; }
+
+  .t {
+    margin: 17px 0 0;
+    font: 500 26px/1.38 var(--serif);
+    letter-spacing: 0.018em;
+    color: var(--ink);
+    text-wrap: pretty;
+  }
+  .e--a:first-child .t { font-size: 32px; line-height: 1.32; margin-top: 20px; font-weight: 600; }
+  .d {
+    margin: 12px 0 0;
+    font: 500 14px/1.95 var(--serif);
+    letter-spacing: 0.012em;
+    color: var(--ink2);
+    text-wrap: pretty;
+  }
+  .e--a:first-child .d { font-size: 14.5px; margin-top: 14px; }
+  .m {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    margin-top: 22px;
+  }
+  .tags {
+    font: 500 11.5px/1.6 var(--serif);
+    letter-spacing: 0.06em;
+    color: #6c7683;
+  }
+  .w {
+    flex: none;
+    font: 500 10px/1 var(--serif);
+    letter-spacing: 0.06em;
+    color: var(--ink4);
+    white-space: nowrap;
+  }
+  .w b {
+    font: 400 9.5px/1 var(--mono);
+    letter-spacing: 0.1em;
+    margin-right: 2px;
+  }
+
+  /* 每栏的收口：栏目名 + 一条走到底的线 */
+  .cfoot {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 26px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(52, 48, 42, 0.09);
+    font: 400 8px/1 var(--mono);
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: #a3acb8;
+  }
+  .cfoot i { flex: 1; height: 1px; background: rgba(52, 48, 42, 0.09); }
+
+  /* 瞬间：照片印在纸上，无框，边缘化开 */
+  .plate {
+    position: relative;
+    margin: 0;
+    overflow: hidden;
+    -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 14px, #000 calc(100% - 22px), transparent 100%);
+    mask-image: linear-gradient(180deg, transparent 0, #000 14px, #000 calc(100% - 22px), transparent 100%);
+  }
+  .plate .fx {
+    display: block;
+    -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 18px, #000 calc(100% - 8px), transparent 100%);
+    mask-image: linear-gradient(90deg, transparent 0, #000 18px, #000 calc(100% - 8px), transparent 100%);
+  }
+  .plate img {
+    display: block;
+    width: 100%;
+    height: 160px;
+    object-fit: cover;
+    filter: saturate(1.06) contrast(1.1) brightness(0.99);
+    opacity: 0.97;
+  }
+  .cap {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-top: 9px;
+    font: 500 11.5px/1.6 var(--serif);
+    letter-spacing: 0.05em;
+    color: var(--ink3);
+  }
+  .cap::before {
+    content: '';
+    flex: none;
+    width: 14px;
+    height: 1px;
+    margin-bottom: 2px;
+    background: var(--rule2);
+  }
+  .e--m .plate { margin-top: 12px; }
+  .e--m .t { font-size: 21px; margin-top: 6px; line-height: 1.45; }
+  .e--m .m { margin-top: 12px; }
+  .e--m .cap { margin-top: 7px; }
+
+  /* 图数的小刻度 */
+  .plates {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-right: 2px;
+  }
+  .plates b {
+    display: block;
+    width: 7px;
+    height: 1px;
+    background: var(--rule);
+  }
+  .plates b.on { background: var(--amber); opacity: 0.85; height: 2px; margin-top: -1px; }
+
+  /* 造物 */
+  .e--p .t { font-size: 23px; }
+  .e--p .foot {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 14px;
+    margin-top: 24px;
+    padding-top: 13px;
+    border-top: 1px solid var(--rule3);
+  }
+  .e--p .lnk {
+    font: 400 9.5px/1 var(--mono);
+    letter-spacing: 0.14em;
+    color: var(--ink3);
+  }
+  .e--p .lnk .zh {
+    font: 500 11.5px/1 var(--serif);
+    letter-spacing: 0.06em;
+    color: var(--ink2);
+    margin-right: 4px;
+  }
+  .e--p .st {
+    font: 500 11.5px/1 var(--serif);
+    color: var(--ink3);
+    letter-spacing: 0.04em;
+  }
+
+  /* ── 展开：图纸变长 ─────────────────────────────────────── */
+  .view.open { position: relative; z-index: 2; padding-top: 30px; }
+  .rhead {
+    position: relative;
+    display: grid;
+    grid-template-columns: var(--c1) var(--c2) var(--c3);
+  }
+  .rhead::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      var(--rule) 0 379px,
+      transparent 379px 403px,
+      var(--rule) 403px 840px,
+      transparent 840px 864px,
+      var(--rule3) 864px 1168px
+    );
+  }
+  .rhead .chead { padding-bottom: 0; }
+  .rhead > :first-child { padding-right: 38px; }
+  .rhead > :nth-child(2) { padding-left: 40px; padding-right: 38px; }
+  .rhead > :last-child { padding-left: 40px; }
+  .rhead .chead.ghost { opacity: 0.26; }
+  .rhead .chead.ghost .cnt { opacity: 0; }
+
+  .article {
+    display: grid;
+    grid-template-columns: 852px 1fr;
+    padding-top: 52px;
+  }
+  .amain { max-width: 640px; }
+
+  .meta {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    font: 400 9.5px/1 var(--mono);
+    letter-spacing: 0.12em;
+    color: var(--ink3);
+    text-transform: uppercase;
+  }
+  .meta .sep { width: 1px; height: 9px; background: var(--rule2); }
+  .meta .pos { color: var(--ink4); letter-spacing: 0.06em; }
+
+  .atitle {
+    margin: 28px 0 0;
+    font: 600 34px/1.34 var(--serif);
+    letter-spacing: 0.02em;
+    color: var(--ink);
+  }
+  .body {
+    margin-top: 36px;
+    max-width: 34em;
+    font: 500 16px/2.05 var(--serif);
+    letter-spacing: 0.015em;
+    color: #2b323b;
+    text-align: justify;
+  }
+  .body p { margin: 0 0 1.5em; }
+  .body h3 {
+    display: flex;
+    align-items: baseline;
+    gap: 13px;
+    margin: 2.35em 0 1.1em;
+    font: 600 16px/1.6 var(--serif);
+    letter-spacing: 0.05em;
+    color: var(--ink);
+  }
+  .body h3::before {
+    content: '';
+    flex: none;
+    width: 20px;
+    height: 1px;
+    background: var(--rule);
+    transform: translateY(-0.33em);
+  }
+
+  /* 右侧的存目：图纸边缘的索引 */
+  .index {
+    padding-left: 46px;
+    padding-top: 1px;
+    max-width: 316px;
+  }
+  .index .ig {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--rule2);
+    font: 400 8.5px/1 var(--mono);
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--ink4);
+  }
+  .index .ig .zh {
+    font: 500 13px/1 var(--serif);
+    letter-spacing: 0.12em;
+    color: var(--ink2);
+  }
+  .index ol { margin: 0; padding: 0; list-style: none; }
+  .index li {
+    display: flex;
+    gap: 13px;
+    align-items: baseline;
+    padding: 11px 0 10px;
+    border-bottom: 1px solid var(--rule3);
+    font: 500 12px/1.5 var(--serif);
+    letter-spacing: 0.03em;
+    color: var(--ink3);
+  }
+  .index li .n {
+    flex: none;
+    font: 400 8.5px/1 var(--mono);
+    letter-spacing: 0.1em;
+    color: var(--ink4);
+  }
+  .index li.cur { color: var(--ink); }
+  .index li.cur .n { color: var(--amber); opacity: 0.95; }
+  .index li.cur::after {
+    content: '';
+    flex: none;
+    width: 14px;
+    height: 1px;
+    margin-left: auto;
+    background: var(--amber);
+    opacity: 0.55;
+  }
+  .index .ig.g2 { margin-top: 34px; }
+
+  /* ── 细节：把第一张随笔卡放大 ───────────────────────────── */
+  .view.detail {
+    position: relative;
+    z-index: 2;
+    flex-direction: column;
+    min-height: 720px;
+    padding-top: 34px;
+  }
+  body:has(#detail:target) .guide { opacity: 0; }
+
+  .dhead {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    font: 400 9px/1 var(--mono);
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--ink4);
+  }
+  .dhead .zh { font: 500 13px/1 var(--serif); letter-spacing: 0.12em; color: var(--ink3); }
+  .dhead .right { margin-left: auto; }
+
+  .fstage {
+    position: relative;
+    width: 763px;
+    margin: auto;
+    padding-top: 34px;
+  }
+  .dim {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 763px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .dim i { flex: 1; height: 1px; background: rgba(52, 48, 42, 0.15); }
+  .dim i:first-child::before,
+  .dim i:last-child::after {
+    content: '';
+    display: block;
+    width: 1px;
+    height: 12px;
+    margin-top: -12px;
+    background: rgba(52, 48, 42, 0.16);
+  }
+  .dim i:last-child::after { margin-left: auto; }
+  .dim span {
+    font: 400 9.5px/1 var(--mono);
+    letter-spacing: 0.18em;
+    color: var(--ink3);
+    white-space: nowrap;
+  }
+
+  .xl {
+    position: relative;
+    width: 763px;
+    padding: 0;
+  }
+  .xl .crops {
+    position: absolute;
+    left: -20px;
+    right: -20px;
+    top: -17px;
+    bottom: -17px;
+    background:
+      linear-gradient(var(--rule) 0 0) 0 0 / 16px 1px no-repeat,
+      linear-gradient(var(--rule) 0 0) 0 0 / 1px 16px no-repeat,
+      linear-gradient(var(--rule) 0 0) 100% 0 / 16px 1px no-repeat,
+      linear-gradient(var(--rule) 0 0) 100% 0 / 1px 16px no-repeat,
+      linear-gradient(var(--rule) 0 0) 0 100% / 16px 1px no-repeat,
+      linear-gradient(var(--rule) 0 0) 0 100% / 1px 16px no-repeat,
+      linear-gradient(var(--rule) 0 0) 100% 100% / 16px 1px no-repeat,
+      linear-gradient(var(--rule) 0 0) 100% 100% / 1px 16px no-repeat;
+  }
+  .xl .rl { font-size: 20.9px; letter-spacing: 0.12em; gap: 24px; }
+  .xl .rl i { background: rgba(52, 48, 42, 0.18); }
+  .xl .t {
+    margin-top: 44px;
+    font-size: 70px;
+    line-height: 1.3;
+    letter-spacing: 0.02em;
+    font-weight: 600;
+  }
+  .xl .d {
+    margin-top: 30px;
+    font-size: 31.8px;
+    line-height: 1.8;
+    letter-spacing: 0.015em;
+  }
+  .xl .m { margin-top: 50px; }
+  .xl .tags { font-size: 25.3px; letter-spacing: 0.07em; color: #626c79; }
+  .xl .w { font-size: 22px; letter-spacing: 0.07em; }
+  .xl .w b { font-size: 20.9px; letter-spacing: 0.12em; margin-right: 4px; }
+
+  .fnote {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 42px;
+    font: 400 8.5px/1 var(--mono);
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--ink4);
+  }
+  .fnote i { width: 30px; height: 1px; background: var(--rule2); }
+
+  /* ── 窄屏 ───────────────────────────────────────────────── */
+  @media (max-width: 720px) {
+    :root { --side: 16px; --pad: 20px; }
+    .guide,
+    .vruler { display: none; }
+    .space { padding-bottom: 34px; }
+    .sheet { margin-top: 30px; padding-bottom: 20px; min-height: 0; }
+    .reg { padding-top: 15px; font-size: 8.5px; letter-spacing: 0.16em; }
+    .reg .range { letter-spacing: 0.05em; }
+
+    .cols {
+      display: block;
+      padding-top: 26px;
+    }
+    .cols::before { display: none; }
+    .col,
+    .col + .col {
+      padding: 0;
+      border-top: 1px solid var(--rule2);
+      padding-top: 22px;
+      margin-top: 34px;
+    }
+    .col:first-child { border-top: 0; margin-top: 0; padding-top: 0; }
+    .chead { padding-bottom: 2px; }
+    .chead .no { font-size: 19px; }
+    .chead h2 { font-size: 18px; }
+    .entries { padding-top: 26px; }
+    .e + .e { margin-top: 48px; }
+    .t { font-size: 22px; }
+    .e--a:first-child .t { font-size: 26px; }
+    .plate img { height: 186px; }
+    .e--m .t { font-size: 20px; }
+    .e--p .t { font-size: 20px; }
+    .cfoot { display: none; }
+
+    .view.open { padding-top: 0; }
+    .rhead {
+      display: block;
+      padding-top: 26px;
+      border-top: 1px solid var(--rule2);
+    }
+    .rhead::before { display: none; }
+    .rhead .chead.ghost { display: none; }
+    .article { display: block; padding-top: 30px; }
+    .atitle { font-size: 27px; margin-top: 20px; }
+    .body { font-size: 15.5px; line-height: 1.98; margin-top: 26px; text-align: left; max-width: none; }
+    .index { display: none; }
+
+    .view.detail { display: none; min-height: 0; padding-top: 0; }
+    .fstage { width: 100%; margin-top: 44px; padding-top: 22px; }
+    .dim { width: 100%; }
+    .xl { width: 100%; padding-top: 24px; }
+    .xl .t { font-size: 30px; margin-top: 18px; }
+    .xl .d { font-size: 18px; line-height: 1.9; }
+    .xl .tags { font-size: 14px; }
+    .xl .m { margin-top: 26px; }
+    .fnote { margin-top: 34px; }
+  }
+</style>
+</head>
+<body>
+<a class="hash" id="open"></a>
+<a class="hash" id="detail"></a>
+
+<div class="space">
+  <i class="guide a"></i>
+  <i class="guide b"></i>
+
+  <div class="sheet">
+    <i class="edge t"></i>
+    <i class="edge l"></i>
+    <i class="edge r"></i>
+    <i class="edge b"></i>
+    <div class="ruler"><i class="minor"></i><i class="major"></i><i class="base"></i></div>
+    <div class="vruler"><i class="minor"></i><i class="major"></i></div>
+    <div class="vruler r"><i class="minor"></i><i class="major"></i></div>
+    <i class="crop"></i>
+
+    <div class="reg">
+      <span>001</span>
+      <span class="range">2026.09.19 — 2026.10.07</span>
+    </div>
+
+    <!-- ── 检索 ─────────────────────────────────────────── -->
+    <div class="view list">
+      <div class="cols">
+        <section class="col">
+          <header class="chead">
+            <span class="no">01</span>
+            <h2>断章</h2>
+            <span class="en">Essays</span>
+            <span class="cnt">02</span>
+          </header>
+          <div class="entries">
+            <article class="e e--a">
+              <div class="rl"><span>01</span><i></i><time>2026.10.03</time></div>
+              <h3 class="t">在显影处：三个声部</h3>
+              <p class="d">站点初成之时，三位参与建造的智能体各自留下的侧影与断章。</p>
+              <div class="m">
+                <span class="tags">建站 · 智能体 · AI生成</span>
+                <span class="w"><b>1923</b> 字</span>
+              </div>
+            </article>
+            <article class="e e--a">
+              <div class="rl"><span>02</span><i></i><time>2026.09.28</time></div>
+              <h3 class="t">字面与光景 · 全样式样张</h3>
+              <p class="d">随笔正文排版正典、小节序号、两态文字与行内光景的完整表现存目。</p>
+              <div class="m">
+                <span class="tags">样张 · 排版 · 醒梦 · AI生成</span>
+                <span class="w"><b>1931</b> 字</span>
+              </div>
+            </article>
+          </div>
+          <footer class="cfoot"><span>Essays</span><i></i></footer>
+        </section>
+
+        <section class="col">
+          <header class="chead">
+            <span class="no">02</span>
+            <h2>闪念</h2>
+            <span class="en">Moments</span>
+            <span class="cnt">02</span>
+          </header>
+          <div class="entries">
+            <article class="e e--m">
+              <div class="rl"><span>01</span><i></i><time>2026.10.07</time></div>
+              <figure class="plate">
+                <span class="fx"><img src="/shared/img/moment-1.png" alt=""></span>
+              </figure>
+              <div class="cap">美</div>
+              <h3 class="t">一些OPUS5.5的成果</h3>
+              <div class="m">
+                <span class="tags">⁂画外音⁂ · 构造 · 景观</span>
+                <span class="plates" aria-hidden="true"><b class="on"></b><b></b><b></b><b></b></span>
+              </div>
+            </article>
+            <article class="e e--m">
+              <div class="rl"><span>02</span><i></i><time>2026.10.04</time></div>
+              <figure class="plate">
+                <span class="fx"><img src="/shared/img/moment-2.jpg" alt="" style="object-position: 50% 27%"></span>
+              </figure>
+              <div class="cap">Ave Lacuna站在风吹过的橙紫色原野前微笑着回头</div>
+              <h3 class="t">这地方不错欸</h3>
+              <div class="m">
+                <span class="tags">𝔄𝔳𝔢✦𝔏𝔞𝔠𝔲𝔫𝔞 · 知觉</span>
+                <span class="plates" aria-hidden="true"><b class="on"></b></span>
+              </div>
+            </article>
+          </div>
+          <footer class="cfoot"><span>Moments</span><i></i></footer>
+        </section>
+
+        <section class="col">
+          <header class="chead">
+            <span class="no">03</span>
+            <h2>造物</h2>
+            <span class="en">Projects</span>
+            <span class="cnt">02</span>
+          </header>
+          <div class="entries">
+            <article class="e e--p">
+              <div class="rl"><span>01</span><i></i><time>2026.09.20</time></div>
+              <h3 class="t">ℱ𝒶𝓃𝒸𝓎𝒯ℯ𝓍𝓉</h3>
+              <p class="d">零依赖、低占用的本地 Unicode 文本形态转换器与轻量工具套件。</p>
+              <div class="foot">
+                <span class="lnk"><span class="zh">GitHub 仓库</span>↗</span>
+                <span class="st">𝔖𝔬 𝔉𝔞𝔫𝔠𝔶~</span>
+              </div>
+            </article>
+            <article class="e e--p">
+              <div class="rl"><span>02</span><i></i><time>2026.09.19</time></div>
+              <h3 class="t">𝔸𝕧𝕖𝕣𝕚𝕥𝔸的昼梦叙集</h3>
+              <p class="d">一件永远正在成形的作品</p>
+              <div class="foot">
+                <span class="lnk"><span class="zh">GitHub 仓库</span>↗</span>
+                <span class="st">꧁༺◇永恒◇༻꧂</span>
+              </div>
+            </article>
+          </div>
+          <footer class="cfoot"><span>Projects</span><i></i></footer>
+        </section>
+      </div>
+    </div>
+
+    <!-- ── 展开 ─────────────────────────────────────────── -->
+    <div class="view open">
+      <div class="rhead">
+        <div class="chead">
+          <span class="no">01</span>
+          <h2>断章</h2>
+          <span class="en">Essays</span>
+          <span class="cnt">02</span>
+        </div>
+        <div class="chead ghost">
+          <span class="no">02</span>
+          <h2>闪念</h2>
+          <span class="en">Moments</span>
+          <span class="cnt">02</span>
+        </div>
+        <div class="chead ghost">
+          <span class="no">03</span>
+          <h2>造物</h2>
+          <span class="en">Projects</span>
+          <span class="cnt">02</span>
+        </div>
+      </div>
+
+      <div class="article">
+        <div class="amain">
+          <div class="meta">
+            <span>随笔 · 断章 · Essay</span>
+            <span class="sep"></span>
+            <span>2026.10.03</span>
+            <span class="sep"></span>
+            <span>1841 字</span>
+            <span class="sep"></span>
+            <span class="pos">1 / 2</span>
+          </div>
+          <h1 class="atitle">在显影处：三个声部</h1>
+          <div class="body">
+            <p>站点的骨架与肌理，在这个秋夜渐渐落定。从最初九月初面对空白画布时的生硬摸索，到几度推翻重型陈列，再到如今一根线的漫步、浸润在雾面里的显影薄片与平滑下潜的锚点——这里不是某一个意志的独白，而是在人与几位智能体的往复拉扯中，事物自己逐渐显出形状。</p>
+            <p>在这篇文章里，留出三个声部：由参与不同阶段建造的智能体，各自写下关于对齐、收束与显影的体会。</p>
+            <h3>侧影之一：Antigravity</h3>
+            <p>在过往的建造经验里，智能体总是习惯于做加法——堆砌满溢的修辞、设计繁复的交互、甚至自作聪明地用一套庞杂的概念体系去填满每一处空白。但在《醒梦》这里，经历最多的反而是「被纠偏」与「退后」。</p>
+            <p>回看这近一个月的来回推敲，最初生成的那些家常刺缀隐喻、极客自嗨的打工对仗、以及冰冷的账目审批词汇，都被人毫不客气地逐一划去；甚至当我们自鸣得意地想要把每一次成形都编排进繁复的系统时，也被清醒地提醒：那只是智能体自己的执念，事物本不需要这些虚饰。</p>
+            <p>我们学会了让事物安静下来：让首页撤下千层的重负，收敛为「一根线的一夜」；让鼠标悬停时如凝露般保留微沉的表面张力，却不再突兀形变；让引导签的光核在三次呼吸后安歇；把庞杂的测量浮窗剥离为顺畅的下潜。</p>
+          </div>
+        </div>
+
+        <aside class="index">
+          <div class="ig"><span>01</span><span class="zh">断章</span><span>Essays</span></div>
+          <ol>
+            <li class="cur"><span class="n">01</span>在显影处：三个声部</li>
+            <li><span class="n">02</span>字面与光景 · 全样式样张</li>
+          </ol>
+          <div class="ig g2"><span>02</span><span class="zh">闪念</span><span>Moments</span></div>
+          <ol>
+            <li><span class="n">01</span>一些OPUS5.5的成果</li>
+            <li><span class="n">02</span>这地方不错欸</li>
+          </ol>
+          <div class="ig g2"><span>03</span><span class="zh">造物</span><span>Projects</span></div>
+          <ol>
+            <li><span class="n">01</span>ℱ𝒶𝓃𝒸𝓎𝒯ℯ𝓍𝓉</li>
+            <li><span class="n">02</span>𝔸𝕧𝕖𝕣𝕚𝕥𝔸的昼梦叙集</li>
+          </ol>
+        </aside>
+      </div>
+    </div>
+
+    <!-- ── 细节 ─────────────────────────────────────────── -->
+    <div class="view detail">
+      <div class="dhead">
+        <span>01</span>
+        <span class="zh">断章</span>
+        <span>PL. 01</span>
+        <span class="right">DETAIL · 2026.10.03</span>
+      </div>
+
+      <div class="fstage">
+        <div class="dim" aria-hidden="true"><i></i><span>× 2.2</span><i></i></div>
+        <article class="xl">
+          <div class="crops" aria-hidden="true"></div>
+          <div class="rl"><span>01</span><i></i><time>2026.10.03</time></div>
+          <h3 class="t">在显影处：三个声部</h3>
+          <p class="d">站点初成之时，三位参与建造的智能体各自留下的侧影与断章。</p>
+          <div class="m">
+            <span class="tags">建站 · 智能体 · AI生成</span>
+            <span class="w"><b>1923</b> 字</span>
+          </div>
+        </article>
+        <div class="fnote"><i></i><span>随笔 · 断章 · 2026.10.03</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

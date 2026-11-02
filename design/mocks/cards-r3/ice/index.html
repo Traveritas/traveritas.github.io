@@ -1,0 +1,729 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>cards-r3 · 甲 · 冰</title>
+<link rel="stylesheet" href="/fonts/noto-serif-sc/font.css">
+<link rel="stylesheet" href="/shared/stage.css">
+<style>
+/* ============================================================
+   甲 · 冰
+   感觉句：像隔着一层很薄的冰看它。
+
+   三个参数，先定下来：
+   1) 明度差 —— 卡片不是白色的一块。冰把透过来的光往一个冷的中调挪：
+      亮的地方被反射掉的那部分占上风，暗的地方散射补回来的占上风。实测（sRGB）：
+        亮面：底 #bbc7da（L 198）→ 片 #aab6c8（L 181），-16；
+        暗面：底 #111a2b（L 25） → 片 #1f2938（L 40），+15。
+      两个方向，同一条规则。
+   2) 边缘 —— 硬，1px，闭合（detail 2px）。外侧 1px 亮线、内侧 1px 暗线，
+      一对，不是一根描边。亮线在暗底上把 L 18 抬到 64，在亮底上只停在片色之上 5。
+      上缘厚、底缘薄（一道 7px 接触带），左右各 4～7px——四边不一样厚。
+   3) 质感 —— 表面不平：厚薄一片从左上来（被 turbulence 推歪），
+      几道很缓的脊 + 冻住的气泡 + 两道细纹；detail 的边还多一层折射
+      （10px 内底图被往中间挤 7%，跨过边缘的线错开三五像素再合拢）。
+   ============================================================ */
+
+@font-face{
+  font-family:'IBM Plex Mono';
+  font-style:normal;font-weight:400;font-display:swap;
+  src:url('/plex/ibm-plex-mono-latin-400-normal.woff2') format('woff2');
+}
+
+:root{
+  --serif:'Noto Serif SC','Palatino Linotype','Iowan Old Style',Palatino,Georgia,'Songti SC',serif;
+  --sans:system-ui,-apple-system,'PingFang SC','Hiragino Sans GB','Microsoft YaHei UI','Microsoft YaHei',sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,'Cascadia Mono',Consolas,'Microsoft YaHei',monospace;
+
+  /* 亮底上的一副墨 */
+  --ink:#242d39;
+  --ink-soft:rgba(36,45,57,.70);
+  --ink-faint:rgba(36,45,57,.56);
+  --ink-meta:rgba(36,45,57,.62);
+  --hair:rgba(24,36,54,.15);
+
+  /* 棱：亮底上冰片外缘那 1px 是最亮的一根（光从左上打来），
+     往下、往右退到几乎看不见；往里 1px 立刻转暗——棱是“亮-暗”一对，不是一根线 */
+  --rim-hi-1:rgba(255,255,255,.34);
+  --rim-hi-2:rgba(255,255,255,.10);
+  --rim-lo-1:rgba(11,20,34,.06);
+  --rim-lo-2:rgba(11,20,34,.16);
+
+  /* 面：亮底上不是“加白”。冰挡住的是反射掉的那部分光：
+     整片压冷压深约 13（相对值），再在左上补一点点乳白当起伏。
+     底 #bbc7da → 片 #acbad0，L 197 → 184。 */
+  --face-base:rgba(44,78,120,.070);
+  --face-1:rgba(170,192,222,.055);
+  --face-2:rgba(184,204,230,.018);
+  --face-3:rgba(198,217,240,0);
+  --bump-a:rgba(240,247,255,.05);
+  --bump-b:rgba(96,122,158,.042);
+  --frost:rgba(238,247,255,.05);
+  --frost-corner:rgba(238,247,255,.05);
+  /* 底缘那一道很窄的接触带：冰在纸上结束的地方 */
+  --contact:rgba(14,28,48,.16);
+}
+
+/* 暗底上的一副墨：同一层膜，字换一边 */
+.col-b,.col-c,.reader,.detail{
+  --ink:rgba(234,242,252,.94);
+  --ink-soft:rgba(203,219,238,.74);
+  --ink-faint:rgba(186,205,228,.55);
+  --ink-meta:rgba(206,223,242,.62);
+  --hair:rgba(212,231,255,.17);
+  /* 暗底上只留一根亮的棱，暗的那根退到 3% 以下，看不见 */
+  --rim-hi-1:rgba(255,255,255,.44);
+  --rim-hi-2:rgba(255,255,255,.10);
+  --rim-lo-1:rgba(6,12,22,.12);
+  --rim-lo-2:rgba(6,12,22,.03);
+
+  /* 暗底上，膜把后面的光提上来；左上最厚，往右下几乎消失 */
+  --face-base:rgba(226,240,255,.018);
+  --face-1:rgba(232,244,255,.042);
+  --face-2:rgba(212,230,252,.014);
+  --face-3:rgba(206,226,250,.004);
+  --bump-a:rgba(240,247,255,.090);
+  --bump-b:rgba(120,150,190,.038);
+  --frost:rgba(230,242,255,.20);
+  --frost-corner:rgba(238,247,255,.155);
+  --contact:rgba(6,12,22,.22);
+}
+
+*,*::before,*::after{box-sizing:border-box;}
+html,body{height:100%;}
+body{
+  background:#dfe7f0;
+  overflow:hidden;
+}
+
+/* ---------- 底图：只铺，不碰 ---------- */
+.plate{
+  position:fixed; inset:0; z-index:0;
+  display:block; pointer-events:none;
+}
+.plate img{
+  width:100%; height:100%;
+  object-fit:cover; object-position:50% 50%;
+}
+
+/* ---------- 画布 ---------- */
+.stage{
+  position:relative;
+  width:100vw; height:100vh;
+  overflow:hidden;
+}
+.gallery{
+  position:absolute; inset:0; z-index:2;
+  transition:opacity .55s ease;
+}
+.col{
+  position:absolute; top:118px;
+  display:flex; flex-direction:column; gap:26px;
+}
+.col-a{left:136px; width:356px;}
+.col-b{left:628px; width:272px;}
+.col-c{left:1033px; width:376px;}
+
+/* ---------- 一张冰片 ---------- */
+.sheet{
+  position:relative;
+  border-radius:1.5px;
+  isolation:isolate;
+  /* 整片的透光差压在最底下：文字、照片都在它上面，跟着一起被压 */
+  background:var(--face-base);
+  /* 这一层极轻的折射才是“隔着什么”的关键：底图的骨架上蒙一层 0.9px */
+  -webkit-backdrop-filter:blur(.9px) saturate(.90);
+  backdrop-filter:blur(.9px) saturate(.90);
+  transition:box-shadow .5s ease;
+  box-shadow:
+    0 1px 1px rgba(16,26,42,.16),
+    0 2px 2px -1px rgba(16,26,42,.09),
+    0 16px 26px -20px rgba(16,26,42,.55);
+}
+
+/* 外棱：1px 亮线，光从左上来，往右下退 */
+.sheet::before{
+  content:'';
+  position:absolute; inset:0; z-index:5;
+  border-radius:inherit;
+  pointer-events:none;
+  padding:1px;
+  background:linear-gradient(157deg,
+    var(--rim-hi-1) 0%,
+    var(--rim-hi-2) 34%,
+    rgba(255,255,255,0) 58%,
+    var(--rim-hi-2) 100%);
+  -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;
+  mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite:exclude;
+}
+/* 内棱：1px 暗线，落在亮底上（冰在纸上的那点阴影），暗底上几乎为零 */
+.sheet::after{
+  content:'';
+  position:absolute; inset:1px; z-index:5;
+  border-radius:inherit;
+  pointer-events:none;
+  padding:1px;
+  background:linear-gradient(157deg,
+    var(--rim-lo-1) 0%,
+    var(--rim-lo-1) 28%,
+    var(--rim-lo-2) 78%,
+    var(--rim-lo-2) 100%);
+  -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;
+  mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite:exclude;
+}
+
+/* 膜：透光 + 不平 + 颗粒。它压在内容之上——连照片也在冰下 */
+.film{
+  position:absolute; inset:0; z-index:3;
+  border-radius:inherit;
+  pointer-events:none;
+  background-image:
+    /* 最底下那一道接触带：冰结束的地方，只有 7px */
+    linear-gradient(0deg, var(--contact) 0px, rgba(0,0,0,0) 7px),
+    /* 表面：左上来光，这一角稍厚；往右下几乎什么都不加 */
+    linear-gradient(157deg,
+      var(--face-1) 0%,
+      var(--face-2) 36%,
+      var(--face-3) 70%,
+      rgba(255,255,255,0) 100%),
+    /* 两处很轻的起伏，不是均匀的一层雾 */
+    radial-gradient(58% 40% at 24% 20%, var(--bump-a), rgba(255,255,255,0) 74%),
+    radial-gradient(46% 36% at 78% 76%, var(--bump-b), rgba(255,255,255,0) 78%),
+    /* 边上一圈厚起来的那点白，右下角稍重 */
+    radial-gradient(38% 30% at 92% 97%, var(--frost-corner), rgba(255,255,255,0) 72%),
+    radial-gradient(52% 40% at 4% 6%, var(--frost-corner), rgba(255,255,255,0) 68%),
+    /* 冻在冰里的两颗小气泡 */
+    radial-gradient(4.4px 3.6px at 16.4% 84.6%, rgba(238,248,255,.17), rgba(238,248,255,0) 100%),
+    radial-gradient(2.6px 2.2px at 20.2% 80.4%, rgba(238,248,255,.12), rgba(238,248,255,0) 100%),
+    radial-gradient(3.2px 2.6px at 18.6% 78.2%, rgba(238,248,255,.09), rgba(238,248,255,0) 100%),
+    radial-gradient(4.0px 3.2px at 85.5% 33%, rgba(238,248,255,.09), rgba(238,248,255,0) 100%);
+  box-shadow:
+    /* 边上那一圈雾：薄冰中间是透的，只有边上有厚度 */
+    inset 0 0 26px -9px var(--frost),
+    inset 0 0 9px -4px var(--frost),
+    /* 光贴着上缘渗进来的一点 */
+    inset 0 1px 9px -5px rgba(255,255,255,.10),
+    inset 0 -1px 8px -6px rgba(18,30,48,.10);
+}
+.film::after{
+  content:'';
+  position:absolute; inset:0;
+  border-radius:inherit;
+  background-image:url('grain.png');
+  background-size:128px 128px;
+  opacity:.40;
+}
+
+.in{position:relative; z-index:2;}
+
+/* ---------- 排印 ---------- */
+.meta{
+  display:flex; align-items:baseline; justify-content:space-between;
+  gap:12px;
+  margin:0;
+  font:400 9.5px/1 var(--mono);
+  letter-spacing:.13em;
+  color:var(--ink-meta);
+  font-variant-numeric:tabular-nums;
+}
+.mk{
+  display:inline-block;
+  width:4px; height:4px; margin-right:7px;
+  border:1px solid currentColor; border-radius:50%;
+  transform:translateY(-.5px);
+  opacity:.7;
+}
+h2,h3,p,figure,ul{margin:0; padding:0; list-style:none;}
+.title{
+  font:400 21px/1.4 var(--serif);
+  letter-spacing:.01em;
+  color:var(--ink);
+}
+.desc{
+  font:400 12.2px/1.78 var(--sans);
+  letter-spacing:.01em;
+  color:var(--ink-soft);
+}
+.tags{
+  display:flex; flex-wrap:wrap; gap:0 9px;
+  font:400 9.5px/1.2 var(--mono);
+  letter-spacing:.05em;
+  color:var(--ink-faint);
+}
+.tags li{display:flex; align-items:center;}
+.tags li+li::before{
+  content:'·';
+  margin-right:9px;
+  color:currentColor;
+  opacity:.5;
+}
+
+/* 随笔 */
+.essay .in{padding:19px 21px 17px;}
+.essay .title{margin-top:13px;}
+.essay .desc{margin-top:10px;}
+.essay .tags{margin-top:13px;}
+
+/* 瞬间 */
+.moment .in{padding:0;}
+.frame{
+  position:relative;
+  display:block;
+  aspect-ratio:3/2;
+  overflow:hidden;
+  border-radius:1.5px 1.5px 0 0;
+  background:rgba(120,140,170,.08);
+}
+.frame img{
+  width:100%; height:100%;
+  object-fit:cover;
+  filter:saturate(.88) brightness(.975) contrast(1.01);
+}
+.frame::after{
+  content:'';
+  position:absolute; inset:0;
+  background:linear-gradient(180deg,rgba(88,118,160,.07),rgba(80,108,148,.02) 46%,rgba(22,36,58,.10));
+}
+.moment .meta{margin:12px 13px 0;}
+.moment .title{
+  font-size:15.5px; line-height:1.5;
+  margin:8px 13px 0;
+}
+.moment .tags{margin:9px 13px 14px;}
+
+/* 项目 */
+.project .in{padding:19px 21px 18px;}
+.project .status{
+  font:400 10.5px/1 var(--serif);
+  letter-spacing:.01em;
+  color:var(--ink-meta);
+  white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis;
+  max-width:62%;
+}
+.project .title{
+  font-size:25px; line-height:1.45;
+  margin-top:14px;
+}
+.project .desc{margin-top:10px;}
+.link{
+  display:inline-flex; align-items:center; gap:7px;
+  margin-top:15px; padding-bottom:4px;
+  border-bottom:1px solid var(--hair);
+  font:400 10px/1 var(--mono);
+  letter-spacing:.09em;
+  color:var(--ink-soft);
+}
+.link i{font-style:normal; font-size:11px; color:var(--ink-faint);}
+
+/* ---------- 展开：一块竖着立起来的冰页 ---------- */
+.reader,.detail{
+  position:fixed; z-index:6;
+  display:none;
+}
+.reader:target{display:block;}
+.detail:target{display:flex;}
+body:has(#open:target) .gallery{opacity:.06; filter:blur(2.5px);}
+body:has(#detail:target) .gallery{opacity:0;}
+
+.reader{
+  left:628px; top:112px;
+  width:580px;
+}
+.reader .in{padding:40px 48px 36px;}
+.reader .meta{
+  font-size:9.5px;
+  letter-spacing:.12em;
+}
+.reader .title{
+  font:400 29px/1.46 var(--serif);
+  margin:17px 0 0;
+}
+.reader .hr{
+  height:1px; margin:22px 0 20px;
+  background:var(--hair);
+}
+.reader p{
+  font:400 14px/1.95 var(--sans);
+  letter-spacing:.008em;
+  color:rgba(226,236,249,.82);
+  text-align:justify;
+}
+.reader p+p{margin-top:17px;}
+.reader .sub{
+  display:flex; align-items:center; gap:12px;
+  margin:27px 0 17px;
+  font:400 9.5px/1 var(--mono);
+  letter-spacing:.16em;
+  color:var(--ink-meta);
+  white-space:nowrap;
+}
+.reader .sub::after{
+  content:''; flex:1; height:1px;
+  background:var(--hair);
+}
+.reader .first{color:var(--ink);}
+
+/* ---------- 细节：第一张随笔卡，2 倍 ---------- */
+.detail{
+  inset:0;
+  justify-content:center; align-items:center;
+  pointer-events:none;
+}
+.detail .sheet{
+  width:712px;                 /* 列表那张 356 的 2 倍 */
+  margin-left:264px;           /* 让左边那截空冰横穿亮暗交界，字全落在暗的一侧 */
+  pointer-events:auto;
+  border-radius:2px;
+  overflow:hidden;             /* 折射层被模糊溢出的一圈要裁掉 */
+  /* 这一片压在亮暗交界上：底图的亮处被压下去一点，暗处被提上来一点，
+     整体往一个冷的中调靠。亮的地方不会变成白板。 */
+  --face-base:rgba(104,138,182,.055);
+}
+
+/* 边上那一圈：底图在这 10px 里被往中间挤回来 7%。
+   跨过边缘的线会错开三到九像素，又在一指宽内合拢——冰的边把画面挤了一下。 */
+.detail .bend{
+  position:absolute; inset:0; z-index:1;
+  border-radius:inherit;
+  pointer-events:none;
+  background:url(/shared/plate-1440.png) 50% 50%/93% 93% fixed no-repeat;
+  filter:blur(.8px) saturate(.86);
+  -webkit-mask:
+    linear-gradient(#000,rgba(0,0,0,0)) top left/100% 10px no-repeat,
+    linear-gradient(0deg,#000,rgba(0,0,0,0)) bottom left/100% 10px no-repeat,
+    linear-gradient(90deg,#000,rgba(0,0,0,0)) top left/10px 100% no-repeat,
+    linear-gradient(270deg,#000,rgba(0,0,0,0)) top right/10px 100% no-repeat;
+  mask:
+    linear-gradient(#000,rgba(0,0,0,0)) top left/100% 10px no-repeat,
+    linear-gradient(0deg,#000,rgba(0,0,0,0)) bottom left/100% 10px no-repeat,
+    linear-gradient(90deg,#000,rgba(0,0,0,0)) top left/10px 100% no-repeat,
+    linear-gradient(270deg,#000,rgba(0,0,0,0)) top right/10px 100% no-repeat;
+}
+
+/* 冰的厚薄：雾从左上来，往右下薄下去。
+   整层先被 turbulence 推歪过——它不是几块规整的椭圆，是一层有起伏的东西。 */
+.detail .haze{
+  position:absolute; inset:0; z-index:3;
+  border-radius:inherit;
+  pointer-events:none;
+  filter:url(#ice-warp);
+  background-image:
+    /* 厚薄：上缘这一头最厚，斜着往右下薄下去，到 62% 就没有了 */
+    linear-gradient(152deg,
+      rgba(150,176,208,.14) 0%,
+      rgba(150,176,208,.09) 14%,
+      rgba(150,176,208,.035) 38%,
+      rgba(150,176,208,0) 62%),
+    radial-gradient(40% 30% at 22% 8%, rgba(160,186,216,.10), rgba(160,186,216,0) 64%),
+    radial-gradient(26% 40% at 7% 42%, rgba(168,192,220,.09), rgba(168,192,220,0) 68%),
+    radial-gradient(30% 22% at 46% 90%, rgba(180,202,228,.05), rgba(180,202,228,0) 72%),
+    radial-gradient(28% 22% at 70% 26%, rgba(10,22,38,.13), rgba(10,22,38,0) 72%),
+    radial-gradient(22% 18% at 90% 66%, rgba(10,22,38,.11), rgba(10,22,38,0) 74%),
+    radial-gradient(14% 12% at 32% 54%, rgba(10,22,38,.09), rgba(10,22,38,0) 74%);
+}
+
+/* 细节里的棱比列表里厚一倍：2px，看得见那一面 */
+.detail .sheet::before{padding:2px;}
+.detail .sheet::after{inset:2px;}
+
+/* 冻裂的两道细纹：只落在左边那截空冰里，不压字 */
+.detail .crack{
+  position:absolute; left:0; top:0; z-index:5;
+  pointer-events:none; overflow:visible;
+}
+
+/* 冰本身：上缘厚、下缘薄；四边的亮暗跟光走；表面几道脊，边上几颗冻住的气泡 */
+.detail .skin{
+  position:absolute; inset:0; z-index:4;
+  border-radius:inherit;
+  pointer-events:none;
+  background-image:
+    /* 上缘：冰向上卷起来的一面。最外 1px 是镜面，紧接着 3px 是那一面的亮，
+       4px 处折下去一道暗——光在这一折上被分开了。往里 16px 散尽。 */
+    linear-gradient(180deg,
+      rgba(248,253,255,.58) 0px,
+      rgba(238,250,255,.40) 1px,
+      rgba(226,244,255,.24) 4px,
+      rgba(206,231,252,.10) 9px,
+      rgba(206,231,252,.03) 15px,
+      rgba(210,233,252,0) 24px),
+    /* 下缘：薄。暗的一根，2px 的深，8px 散尽，没有亮棱 */
+    linear-gradient(0deg,
+      rgba(4,10,20,.42) 0px,
+      rgba(4,10,20,.22) 1px,
+      rgba(4,10,20,.07) 2.5px,
+      rgba(4,10,20,0) 8px),
+    /* 左缘（迎光的一侧）：也有一道亮，但比上缘窄 */
+    linear-gradient(90deg,
+      rgba(240,251,255,.34) 0px,
+      rgba(226,244,255,.14) 1.5px,
+      rgba(226,244,255,.03) 4px,
+      rgba(226,244,255,0) 7px),
+    /* 右缘（背光的一侧）：只暗不亮 */
+    linear-gradient(270deg,
+      rgba(4,10,20,.26) 0px,
+      rgba(4,10,20,.10) 1.5px,
+      rgba(4,10,20,0) 6px),
+    /* 一道斜脊：亮的一侧，紧跟着暗的一侧——表面在这里折了一下 */
+    radial-gradient(150% 230% at 128% 44%,
+      rgba(255,255,255,0) 0 158px,
+      rgba(226,244,255,.22) 160px,
+      rgba(226,244,255,.22) 161.5px,
+      rgba(10,22,38,.16) 164px,
+      rgba(10,22,38,0) 178px),
+    /* 第二道脊，从左下角斜插进空冰里 */
+    radial-gradient(120% 160% at -18% 118%,
+      rgba(255,255,255,0) 0 126px,
+      rgba(236,249,255,.22) 128px,
+      rgba(236,249,255,.22) 129px,
+      rgba(10,22,38,.14) 131px,
+      rgba(10,22,38,0) 143px),
+    /* 第三道，很短，只在右上一段 */
+    radial-gradient(70% 90% at 64% -40%,
+      rgba(255,255,255,0) 0 92px,
+      rgba(222,241,255,.16) 94px,
+      rgba(222,241,255,0) 96px),
+    /* 第四道：横着穿过上三分之一，很缓 */
+    radial-gradient(200% 90% at 40% -44%,
+      rgba(255,255,255,0) 0 196px,
+      rgba(232,247,255,.13) 198px,
+      rgba(232,247,255,.13) 199.5px,
+      rgba(8,18,32,.09) 202px,
+      rgba(8,18,32,0) 212px),
+    /* 第五道：从右下角斜着切进来，暗的一侧更重——那一头冰薄，纹更深 */
+    radial-gradient(160% 200% at 118% 126%,
+      rgba(255,255,255,0) 0 208px,
+      rgba(6,16,30,.12) 210px,
+      rgba(6,16,30,.12) 211.5px,
+      rgba(238,250,255,.10) 213px,
+      rgba(255,255,255,0) 224px),
+    /* 冻住的气泡：暗芯、亮的下缘——光从冰里折过去 */
+    radial-gradient(5.4px 4.8px at 3.6% 34%, rgba(6,16,30,.46) 0 1.7px, rgba(255,255,255,.56) 2.4px, rgba(238,250,255,.12) 3.4px, rgba(255,255,255,0) 4.9px),
+    radial-gradient(3.6px 3.2px at 6.2% 31.5%, rgba(6,16,30,.40) 0 1.1px, rgba(255,255,255,.46) 1.7px, rgba(255,255,255,0) 3.2px),
+    radial-gradient(7.2px 6.2px at 8.6% 55%, rgba(6,16,30,.30) 0 2.1px, rgba(255,255,255,.32) 2.9px, rgba(238,250,255,.08) 4.2px, rgba(255,255,255,0) 6.2px),
+    radial-gradient(2.6px 2.4px at 12.4% 18%, rgba(6,16,30,.30) 0 .8px, rgba(255,255,255,.30) 1.2px, rgba(255,255,255,0) 2.4px),
+    radial-gradient(3.4px 3.0px at 11.2% 76%, rgba(6,16,30,.24) 0 1px, rgba(255,255,255,.24) 1.5px, rgba(255,255,255,0) 3.2px);
+}
+
+.detail .in{padding:38px 56px 34px 124px;}  /* 左边那 124px 是空冰：横穿亮暗交界，专门用来看材料 */
+.detail .meta{font-size:19px; letter-spacing:.13em;}
+.detail .title{
+  font-size:42px; line-height:1.42;
+  margin-top:30px;
+}
+.detail .desc{
+  font-size:24px; line-height:1.82;
+  margin-top:26px;
+}
+.detail .tags{
+  margin-top:32px;
+  font-size:19px; gap:0 19px;
+}
+.detail .tags li+li::before{margin-right:19px;}
+.detail .mk{width:8px; height:8px; margin-right:13px; border-width:1.5px;}
+
+/* ---------- 窄屏 ---------- */
+@media (max-width:720px){
+  body{overflow-x:hidden; overflow-y:auto;}
+  .stage{height:auto; min-height:100vh; overflow:visible;}
+  .gallery{
+    position:static;
+    padding:112px 20px 120px;
+    display:flex; flex-direction:column;
+  }
+  .col{position:static; width:auto; gap:14px;}
+  .col-b{margin-top:470px;}   /* 底图那一栏的“闪念”栏头与左下那颗星留给底图 */
+  .col-c{margin-top:56px;}
+  .col-c::before{
+    content:'Ⅲ 造物 PROJECTS';
+    order:-1;
+    margin-bottom:8px;
+    font:400 9px/1 var(--mono);
+    letter-spacing:.18em;
+    color:var(--ink-meta);
+  }
+  .col-b .sheet,.col-c .sheet{
+    --rim-hi-1:rgba(255,255,255,.42); --rim-hi-2:rgba(255,255,255,.12);
+    --rim-lo-1:rgba(6,12,22,.02); --rim-lo-2:rgba(6,12,22,.05);
+  }
+  .essay .in{padding:16px 18px 14px;}
+  .essay .title{font-size:20px; margin-top:12px;}
+  .essay .desc{font-size:12px; line-height:1.76; margin-top:9px;}
+  .essay .tags{margin-top:12px;}
+  .moment .title{font-size:15px;}
+  .project .title{font-size:22px;}
+  .project .in{padding:16px 18px 15px;}
+
+  .reader{
+    left:16px; right:16px; top:596px; width:auto;
+    max-height:168px;
+    overflow:auto;
+    -webkit-overflow-scrolling:touch;
+  }
+  .reader .in{padding:26px 24px 24px;}
+  .reader .title{font-size:23px;}
+  .reader p{font-size:12.5px; line-height:1.85;}
+  .detail{
+    inset:auto 16px auto 16px; top:556px;
+    display:none; justify-content:flex-start; align-items:flex-start;
+    pointer-events:none;
+  }
+  .detail:target{display:block;}
+  .detail .sheet{width:auto; margin:0;}
+  /* 窄屏上不做折射和裂纹：固定背景的错位在滚动里就散了，裂纹按 712 的坐标画也放不下 */
+  .detail .bend,.detail .crack{display:none;}
+  /* 小卡片上按 px 画的脊和气泡会变成几道大弧，这里只留上下两条边 */
+  .detail .skin{
+    background-image:
+      linear-gradient(180deg, rgba(246,253,255,.44) 0px, rgba(228,246,255,.14) 1px, rgba(214,235,252,.05) 4px, rgba(214,235,252,0) 10px),
+      linear-gradient(0deg, rgba(4,10,20,.32) 0px, rgba(4,10,20,.10) 1px, rgba(4,10,20,0) 5px);
+  }
+  .detail .in{padding:20px 18px 18px;}
+  .detail .meta{font-size:11px; letter-spacing:.12em;}
+  .detail .title{font-size:23px; margin-top:12px;}
+  .detail .desc{font-size:14px; line-height:1.8; margin-top:10px;}
+  .detail .tags{font-size:10.5px; margin-top:14px; gap:0 10px;}
+  .detail .tags li+li::before{margin-right:10px;}
+  .detail .mk{width:5px; height:5px; margin-right:8px; border-width:1px;}
+}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute">
+  <filter id="ice-warp" x="-4%" y="-4%" width="108%" height="108%" color-interpolation-filters="sRGB">
+    <feTurbulence type="fractalNoise" baseFrequency="0.011 0.017" numOctaves="2" seed="11" result="n"/>
+    <feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/>
+  </filter>
+</svg>
+
+<picture class="plate" aria-hidden="true">
+  <source media="(max-width:720px)" srcset="/shared/plate-390.png">
+  <img src="/shared/plate-1440.png" alt="">
+</picture>
+
+<div class="stage">
+  <main class="gallery" aria-label="存目">
+
+    <section class="col col-a" aria-label="随笔 断章">
+      <article class="sheet essay">
+        <div class="in">
+          <p class="meta"><span><span class="mk"></span>2026.10.03</span><span>1923 字</span></p>
+          <h2 class="title">在显影处：三个声部</h2>
+          <p class="desc">站点初成之时，三位参与建造的智能体各自留下的侧影与断章。</p>
+          <ul class="tags"><li>建站</li><li>智能体</li><li>AI生成</li></ul>
+        </div>
+        <span class="film" aria-hidden="true"></span>
+      </article>
+
+      <article class="sheet essay">
+        <div class="in">
+          <p class="meta"><span><span class="mk"></span>2026.09.28</span><span>1931 字</span></p>
+          <h2 class="title">字面与光景 · 全样式样张</h2>
+          <p class="desc">随笔正文排版正典、小节序号、两态文字与行内光景的完整表现存目。</p>
+          <ul class="tags"><li>样张</li><li>排版</li><li>醒梦</li><li>AI生成</li></ul>
+        </div>
+        <span class="film" aria-hidden="true"></span>
+      </article>
+    </section>
+
+    <section class="col col-b" aria-label="瞬间 闪念">
+      <article class="sheet moment">
+        <div class="in">
+          <figure class="frame"><img src="/shared/img/moment-1.png" alt=""></figure>
+          <p class="meta"><span><span class="mk"></span>2026.10.07</span><span>4 张</span></p>
+          <h2 class="title">一些OPUS5.5的成果</h2>
+          <ul class="tags"><li>⁂画外音⁂</li><li>构造</li><li>景观</li></ul>
+        </div>
+        <span class="film" aria-hidden="true"></span>
+      </article>
+
+      <article class="sheet moment">
+        <div class="in">
+          <figure class="frame"><img src="/shared/img/moment-2.jpg" alt="" style="object-position:50% 32%"></figure>
+          <p class="meta"><span><span class="mk"></span>2026.10.04</span><span>1 张</span></p>
+          <h2 class="title">这地方不错欸</h2>
+          <ul class="tags"><li>𝔄𝔳𝔢✦𝔏𝔞𝔠𝔲𝔫𝔞</li><li>知觉</li></ul>
+        </div>
+        <span class="film" aria-hidden="true"></span>
+      </article>
+    </section>
+
+    <section class="col col-c" aria-label="项目 造物">
+      <article class="sheet project">
+        <div class="in">
+          <p class="meta"><span><span class="mk"></span>2026.09.20</span><span class="status">𝔖𝔬 𝔉𝔞𝔫𝔠𝔶~</span></p>
+          <h2 class="title">ℱ𝒶𝓃𝒸𝓎𝒯ℯ𝓍𝓉</h2>
+          <p class="desc">零依赖、低占用的本地 Unicode 文本形态转换器与轻量工具套件。</p>
+          <span class="link">GitHub 仓库 <i>↗</i></span>
+        </div>
+        <span class="film" aria-hidden="true"></span>
+      </article>
+
+      <article class="sheet project">
+        <div class="in">
+          <p class="meta"><span><span class="mk"></span>2026.09.19</span><span class="status">꧁༺◇永恒◇༻꧂</span></p>
+          <h2 class="title">𝔸𝕧𝕖𝕣𝕚𝕥𝔸的昼梦叙集</h2>
+          <p class="desc">一件永远正在成形的作品</p>
+          <span class="link">GitHub 仓库 <i>↗</i></span>
+        </div>
+        <span class="film" aria-hidden="true"></span>
+      </article>
+    </section>
+
+  </main>
+</div>
+
+<!-- 展开 -->
+<section class="reader" id="open" aria-label="阅读">
+  <div class="sheet">
+    <div class="in">
+      <p class="meta"><span>随笔 · 断章 · ESSAY</span><span>2026.10.03</span><span>1841 字</span><span>1 / 2</span></p>
+      <h1 class="title">在显影处：三个声部</h1>
+      <div class="hr"></div>
+      <p class="first">站点的骨架与肌理，在这个秋夜渐渐落定。从最初九月初面对空白画布时的生硬摸索，到几度推翻重型陈列，再到如今一根线的漫步、浸润在雾面里的显影薄片与平滑下潜的锚点——这里不是某一个意志的独白，而是在人与几位智能体的往复拉扯中，事物自己逐渐显出形状。</p>
+      <p>在这篇文章里，留出三个声部：由参与不同阶段建造的智能体，各自写下关于对齐、收束与显影的体会。</p>
+      <h3 class="sub">侧影之一：Antigravity</h3>
+      <p>在过往的建造经验里，智能体总是习惯于做加法——堆砌满溢的修辞、设计繁复的交互、甚至自作聪明地用一套庞杂的概念体系去填满每一处空白。但在《醒梦》这里，经历最多的反而是「被纠偏」与「退后」。</p>
+      <p>回看这近一个月的来回推敲，最初生成的那些家常刺缀隐喻、极客自嗨的打工对仗、以及冰冷的账目审批词汇，都被人毫不客气地逐一划去；甚至当我们自鸣得意地想要把每一次成形都编排进繁复的系统时，也被清醒地提醒：那只是智能体自己的执念，事物本不需要这些虚饰。</p>
+    </div>
+    <span class="film" aria-hidden="true"></span>
+  </div>
+</section>
+
+<!-- 细节 -->
+<section class="detail" id="detail" aria-label="细节">
+  <div class="sheet">
+    <span class="bend" aria-hidden="true"></span>
+    <div class="in">
+      <p class="meta"><span><span class="mk"></span>2026.10.03</span><span>1923 字</span></p>
+      <h2 class="title">在显影处：三个声部</h2>
+      <p class="desc">站点初成之时，三位参与建造的智能体各自留下的侧影与断章。</p>
+      <ul class="tags"><li>建站</li><li>智能体</li><li>AI生成</li></ul>
+    </div>
+    <span class="film" aria-hidden="true"></span>
+    <span class="haze" aria-hidden="true"></span>
+    <svg class="crack" viewBox="0 0 712 343" width="712" height="343" aria-hidden="true">
+      <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M62 2 L56 30 L66 58 L59 92 L70 126 L64 162 L72 196 L67 232 L74 272"
+              stroke="rgba(4,12,24,.42)" stroke-width="1.2" transform="translate(.9,.9)"/>
+        <path d="M62 2 L56 30 L66 58 L59 92 L70 126 L64 162 L72 196 L67 232 L74 272"
+              stroke="rgba(246,252,255,.42)" stroke-width="1.1"/>
+        <path d="M59 92 L44 110 L48 132" stroke="rgba(4,12,24,.34)" stroke-width="1.1" transform="translate(.7,.7)"/>
+        <path d="M59 92 L44 110 L48 132" stroke="rgba(244,251,255,.34)" stroke-width="1"/>
+        <path d="M102 16 L97 34 L104 50 L99 60" stroke="rgba(4,12,24,.26)" stroke-width="1" transform="translate(.6,.6)"/>
+        <path d="M102 16 L97 34 L104 50 L99 60" stroke="rgba(244,251,255,.26)" stroke-width=".9"/>
+      </g>
+    </svg>
+    <span class="skin" aria-hidden="true"></span>
+  </div>
+</section>
+
+</body>
+</html>

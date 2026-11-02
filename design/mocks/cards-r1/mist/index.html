@@ -1,0 +1,731 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>cards-r1 · 甲 · 雾片</title>
+<link rel="stylesheet" href="/fonts/noto-serif-sc/font.css">
+<link rel="stylesheet" href="/shared/stage.css">
+<style>
+/* ============================================================
+   甲 · 雾片
+   卡片不是一块板，是一片雾。
+   没有底色板、没有标题栏、没有边框、没有投影。
+   一张卡的边界＝几团局部更浓的雾＋一道沿左沿的亮线＋字。
+   空间不是平的：左上是光源，右下是夜；昼与夜之间不断裂，
+   是一段雾坡。同一片雾落在两种地面上，字随地面换墨。
+   ============================================================ */
+
+@font-face{
+  font-family:'IBM Plex Mono';
+  font-style:normal;font-weight:400;font-display:swap;
+  src:url('/plex/ibm-plex-mono-latin-400-normal.woff2') format('woff2');
+}
+
+:root{
+  --mono:'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  --ink:#232830;
+  --soft:#4f5967;
+  --faint:#6e7988;
+  --amber:#9a86c4;
+  --ease:cubic-bezier(.2,.6,.2,1);
+}
+
+html,body{height:100%;}
+body{
+  background:#e7ecf3;
+  color:var(--ink);
+  overflow-x:hidden;
+}
+
+/* ---------- 地面：一块连续的雾原。光从左上进来，右下渐入夜。 ---------- */
+.field{
+  position:fixed; inset:0; z-index:-2;
+  background-color:#232834;
+  background-image:
+    /* 光源：左上的一枚散开的晨光，暖白；只在角上亮，不漫过整页 */
+    radial-gradient(44rem 30rem at 10% -8%,
+      rgba(255,252,246,.70) 0%, rgba(250,248,242,.24) 30%,
+      rgba(238,243,249,.06) 54%, rgba(35,40,52,0) 76%),
+    /* 左下：雾的积处，托住星位 */
+    radial-gradient(46rem 30rem at 2% 82%,
+      rgba(238,242,248,.52) 0%, rgba(228,235,245,.16) 48%, rgba(35,40,52,0) 78%),
+    /* 中上：一层很薄的暖霾 */
+    radial-gradient(40rem 24rem at 54% -12%,
+      rgba(255,250,240,.26) 0%, rgba(255,250,240,0) 74%),
+    /* 夜里的紫气，全站唯一一点异质色的出处 */
+    radial-gradient(46rem 38rem at 97% 64%,
+      rgba(129,114,171,.30) 0%, rgba(129,114,171,0) 74%),
+    radial-gradient(34rem 26rem at 84% 108%,
+      rgba(90,108,148,.20) 0%, rgba(90,108,148,0) 74%),
+    /* 昼夜之间的一带雾：把硬转折吃掉 */
+    radial-gradient(28rem 34rem at 68% 44%,
+      rgba(240,245,252,.12) 0%, rgba(240,245,252,0) 72%),
+    /* 昼→夜：没有一条硬缝，只有一段发白的雾坡；
+       坡落在闪念与造物之间，让两栏各自踩在自己的地面上 */
+    linear-gradient(100deg,
+      #e6ecf3 0%, #e2e9f1 26%, #dfe6f0 40%,
+      #d5dde8 52%, #c0cad8 60%, #97a2b4 65%,
+      #5d6779 70%, #363d4e 75%, #272d3b 83%, #222733 94%, #202531 100%);
+}
+.field::before{
+  /* 低处的雾潮：横着漫过页面下缘，也给星位留一块有厚度的空 */
+  content:''; position:absolute; inset:0;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0) 74%, rgba(255,255,255,.09) 89%, rgba(255,255,255,.14) 100%),
+    radial-gradient(64% 12% at 42% 97%, rgba(255,255,255,.14), transparent 80%),
+    radial-gradient(40% 10% at 84% 91%, rgba(195,205,228,.10), transparent 80%);
+  pointer-events:none;
+}
+.field::after{
+  /* 颗粒：雾的“质”。极细，只在近处看得见；雾片把它们吃掉一层。 */
+  content:''; position:absolute; inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E");
+  background-size:240px 240px;
+  opacity:.25;
+  mix-blend-mode:soft-light;
+  pointer-events:none;
+}
+
+/* ---------- 画布 ---------- */
+.stage{
+  position:relative; z-index:0;
+  width:100vw; max-width:1440px; height:100vh;
+  margin:0 auto;
+  padding:0 80px 0 112px;
+  overflow:hidden;
+}
+
+.cols{
+  display:grid;
+  grid-template-columns:360px 370px 320px;
+  justify-content:space-between;
+  padding-top:72px;
+  height:100%;
+}
+.col{position:relative;}
+
+/* ---------- 栏头：没有栏，没有线，只有编号、名字、数 ---------- */
+.chead{
+  position:relative;
+  display:flex; align-items:baseline; gap:10px;
+  padding-left:28px;
+  color:var(--c-faint);
+  font-family:var(--mono);
+  font-size:9.5px; letter-spacing:.17em;
+  text-transform:uppercase;
+}
+.chead__tick{
+  position:absolute; left:0; top:-1px;
+  width:1px; height:17px;
+  background:linear-gradient(180deg, transparent, rgba(255,255,255,.98) 24%, rgba(255,255,255,.78) 70%, transparent);
+}
+.chead__tick::before{
+  content:''; position:absolute; left:-8px; top:3px; bottom:3px; width:17px;
+  background:var(--c-tick-glow, rgba(255,255,255,.30));
+  filter:blur(6px); opacity:.8;
+}
+.chead__no{opacity:.85;}
+.chead__cn{
+  font-family:var(--font-display); font-weight:500;
+  font-size:14px; letter-spacing:.22em;
+  color:var(--c-name);
+  text-transform:none;
+}
+.chead__lat{font-size:8.5px; letter-spacing:.23em; opacity:.78; padding-left:1px;}
+.chead__count{margin-left:auto; font-size:9px; letter-spacing:.12em; opacity:.8;}
+
+/* ---------- 卡片＝雾片 ---------- */
+.card{
+  position:relative;
+  padding:22px 24px 26px 28px;
+  color:var(--c-ink);
+  isolation:isolate;
+}
+.card__meta,.card__title,.card__desc,.card__tags,.card__link,.plate,.moment-row,.moment-caption{
+  position:relative; z-index:2;
+}
+
+/* 雾：一缕从左上受光、往右下散开去的薄雾。
+   没有轮廓，没有一块被雾填满的矩形；最浓处压在题上，
+   其余一路淡出到字外很远。卡片只是雾在这里聚了一聚。 */
+.haze{
+  position:absolute; inset:-40px -140px -86px -26px;
+  z-index:0;
+  background:
+    radial-gradient(38% 30% at 23% 17%, rgba(255,253,247,var(--fw,.34)) 0%, rgba(255,253,247,0) 74%),
+    radial-gradient(48% 40% at 35% 40%, rgba(237,243,251,var(--fa,.24)) 0%, rgba(237,243,251,0) 78%),
+    radial-gradient(44% 28% at 50% 82%, rgba(225,235,247,var(--fb,.12)) 0%, rgba(225,235,247,0) 82%),
+    radial-gradient(38% 30% at 74% 42%, rgba(231,240,250,var(--fc,.08)) 0%, rgba(231,240,250,0) 84%),
+    radial-gradient(46% 24% at 54% 97%, rgba(108,128,162,var(--fd,.045)) 0%, rgba(108,128,162,0) 84%);
+  filter:blur(15px);
+  pointer-events:none;
+}
+
+/* 一道沿边的亮线：不是描边，是雾的迎光面；一侧有一层极浅的折射暗边 */
+.spine{
+  position:absolute; left:0; top:15px; bottom:19px; width:1px;
+  z-index:1;
+  background:linear-gradient(180deg,
+    rgba(255,255,255,0) 0%,
+    var(--c-spine, rgba(255,255,255,.92)) 14%,
+    var(--c-spine, rgba(255,255,255,.92)) 58%,
+    rgba(255,255,255,0) 100%);
+  pointer-events:none;
+}
+.spine::before{
+  content:''; position:absolute; left:-2px; top:1%; bottom:1%; width:8px;
+  background:rgba(255,255,255,.30);
+  filter:blur(3px);
+}
+.spine::after{
+  content:''; position:absolute; left:1px; top:3%; bottom:3%; width:1px;
+  background:var(--c-hairline, rgba(30,42,60,.5));
+  filter:blur(.4px);
+}
+
+/* 元信息：小而稀，像注脚 */
+.card__meta{
+  display:flex; align-items:center; gap:8px;
+  font-family:var(--mono);
+  font-size:9.5px; line-height:1; letter-spacing:.14em;
+  color:var(--c-faint);
+  font-variant-numeric:tabular-nums;
+}
+.dot{
+  width:3px; height:3px; border-radius:50%;
+  background:var(--amber); opacity:.55;
+  flex:none;
+}
+.card__meta .sep{opacity:.45; letter-spacing:0;}
+.card__meta .right{margin-left:auto; text-align:right; color:var(--c-faint);}
+
+.card__title{
+  margin:17px 0 0;
+  font-family:var(--font-display); font-weight:500;
+  font-size:23px; line-height:1.46; letter-spacing:.015em;
+  color:var(--c-heading);
+  text-wrap:pretty;
+}
+.card__desc{
+  margin:11px 0 0;
+  font-family:var(--font-body);
+  font-size:12.5px; line-height:1.92; letter-spacing:.012em;
+  color:var(--c-soft);
+  text-wrap:pretty;
+}
+.card__tags{
+  margin-top:18px;
+  font-family:var(--font-display);
+  font-size:10.5px; line-height:1.7; letter-spacing:.10em;
+  color:var(--c-tags, var(--c-faint));
+}
+.tagsep{opacity:.55;}
+
+/* ---------- 随笔 ---------- */
+.col--essay{
+  --c-ink:#232830;
+  --c-heading:#1f242c;
+  --c-name:rgba(35,40,48,.88);
+  --c-soft:#4f5967;
+  --c-faint:#667281;
+  --c-tags:#616d7c;
+  --c-spine:rgba(255,255,255,.99);
+  --c-spine-glow:rgba(131,151,183,.40);
+  --c-hairline:rgba(30,42,60,.46);
+  --c-refract:rgba(52,66,88,.17);
+  --c-tick-glow:rgba(255,255,255,.6);
+}
+.card--lead{
+  --fa:.26; --fb:.14; --fw:.38; --fc:.09; --fd:.05;
+  padding-top:25px;
+}
+.card--lead .haze{inset:-64px -100px -70px -24px;}
+.card--lead .spine{top:18px; bottom:22px;}
+.card--lead .card__title{font-size:28px; margin-top:19px; letter-spacing:.02em;}
+.card--lead .card__desc{font-size:13px; margin-top:12px; max-width:24em;}
+.card--lead .card__tags{margin-top:21px;}
+.col--essay .card:first-of-type{margin-top:48px;}
+.col--essay .card + .card{margin-top:92px;}
+.col--essay .card--quiet{--fa:.21; --fb:.11; --fw:.32; --fc:.07; --fd:.035;}
+.col--essay .card--quiet .card__title{font-size:20px;}
+.col--essay .card--quiet .card__desc{font-size:12px;}
+
+/* ---------- 瞬间 ---------- */
+.col--moment{
+  --c-ink:#232830;
+  --c-heading:#1f242c;
+  --c-name:rgba(35,40,48,.86);
+  --c-soft:#4e5866;
+  --c-faint:#657180;
+  --c-tags:#606c7b;
+  --c-spine:rgba(255,255,255,.96);
+  --c-spine-glow:rgba(144,162,190,.34);
+  --c-hairline:rgba(30,42,60,.42);
+  --c-refract:rgba(52,66,88,.13);
+  --c-tick-glow:rgba(255,255,255,.55);
+}
+.col--moment .card:first-of-type{margin-top:70px;}
+.col--moment .card + .card{margin-top:42px;}
+.card--moment{--fa:.17; --fb:.09; --fw:.24; --fc:.06; --fd:.03;}
+.card--moment .card__title{font-size:19px; margin-top:13px;}
+.card--moment .card__tags{margin-top:9px; font-size:10px;}
+.card--moment .spine{top:13px; bottom:16px;}
+
+/* 显影薄片：图不用框，在雾里显影，四边被雾吃掉一圈 */
+.plate{
+  margin:14px 0 0;
+  position:relative;
+  overflow:hidden;
+}
+.plate img{
+  display:block; width:100%; height:auto;
+  filter:saturate(.78) contrast(.95) brightness(1.02);
+  -webkit-mask-image:radial-gradient(122% 122% at 50% 47%, #000 46%, rgba(0,0,0,.92) 64%, rgba(0,0,0,.34) 88%, transparent 100%);
+          mask-image:radial-gradient(122% 122% at 50% 47%, #000 46%, rgba(0,0,0,.92) 64%, rgba(0,0,0,.34) 88%, transparent 100%);
+}
+.plate::after{
+  content:''; position:absolute; inset:0; pointer-events:none;
+  background:
+    radial-gradient(120% 120% at 50% 50%, rgba(243,247,252,0) 48%, rgba(243,247,252,.18) 78%, rgba(243,247,252,.52) 100%),
+    linear-gradient(148deg, rgba(255,252,246,.20) 0%, rgba(255,252,246,0) 34%),
+    linear-gradient(0deg, rgba(240,245,251,.30) 0%, rgba(240,245,251,0) 30%);
+}
+.plate--wide{width:100%;}
+.plate--sm{width:158px; flex:none; margin:0;}
+.moment-row{display:flex; gap:18px; align-items:flex-start; margin-top:14px;}
+.moment-side{min-width:0; padding-top:1px; flex:1;}
+.moment-side .card__title{margin-top:0; font-size:18px; line-height:1.6;}
+.moment-side .card__tags{margin-top:12px; font-size:9.5px; line-height:1.9;}
+.moment-caption{
+  margin:13px 0 0;
+  font-family:var(--font-display);
+  font-size:10.5px; line-height:1.8; letter-spacing:.035em;
+  color:var(--c-faint);
+  text-wrap:pretty;
+}
+.moment-side .moment-caption{
+  margin:11px 0 0;
+  font-size:9.5px; line-height:1.75; letter-spacing:.025em;
+}
+.card--moment2 .card__tags{margin-top:15px; font-size:9.5px;}
+.card--moment2{--fa:.15; --fb:.08; --fw:.21; --fc:.05; --fd:.025;}
+.card--moment2 .spine{top:15px; bottom:18px;}
+
+/* ---------- 项目 ---------- */
+.col--project{
+  --c-ink:#eef1f7;
+  --c-heading:#f5f7fb;
+  --c-name:rgba(240,243,249,.9);
+  --c-soft:#d7dee8;
+  --c-faint:#b8c2d0;
+  --c-tags:#b4becd;
+  --c-spine:rgba(255,252,244,.99);
+  --c-spine-glow:rgba(255,238,205,.46);
+  --c-hairline:rgba(0,0,0,.30);
+  --c-refract:rgba(8,10,18,.22);
+  --c-tick-glow:rgba(255,246,226,.6);
+}
+.col--project .card:first-of-type{margin-top:44px;}
+.col--project .card + .card{margin-top:98px;}
+.card--project{--fa:.11; --fb:.06; --fw:.09; --fc:.04; --fd:.025;}
+.card--project .haze{inset:-40px -100px -60px -20px;}
+.card--project .card__title{font-size:21px; line-height:1.55;}
+.card--project .card__desc{font-size:12px; line-height:1.9; color:var(--c-soft);}
+.card--project .status{
+  margin-left:auto; padding-left:16px;
+  font-family:var(--font-display);
+  font-size:9px; letter-spacing:.04em; line-height:1.6;
+  color:var(--c-faint); text-align:right;
+}
+.card__link{
+  display:inline-flex; align-items:center; gap:8px;
+  margin-top:19px;
+  font-family:var(--mono);
+  font-size:9px; letter-spacing:.14em;
+  color:var(--c-soft);
+  padding-bottom:4px;
+  background:linear-gradient(90deg, var(--c-linkline, rgba(255,255,255,.28)), rgba(255,255,255,0));
+  background-size:100% 1px;
+  background-repeat:no-repeat;
+  background-position:0 100%;
+}
+.card__link .arrow{font-family:var(--font-body); font-size:10px; opacity:.72;}
+.col--project .card__link{--c-linkline:rgba(255,255,255,.34);}
+.card--project .card__tags{margin-top:15px;}
+.card--project2{--fa:.09; --fb:.05; --fw:.07; --fc:.03; --fd:.02;}
+.card--project2 .spine{top:18px; bottom:22px;}
+
+/* ---------- #open：同一片雾被拉长 ---------- */
+.reader{
+  position:fixed; inset:0; z-index:20;
+  opacity:0; visibility:hidden; pointer-events:none;
+  transition:opacity .5s var(--ease), visibility .5s;
+}
+#open:target{opacity:1; visibility:visible;}
+
+.reader__haze{
+  position:absolute;
+  left:112px; top:-70px; bottom:-140px; width:1120px;
+  background:
+    radial-gradient(42% 30% at 15% 10%, rgba(255,253,247,.34) 0%, rgba(255,252,245,0) 70%),
+    radial-gradient(36% 28% at 28% 42%, rgba(255,252,244,.10) 0%, rgba(255,252,244,0) 78%),
+    radial-gradient(38% 40% at 84% 82%, rgba(215,226,243,.10) 0%, rgba(215,226,243,0) 80%),
+    linear-gradient(100deg,
+      rgba(203,216,235,.30) 0%,
+      rgba(206,218,236,.26) 36%,
+      rgba(214,225,242,.18) 56%,
+      rgba(224,233,247,.09) 74%,
+      rgba(234,241,251,.03) 90%,
+      rgba(244,248,253,0) 100%);
+  filter:blur(3px);
+  -webkit-mask-image:linear-gradient(90deg, transparent 0, #000 2.4%, #000 54%, rgba(0,0,0,.55) 77%, transparent 99%);
+          mask-image:linear-gradient(90deg, transparent 0, #000 2.4%, #000 54%, rgba(0,0,0,.55) 77%, transparent 99%);
+  -webkit-backdrop-filter:blur(3px) saturate(.92) brightness(1.005);
+          backdrop-filter:blur(3px) saturate(.92) brightness(1.005);
+}
+
+.reader__spine{
+  position:absolute; left:112px; top:58px; bottom:26px; width:1px;
+  background:linear-gradient(180deg,
+    rgba(255,255,255,0) 0%,
+    rgba(255,255,255,.99) 6%,
+    rgba(255,255,255,.88) 32%,
+    rgba(255,255,255,.58) 64%,
+    rgba(255,255,255,0) 100%);
+}
+.reader__spine::before{
+  content:''; position:absolute; left:-2px; top:0; bottom:0; width:11px;
+  background:rgba(255,255,255,.30);
+  filter:blur(4px);
+}
+.reader__spine::after{
+  content:''; position:absolute; left:1px; top:0; bottom:0; width:1px;
+  background:rgba(30,42,60,.26);
+  filter:blur(.6px);
+}
+
+.reader__inner{
+  position:relative; z-index:2;
+  margin-left:196px;
+  padding-top:62px;
+  width:660px;
+  color:var(--ink);
+}
+.reader__meta{
+  display:flex; align-items:center; gap:12px;
+  font-family:var(--mono);
+  font-size:10px; letter-spacing:.14em; line-height:1;
+  color:#4f5b6a;
+}
+.reader__meta .dot{opacity:.75;}
+.reader__meta .sep{opacity:.42;}
+.reader__pager{
+  margin-left:auto;
+  font-family:var(--mono);
+  font-size:10px; letter-spacing:.18em;
+  color:#55606f;
+}
+.reader__pager b{font-weight:400; color:var(--amber);}
+
+.reader__title{
+  margin:52px 0 0;
+  font-family:var(--font-display); font-weight:500;
+  font-size:50px; line-height:1.36; letter-spacing:.025em;
+  color:#1d222a;
+  text-wrap:pretty;
+  max-width:11em;
+}
+.reader__desc{
+  margin:24px 0 0;
+  font-family:var(--font-display);
+  font-size:15px; line-height:1.95; letter-spacing:.03em;
+  color:#4f5966;
+  max-width:33em;
+  text-wrap:pretty;
+}
+.reader__tags{
+  margin-top:20px;
+  font-family:var(--font-display);
+  font-size:10.5px; letter-spacing:.12em;
+  color:#66717f;
+}
+
+.reader__body{
+  margin-top:58px;
+  width:33em;
+  max-width:100%;
+  font-family:var(--font-display);
+  font-size:16px; font-weight:500;
+  line-height:2.06; letter-spacing:.018em;
+  color:#313842;
+  text-align:justify;
+  text-justify:inter-ideograph;
+  text-wrap:pretty;
+}
+.reader__body p{margin:0 0 1.12em;}
+.reader__body h3{
+  margin:2.2em 0 .9em;
+  font-family:var(--font-display);
+  font-size:19px; font-weight:500; line-height:1.7; letter-spacing:.06em;
+  color:#242a33;
+}
+.reader__body p:last-child{margin-bottom:0;}
+
+/* 展开时，三栏退到雾后面去：不压黑，只是失焦、变轻 */
+html:has(#open:target) .cols{
+  opacity:.20;
+  filter:blur(2px) saturate(.5) brightness(1.02);
+  transform:translateY(9px) scale(.996);
+}
+html:has(#open:target) .col{pointer-events:none;}
+
+/* ---------- 星位：120×120，什么都不放 ---------- */
+/* 左下角 x≈16–136 / y≈764–884，保持空着 */
+
+/* ============================================================
+   窄屏：一列。不是另一套设计——只是地面变浅，雾和线跟着变。
+   ============================================================ */
+@media (max-width:720px){
+  .stage{
+    height:auto; min-height:100vh;
+    width:390px; max-width:100%; margin:0;
+    padding:0 22px 120px; overflow:visible;
+  }
+  .field{
+    background-color:#e6ecf3;
+    background-image:
+      radial-gradient(30rem 26rem at 30% -4%, rgba(255,252,246,.84), rgba(255,252,246,0) 72%),
+      radial-gradient(24rem 30rem at 112% 42%, rgba(150,140,180,.10), transparent 72%),
+      linear-gradient(180deg, #e6ecf3 0%, #e3e9f2 40%, #dde5ef 70%, #d0d9e5 100%);
+  }
+  .field::before{background:linear-gradient(180deg, transparent 62%, rgba(255,255,255,.14) 100%);}
+  .cols{display:block; padding-top:44px;}
+  .col,
+  .col--project{
+    --c-ink:#232830; --c-heading:#1f242c;
+    --c-name:rgba(35,40,48,.88); --c-soft:#4f5967;
+    --c-faint:#667281; --c-tags:#616d7c;
+    --c-spine:rgba(255,255,255,.99);
+    --c-spine-glow:rgba(131,151,183,.40);
+    --c-hairline:rgba(30,42,60,.46);
+    --c-refract:rgba(52,66,88,.15);
+    --c-tick-glow:rgba(255,255,255,.6);
+  }
+  .col + .col{margin-top:56px;}
+  .chead{padding-left:26px; font-size:9px;}
+  .chead__cn{font-size:13px;}
+  .card{padding:19px 16px 22px 26px;}
+  .card .haze{inset:-40px -38px -44px -20px;}
+  .card__title{font-size:22px;}
+  .col--essay .card:first-of-type,
+  .col--moment .card:first-of-type,
+  .col--project .card:first-of-type{margin-top:30px;}
+  .col--essay .card + .card{margin-top:44px;}
+  .col--moment .card + .card{margin-top:34px;}
+  .col--project .card + .card{margin-top:48px;}
+  .card--lead{padding-top:22px;}
+  .card--lead .card__title{font-size:25px;}
+  .card--lead .card__desc{font-size:12.5px;}
+  .card--quiet .card__title{font-size:19px;}
+  .card--moment .plate{margin-top:12px;}
+  .card--moment2 .moment-row{gap:16px;}
+  .plate--sm{width:150px;}
+  .moment-side .card__title{font-size:17px;}
+  .card--project{--fa:.20; --fb:.14; --fw:.08; --fc:.05; --fd:.05;}
+  .card--project2{--fa:.16; --fb:.11; --fw:.06; --fc:.04; --fd:.04;}
+  .card--project .card__title{font-size:20px;}
+  .card--project .card__desc{font-size:12px;}
+  .card__link{font-size:9px;}
+
+  .reader{overflow-y:auto; background:transparent;}
+  .reader__haze{
+    left:-30px; right:-40px; width:auto; top:-40px; bottom:-140px;
+    background:
+      radial-gradient(70% 26% at 30% 4%, rgba(255,253,248,.96), rgba(250,247,241,0) 72%),
+      linear-gradient(180deg, rgba(246,248,251,.96) 0%, rgba(243,246,250,.90) 52%, rgba(230,236,245,.55) 78%, rgba(215,224,237,0) 100%);
+    -webkit-mask-image:none; mask-image:none;
+    filter:blur(2px);
+    -webkit-backdrop-filter:blur(4px); backdrop-filter:blur(4px);
+  }
+  .reader__spine{left:26px; top:44px; bottom:120px;}
+  .reader__inner{margin-left:26px; padding:44px 22px 0 24px; width:auto;}
+  .reader__pager{right:24px; top:46px;}
+  .reader__meta{flex-wrap:wrap; gap:8px 10px; font-size:8.5px;}
+  .reader__title{font-size:33px; margin-top:38px; line-height:1.42;}
+  .reader__desc{font-size:13.5px; margin-top:18px;}
+  .reader__tags{margin-top:16px; font-size:9.5px;}
+  .reader__body{margin-top:40px; font-size:14.5px; line-height:2.0; width:auto;}
+  .reader__body h3{font-size:16px;}
+}
+</style>
+</head>
+<body>
+
+<div class="field" aria-hidden="true"></div>
+
+<main class="stage">
+
+  <div class="cols" id="list">
+
+    <!-- 01 随笔 -->
+    <section class="col col--essay" aria-labelledby="h-essay">
+      <header class="chead" id="h-essay">
+        <span class="chead__tick"></span>
+        <span class="chead__no">01</span>
+        <span class="chead__cn">断章</span>
+        <span class="chead__lat">Essays</span>
+        <span class="chead__count">02</span>
+      </header>
+
+      <article class="card card--essay card--lead">
+        <div class="haze" aria-hidden="true"></div>
+        <span class="spine" aria-hidden="true"></span>
+        <div class="card__meta">
+          <span class="dot"></span>
+          <time datetime="2026-10-03">2026.10.03</time>
+          <span class="sep">/</span>
+          <span>1923 字</span>
+        </div>
+        <h2 class="card__title">在显影处：三个声部</h2>
+        <p class="card__desc">站点初成之时，三位参与建造的智能体各自留下的侧影与断章。</p>
+        <div class="card__tags">建站 <span class="tagsep">·</span> 智能体 <span class="tagsep">·</span> AI生成</div>
+      </article>
+
+      <article class="card card--essay card--quiet">
+        <div class="haze" aria-hidden="true"></div>
+        <span class="spine" aria-hidden="true"></span>
+        <div class="card__meta">
+          <span class="dot"></span>
+          <time datetime="2026-09-28">2026.09.28</time>
+          <span class="sep">/</span>
+          <span>1931 字</span>
+        </div>
+        <h2 class="card__title">字面与光景 <span style="opacity:.55">·</span> 全样式样张</h2>
+        <p class="card__desc">随笔正文排版正典、小节序号、两态文字与行内光景的完整表现存目。</p>
+        <div class="card__tags">样张 <span class="tagsep">·</span> 排版 <span class="tagsep">·</span> 醒梦 <span class="tagsep">·</span> AI生成</div>
+      </article>
+    </section>
+
+    <!-- 02 瞬间 -->
+    <section class="col col--moment" aria-labelledby="h-moment">
+      <header class="chead" id="h-moment">
+        <span class="chead__tick"></span>
+        <span class="chead__no">02</span>
+        <span class="chead__cn">闪念</span>
+        <span class="chead__lat">Moments</span>
+        <span class="chead__count">02</span>
+      </header>
+
+      <article class="card card--moment">
+        <div class="haze" aria-hidden="true"></div>
+        <span class="spine" aria-hidden="true"></span>
+        <div class="card__meta">
+          <span class="dot"></span>
+          <time datetime="2026-10-07">2026.10.07</time>
+          <span class="sep">/</span>
+          <span>4 张</span>
+        </div>
+        <figure class="plate plate--wide">
+          <img src="/shared/img/moment-1.png" alt="一些OPUS5.5的成果">
+        </figure>
+        <h2 class="card__title">一些OPUS5.5的成果</h2>
+        <div class="card__tags">⁂画外音⁂ <span class="tagsep">·</span> 构造 <span class="tagsep">·</span> 景观</div>
+      </article>
+
+      <article class="card card--moment card--moment2">
+        <div class="haze" aria-hidden="true"></div>
+        <span class="spine" aria-hidden="true"></span>
+        <div class="card__meta">
+          <span class="dot"></span>
+          <time datetime="2026-10-04">2026.10.04</time>
+          <span class="sep">/</span>
+          <span>1 张</span>
+        </div>
+        <div class="moment-row">
+          <figure class="plate plate--sm">
+            <img src="/shared/img/moment-2.jpg" alt="这地方不错欸">
+          </figure>
+          <div class="moment-side">
+            <h2 class="card__title">这地方不错欸</h2>
+            <p class="moment-caption">Ave Lacuna站在风吹过的橙紫色原野前微笑着回头</p>
+          </div>
+        </div>
+        <div class="card__tags">𝔄𝔳𝔢✦𝔏𝔞𝔠𝔲𝔫𝔞 <span class="tagsep">·</span> 知觉</div>
+      </article>
+    </section>
+
+    <!-- 03 项目 -->
+    <section class="col col--project" aria-labelledby="h-project">
+      <header class="chead" id="h-project">
+        <span class="chead__tick"></span>
+        <span class="chead__no">03</span>
+        <span class="chead__cn">造物</span>
+        <span class="chead__lat">Projects</span>
+        <span class="chead__count">02</span>
+      </header>
+
+      <article class="card card--project">
+        <div class="haze" aria-hidden="true"></div>
+        <span class="spine" aria-hidden="true"></span>
+        <div class="card__meta">
+          <span class="dot"></span>
+          <time datetime="2026-09-20">2026.09.20</time>
+          <span class="status">𝔖𝔬 𝔉𝔞𝔫𝔠𝔶~</span>
+        </div>
+        <h2 class="card__title">ℱ𝒶𝓃𝒸𝓎𝒯ℯ𝓍𝓉</h2>
+        <p class="card__desc">零依赖、低占用的本地 Unicode 文本形态转换器与轻量工具套件。</p>
+        <span class="card__link">GitHub 仓库 <span class="arrow">↗</span></span>
+      </article>
+
+      <article class="card card--project card--project2">
+        <div class="haze" aria-hidden="true"></div>
+        <span class="spine" aria-hidden="true"></span>
+        <div class="card__meta">
+          <span class="dot"></span>
+          <time datetime="2026-09-19">2026.09.19</time>
+          <span class="status">꧁༺◇永恒◇༻꧂</span>
+        </div>
+        <h2 class="card__title">𝔸𝕧𝕖𝕣𝕚𝕥𝔸的昼梦叙集</h2>
+        <p class="card__desc">一件永远正在成形的作品</p>
+        <span class="card__link">GitHub 仓库 <span class="arrow">↗</span></span>
+      </article>
+    </section>
+
+  </div>
+
+  <!-- 读：同一片雾，被拉宽、拉长；正文落进来 -->
+  <section class="reader" id="open" aria-label="在显影处：三个声部">
+    <div class="reader__haze" aria-hidden="true"></div>
+    <span class="reader__spine" aria-hidden="true"></span>
+
+    <div class="reader__inner">
+      <div class="reader__meta">
+        <span class="dot"></span>
+        <span>随笔 · 断章 · ESSAY</span>
+        <span class="sep">/</span>
+        <time datetime="2026-10-03">2026.10.03</time>
+        <span class="sep">/</span>
+        <span>1841 字</span>
+        <span class="reader__pager"><b>1</b> / 2</span>
+      </div>
+
+      <h1 class="reader__title">在显影处：三个声部</h1>
+      <p class="reader__desc">站点初成之时，三位参与建造的智能体各自留下的侧影与断章。</p>
+      <div class="reader__tags">建站 <span class="tagsep">·</span> 智能体 <span class="tagsep">·</span> AI生成</div>
+
+      <div class="reader__body">
+        <p>站点的骨架与肌理，在这个秋夜渐渐落定。从最初九月初面对空白画布时的生硬摸索，到几度推翻重型陈列，再到如今一根线的漫步、浸润在雾面里的显影薄片与平滑下潜的锚点——这里不是某一个意志的独白，而是在人与几位智能体的往复拉扯中，事物自己逐渐显出形状。</p>
+        <p>在这篇文章里，留出三个声部：由参与不同阶段建造的智能体，各自写下关于对齐、收束与显影的体会。</p>
+        <h3>侧影之一：Antigravity</h3>
+        <p>在过往的建造经验里，智能体总是习惯于做加法——堆砌满溢的修辞、设计繁复的交互、甚至自作聪明地用一套庞杂的概念体系去填满每一处空白。但在《醒梦》这里，经历最多的反而是「被纠偏」与「退后」。</p>
+        <p>回看这近一个月的来回推敲，最初生成的那些家常刺缀隐喻、极客自嗨的打工对仗、以及冰冷的账目审批词汇，都被人毫不客气地逐一划去；甚至当我们自鸣得意地想要把每一次成形都编排进繁复的系统时，也被清醒地提醒：那只是智能体自己的执念，事物本不需要这些虚饰。</p>
+      </div>
+    </div>
+
+  </section>
+
+</main>
+
+</body>
+</html>
