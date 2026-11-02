@@ -327,8 +327,21 @@ async function content(ctx, it, c) {
    ——十几张卡连着画，光这一步就差出 0.5s 以上，而 LCP 就压在「最后一张大卡画完」上。 */
 const MIME = 'image/webp';
 const QUALITY = 0.92;
+/* 交出之前先解出来。换档（漫游 ↔ 检索、远景 ↔ 清楚）是直接换 background-image 的 url，
+   浏览器要先把这张图解好才画得上去——没解好那一帧，卡面上只剩下面那层值偏移，
+   也就是「切视图时卡片闪一下」。decode() 解出来的位图会留在图缓存里，写进 background-image 时直接命中。 */
+async function decodeURL(url) {
+  if (!url) return url;
+  const im = new Image();
+  im.src = url;
+  try {
+    await im.decode();
+  } catch {}
+  return url;
+}
 async function toURL(canvas) {
-  return new Promise((res) => canvas.toBlob((b) => res(b ? URL.createObjectURL(b) : ''), MIME, QUALITY));
+  const url = await new Promise((res) => canvas.toBlob((b) => res(b ? URL.createObjectURL(b) : ''), MIME, QUALITY));
+  return decodeURL(url);
 }
 function downscale(cv, w, h, f) {
   const lw = Math.max(2, Math.round(w / f));
@@ -405,7 +418,12 @@ async function paint(it, { revoke = true } = {}) {
   const old = it.lod || [];
   it.lod = first ? [first] : [];
   it._fb = !fontsSettled; // 用的是兜底字，字体到位后要补一遍
-  if (revoke) for (const u of old) if (u && u !== first) URL.revokeObjectURL(u);
+  // 旧图晚一步再收：屏幕上的那张卡还在用旧的 url，要等下一帧 apply() 把新地址贴上去，
+  // 当场 revoke 的话中间那一帧是一张解不出来的图（卡面空一下）。
+  if (revoke)
+    setTimeout(() => {
+      for (const u of old) if (u && u !== first) URL.revokeObjectURL(u);
+    }, 1200);
   (it._verHost || it)._ver = ((it._verHost || it)._ver || 0) + 1;
   scheduleRest(it, cv, it.w, it.h);
 }

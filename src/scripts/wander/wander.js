@@ -355,6 +355,7 @@ export async function initWander(host) {
     el._it = null;
     el._url = '';
     el._free = false;
+    el._born = 0;
     el.removeAttribute('data-lod');
     if (el.parentNode !== spaces[s]) spaces[s].appendChild(el);
     return el;
@@ -366,6 +367,7 @@ export async function initWander(host) {
     el.style.cssText = 'opacity:0;visibility:hidden';
     el._it = null;
     el._url = '';
+    el._born = 0;
     el.removeAttribute('tabindex');
     el.removeAttribute('role');
     el.removeAttribute('aria-label');
@@ -427,11 +429,17 @@ export async function initWander(host) {
     const tilt = Math.abs(v.rx) + Math.abs(v.ry) > 0.02 ? ` perspective(1000px) rotateX(${v.rx.toFixed(2)}deg) rotateY(${v.ry.toFixed(2)}deg)` : '';
     const tr = `translate3d(${(v.x - w / 2).toFixed(1)}px,${(v.y - h / 2).toFixed(1)}px,0) scale(${Math.max(0.01, v.s).toFixed(4)})${tilt}`;
     if (tr !== v._t) { el.style.transform = tr; v._t = tr; }
-    const a = v.a.toFixed(3);
+    // 还没画出来的那一条先不露：卡面图是分批画的，晚到的那几张如果先露出来，
+    // 屏幕上就是一张只有值偏移、没有字的空纸（切视图时看见的就是这一下）。
+    // 第一次拿到卡面时用 240ms 淡进来，免得它作为一块纸「啪」地出现。
+    if (url && !el._born) el._born = now();
+    const ramp = url ? Math.min(1, (now() - el._born) / 240) : 0;
+    const vis = url ? v.a * ramp : 0;
+    const a = vis.toFixed(3);
     if (a !== v._a) {
       el.style.opacity = a;
-      el.style.visibility = v.a > 0.004 ? '' : 'hidden';
-      el.style.pointerEvents = v.a > 0.3 && !v.fl ? '' : 'none';
+      el.style.visibility = vis > 0.004 ? '' : 'hidden';
+      el.style.pointerEvents = vis > 0.3 && !v.fl ? '' : 'none';
       v._a = a;
     }
     const z = String(Math.round(v.z));
