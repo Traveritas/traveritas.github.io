@@ -420,7 +420,8 @@ export async function initWander(host) {
     if (lod !== v._lod || el._url !== url) {
       v._lod = lod;
       el._url = url;
-      el.style.backgroundImage = url ? `url(${url})` : '';
+      // 卡面图走 CSS 变量：它只是纸上的字，材料（值偏移、两条边、收口）在 CSS 里，要压在它下面
+      el.style.setProperty('--w-face', url ? `url(${url})` : 'none');
       el.dataset.lod = lod;
     }
     const tilt = Math.abs(v.rx) + Math.abs(v.ry) > 0.02 ? ` perspective(1000px) rotateX(${v.rx.toFixed(2)}deg) rotateY(${v.ry.toFixed(2)}deg)` : '';

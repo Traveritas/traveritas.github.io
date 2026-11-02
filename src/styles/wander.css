@@ -2,23 +2,17 @@
 [data-wscene='essay'], [data-ink='essay'] {
   --w-bg: #c6ced9; --w-fg: #232830; --w-soft: #56606d; --w-faint: #8a94a2; --w-ink: #4f4a66; --w-chrome: #2b3038;
   --w-glass: 250 251 253; --w-glass-a: 0.62; --w-edge: 52 62 82; --w-edge-a: 0.24; --w-sheen: 255 255 255; --w-sheen-a: 0.5;
-  --w-shadow: 0 24px 54px -28px rgb(40 50 72 / 0.5), 0 2px 10px -5px rgb(40 50 72 / 0.22);
-  --w-shadow-hot: 0 34px 70px -30px rgb(40 50 72 / 0.56), 0 3px 12px -5px rgb(40 50 72 / 0.24);
-  --w-panel-a: 0.93;
+  --w-panel-a: 0.986;
 }
 [data-wscene='project'], [data-ink='project'] {
   --w-bg: #0d1524; --w-fg: #e6ebf1; --w-soft: #a6b4c6; --w-faint: #71849c; --w-ink: #988bb6; --w-chrome: #dfe6ee;
   --w-glass: 16 26 42; --w-glass-a: 0.56; --w-edge: 168 206 226; --w-edge-a: 0.24; --w-sheen: 190 225 240; --w-sheen-a: 0.34;
-  --w-shadow: 0 26px 56px -24px rgb(0 0 0 / 0.66), 0 2px 10px -4px rgb(0 0 0 / 0.42);
-  --w-shadow-hot: 0 36px 72px -26px rgb(0 0 0 / 0.72), 0 3px 12px -4px rgb(0 0 0 / 0.46), 0 0 40px -12px rgb(150 205 218 / 0.22);
-  --w-panel-a: 0.9;
+  --w-panel-a: 0.978;
 }
 [data-wscene='moment'], [data-ink='moment'] {
   --w-bg: #1d1729; --w-fg: #f0e9f4; --w-soft: #bcadca; --w-faint: #877a98; --w-ink: #9c92c8; --w-chrome: #efe6f2;
   --w-glass: 40 30 56; --w-glass-a: 0.54; --w-edge: 236 196 180; --w-edge-a: 0.24; --w-sheen: 250 215 200; --w-sheen-a: 0.34;
-  --w-shadow: 0 26px 56px -24px rgb(6 2 12 / 0.64), 0 2px 10px -4px rgb(6 2 12 / 0.4);
-  --w-shadow-hot: 0 36px 72px -26px rgb(6 2 12 / 0.7), 0 3px 12px -4px rgb(6 2 12 / 0.44), 0 0 40px -12px rgb(240 186 150 / 0.22);
-  --w-panel-a: 0.9;
+  --w-panel-a: 0.978;
 }
 
 
@@ -50,48 +44,177 @@ html.w-dragging #w-stage { cursor: grabbing; }
 .w-space { position: absolute; inset: 0; pointer-events: none; }
 
 /* ══ 窗 ══
-   卡面是画好的图（字、标题栏、边）；投影与背后的磨砂由这里给，只有清楚的那一档才有——
-   远处的窗只剩像素块，投影与磨砂都没有意义。 */
+   一张几乎看不见的纸：面是底图的一次值偏移（上轻下重），形由上亮下暗两条 .6px 与一圈 .5px 收口给出。
+   卡面图（faces.js 画的字、标签、配图）是 background-image 的第一层，铺在这层值偏移之上。
+   这四种颜色注册成 <color> 才能插值——悬停是这四个值自己在过渡里走。
+   没有投影、没有磨砂、没有反光；悬停不位移、不缩放。 */
+@property --w-face-a {
+  syntax: '<color>';
+  inherits: false;
+  initial-value: rgba(0, 0, 0, 0);
+}
+@property --w-face-b {
+  syntax: '<color>';
+  inherits: false;
+  initial-value: rgba(0, 0, 0, 0);
+}
+@property --w-edge-hi {
+  syntax: '<color>';
+  inherits: false;
+  initial-value: rgba(0, 0, 0, 0);
+}
+@property --w-edge-lo {
+  syntax: '<color>';
+  inherits: false;
+  initial-value: rgba(0, 0, 0, 0);
+}
+@property --w-edge-ring {
+  syntax: '<color>';
+  inherits: false;
+  initial-value: rgba(0, 0, 0, 0);
+}
+
 .w-card {
   position: absolute;
   left: 0;
   top: 0;
   transform-origin: 50% 50%;
+  background-image: var(--w-face, none), linear-gradient(180deg, var(--w-face-a), var(--w-face-b));
   background-size: 100% 100%;
   background-repeat: no-repeat;
   border-radius: 3px;
+  box-shadow:
+    inset 0 0.6px 0 var(--w-edge-hi),
+    0 0.6px 0 var(--w-edge-lo),
+    0 0 0 0.5px var(--w-edge-ring);
   will-change: transform, opacity;
   pointer-events: auto;
   cursor: pointer;
   outline: none;
+  transition:
+    --w-face-a 0.22s ease,
+    --w-face-b 0.22s ease,
+    --w-edge-hi 0.22s ease,
+    --w-edge-lo 0.22s ease,
+    --w-edge-ring 0.22s ease;
 }
 .w-card:not([data-lod='0']) { image-rendering: pixelated; }
-.w-card[data-lod='0'] {
-  -webkit-backdrop-filter: blur(16px) saturate(1.18) brightness(1.03);
-  backdrop-filter: blur(16px) saturate(1.18) brightness(1.03);
-  box-shadow: var(--w-shadow);
+/* 远处的窗只剩像素块，但材质不换档：同一张纸，只是糊了 */
+.w-card.hot { transition-duration: 0.18s; }
+
+/* 顶沿亮起来的那一小段：左边起笔，走到 62% 化掉。不是一圈描边 */
+.w-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 0.7px;
+  border-radius: 3px 3px 0 0;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(
+    90deg,
+    var(--w-lit) 0%,
+    color-mix(in srgb, var(--w-lit) 62%, transparent) 26%,
+    transparent 62%
+  );
+  transition: opacity 0.22s ease;
 }
-.w-card[data-lod='1'] { box-shadow: 0 18px 40px -26px rgb(0 0 0 / 0.3); }
-/* 反光：跟着指针在玻璃上走的一小片亮，另有一道沿边的亮线 */
+.w-card.hot::before { opacity: 1; transition-duration: 0.18s; }
+
+/* 键盘焦点：四角裁切标记。悬停亮的是顶沿那一段，焦点亮的是四个角，两件事不会混 */
 .w-card::after {
   content: '';
   position: absolute;
-  inset: 0;
-  border-radius: inherit;
+  inset: 5px;
+  border-radius: 1px;
   pointer-events: none;
   opacity: 0;
-  transition: opacity 0.4s ease;
+  transition: opacity 0.16s ease;
   background:
-    radial-gradient(circle at var(--mx, 30%) var(--my, 20%), rgb(var(--w-sheen) / calc(var(--w-sheen-a) * 0.75)), rgb(var(--w-sheen) / 0) 46%),
-    linear-gradient(rgb(var(--w-sheen) / 0), rgb(var(--w-sheen) / 0));
-  box-shadow: inset 0 0 0 1px rgb(var(--w-sheen) / calc(var(--w-sheen-a) * 0.7));
+    linear-gradient(var(--w-mark), var(--w-mark)) 0 0 / 11px 0.8px no-repeat,
+    linear-gradient(var(--w-mark), var(--w-mark)) 0 0 / 0.8px 11px no-repeat,
+    linear-gradient(var(--w-mark), var(--w-mark)) 100% 0 / 11px 0.8px no-repeat,
+    linear-gradient(var(--w-mark), var(--w-mark)) 100% 0 / 0.8px 11px no-repeat,
+    linear-gradient(var(--w-mark), var(--w-mark)) 0 100% / 11px 0.8px no-repeat,
+    linear-gradient(var(--w-mark), var(--w-mark)) 0 100% / 0.8px 11px no-repeat,
+    linear-gradient(var(--w-mark), var(--w-mark)) 100% 100% / 11px 0.8px no-repeat,
+    linear-gradient(var(--w-mark), var(--w-mark)) 100% 100% / 0.8px 11px no-repeat;
 }
-.w-card.hot::after { opacity: 1; transition-duration: 0.18s; }
-.w-card.hot[data-lod='0'] { box-shadow: var(--w-shadow-hot); }
-.w-card:focus-visible::after { opacity: 1; box-shadow: inset 0 0 0 1px rgb(var(--w-sheen) / 0.5), 0 0 0 2px var(--amber); }
+.w-card:focus-visible::after { opacity: 1; }
 html.w-reading #w-stage .w-card { pointer-events: none; }
 /* 漫游里不够清楚的窗：点了是「走过去」，不是「打开」 */
 html[data-wview='explore'] .w-card:not(.clear) { cursor: zoom-in; }
+
+/* ── 三栏各一组数（rest / hover）──
+   随笔（浅底）压暗、瞬间与项目（深底）提亮；方向一致：顶变轻、底变沉——
+   一张纸的近边被指头挑起，远端压得更实。数值与 design/mocks/cards-r8 的 value 一版一致。 */
+.w-space[data-wscene='essay'] .w-card {
+  --w-face-a: rgba(23, 28, 40, 0.018);
+  --w-face-b: rgba(23, 28, 40, 0.092);
+  --w-face-a-hov: rgba(23, 28, 40, 0.006);
+  --w-face-b-hov: rgba(23, 28, 40, 0.118);
+  --w-edge-hi-hov: rgba(255, 255, 255, 0.7);
+  --w-edge-lo-hov: rgba(23, 28, 40, 0.36);
+  --w-edge-ring-hov: rgba(23, 28, 40, 0.2);
+  --w-edge-hi: rgba(255, 255, 255, 0.46);
+  --w-edge-lo: rgba(23, 28, 40, 0.27);
+  --w-edge-ring: rgba(23, 28, 40, 0.16);
+  --w-lit: rgba(255, 255, 255, 0.94);
+  --w-mark: rgba(23, 28, 40, 0.62);
+}
+.w-space[data-wscene='essay'] .w-card.hot {
+  --w-face-a: var(--w-face-a-hov);
+  --w-face-b: var(--w-face-b-hov);
+  --w-edge-hi: var(--w-edge-hi-hov);
+  --w-edge-lo: var(--w-edge-lo-hov);
+  --w-edge-ring: var(--w-edge-ring-hov);
+}
+
+.w-space[data-wscene='moment'] .w-card {
+  --w-face-a: rgba(255, 255, 255, 0.118);
+  --w-face-b: rgba(255, 255, 255, 0.022);
+  --w-face-a-hov: rgba(255, 255, 255, 0.15);
+  --w-face-b-hov: rgba(255, 255, 255, 0.014);
+  --w-edge-hi-hov: rgba(255, 255, 255, 0.66);
+  --w-edge-lo-hov: rgba(0, 0, 0, 0.33);
+  --w-edge-ring-hov: rgba(255, 255, 255, 0.15);
+  --w-edge-hi: rgba(255, 255, 255, 0.55);
+  --w-edge-lo: rgba(0, 0, 0, 0.28);
+  --w-edge-ring: rgba(255, 255, 255, 0.1);
+  --w-lit: rgba(255, 255, 255, 0.9);
+  --w-mark: rgba(255, 255, 255, 0.72);
+}
+.w-space[data-wscene='moment'] .w-card.hot {
+  --w-face-a: var(--w-face-a-hov);
+  --w-face-b: var(--w-face-b-hov);
+  --w-edge-hi: var(--w-edge-hi-hov);
+  --w-edge-lo: var(--w-edge-lo-hov);
+  --w-edge-ring: var(--w-edge-ring-hov);
+}
+
+.w-space[data-wscene='project'] .w-card {
+  --w-face-a: rgba(255, 255, 255, 0.092);
+  --w-face-b: rgba(255, 255, 255, 0.014);
+  --w-face-a-hov: rgba(255, 255, 255, 0.12);
+  --w-face-b-hov: rgba(255, 255, 255, 0.008);
+  --w-edge-hi-hov: rgba(255, 255, 255, 0.62);
+  --w-edge-lo-hov: rgba(0, 0, 0, 0.31);
+  --w-edge-ring-hov: rgba(255, 255, 255, 0.17);
+  --w-edge-hi: rgba(255, 255, 255, 0.5);
+  --w-edge-lo: rgba(0, 0, 0, 0.26);
+  --w-edge-ring: rgba(255, 255, 255, 0.12);
+  --w-lit: rgba(255, 255, 255, 0.88);
+  --w-mark: rgba(255, 255, 255, 0.68);
+}
+.w-space[data-wscene='project'] .w-card.hot {
+  --w-face-a: var(--w-face-a-hov);
+  --w-face-b: var(--w-face-b-hov);
+  --w-edge-hi: var(--w-edge-hi-hov);
+  --w-edge-lo: var(--w-edge-lo-hov);
+  --w-edge-ring: var(--w-edge-ring-hov);
+}
 
 #w-veil {
   position: fixed;
@@ -209,14 +332,22 @@ html.w-reading .w-chrome > * { opacity: 0 !important; pointer-events: none; }
 .w-rd-win {
   position: absolute;
   overflow: hidden;
-  border-radius: 3px; /* 与卡片（.w-card、faces.js 的 RAD）同一个角：长大的过程里角不跳 */
-  background: linear-gradient(115deg, rgb(var(--w-sheen) / calc(var(--w-sheen-a) * 0.5)), rgb(var(--w-sheen) / 0) 30%), rgb(var(--w-glass) / var(--w-panel-a));
-  -webkit-backdrop-filter: blur(26px) saturate(1.15);
-  backdrop-filter: blur(26px) saturate(1.15);
-  border: 1px solid rgb(var(--w-edge) / var(--w-edge-a));
-  box-shadow: 0 40px 90px -40px rgb(0 0 0 / 0.55), 0 4px 16px -8px rgb(0 0 0 / 0.3);
+  border-radius: 3px; /* 与卡片（.w-card）同一个角：长大的过程里角不跳 */
+  /* 同一块纸，只是厚了：面是这一栏的纸色，形还是那两条 .6px 与一圈 .5px——
+     没有磨砂、没有投影、没有 1px 描边，和列表里的卡是一家。 */
+  background-color: rgb(var(--w-glass) / var(--w-panel-a));
+  box-shadow:
+    inset 0 0.6px 0 var(--w-edge-hi),
+    0 0.6px 0 var(--w-edge-lo),
+    0 0 0 0.5px var(--w-edge-ring);
   display: flex;
   flex-direction: column;
+  /* 它是从卡片那块「几乎看不见的纸」上长出来的：纸的位置先就位，颜色在头 0.24s 里浓起来
+     （再慢就成了半透明方块漂在半空——背景会从材料里透出来读） */
+  animation: w-rd-sheet 0.24s cubic-bezier(0.25, 0.8, 0.3, 1) both;
+}
+@keyframes w-rd-sheet {
+  from { background-color: rgb(var(--w-glass) / calc(var(--w-panel-a) * 0.45)); }
 }
 .w-rd-face { position: absolute; z-index: 3; left: 0; top: 0; width: 100%; background-size: 100% 100%; pointer-events: none; }
 .w-rd-tb {
@@ -301,6 +432,22 @@ html.w-reading .w-chrome > * { opacity: 0 !important; pointer-events: none; }
 .w-rd[data-wscene='essay'] { --bg: rgb(225 231 239); --bg-sunken: rgb(214 221 231); --fg: rgb(35 40 48); --fg-soft: rgb(86 96 109); --fg-faint: rgb(134 144 158); --line: color-mix(in srgb, var(--fg) 12%, transparent); }
 .w-rd[data-wscene='project'] { color-scheme: dark; --bg: rgb(20 27 41); --bg-sunken: rgb(14 20 31); --fg: rgb(230 233 239); --fg-soft: rgb(154 166 184); --fg-faint: rgb(108 120 138); --line: color-mix(in srgb, var(--fg) 15%, transparent); --frost: 165 180 215; --frost-a: 0.1; --hour-ink: color-mix(in srgb, var(--umber) 52%, #fff); }
 .w-rd[data-wscene='moment'] { color-scheme: dark; --bg: rgb(38 33 53); --bg-sunken: rgb(30 26 43); --fg: rgb(236 230 241); --fg-soft: rgb(169 159 186); --fg-faint: rgb(124 115 140); --line: color-mix(in srgb, var(--fg) 15%, transparent); --frost: 180 162 215; --frost-a: 0.1; --hour-ink: color-mix(in srgb, var(--umber) 52%, #fff); }
+/* 阅读窗的边：与它那一栏的卡同一套规矩（上亮、下暗、一圈极淡收口），只是这张纸厚一些 */
+.w-rd[data-wscene='essay'] .w-rd-win {
+  --w-edge-hi: rgba(255, 255, 255, 0.5);
+  --w-edge-lo: rgba(23, 28, 40, 0.34);
+  --w-edge-ring: rgba(23, 28, 40, 0.18);
+}
+.w-rd[data-wscene='project'] .w-rd-win {
+  --w-edge-hi: rgba(255, 255, 255, 0.42);
+  --w-edge-lo: rgba(0, 0, 0, 0.3);
+  --w-edge-ring: rgba(255, 255, 255, 0.13);
+}
+.w-rd[data-wscene='moment'] .w-rd-win {
+  --w-edge-hi: rgba(255, 255, 255, 0.44);
+  --w-edge-lo: rgba(0, 0, 0, 0.32);
+  --w-edge-ring: rgba(255, 255, 255, 0.12);
+}
 .w-rd .md { margin-top: 36px; color: var(--w-fg); }
 .w-rd .prose { max-width: none; }
 .w-rd .w-rd-mdm { margin-top: 18px; }
@@ -347,6 +494,7 @@ html.w-on .page-ambient, html.w-on .wash-backdrop { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .w-host *, .w-rd * { transition: none !important; }
+  .w-rd-win { animation: none; }
 }
 
 /* ══ 主页：这片空间还没分开的样子（wander.js 的 home） ══
@@ -357,7 +505,7 @@ html.w-on .page-ambient, html.w-on .wash-backdrop { display: none; }
 [data-wscene='home'], [data-ink='home'] {
   --w-bg: #0e0f1d; --w-fg: #ece8f2; --w-soft: #b7b3c8; --w-faint: #827f98; --w-ink: #a195c1; --w-chrome: #e6e2ee;
   --w-glass: 22 22 40; --w-glass-a: 0.56; --w-edge: 214 206 236; --w-edge-a: 0.24; --w-sheen: 220 214 240; --w-sheen-a: 0.3;
-  --w-panel-a: 0.9;
+  --w-panel-a: 0.978;
 }
 .w-home {
   --home: 1;

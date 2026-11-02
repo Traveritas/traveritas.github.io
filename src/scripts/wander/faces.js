@@ -1,33 +1,32 @@
 /* ─────────────────────────────────────────────────────────────
- 卡面：最简的窗。
- 一片半透明的薄片 + 1px 边 + 一道标题栏（圆点 · 版块名 · 英文 · 右侧日期），下面是内容。
- 不做像素边、不做假按钮——像素与定格归空间（流光、失焦），窗本身保持干净、连续。
+ 卡面：一张几乎看不见的纸上的字。
+ 材料（面的一次值偏移、上亮下暗两条 .6px、一圈 .5px 收口）不画在这里——
+ 那是 CSS 的事（wander.css 的 --w-face-* / --w-edge-*），因为要能被悬停改、被过渡插值。
+ 这里只画纸上真正的内容：标题栏那一行（圆点 · 日期 · 右侧那一项）、标题、简介、标签、配图。
 
  每张卡用 canvas 2D 画一次（固定 2× 密度，检索视图里按 0.6–0.9 缩放时字仍清楚），
- 再降采样出三档失焦（每像素 6 / 12 / 24 个世界单位）。投影与背后的磨砂不画进图里，
- 由 CSS 给（box-shadow / backdrop-filter），这样窗在空间里是真的「浮着」的。
+ 再降采样出三档失焦（每像素 6 / 12 / 24 个世界单位）。
 
  数据由 WanderIndex.astro 在构建期写进页面（见 readData）。
  ───────────────────────────────────────────────────────────── */
 const R = 2;
 const LODS = [6, 12, 24];
 const TB = 30; // 标题栏高
-const RAD = 3;
 // 画卡的先后：随笔 → 瞬间 → 项目（与屏上从左到右一致，首屏每栏取前几张）
 const SCENE_ORDER = ['essay', 'moment', 'project'];
 
-/* 窗的墨色：浅底（随笔）与两种深底。ink 与 chip 是强调色那一族（怎么推出来的见 design/accent-contrast.cjs） */
+/* 纸上那套墨：与 wander.css 里三栏的值偏移一起定的（对照 design/mocks/cards-r8 的 value 一版）。
+   浅底（随笔）压暗、两种深底（瞬间 / 项目）提亮；chip 是标签那一圈细边。 */
 const INK = {
-  essay: { glass: 'rgba(250, 251, 253, 0.62)', edge: 'rgba(52, 62, 82, 0.24)', hair: 'rgba(52, 62, 82, 0.13)', chip: 'rgba(79, 74, 102, 0.32)', sheen: [255, 255, 255, 0.46], fg: '#232830', soft: '#56606d', faint: '#8a94a2', ink: '#4f4a66', dot: '#3a414c' },
-  project: { glass: 'rgba(16, 26, 42, 0.56)', edge: 'rgba(168, 206, 226, 0.24)', hair: 'rgba(168, 206, 226, 0.13)', chip: 'rgba(152, 139, 182, 0.34)', sheen: [190, 225, 240, 0.11], fg: '#e6ebf1', soft: '#a6b4c6', faint: '#71849c', ink: '#988bb6', dot: '#cfdbe6' },
-  moment: { glass: 'rgba(40, 30, 56, 0.54)', edge: 'rgba(236, 196, 180, 0.24)', hair: 'rgba(236, 196, 180, 0.13)', chip: 'rgba(156, 146, 200, 0.34)', sheen: [250, 215, 200, 0.1], fg: '#f0e9f4', soft: '#bcadca', faint: '#877a98', ink: '#9c92c8', dot: '#e8dcec' },
+  essay: { fg: '#232830', soft: '#49525f', faint: '#5c6675', ink: '#4f4a66', dot: '#3a414c', chip: 'rgba(79, 74, 102, 0.3)' },
+  project: { fg: 'rgba(232, 240, 252, 0.93)', soft: 'rgba(213, 226, 247, 0.62)', faint: 'rgba(213, 226, 247, 0.45)', ink: '#988bb6', dot: '#cfdbe6', chip: 'rgba(152, 139, 182, 0.3)' },
+  moment: { fg: 'rgba(246, 240, 246, 0.93)', soft: 'rgba(237, 228, 239, 0.64)', faint: 'rgba(237, 228, 239, 0.47)', ink: '#9c92c8', dot: '#e8dcec', chip: 'rgba(156, 146, 200, 0.3)' },
 };
 const LABEL = { essay: ['随笔', 'ESSAY'], project: ['项目', 'PROJECT'], moment: ['瞬间', 'MOMENT'] };
 const SERIF = "'Noto Serif SC', 'Source Han Serif SC', SimSun, serif";
 const MONO = "'IBM Plex Mono', Consolas, monospace";
 const dot = (d) => d.slice(0, 10).replace(/-/g, '.');
 const paras = (s) => (s || '').split(/\n\s*\n/).map((x) => x.trim()).filter(Boolean);
-const rgba = ([r, g, b], a) => `rgba(${r}, ${g}, ${b}, ${a})`;
 
 /* ══ 多图瞬间的排法（工具栏「多图」，存在 localStorage 的 xm-multi）══
    grid 网格：2 列（≥5 张 3 列）方格裁切；row 并排：一行、各自的比例，放不下就溢出右缘；car 轮播：窗面上只摆第一张 + 圆点。
@@ -164,32 +163,9 @@ function loadImage(src) {
   return imgCache.get(src);
 }
 
-/* ══ 窗 ══ */
-function frame(ctx, it, c) {
-  const { w, h } = it;
-  rrect(ctx, 0, 0, w, h, RAD);
-  ctx.fillStyle = c.glass;
-  ctx.fill();
-  ctx.save();
-  ctx.clip();
-  // 迎光：左上一道斜向的亮（115°，到 42% 处归零）
-  const g = ctx.createLinearGradient(0, 0, w * 0.62, h * 0.9);
-  g.addColorStop(0, rgba(c.sheen, c.sheen[3]));
-  g.addColorStop(0.42, rgba(c.sheen, 0));
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, w, h);
-  // 标题栏下的发丝线
-  ctx.fillStyle = c.hair;
-  ctx.fillRect(0, TB, w, 1);
-  ctx.restore();
-  rrect(ctx, 0.5, 0.5, w - 1, h - 1, RAD);
-  ctx.strokeStyle = c.edge;
-  ctx.lineWidth = 1;
-  ctx.stroke();
-}
-
 /* 标题栏：不再写版块名（三栏 / 三种夜色已经说了它是什么），只放日期——
-   左边一个空心小圈 + 日期，右边一条次要的信息（字数 / 状态 / 第几张）。 */
+   左边一个空心小圈 + 日期，右边一条次要的信息（字数 / 状态 / 第几张）。
+   这一行不再压一条发丝线：纸上一共只有顶沿、下沿两条边（见 wander.css）。 */
 function titleBar(ctx, it, c, date, right, rightInk) {
   const { w } = it;
   ctx.beginPath();
@@ -213,7 +189,7 @@ function titleBar(ctx, it, c, date, right, rightInk) {
   }
 }
 
-/* 标签：细边的小签，左对齐排一行，放不下的就不放 */
+/* 标签：一条极淡细边的小签，左对齐排一行，放不下的就不放（边上只有 .8，不抢那两条 0.6 的边） */
 function chips(ctx, c, labels, x, y, maxX) {
   ctx.font = `400 11.5px ${SERIF}`;
   const H = 20;
@@ -223,9 +199,9 @@ function chips(ctx, c, labels, x, y, maxX) {
     const tw = ctx.measureText(t).width;
     const cw = tw + 14;
     if (cx + cw > maxX) break;
-    rrect(ctx, cx + 0.5, y + 0.5, cw - 1, H - 1, 2);
+    rrect(ctx, cx + 0.4, y + 0.4, cw - 0.8, H - 0.8, 2);
     ctx.strokeStyle = c.chip;
-    ctx.lineWidth = 1;
+    ctx.lineWidth = 0.8;
     ctx.stroke();
     ctx.fillStyle = c.ink;
     ctx.fillText(t, cx + 7, y + 14);
@@ -286,13 +262,13 @@ async function content(ctx, it, c) {
     const pics = await Promise.all(a.images.slice(0, pl.cells.length).map((im) => loadImage(im.m)));
     ctx.save();
     ctx.beginPath();
-    ctx.rect(1, TB + 1, w - 2, ih);
+    ctx.rect(0, TB, w, ih);
     ctx.clip();
     pl.cells.forEach((cell, i) => {
       const pic = pics[i];
       if (!pic) return;
-      const x0 = 1 + cell.x;
-      const y0 = TB + 1 + cell.y;
+      const x0 = cell.x;
+      const y0 = TB + cell.y;
       ctx.save();
       ctx.beginPath();
       ctx.rect(x0, y0, cell.w, cell.h);
@@ -320,9 +296,7 @@ async function content(ctx, it, c) {
       }
     }
     ctx.restore();
-    ctx.fillStyle = c.hair;
-    ctx.fillRect(0, TB + 1 + ih, w, 1);
-    // 图注：标题在左，第一个标签在右
+    // 图注：标题在左，第一个标签在右（图上不再压一条线：图的边本来就是一条边）
     const tag = (a.tags || [])[0];
     ctx.font = `400 11px ${SERIF}`;
     const tagW = tag ? ctx.measureText(tag).width : 0;
@@ -425,7 +399,6 @@ async function paint(it, { revoke = true } = {}) {
   const ctx = cv.getContext('2d');
   ctx.scale(R, R);
   ctx.textBaseline = 'alphabetic';
-  frame(ctx, it, c);
   await content(ctx, it, c);
   // 先只交出第一档：等它就能上屏，其余三档排到空闲时
   const first = await toURL(cv);
