@@ -330,6 +330,13 @@ const QUALITY = 0.92;
 /* 交出之前先解出来。换档（漫游 ↔ 检索、远景 ↔ 清楚）是直接换 background-image 的 url，
    浏览器要先把这张图解好才画得上去——没解好那一帧，卡面上只剩下面那层值偏移，
    也就是「切视图时卡片闪一下」。decode() 解出来的位图会留在图缓存里，写进 background-image 时直接命中。 */
+/* 解好的那张 Image 要留着引用：decode() 只保证「此刻解好了」，对象一丢，位图就可能被浏览器回收，
+   下一次贴上去又得现场解——那一帧还是空的。keep 里挂着的引用把它钉住，revoke 时一起放掉。 */
+const keep = new Map();
+function release(url) {
+  keep.delete(url);
+  URL.revokeObjectURL(url);
+}
 async function decodeURL(url) {
   if (!url) return url;
   const im = new Image();
@@ -337,6 +344,7 @@ async function decodeURL(url) {
   try {
     await im.decode();
   } catch {}
+  keep.set(url, im);
   return url;
 }
 async function toURL(canvas) {
@@ -422,7 +430,7 @@ async function paint(it, { revoke = true } = {}) {
   // 当场 revoke 的话中间那一帧是一张解不出来的图（卡面空一下）。
   if (revoke)
     setTimeout(() => {
-      for (const u of old) if (u && u !== first) URL.revokeObjectURL(u);
+      for (const u of old) if (u && u !== first) release(u);
     }, 1200);
   (it._verHost || it)._ver = ((it._verHost || it)._ver || 0) + 1;
   scheduleRest(it, cv, it.w, it.h);
@@ -516,10 +524,10 @@ async function repaintMulti(all) {
     // revoke:false —— nt.lod 从 it 继承来的那个数组正是屏幕在用的一份，不能在这里回收
     await paint(nt, { revoke: false });
     // 连着点了几下：只认最后一次
-    if (gen !== multiGen) { for (const u of nt.lod) if (!(it.lod || []).includes(u)) URL.revokeObjectURL(u); return; }
+    if (gen !== multiGen) { for (const u of nt.lod) if (!(it.lod || []).includes(u)) release(u); return; }
     const gone = (it.lod || []).filter((u) => !nt.lod.includes(u));
     Object.assign(it, { _pl: nt._pl, h: nt.h, lod: nt.lod, _fb: nt._fb, _ver: (it._ver || 0) + 1 });
-    for (const u of gone) URL.revokeObjectURL(u);
+    for (const u of gone) release(u);
   }));
   return its;
 }
