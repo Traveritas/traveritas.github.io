@@ -307,6 +307,9 @@ export function createReader({ onOpen, onNav, onClosing, onClosed, onBody }) {
     if (target) {
       face.style.opacity = '';
       anim(face, [{ opacity: 0 }, { opacity: 1 }], { duration: 220, delay: 60 });
+      // 纸在同一段时间里退回成卡片那一层（见 wander.css 的 .is-closing / w-rd-drain）：
+      // 落下的最后一帧等于卡片本身，卡片接回来时不会「换一次材质」
+      win.classList.add('is-closing');
       done = anim(win, [{ ...geo(pr), opacity: 1 }, { ...geo(target), opacity: 1 }], { duration: 580, delay: 70, easing: EASE_CLOSE }).finished;
     } else {
       // 那一条此刻不在视野里：窗原地合上、淡掉
