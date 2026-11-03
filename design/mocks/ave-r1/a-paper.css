@@ -1,0 +1,267 @@
+/* A · 纸 —— 把 Ave 的材料降到「一张几乎看不见的纸」，和 cards-r9 换过的卡片说同一种语言。
+   一句话：面 = 一层薄纸 + 底图的一次值偏移（上轻下重）；形只有上亮 .6px / 下暗 .6px / .5px 收口三条；
+   没有磨砂、没有投影、没有反光、没有折角、没有晶柱。轮廓退回矩形，圆角 3px。
+
+   三层都在 .a-card 的 background 里，不再添别的：
+     ① 她的颜色，整块纸上只这一层 3.5%（--a-wash）
+     ② 值偏移：上轻下重（亮底压暗 .014→.082；暗底提亮 .075→.014，与卡片同一套）
+     ③ 纸本身：上纸色一点、下纸色沉一点，浓度 --a-paper-k 由这一场给
+   纸那一层是这一案唯一的让步：对话框会落在 bg-list 右下那条深栏上（L≈28），
+   只靠那 8% 的值偏移，深底上的深字读不出来。取舍写在 A-NOTES.md。 */
+
+.ave {
+  position: fixed;
+  right: 22px;
+  bottom: 58px;
+  z-index: 59;
+  max-width: min(23rem, calc(100vw - 112px));
+  --size: 50px;
+  --pad-x: 14px;
+  --pad-y: 11px;
+  color: var(--m-fg);
+}
+body.anchored .ave {
+  left: 640px;
+  right: auto;
+  bottom: auto;
+  top: 430px;
+}
+
+/* ── 一张纸 ── */
+.a-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas:
+    'port text'
+    'name text';
+  align-content: center;
+  align-items: center;
+  row-gap: 7px;
+  column-gap: 13px;
+  padding: calc(var(--pad-y) + 2px) var(--pad-x) calc(var(--pad-y) + 4px);
+  border-radius: 3px;
+  isolation: isolate;
+
+  /* 纸：不是白纸，是这一页自己的纸色（和 cards-r9 阅读窗同一个判断）。
+     近白的纸会在这两页上变成一块贴上去的板；这一页的纸色压上去，浅底上几乎看不见，
+     只有落到 bg-list 右下那条深栏上时才显出来——它显出来，正是为了让字还读得出来。 */
+  --a-paper-a: #eaf0f8;
+  --a-paper-b: #d5e0ec;
+  --a-paper-k: 0.82;
+
+  /* 值偏移：上轻下重 */
+  --a-face-a: rgba(23, 28, 40, 0.014);
+  --a-face-b: rgba(23, 28, 40, 0.082);
+
+  /* 三条边：上亮 / 下暗 / 极淡收口，与卡片的 .6 / .6 / .5 同一套 */
+  --a-edge-hi: rgba(255, 255, 255, 0.78);
+  --a-edge-lo: rgba(23, 28, 40, 0.3);
+  --a-edge-ring: rgba(23, 28, 40, 0.12);
+
+  /* 她的颜色，整块纸上只叠这一层，3.5% */
+  --a-wash: color-mix(in srgb, var(--m-hue) 3.5%, transparent);
+
+  background-image:
+    linear-gradient(var(--a-wash), var(--a-wash)),
+    linear-gradient(180deg, var(--a-face-a) 0%, var(--a-face-b) 62%, var(--a-face-b) 100%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--a-paper-a) calc(var(--a-paper-k) * 100%), transparent),
+      color-mix(in srgb, var(--a-paper-b) calc(var(--a-paper-k) * 100%), transparent)
+    );
+  box-shadow:
+    inset 0 0.6px 0 var(--a-edge-hi),
+    0 0.6px 0 var(--a-edge-lo),
+    0 0 0 0.5px var(--a-edge-ring);
+}
+
+/* 深色钟点：纸换成一页深纸，值偏移反向（上亮下收）。
+   浓度给到 0.97——深夜那页背后是设置面板这类高对比的东西（滑块、按钮描边都近白），
+   0.66 / 0.86 / 0.93 都试过，它们仍旧从正文底下浮出来。暗底上没有投影可借，
+   只能靠纸自己盖住。这一步和 cards-r9 的阅读窗是同一个选择（那边取 .968–.982）。 */
+body.bg-dusk .a-card,
+body.bg-dream .a-card {
+  --a-paper-a: #2b3247;
+  --a-paper-b: #1a2030;
+  --a-paper-k: 0.97;
+  --a-face-a: rgba(255, 255, 255, 0.075);
+  --a-face-b: rgba(255, 255, 255, 0.014);
+  --a-edge-hi: rgba(255, 255, 255, 0.26);
+  --a-edge-lo: rgba(0, 0, 0, 0.24);
+  --a-edge-ring: rgba(255, 255, 255, 0.07);
+}
+/* 漫游那张底整体是浅的：纸比亮页薄一档，不然它会从浅底上「贴」出来 */
+body.bg-explore .a-card {
+  --a-paper-k: 0.78;
+}
+
+/* ── 名牌：一枚压在纸角的小签。
+   头像是印在这张纸上的，小签就是它的说明——一行小字 + 一颗空心菱，坐在小方块正下方，
+   没有底版、不伸出框沿。它不属于正文那一栏（正文从上面就开始），所以不读成一枚标题栏 ── */
+.a-name {
+  grid-area: name;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5em;
+  height: 10px;
+  margin: 2px 0 0;
+  font: 400 9px/1 var(--font-mono);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--m-hue-2) 74%, var(--m-fg));
+  align-self: start;
+}
+.a-name i {
+  width: 5px;
+  height: 5px;
+  border: 1px solid currentColor;
+  opacity: 0.78;
+  rotate: 45deg;
+}
+body.bg-dusk .a-name,
+body.bg-dream .a-name {
+  color: color-mix(in srgb, var(--m-hue) 80%, var(--m-fg));
+}
+
+/* ── 头像：印在纸上的一枚小方块，没有玻璃边 ──
+   浅纸用乘（像压上去的墨），深纸用滤色（像从纸里透出来的光）；
+   两头都收一点对比，免得她的黑压在纸上成为黑块 */
+.a-portrait {
+  grid-area: port;
+  position: relative;
+  width: var(--size);
+  height: var(--size);
+  align-self: end;
+  margin: 0;
+  overflow: hidden;
+  background: none;
+  box-shadow: none;
+}
+.a-portrait img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  mix-blend-mode: multiply;
+  opacity: 0.92;
+  filter: contrast(0.7) brightness(1.2) saturate(0.9);
+}
+/* 浅纸：多压一层极淡的她的颜色，让这块「印刷」和纸是同一张片子，不是贴上去的图 */
+.a-portrait::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--m-hue) 6%, transparent);
+  mix-blend-mode: multiply;
+  pointer-events: none;
+}
+body.bg-dusk .a-portrait img,
+body.bg-dream .a-portrait img {
+  mix-blend-mode: screen;
+  opacity: 0.7;
+  filter: contrast(0.9) saturate(0.94);
+}
+body.bg-dusk .a-portrait::after,
+body.bg-dream .a-portrait::after {
+  display: none;
+}
+
+/* ── 字栏：没有竖刻线，就是纸上的正文 ── */
+.a-body {
+  grid-area: text;
+  min-width: 0;
+}
+.ave-text {
+  margin: 0;
+  font: 500 15px/2 var(--font-display);
+  overflow-wrap: anywhere;
+}
+.ave-text .c {
+  --ave-ink: var(--m-ink);
+  --ave-hue: var(--m-hue-2);
+}
+
+/* 最后一个字和碎屑绑在一起 */
+.a-end {
+  white-space: nowrap;
+}
+
+/* 句尾三截碎屑：她的颜色 */
+.a-tail {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 1em;
+  margin-left: 5px;
+  vertical-align: calc(-1px - 0.18em);
+}
+.a-tail i {
+  width: 1px;
+  background: color-mix(in srgb, var(--m-hue-2) 82%, var(--m-fg));
+}
+.a-tail i:nth-child(1) { height: 7px; }
+.a-tail i:nth-child(2) { height: 4px; }
+.a-tail i:nth-child(3) { height: 2px; }
+
+/* ── 收起 ×：纸的右上角 ── */
+.a-x {
+  position: absolute;
+  top: 8px;
+  right: 9px;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--m-faint);
+  opacity: 0.55;
+  font: 400 11px/1 var(--font-mono);
+}
+
+/* 晶柱 / 四芒星在纸上没有位置，留元素不画 */
+.a-star {
+  display: none;
+}
+
+/* ── 贴着元素说：牵过来的一根发丝（位置由真站点算，这里一段示意） ── */
+.a-lead {
+  display: none;
+}
+body.anchored .a-lead {
+  display: block;
+  position: absolute;
+  left: -90px;
+  top: 34px;
+  width: 90px;
+  height: 1px;
+  background: var(--m-ink);
+}
+body.anchored .a-lead::before {
+  content: '';
+  position: absolute;
+  left: -4px;
+  top: -3px;
+  width: 7px;
+  height: 7px;
+  border: 1px solid var(--m-ink);
+  background: var(--bg);
+  rotate: 45deg;
+}
+
+@media (max-width: 560px) {
+  .ave {
+    right: 12px;
+    bottom: 64px;
+    max-width: calc(100vw - 94px);
+    --size: 40px;
+    --pad-x: 11px;
+  }
+  .a-card { column-gap: 10px; }
+  .a-portrait { margin-top: 2px; }
+  .ave-text { font-size: 14px; }
+  body.anchored .ave { left: auto; right: 12px; top: auto; bottom: 120px; }
+}

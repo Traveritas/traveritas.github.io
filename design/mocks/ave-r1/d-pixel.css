@@ -1,0 +1,348 @@
+/* ═════════════════════════════════════════════════════════════
+   D · 像素场（与头像同源）
+   ═════════════════════════════════════════════════════════════
+   头像里那门语言：5px 一格、Bayer 4×4 抖动、黑白灰加一点雾蓝 / 薄暮紫。
+   这一支让同一门语言从头像槽里流出来——整句话被一片稀疏的格托住。
+
+   ■ 怎么织（三层，全部 5px）
+
+     L1  面 · 她的格
+        一个「像素矩形」：外轮廓由 5px 的方块错位而成（右上切一格、
+        左下切两格），用 clip-path 画出来。面上再铺一张 4×4 的 5px 平铺，
+        每格的 alpha 按 Bayer 次序在 0.90–1.00 之间抖 —— 眯眼是一块浅面，
+        看近处是一格一格的。正文就坐在这一层上。
+        （不是描边：这一层是实心面，边上的台阶是面的外轮廓。）
+
+     L2  中圈 · 四取一
+        同色，但每 4 格里只留 1 格；用 clip-path 挖空中间那圈以外的一带
+        （evenodd 两个像素矩形之间那一圈），于是它只在面外一圈点出稀格。
+
+     L3  外圈 · 八取一
+        再往外一带，只剩 2/16 的格。出了这一圈就什么都没有。
+
+     平铺的相位与头像那一格对齐（实测头像图里格原点在 (8,4)），原点取
+     头像槽右上角 —— 场是从她那一格长出来的。
+
+   ■ 两套底都能读
+
+     bg-list / bg-narrow：卡压在近黑底（#0a141d），正文深字 #232830。
+       L1 的浅格把底抬到 #d6dfe9 一档，正文在 9:1 以上。
+     bg-explore：底本就近白（#e5e6ef），同一块浅色面放上去几乎看不出来，
+       正文照样稳，不必换色。
+     bg-dusk / bg-dream：正文是浅字，L1/L2/L3 翻成她的深色格。
+
+   ■ 没有：模糊、描边、投影、圆角、发光。
+   ═════════════════════════════════════════════════════════════ */
+
+.ave {
+  position: fixed;
+  right: 22px;
+  bottom: 58px;
+  z-index: 59;
+  max-width: min(24rem, calc(100vw - 112px));
+  --size: 50px;
+  --pad: 0.7rem;
+  --g: 5px;
+  color: var(--m-fg);
+}
+body.anchored .ave {
+  left: 640px;
+  right: auto;
+  bottom: auto;
+  top: 430px;
+}
+
+.a-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  padding: 0;
+  isolation: isolate;
+}
+
+/* ═══ 场 ═══ 四边各多出两到三格 */
+.a-field {
+  position: absolute;
+  z-index: -1;
+  left: -10px;
+  top: -12px;
+  right: -12px;
+  bottom: -12px;
+  pointer-events: none;
+
+  /* 与头像对齐的格原点（场坐标） */
+  --ghx: calc(var(--pad) + 10px);
+  --ghy: calc(var(--pad) + 12px);
+
+  /* 她的浅色（取色自 ref/faceflow.png 的雾白那几档） */
+  --d-fc: color-mix(in srgb, var(--m-hue) 24%, #edf2fa);
+
+  /* 4×4 个 5px 格。L1：每格都在，alpha 在 0.90–1.00 之间抖 */
+  --d-t16: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' shape-rendering='crispEdges'%3E%3Crect x='0' y='0' width='5' height='5' fill='%23fff' fill-opacity='0.903'/%3E%3Crect x='5' y='0' width='5' height='5' fill='%23fff' fill-opacity='0.953'/%3E%3Crect x='10' y='0' width='5' height='5' fill='%23fff' fill-opacity='0.916'/%3E%3Crect x='15' y='0' width='5' height='5' fill='%23fff' fill-opacity='0.966'/%3E%3Crect x='0' y='5' width='5' height='5' fill='%23fff' fill-opacity='0.978'/%3E%3Crect x='5' y='5' width='5' height='5' fill='%23fff' fill-opacity='0.928'/%3E%3Crect x='10' y='5' width='5' height='5' fill='%23fff' fill-opacity='0.991'/%3E%3Crect x='15' y='5' width='5' height='5' fill='%23fff' fill-opacity='0.941'/%3E%3Crect x='0' y='10' width='5' height='5' fill='%23fff' fill-opacity='0.922'/%3E%3Crect x='5' y='10' width='5' height='5' fill='%23fff' fill-opacity='0.972'/%3E%3Crect x='10' y='10' width='5' height='5' fill='%23fff' fill-opacity='0.909'/%3E%3Crect x='15' y='10' width='5' height='5' fill='%23fff' fill-opacity='0.959'/%3E%3Crect x='0' y='15' width='5' height='5' fill='%23fff' fill-opacity='0.997'/%3E%3Crect x='5' y='15' width='5' height='5' fill='%23fff' fill-opacity='0.947'/%3E%3Crect x='10' y='15' width='5' height='5' fill='%23fff' fill-opacity='0.984'/%3E%3Crect x='15' y='15' width='5' height='5' fill='%23fff' fill-opacity='0.934'/%3E%3C/svg%3E");
+  /* L2：四取一 */
+  --d-t4: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' shape-rendering='crispEdges'%3E%3Crect x='0' y='0' width='5' height='5' fill='%23fff' fill-opacity='0.0'/%3E%3Crect x='5' y='0' width='5' height='5' fill='%23fff' fill-opacity='0.0'/%3E%3Crect x='10' y='0' width='5' height='5' fill='%23fff' fill-opacity='0.0'/%3E%3Crect x='15' y='0' width='5' height='5' fill='%23fff' fill-opacity='0.0'/%3E%3Crect x='0' y='5' width='5' height='5' fill='%23fff' fill-opacity='1.0'/%3E%3Crect x='5' y='5' width='5' height='5' fill='%23fff' fill-opacity='0.0'/%3E%3Crect x='10' y='5' width='5' height='5' fill='%23fff' fill-opacity='1.0'/%3E%3Crect x='15' y='5' width='5' height='5' fill='%23fff' fill-opacity='0.0'/%3E%3Crect x='0' y='10' width='5' height='5' fill='%23fff' fill-opacity='0.0'/%3E%3Crect x='5' y='10' width='5' height='5' fill='%23fff' fill-opacity='0.0'/%3E%3Crect x='10' y='10' width='5' height='5' fill='%23fff' fill-opacity='0.0'/%3E%3Crect x='15' y='10' width='5' height='5' fill='%23fff' fill-opacity='0.0'/%3E%3Crect x='0' y='15' width='5' height='5' fill='%23fff' fill-opacity='1.0'/%3E%3Crect x='5' y='15' width='5' height='5' fill='%23fff' fill-opacity='0.0'/%3E%3Crect x='10' y='15' width='5' height='5' fill='%23fff' fill-opacity='1.0'/%3E%3Crect x='15' y='15' width='5' height='5' fill='%23fff' fill-opacity='0.0'/%3E%3C/svg%3E");
+  /* L3：八取一 */
+  --d-t2: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' shape-rendering='crispEdges'%3E%3Crect x='0' y='0' width='5' height='5' fill='%23fff' fill-opacity='0.0'/%3E%3Crect x='5' y='0' width='5' height='5' fill='%23fff' fill-opacity='0.0'/%3E%3Crect x='10' y='0' width='5' height='5' fill='%23fff' fill-opacity='0.0'/%3E%3Crect x='15' y='0' width='5' height='5' fill='%23fff' fill-opacity='0.0'/%3E%3Crect x='0' y='5' width='5' height='5' fill='%23fff' fill-opacity='0.0'/%3E%3Crect x='5' y='5' width='5' height='5' fill='%23fff' fill-opacity='0.0'/%3E%3Crect x='10' y='5' width='5' height='5' fill='%23fff' fill-opacity='1.0'/%3E%3Crect x='15' y='5' width='5' height='5' fill='%23fff' fill-opacity='0.0'/%3E%3Crect x='0' y='10' width='5' height='5' fill='%23fff' fill-opacity='0.0'/%3E%3Crect x='5' y='10' width='5' height='5' fill='%23fff' fill-opacity='0.0'/%3E%3Crect x='10' y='10' width='5' height='5' fill='%23fff' fill-opacity='0.0'/%3E%3Crect x='15' y='10' width='5' height='5' fill='%23fff' fill-opacity='0.0'/%3E%3Crect x='0' y='15' width='5' height='5' fill='%23fff' fill-opacity='1.0'/%3E%3Crect x='5' y='15' width='5' height='5' fill='%23fff' fill-opacity='0.0'/%3E%3Crect x='10' y='15' width='5' height='5' fill='%23fff' fill-opacity='0.0'/%3E%3Crect x='15' y='15' width='5' height='5' fill='%23fff' fill-opacity='0.0'/%3E%3C/svg%3E");
+}
+.a-field > i {
+  position: absolute;
+  inset: 0;
+  background: var(--d-fc);
+  -webkit-mask-repeat: repeat;
+  mask-repeat: repeat;
+  -webkit-mask-size: 20px 20px;
+  mask-size: 20px 20px;
+  -webkit-mask-position: var(--ghx) var(--ghy);
+  mask-position: var(--ghx) var(--ghy);
+}
+
+/* ── L1 面：像素矩形（右上切一格、左下切两格）+ 抖开的 5px 格 ── */
+.a-field > i:nth-child(1) {
+  clip-path: polygon(
+    17px 12px,
+    calc(100% - 17px) 12px,
+    calc(100% - 17px) 17px,
+    calc(100% - 12px) 17px,
+    calc(100% - 12px) calc(100% - 17px),
+    calc(100% - 17px) calc(100% - 17px),
+    calc(100% - 17px) calc(100% - 12px),
+    17px calc(100% - 12px),
+    17px calc(100% - 17px),
+    12px calc(100% - 17px),
+    12px 17px,
+    17px 17px
+  );
+  -webkit-mask-image: var(--d-t16);
+  mask-image: var(--d-t16);
+}
+
+/* ── L2 中圈：面外 10px 那一带，只留四分之一的格 ── */
+.a-field > i:nth-child(2) {
+  clip-path: polygon(
+    evenodd,
+    11px 6px,
+    calc(100% - 11px) 6px,
+    calc(100% - 11px) 11px,
+    calc(100% - 6px) 11px,
+    calc(100% - 6px) calc(100% - 11px),
+    calc(100% - 11px) calc(100% - 11px),
+    calc(100% - 11px) calc(100% - 6px),
+    11px calc(100% - 6px),
+    11px calc(100% - 11px),
+    6px calc(100% - 11px),
+    6px 11px,
+    11px 11px,
+    17px 12px,
+    calc(100% - 17px) 12px,
+    calc(100% - 17px) 17px,
+    calc(100% - 12px) 17px,
+    calc(100% - 12px) calc(100% - 17px),
+    calc(100% - 17px) calc(100% - 17px),
+    calc(100% - 17px) calc(100% - 12px),
+    17px calc(100% - 12px),
+    17px calc(100% - 17px),
+    12px calc(100% - 17px),
+    12px 17px,
+    17px 17px
+  );
+  -webkit-mask-image: var(--d-t4);
+  mask-image: var(--d-t4);
+  opacity: 0.42;
+}
+
+/* ── L3 外圈：再外 10px 一带，只留八分之一的格 —— 场到这里就断了 ── */
+.a-field > i:nth-child(3) {
+  clip-path: polygon(
+    evenodd,
+    5px 0,
+    calc(100% - 5px) 0,
+    calc(100% - 5px) 5px,
+    100% 5px,
+    100% calc(100% - 5px),
+    calc(100% - 5px) calc(100% - 5px),
+    calc(100% - 5px) 100%,
+    5px 100%,
+    5px calc(100% - 5px),
+    0 calc(100% - 5px),
+    0 5px,
+    5px 5px,
+    11px 6px,
+    calc(100% - 11px) 6px,
+    calc(100% - 11px) 11px,
+    calc(100% - 6px) 11px,
+    calc(100% - 6px) calc(100% - 11px),
+    calc(100% - 11px) calc(100% - 11px),
+    calc(100% - 11px) calc(100% - 6px),
+    11px calc(100% - 6px),
+    11px calc(100% - 11px),
+    6px calc(100% - 11px),
+    6px 11px,
+    11px 11px
+  );
+  -webkit-mask-image: var(--d-t2);
+  mask-image: var(--d-t2);
+  opacity: 0.2;
+}
+
+/* ── 近白底（bg-explore）：面几乎看不见，外两圈再收一收 ── */
+body.bg-explore .a-field { --d-fc: color-mix(in srgb, var(--m-hue) 28%, #f5f8fd); }
+body.bg-explore .a-field > i:nth-child(2) { opacity: 0.3; }
+body.bg-explore .a-field > i:nth-child(3) { opacity: 0.13; }
+
+/* ── 深夜 / 梦面：浅字，场翻成她的深色格 ── */
+body.bg-dusk .a-field,
+body.bg-dream .a-field {
+  --d-fc: color-mix(in srgb, var(--m-deep) 38%, #121727);
+}
+body.bg-dusk .a-field > i:nth-child(2),
+body.bg-dream .a-field > i:nth-child(2) { opacity: 0.46; }
+body.bg-dusk .a-field > i:nth-child(3),
+body.bg-dream .a-field > i:nth-child(3) { opacity: 0.22; }
+
+/* ═══ 头像槽：5px 的台阶边，不画描边 ═══ */
+.a-portrait {
+  position: relative;
+  width: var(--size);
+  height: var(--size);
+  margin: var(--pad) 0 var(--pad) var(--pad);
+  overflow: hidden;
+  clip-path: polygon(
+    0 0,
+    calc(100% - 5px) 0,
+    calc(100% - 5px) 5px,
+    100% 5px,
+    100% 100%,
+    10px 100%,
+    10px calc(100% - 5px),
+    5px calc(100% - 5px),
+    5px calc(100% - 10px),
+    0 calc(100% - 10px)
+  );
+}
+/* 原图 56px、格 5px；1:1 摆，格还是 5px，与场的格同尺寸同相 */
+.a-portrait img {
+  position: absolute;
+  left: -8px;
+  top: -4px;
+  width: 56px;
+  height: 56px;
+  image-rendering: pixelated;
+}
+
+/* ═══ 字栏 ═══ */
+.a-body {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  padding: 0.55rem 1.15rem 0.6rem 0.85rem;
+}
+
+/* 名牌：低对比小字 + 一颗空心菱，无底牌、无描边 */
+.a-name {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  height: 12px;
+  margin: 0 0 2px;
+  font: 400 9px/1 var(--font-pixel);
+  letter-spacing: 0.18em;
+  color: color-mix(in srgb, var(--m-hue-2) 52%, var(--m-fg));
+}
+.a-name i {
+  width: 5px;
+  height: 5px;
+  border: 1px solid currentColor;
+  rotate: 45deg;
+  opacity: 0.7;
+}
+body.bg-dusk .a-name,
+body.bg-dream .a-name {
+  color: color-mix(in srgb, var(--m-hue) 62%, var(--m-fg));
+}
+
+/* ═══ 台词 ═══ 15px / 行高 2（窄屏 14px），逐字结构不动 */
+.ave-text {
+  margin: 0;
+  font: 500 15px/2 var(--font-display);
+  overflow-wrap: anywhere;
+}
+.ave-text .c {
+  --ave-ink: color-mix(in srgb, var(--m-fg) 44%, transparent);
+  --ave-hue: var(--m-hue-2);
+}
+
+.a-end { white-space: nowrap; }
+
+/* 句尾三截碎屑：7 / 4 / 2px */
+.a-tail {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 1em;
+  margin-left: 6px;
+  vertical-align: calc(-1px - 0.18em);
+}
+.a-tail i {
+  width: 1px;
+  background: color-mix(in srgb, var(--m-fg) 44%, transparent);
+}
+.a-tail i:nth-child(1) { height: 7px; }
+.a-tail i:nth-child(2) { height: 4px; }
+.a-tail i:nth-child(3) { height: 2px; }
+
+/* ═══ × ═══ 平时 55% */
+.a-x {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.1rem;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--m-faint);
+  opacity: 0.55;
+  font: 400 11px/1 var(--font-mono);
+}
+
+/* ═══ 贴着元素说：牵过来的那段也是 5px 的格 ═══ */
+.a-lead { display: none; }
+body.anchored .a-lead {
+  display: block;
+  position: absolute;
+  left: -95px;
+  top: 24px;
+  width: 95px;
+  height: 5px;
+  background: repeating-linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--m-hue-2) 50%, transparent) 0 5px,
+    transparent 5px 10px
+  );
+}
+body.anchored .a-lead::before {
+  content: '';
+  position: absolute;
+  left: -5px;
+  top: -3px;
+  width: 10px;
+  height: 10px;
+  border: 1px solid color-mix(in srgb, var(--m-hue-2) 50%, transparent);
+  background: var(--bg);
+  rotate: 45deg;
+}
+
+@media (max-width: 560px) {
+  .ave {
+    right: 12px;
+    bottom: 64px;
+    max-width: calc(100vw - 94px);
+    --size: 40px;
+    --pad: 0.55rem;
+  }
+  .a-body { padding: 0.5rem 1rem 0.55rem 0.7rem; }
+  .ave-text { font-size: 14px; }
+  body.anchored .ave { left: auto; right: 12px; top: auto; bottom: 120px; }
+}

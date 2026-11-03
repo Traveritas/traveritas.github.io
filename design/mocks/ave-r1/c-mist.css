@@ -1,0 +1,272 @@
+/* C · 无面之雾
+   不放「面」：没有框、没有轮廓、没有边、没有名牌底板。
+   字直接落在页面上，底下只有一块边缘化到 0 的极淡雾；
+   雾只把这一块的底图往「字的反面」推一点点，不加任何颜色。
+   （c- 前缀；kit / overlay / base 三个共用文件一个字没动）
+
+   雾的画法：一族不同心、不同大小的 radial-gradient 直接当 background 叠起来。
+   alpha 是写进每一枚渐变的 stop 里的，最外一圈本来就是 0，
+   所以边是「化掉」的，不用 mask 裁。
+   （试过 backdrop-filter + mask 那条路：这个 Chromium 里 mask 一上，
+     backdrop-filter 会被整条丢掉，只剩一块透明 —— 见 C-NOTES.md。） */
+
+.ave {
+  position: fixed;
+  right: 22px;
+  bottom: 58px;
+  z-index: 59;
+  max-width: min(24rem, calc(100vw - 112px));
+  --size: 50px;
+  --gap: 1rem;
+  /* 雾比内容大出去的一圈 */
+  --fog-x: 76px;
+  --fog-t: 30px;
+  --fog-b: 26px;
+  --tail-a: 0.62;
+  /* 雾的颜色：中性灰白，不带她的色 */
+  --mist-c: 242 245 248;
+  /* 雾的四档浓度（主团 / 次团 / 两端 / 名牌那一小团），每场各一套 */
+  --mist-a1: 0.1;
+  --mist-a2: 0.13;
+  --mist-a3: 0.16;
+  --mist-a4: 0.2;
+  color: var(--m-fg);
+}
+
+body.anchored .ave {
+  left: 640px;
+  right: auto;
+  bottom: auto;
+  top: 430px;
+}
+
+/* 格：一行小字压在上缘，下面头像一列 + 台词一栏。没有底板，只有对齐。 */
+.a-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas:
+    'name name'
+    'port text';
+  column-gap: var(--gap);
+  row-gap: 7px;
+  align-items: center;
+  padding-right: 16px;
+}
+
+/* ── 雾 ──────────────────────────────────────────────────────────
+   五枚径向椭圆，圆心各偏一点、半径各差一档：
+     · 主团顺着台词横着摊开，中段是一块平的浓度（所以整句都站得住）；
+     · 头像那头往下沉，雾在左下最厚；
+     · 句尾那头往上飘，右上是它最薄的地方；
+     · 名牌那一行单独一小团，只托住那几个字母。
+   每一枚的最外一圈都是 transparent，盒子边界上已经没有雾了。 */
+.a-card::before {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+  z-index: 0;
+  inset: calc(-1 * var(--fog-t)) calc(-1 * var(--fog-x)) calc(-1 * var(--fog-b));
+  /* 每一枚的浓度直接写在 stop 里（不用 calc，免得被当成非法值整条丢掉） */
+  background:
+    radial-gradient(ellipse 50% 54% at 50% 52%, rgb(var(--mist-c) / var(--mist-a4)) 0 54%, transparent 100%),
+    radial-gradient(ellipse 36% 42% at 47% 50%, rgb(var(--mist-c) / var(--mist-a3)) 0 34%, transparent 100%),
+    radial-gradient(ellipse 17% 42% at 15% 56%, rgb(var(--mist-c) / var(--mist-a2)) 0 26%, transparent 100%),
+    radial-gradient(ellipse 19% 40% at 78% 56%, rgb(var(--mist-c) / var(--mist-a2)) 0 26%, transparent 100%),
+    radial-gradient(ellipse 44% 22% at 52% 74%, rgb(var(--mist-c) / var(--mist-a1)) 0 22%, transparent 100%),
+    radial-gradient(ellipse 11% 24% at 21% 18%, rgb(var(--mist-c) / var(--mist-a2)) 0 18%, transparent 100%);
+}
+
+/* 内容压在雾上面 */
+.a-name,
+.a-portrait,
+.a-body,
+.a-x { position: relative; z-index: 2; }
+
+/* ── 名牌：一行小字 + 一颗空心菱，压在雾的上缘，没有底片 ── */
+.a-name {
+  grid-area: name;
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  height: 11px;
+  margin: 0 0 0 1px;
+  padding: 0;
+  background: none;
+  font: 400 10px/1 var(--font-mono);
+  letter-spacing: 0.2em;
+  color: color-mix(in srgb, var(--m-fg) 60%, transparent);
+}
+.a-name::after { content: none; }
+.a-name i {
+  width: 4px;
+  height: 4px;
+  margin-bottom: 1px;
+  border: 1px solid color-mix(in srgb, var(--m-hue-2) 88%, var(--m-fg));
+  rotate: 45deg;
+}
+
+/* ── 头像槽：雾里更浓一点的那一小块，只留一圈极淡的方块与半透的流光 ── */
+.a-portrait {
+  grid-area: port;
+  width: var(--size);
+  height: var(--size);
+  margin: 0;
+  overflow: hidden;
+  background: none;
+  box-shadow: none;
+}
+.a-portrait img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  opacity: 0.34;
+  -webkit-mask-image: radial-gradient(ellipse 90% 90% at 44% 44%, #000 44%, transparent 94%);
+  mask-image: radial-gradient(ellipse 90% 90% at 44% 44%, #000 44%, transparent 94%);
+}
+.a-portrait::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--m-fg) 9%, transparent);
+}
+
+/* ── 台词：主体，底下什么都没有 ── */
+.a-body {
+  grid-area: text;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+}
+.ave-text {
+  margin: 0;
+  font: 500 15px/2 var(--font-display);
+  overflow-wrap: anywhere;
+}
+.ave-text .c {
+  --ave-ink: color-mix(in srgb, var(--m-fg) 40%, transparent);
+  --ave-hue: var(--m-hue-2);
+}
+
+.a-end { white-space: nowrap; }
+
+/* 句尾三截碎屑：她的颜色，越往后越淡 */
+.a-tail {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 1em;
+  margin-left: 5px;
+  vertical-align: calc(-1px - 0.18em);
+}
+.a-tail i {
+  width: 1px;
+  background: var(--m-hue-2);
+}
+.a-tail i:nth-child(1) { height: 7px; opacity: var(--tail-a); }
+.a-tail i:nth-child(2) { height: 4px; opacity: calc(var(--tail-a) * 0.74); }
+.a-tail i:nth-child(3) { height: 2px; opacity: calc(var(--tail-a) * 0.5); }
+
+/* ── 收起 ×：平时几乎没有，只有 hover 才认得出来 ── */
+.a-x {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--m-faint);
+  opacity: 0.1;
+  font: 400 10px/1 var(--font-mono);
+  transition: opacity 0.2s ease;
+}
+.a-x:hover,
+.a-x:focus-visible { opacity: 0.6; }
+
+/* 贴着元素说时，那头牵过来的一根发丝（位置由真站点算，这里画一段示意） */
+.a-lead { display: none; }
+body.anchored .a-lead {
+  display: block;
+  position: absolute;
+  left: -92px;
+  top: 30px;
+  width: 88px;
+  height: 1px;
+  background: color-mix(in srgb, var(--m-fg) 28%, transparent);
+}
+body.anchored .a-lead::before {
+  content: '';
+  position: absolute;
+  left: -5px;
+  top: -3px;
+  width: 5px;
+  height: 5px;
+  border: 1px solid color-mix(in srgb, var(--m-fg) 34%, transparent);
+  background: none;
+  rotate: 45deg;
+}
+
+/* ── 每场一套浓度 ───────────────────────────────────────────────
+   bg-list     对话框正好落在右侧「造物」那一栏的深底上，而这一页台词是深墨：
+               深墨压深底读不出来，雾在这里必须实打实地把地提亮 ——
+               这是整支方向唯一一场雾「有用」而不只是「好看」的地方。
+   bg-explore  底本来就接近白，深墨字自己就站得住；但那张图右下角印着旧卡片，
+               雾在这里负责把那块旧卡片洗淡，免得和台词打架。
+   bg-dusk /
+   bg-dream    深夜深底 + 浅字，本来就好；正后面是一块带按钮的亮面板，
+               换一层暗雾把那些按钮描边压下去，自身几乎看不出来。 */
+body.bg-list .ave {
+  --mist-a1: 0.34;
+  --mist-a2: 0.46;
+  --mist-a3: 0.56;
+  --mist-a4: 0.64;
+}
+body.bg-explore .ave {
+  /* bg-explore.png 的右下角本身就印着上一版的 Ave 卡片 ——
+     正好落在这一块雾下面。这张底接近白，雾在这里只要把旧卡片洗淡，
+     深墨字就已经站得住了。浓度取「洗掉一半多一点」，不追纸。
+     雾往上多探一点，是为了够到旧卡片右上那条边。 */
+  --fog-t: 56px;
+  --fog-b: 40px;
+  --fog-x: 150px;
+  --mist-a1: 0.5;
+  --mist-a2: 0.56;
+  --mist-a3: 0.62;
+  --mist-a4: 0.68;
+}
+body.bg-dusk .ave,
+body.bg-dream .ave {
+  /* 深夜主页那张图的正后面正好是一块设置的亮面板（保亮度 / 原色 / 重载 三个按钮
+     和一行说明），按钮的描边会从台词后面穿出来。
+     换一层暗雾把它压下去：这一场雾的作用不是「托字」，是把地抹平。 */
+  --mist-c: 12 15 24;
+  --fog-t: 40px;
+  --fog-b: 44px;
+  --fog-x: 78px;
+  --mist-a1: 0.66;
+  --mist-a2: 0.74;
+  --mist-a3: 0.82;
+  --mist-a4: 0.9;
+}
+
+@media (max-width: 560px) {
+  .ave {
+    right: 12px;
+    bottom: 64px;
+    max-width: calc(100vw - 94px);
+    --size: 40px;
+    --gap: 0.8rem;
+    --fog-x: 44px;
+    --fog-t: 24px;
+    --fog-b: 20px;
+  }
+  .ave-text { font-size: 14px; }
+  body.anchored .ave { left: auto; right: 12px; top: auto; bottom: 120px; }
+  body.anchored .a-lead { display: none; }
+}

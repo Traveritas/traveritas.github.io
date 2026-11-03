@@ -1,0 +1,92 @@
+/* 公共 · 保留部件的画法与标注（每个 mockup 都照抄，别改）
+
+   一、必须保留的五件东西（它们的画法你自由，但都要认得出）：
+       ① 头像槽（50×50，窄屏 40×40）—— 现在是一块像素流光（fig. .a-slot 里的 img）
+       ② 名牌 Ave + 一颗空心菱饰，伸出框沿
+       ③ 一句台词，逐字揭开：已经说出来的字是实字，还没说的字占着位置但看不见；
+          字底下一条线跟着念出来的字长，最后两个字换成她的颜色（--ave-hue）当线头
+       ④ 句尾三截碎屑（7px / 4px / 2px 的竖条，越往后越短），说完才出现
+       ⑤ 收起 ×（右上一枚细十字，平时 55% 不透明度）
+   二、允许你重新设计的：外轮廓、面的材质、边的画法、名牌的形、头像槽的框、
+       线头与碎屑的画法、晶柱 / 侧栏这类附加结构留不留、悬停与说话时的微动。
+   三、不许做的：加投影堆叠、加发光、加描边双层、圆角大于 8px、把字挪出这个对话框、
+       在框里加按钮 / 图标 / 装饰文字（× 和她的名字除外）。
+   四、动效：只说一句话的静态图。用 class 模拟状态（.is-on / .is-said 见下），
+       不要用无限循环的动画，也不要写 JS 去改 DOM 结构。 */
+
+/* ── 状态：每个 mockup 里对话框根元素都带这些类 ──
+   .ave.is-on          已经出现（opacity 1）
+   .ave.is-said        这句话已经说完（线头到句尾、碎屑出现）
+   想拍「正在说」的那一帧：去掉 .is-said，并且只让前 2/3 的字带 .on */
+.ave .c { color: transparent; }
+.ave .c.on { color: inherit; }
+
+/* ── 逐字的线：默认照抄现行做法（每个字底下自己一小段线，念到才长出来） ──
+   你的方向如果给这条线换了画法（比如整句一条连续线、或双线），就覆盖这一块。 */
+.ave-text .c {
+  position: relative;
+  padding-bottom: 3px;
+  background: linear-gradient(var(--ave-ink, currentColor), var(--ave-ink, currentColor)) 0 100% / 0 1px no-repeat;
+  opacity: 0.999; /* 别动 */
+}
+.ave-text .c.on {
+  background-size: 100% 1px;
+}
+.ave-text .c.head {
+  background-image: linear-gradient(var(--ave-hue, currentColor), var(--ave-hue, currentColor));
+  background-size: 100% 2px;
+}
+
+/* ── 标注：截图时会被拍到。用 <i class="note" data-k="1"> 一个小圆点 + 数字，坐标用整页坐标 ──
+   对应的说明写在右下角的 .legend 里（key 是同一个数字）。图上只落一个小点，别用大白标签盖住框。 */
+.note {
+  position: absolute;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  width: 13px;
+  height: 13px;
+  margin: -6.5px 0 0 -6.5px;
+  border: 1px solid #1f2630;
+  border-radius: 50%;
+  background: #fff;
+  font: 600 8px/1 var(--font-mono);
+  color: #1f2630;
+  font-style: normal;
+  pointer-events: none;
+}
+.note.on-dark {
+  border-color: #eef3fb;
+  background: #1c2430;
+  color: #eef3fb;
+}
+
+/* 图例（固定在左上角，别压在屏幕上的内容上；截图时可以忽略它）：一条一行，key 对齐 */
+.legend {
+  position: fixed;
+  left: 24px;
+  top: 64px;
+  z-index: 60;
+  max-width: 30ch;
+  padding: 13px 15px 12px;
+  background: #fff;
+  box-shadow: 0 0 0 1px rgb(31 38 48 / 0.14);
+  font: 400 11px/1.75 var(--font-display);
+  color: #2a323d;
+  letter-spacing: 0.01em;
+}
+.legend b {
+  display: block;
+  margin-bottom: 5px;
+  font: 600 10px/1 var(--font-mono);
+  letter-spacing: 0.14em;
+  color: #7b8695;
+  text-transform: uppercase;
+}
+.legend i {
+  font-style: normal;
+  display: inline-block;
+  min-width: 1.8em;
+  font: 600 10px/1 var(--font-mono);
+  color: #9a86c4;
+}
