@@ -117,13 +117,16 @@ void main() {
   /* 整体不走到最亮芯：外侧也只是一层浅雾，静域与外侧才不像两种材料 */
   v *= 0.72;
 
-  /* 正文列：雾在字底下只留一口气 —— 不是压成一块平色，是把起伏收到十二分之一，
-     边界沿纵轴缓慢起伏、羽化很宽，看不出边在哪。
-     要做到这一点的关键是：羽化比正文列本身宽得多，两段过渡叠在一起就没有界线。 */
-  float wob = (vnoise(vec2(gl_FragCoord.y * 0.0017, uTime * 0.015)) - 0.5) * uCalm.z * 2.4;
-  float dx = abs(gl_FragCoord.x - uCalm.x - wob);
+  /* 正文列：雾在字底下只留一口气 —— 不是压成一块平色，是把起伏收到十六分之一。
+     形状用高斯，不用 smoothstep：
+       · 高斯没有「边」，两条尾巴自然而然地落进雾里，到哪儿都量不出一条界线；
+       · 高斯左右对称、中心就在正文列正中 —— 垫底不会偏，也不会歪。
+     不做任何沿纵轴的摆动。量过：±16px 的摆动落到屏幕上就是一块看得出倾斜的纸，
+     人眼对这种长直线比对我调参数敏感得多。 */
+  float dx = abs(gl_FragCoord.x - uCalm.x);
   /* uCalm.y < 0 = 这一页没有正文列（404）：不压静域，整片照常走 */
-  float calm = uCalm.y < 0.0 ? 0.0 : 1.0 - smoothstep(uCalm.y * 0.72, uCalm.y + uCalm.z, dx);
+  float calm = uCalm.y < 0.0 ? 0.0 : exp(-pow(dx / (uCalm.y * 1.45 + uCalm.z), 2.0));
+  calm = smoothstep(0.0, 1.0, calm);
   /* 窄屏：静下来的不只是中间那条列，而是整片正文；雾从上下的边缘进来，
      离上下边缘越近越像原来那场雾 */
   if (uLeak > 0.5) {
@@ -131,7 +134,7 @@ void main() {
     float edge = 1.0 - smoothstep(0.0, 0.42, min(dTop, 1.0 - dTop));
     calm *= 1.0 - edge * 0.92;
   }
-  v = mix(v, 0.30 + (v - 0.30) * 0.16, calm);
+  v = mix(v, 0.30 + (v - 0.30) * 0.06, calm);
 
   vec3 col = mix(uP[0], uP[1], smoothstep(0.10, 0.54, v));
   col = mix(col, uP[2], smoothstep(0.54, 0.90, v));
@@ -165,12 +168,18 @@ void main() {
   o = vec4(clamp(col, 0.0, 1.0), 1.0);
 }`;
 
-/** 静域 = 本页正文列（.page-body 就是那条列），两侧各留一段羽化 */
+/* 静域 = 本页正文列，按它**实际的矩形**量，不按视口正中算。
+   随笔页的 article.prose 有 max-width: 34em，又没在 42rem 的容器里居中
+   （h1 与正文一起贴在容器左边，列心比视口中心偏左 21px）——
+   垫底跟着视口画就会明显歪向一侧。量的对象是 Mist.astro 给的 calm 选择器。 */
 function calmZone(host: HTMLElement | null): [number, number, number] {
   const vw = window.innerWidth || 1;
   if (host?.dataset.calm === 'none') return [vw / 2, -1, 1];
-  const width = host ? host.getBoundingClientRect().width : Math.min(vw - 48, 672);
-  return [vw / 2, width / 2, Math.max(150, width * 0.30)];
+  const r = host?.getBoundingClientRect();
+  const measured = !!r && r.width > 8;
+  const width = measured ? r!.width : Math.min(vw - 48, 672);
+  const cx = measured ? r!.left + r!.width / 2 : vw / 2;
+  return [cx, width / 2, Math.max(72, width * 0.12)];
 }
 
 export function initMist(): () => void {
