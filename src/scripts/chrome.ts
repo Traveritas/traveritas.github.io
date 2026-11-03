@@ -1,7 +1,10 @@
 /* ─────────────────────────────────────────────────────────────
    全局 chrome：发丝进度线 / past-hero /
    缝线锚点（函数图巡行：随结停靠、逐站沿线越走越远；
-   停靠点附近沿线大幅无规律游走交给 Seam.astro 的 CSS）/ 阅读页晓线（随 [data-depth] 指定的正文爬升）。
+   停靠点附近沿线大幅无规律游走交给 Seam.astro 的 CSS）。
+
+   （阅读页的晓线随 2026-11-03 随笔页改版一起撤了：光现在就在昼雾那片地面上，
+     不必再点一盏。Gauge 的 data-depth 属性因此暂时没有消费方，留着不影响什么。）
    ───────────────────────────────────────────────────────────── */
 
 import { clamp, onFrame30, onScrollRaf, reducedMotion } from './lib';
@@ -167,11 +170,6 @@ export function initChrome() {
   }, 700);
 
   const hairline = document.querySelector<HTMLElement>('.hairline-fill');
-  const depthHost = document.querySelector<HTMLElement>('[data-depth]');
-  const depthTarget = depthHost?.dataset.depth
-    ? document.querySelector<HTMLElement>(depthHost.dataset.depth)
-    : null;
-  const dawnGlow = document.querySelector<HTMLElement>('.dawn-glow');
 
   const heroEl = document.getElementById('ns-hero');
   const dawnEl = document.getElementById('ns-dawn');
@@ -199,13 +197,6 @@ export function initChrome() {
   }
 
   onScrollRaf(() => {
-    // 读操作前置（避免写后读引发 Layout Thrashing）
-    let prog = 0;
-    if (depthTarget) {
-      const r = depthTarget.getBoundingClientRect();
-      prog = clamp((innerHeight * 0.6 - r.top) / Math.max(r.height, 1), 0, 1);
-    }
-
     const doc = document.documentElement;
     const max = doc.scrollHeight - innerHeight;
     const p = max > 0 ? clamp(scrollY / max, 0, 1) : 0;
@@ -223,10 +214,6 @@ export function initChrome() {
 
     // scaleX 而非 width：不进布局（渐变随盒子一起压缩，与按宽度裁出的一截逐像素相同）
     if (hairline) hairline.style.transform = `scaleX(${p.toFixed(4)})`;
-
-    if (depthTarget) {
-      if (dawnGlow) dawnGlow.style.opacity = (0.12 + prog * 0.85).toFixed(3);
-    }
 
     kickAnchor();
   });

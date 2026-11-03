@@ -1,0 +1,104 @@
+---
+/* ─────────────────────────────────────────────────────────────
+   返回 · 撤掉页头页脚之后，长文页上唯一的去处。
+   写法克制到几乎只是雾里的一枚记号：一枚 1px 的细箭 + 一个小字。
+   不用按钮样式（没有底、没有框）—— 它不是控件，是「往回」这件事本身。
+
+   位置固定在左上角，Gauge 起于视口左缘的垂直中线，两者不抢；
+   Toolstar 在左下，也不抢。顶部的发丝进度线在它之上 2px 处，不打架。
+
+   双态：字随醒梦换面（[data-morph]）——「回到随笔 / 退回断章」，与页头那四项同一套换字。
+   z 40：在正文之上、工具栏（更低的位置）之下的等次。
+   ───────────────────────────────────────────────────────────── */
+interface Props {
+  href: string;
+  /** 醒面文案；不给就用「返回」 */
+  label?: string;
+  /** 梦面文案；不给就由 BaseLayout 的双语推导管不着，这里给默认 */
+  dream?: string;
+}
+const { href, label = '回到随笔', dream = '退回断章' } = Astro.props;
+---
+
+<a class="reback" href={href} data-morph data-true={label} data-dream={dream}>
+  <span class="reback-arrow" aria-hidden="true">
+    <svg viewBox="0 0 18 8" fill="none" aria-hidden="true">
+      <path d="M17 4H1.6M1.6 4 4.6 1M1.6 4 4.6 7" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      ></path>
+    </svg>
+  </span>
+  <span class="reback-t">{label}</span>
+</a>
+
+<style>
+  .reback {
+    position: fixed;
+    left: max(1.35rem, env(safe-area-inset-left));
+    top: 1.45rem;
+    z-index: 40;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    color: var(--fg-soft);
+    text-decoration: none;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.22em;
+    padding: 0.45rem 0.35rem 0.45rem 0;
+    outline: none;
+    transition:
+      color 0.24s ease,
+      opacity 0.24s ease;
+  }
+
+  .reback-arrow {
+    display: block;
+    width: 18px;
+    height: 8px;
+    opacity: 0.75;
+    transition:
+      transform 0.34s cubic-bezier(0.2, 0.8, 0.3, 1),
+      opacity 0.24s ease;
+  }
+
+  .reback-arrow svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* 悬停：箭稍向回走一点，字升到正文色。不位移、不缩放整件 */
+  .reback:hover,
+  .reback:focus-visible {
+    color: var(--fg);
+  }
+
+  .reback:hover .reback-arrow,
+  .reback:focus-visible .reback-arrow {
+    opacity: 1;
+    transform: translateX(-3px);
+  }
+
+  .reback:focus-visible {
+    outline: 1px solid var(--amber);
+    outline-offset: 4px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .reback,
+    .reback-arrow {
+      transition: color 0.24s ease;
+    }
+    .reback:hover .reback-arrow,
+    .reback:focus-visible .reback-arrow {
+      transform: none;
+    }
+  }
+
+  @media (max-width: 560px) {
+    .reback {
+      left: 1.1rem;
+      top: 1.1rem;
+    }
+  }
+</style>

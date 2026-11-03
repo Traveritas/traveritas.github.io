@@ -18,6 +18,7 @@ import BootVeil from '../components/chrome/BootVeil.astro';
 import Cursor from '../components/chrome/Cursor.astro';
 import Toolstar from '../components/chrome/Toolstar.astro';
 import Ave from '../components/chrome/Ave.astro';
+import Mist from '../components/chrome/Mist.astro';
 
 interface Props {
   title: string;
@@ -34,6 +35,11 @@ interface Props {
      渲染 .page-ambient，样式在 global.css「全页微温环境微光叠加层」。
      随笔 / 项目（目录与阅读页）及瞬间页开启。 */
   ambient?: boolean;
+  /* 昼雾地面（components/chrome/Mist.astro：一片走得很慢的流光，正文列里压平）：
+     2026-11-03 起随笔阅读页与 404 用它换掉了 14° 缝线与脑电群。
+     'hole' = 正中塌成一个安静的坑（404：这一处没有坐标）。
+     开着它时 ambient 没有意义（同一层地面，别叠两片光），传了也不画。 */
+  mist?: boolean | 'hole';
   /* 阅读/长文页面中央线条消隐蒙版：正文列避让 14° 发丝线与脑电波（保留背景方块） */
   maskLines?: boolean;
   /* 缝线 / 脑电的中央消隐列按本页正文列放宽（配合 maskLines）：true = 目录页 container-wide 列宽；
@@ -73,6 +79,7 @@ const {
   noindex = false,
   seam = 'faint',
   ambient = false,
+  mist = false as boolean | 'hole',
   maskLines = type === 'article',
   fieldVeil = false,
   bgm,
@@ -181,8 +188,10 @@ const [, hour, tone] = HOURS.find(([p]) => path.startsWith(p)) ?? ['', path === 
     data-bgm={bgm === 'reading' ? 'reading' : undefined}
   >
     <div class="wash-backdrop" aria-hidden="true"></div>
-    {/* wash-backdrop 全站常驻（z −5，7% 醒梦洗染）；page-ambient 只在传了 ambient 的页面出现 */}
-    {ambient && !immersive && <div class="page-ambient" aria-hidden="true" />}
+    {/* wash-backdrop 全站常驻（z −5，7% 醒梦洗染）；page-ambient 只在传了 ambient 的页面出现；
+        mist（z −4）是阅读页那一层会走的昼雾，与 ambient 同一层地面，同时传只认 mist */}
+    {mist && !immersive && <Mist hole={mist === 'hole'} calm={mist === 'hole' ? 'none' : undefined} />}
+    {ambient && !immersive && !mist && <div class="page-ambient" aria-hidden="true" />}
     {boot && <BootVeil always={boot === 'always'} />}
     {!immersive && <Hairline />}
     {seam !== 'none' && !immersive && <Seam variant={seam} />}

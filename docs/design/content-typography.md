@@ -99,9 +99,11 @@ h2 的序号由 `src/markdown/ordinal.mjs` 这个 **mdast 插件在构建期注�
 > 一个插件函数 + 三条 CSS 规则。逐点独立错相也在那一版里被证伪过：相邻点的相位差恰好是
 > 一整档阶梯，整枚数字会同时摊开六个高度，字形当场散掉（6× 特写下只剩噪点）。
 
-页面 `<style>` 里只剩该页独有的块：随笔的 `.dawn-glow`、`.tag-row`、`.wake-card`；
+页面 `<style>` 里只剩该页独有的块：随笔的 `.tag-row`、`.wake-card`；
 项目的 `.pin-line`、`.coverband`、`.file-note`、`.link-list`、`.pj-next`。
-（随笔页原有的「起笔琥珀标尺」（`.prose-rule::before`）已于 2026-09-25 移除，见第三节。）
+（随笔页原有的「起笔琥珀标尺」（`.prose-rule::before`）已于 2026-09-25 移除，见第三节；
+随笔阅读页的晓线 `.dawn-glow` 已于 2026-11-03 撤掉——那一页的地面换成昼雾，
+光就在地上，见 `docs/design/styleguide.md` 与 `components/chrome/Mist.astro`。）
 
 ## 三、还没有设计的（下一轮的活）
 

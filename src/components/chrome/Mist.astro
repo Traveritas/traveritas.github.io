@@ -1,0 +1,68 @@
+---
+/* ─────────────────────────────────────────────────────────────
+   昼雾：文章页 / 404 的地面（撤掉缝线之后，这些页底下只剩一场很慢的光）
+   画布的 WebGL 逻辑在 src/scripts/mist.ts，这里只给画布与走不动时的样子。
+
+   静域 = 本页正文列（calm 属性指的正是 article.prose）：列里的雾压成一张
+   几乎不动、几乎全白的纸，列外照常走。字落在最安静的地方，光只在它够不着的地方走——
+   缝线时代「正文列避让缝线」的那条纪律，换到这片场上就是「正文列避让流动」。
+
+   没有 WebGL2、只有软件渲染、或上下文丢了：canvas 上的 CSS 静态雾照同一个明暗沉下去，
+   仍然是一条安静的列（404 则是一处被雾绕开的空地），只是不再走。
+
+   z −4：压在 wash-backdrop（−5）之上、正文之下，不接任何指针。
+   ───────────────────────────────────────────────────────────── */
+interface Props {
+  /* 静域的参照元素：给它测出来的矩形做正文列；'none' = 本页不要静域（404） */
+  calm?: string;
+  /* 洞（404）：同一片雾在正中让开一处安静的空地 */
+  hole?: boolean;
+}
+const { calm = 'article.prose', hole = false } = Astro.props;
+---
+
+<canvas id="mist" data-calm={calm} data-hole={hole ? '1' : undefined} aria-hidden="true"></canvas>
+
+<script>
+  import { initMist } from '../../scripts/mist';
+  initMist();
+</script>
+
+<style>
+  #mist {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: -4;
+    pointer-events: none;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    /* 走不动时露出的底：同色组、同一条安静的列，只是不再走。
+       值照着 mist.ts 的 WAKE 四档取，别单独调——两边要看起来是同一片雾。 */
+    background:
+      linear-gradient(
+        90deg,
+        transparent 0,
+        transparent calc(50% - 21rem - 9rem),
+        rgba(253, 254, 255, 0.92) calc(50% - 21rem + 4rem),
+        rgba(253, 254, 255, 0.96) calc(50% + 21rem - 4rem),
+        transparent calc(50% + 21rem + 9rem),
+        transparent 100%
+      ),
+      radial-gradient(46% 38% at 74% 26%, rgba(203, 216, 230, 0.75) 0%, rgba(203, 216, 230, 0) 72%),
+      radial-gradient(52% 44% at 16% 78%, rgba(214, 226, 236, 0.7) 0%, rgba(214, 226, 236, 0) 70%),
+      #f4f8fc;
+  }
+
+  /* 404：没有正文列，只有正中那处空地 */
+  #mist[data-hole] {
+    background:
+      radial-gradient(30rem 30rem at 50% 52%, rgba(253, 254, 255, 0.95) 0%, rgba(253, 254, 255, 0.55) 42%, rgba(253, 254, 255, 0) 68%),
+      radial-gradient(46% 38% at 74% 26%, rgba(203, 216, 230, 0.75) 0%, rgba(203, 216, 230, 0) 72%),
+      radial-gradient(52% 44% at 16% 78%, rgba(214, 226, 236, 0.7) 0%, rgba(214, 226, 236, 0) 70%),
+      #f4f8fc;
+  }
+
+  /* 上下文丢了：整块画布摘下（mist.ts 写 hidden），body 自己的底色接住 */
+</style>

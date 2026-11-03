@@ -102,8 +102,9 @@ Astro 的 `<style>` 是**组件作用域**的：写在 `projects/[slug].astro` �
 | `project/Coverband` · `FileNote` · `LinkList` · `ProjectNav` | `projects/[slug].astro` | 项目页 |
 | `article/TagRow` · `WakeCard` | `articles/[slug].astro` | 随笔页文末 |
 
-仍留在页面里、只在索引表给实物入口的：晓线 `.dawn-glow`（整页效果）、标签页的结、
-404 失线页（整页即一块）。
+仍留在页面里、只在索引表给实物入口的：标签页的结、404 那一页的字（整页即一块）。
+随笔阅读页与 404 的地面（`components/chrome/Mist.astro` + `src/scripts/mist.ts`）与
+返回键（`components/chrome/Return.astro`）已抽成组件，索引表里能直接点到实物。
 
 **抽组件时的验收**：改前留一份 `dist`，改后逐路由对比目标块子树的几何与计算样式
 （1440 / 390 两档，含文档总高）。2026-10-07 这一批对照了两篇随笔、两个项目与关于页，

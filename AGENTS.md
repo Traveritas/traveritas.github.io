@@ -45,6 +45,7 @@
   - `src/components/chrome/Gauge.astro` & `src/scripts/gauge.ts`：阅读页左侧的页内导览轨（滚动进度与节点）；
   - `src/components/chrome/Toolstar.astro` & `src/scripts/toolstar.ts`：全站左下角的工具栏——一颗三轴六芒星开关，点开是绕星的同心轨道（去处 / 寻找 / 本页 / 换面 / 环境声 / 设置），阅读页的目录与字号、行距在「本页」里；
   - `src/components/chrome/Ave.astro` & `src/scripts/ave.ts`：右下角偶尔冒出的 Ave 旁白（台词表 `src/data/ave-lines.ts`）；
+  - `src/components/chrome/Mist.astro` & `src/scripts/mist.ts`：随笔阅读页与 404 的地面（昼雾：一片走得很慢的流光，正文列里压平；404 版在正中让开一处空地）。这两页不出页头页脚、不画 14° 缝线与脑电，唯一的去处是 `components/chrome/Return.astro`；
   - `src/styles/tokens.css` & `global.css`：全站设计令牌与全局样式。
 - **修改验证**：任何代码修改后，务必在根目录运行 `npm run build`，确保 100% 静态编译通过。
 
