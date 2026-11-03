@@ -115,11 +115,41 @@ function serve() {
     await page.waitForTimeout(2200);
     await shot('15-mobile.png');
 
+    /* 项目单独页 */
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(`http://127.0.0.1:${port}/projects/averita-s-dsh-plugins/`, { waitUntil: 'networkidle' });
+    await page.waitForTimeout(2400);
+    await shot('17-project-top.png');
+    await page.evaluate(() => window.scrollTo({ top: window.innerHeight * 1.15, behavior: 'instant' }));
+    await page.waitForTimeout(600);
+    await shot('18-project-mid.png');
+
     /* 404 */
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto(`http://127.0.0.1:${port}/404.html`, { waitUntil: 'networkidle' });
     await page.waitForTimeout(2200);
     await shot('14-404.png');
+
+    /* 项目页 · 手机 */
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`http://127.0.0.1:${port}/projects/averita-s-dsh-plugins/`, { waitUntil: 'networkidle' });
+    await page.waitForTimeout(2000);
+    await page.screenshot({ path: path.join(OUT, '21-project-mobile.png') });
+    console.log('ok 21-project-mobile.png');
+    await page.setViewportSize({ width: 1440, height: 900 });
+
+    /* 返回键：悬停态 + 手机 */
+    await page.goto(`http://127.0.0.1:${port}/articles/style-specimen/`, { waitUntil: 'networkidle' });
+    await page.waitForTimeout(1800);
+    await page.hover('.reback');
+    /* 光标环淡入要 0.5s；等它到位再拍，这一张是「真实使用时的悬停态」 */
+    await page.waitForTimeout(1200);
+    await page.screenshot({ path: path.join(OUT, '19-return-hover.png'), clip: { x: 0, y: 0, width: 420, height: 120 } });
+    /* 再把指针移开，单拍这枚片本身 */
+    await page.mouse.move(1400, 700);
+    await page.waitForTimeout(900);
+    await page.screenshot({ path: path.join(OUT, '20-return-rest.png'), clip: { x: 0, y: 0, width: 420, height: 120 } });
+    console.log('ok 19-return-hover.png');
 
     /* 走不动时的样子：把 WebGL 关掉，看 CSS 静态雾 */
     const off = await browser.newPage({ viewport: { width: 1440, height: 900 } });

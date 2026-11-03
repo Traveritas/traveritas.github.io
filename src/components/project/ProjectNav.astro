@@ -1,17 +1,25 @@
 ---
-/* 项目页文末导航：← 全部项目 ‖ 名录里的下一件 → */
+/* 项目页文末：名录里的下一件。
+   2026-11-03：左上角有了「回到项目」，这里原本那枚「← 全部项目」就成了同一件事的第二遍，
+   撤掉；只剩往前的一步。没有下一件（或全站只有一件）时整块不出。 */
 interface Props {
-  /** 「另一项」；不传（或只有一件项目）时只留返回 */
   next?: { id: string; title: string };
 }
 
 const { next } = Astro.props;
 ---
 
-<nav class="pj-next" aria-label="项目导航">
-  <a href="/projects/">← 全部项目</a>
-  {next && <a href={`/projects/${next.id}/`}>{next.title} →</a>}
-</nav>
+{
+  next && (
+    <nav class="pj-next" aria-label="项目导航">
+      <span class="pj-h mono">下一件</span>
+      <a href={`/projects/${next.id}/`}>
+        <span class="pj-t">{next.title}</span>
+        <span class="pj-arrow" aria-hidden="true">→</span>
+      </a>
+    </nav>
+  )
+}
 
 <style>
   .pj-next {
@@ -19,13 +27,59 @@ const { next } = Astro.props;
     padding-top: 1.4rem;
     border-top: 1px solid var(--line);
     display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    gap: 1rem;
-    flex-wrap: wrap;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.35rem;
+    text-align: right;
+  }
+
+  .pj-h {
+    font-size: 0.58rem;
+    letter-spacing: 0.3em;
+    color: var(--umber);
   }
 
   .pj-next a {
-    font-size: 0.88rem;
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    font-family: var(--font-display);
+    font-size: 1rem;
+    line-height: 1.6;
+    color: var(--fg-soft);
+    text-decoration: none;
+    transition: color 0.22s ease;
+  }
+
+  .pj-arrow {
+    transition: transform 0.32s cubic-bezier(0.2, 0.8, 0.3, 1);
+  }
+
+  .pj-next a:hover,
+  .pj-next a:focus-visible {
+    color: var(--umber);
+  }
+
+  .pj-next a:hover .pj-arrow,
+  .pj-next a:focus-visible .pj-arrow {
+    transform: translateX(3px);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .pj-next a,
+    .pj-arrow {
+      transition: color 0.22s ease;
+    }
+    .pj-next a:hover .pj-arrow,
+    .pj-next a:focus-visible .pj-arrow {
+      transform: none;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .pj-next {
+      align-items: flex-start;
+      text-align: left;
+    }
   }
 </style>

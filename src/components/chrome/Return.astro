@@ -1,104 +1,171 @@
 ---
 /* ─────────────────────────────────────────────────────────────
-   返回 · 撤掉页头页脚之后，长文页上唯一的去处。
-   写法克制到几乎只是雾里的一枚记号：一枚 1px 的细箭 + 一个小字。
-   不用按钮样式（没有底、没有框）—— 它不是控件，是「往回」这件事本身。
+   返回 · 撤掉页头页脚之后，长文页上唯一的去处（2026-11-03 重做）
 
-   位置固定在左上角，Gauge 起于视口左缘的垂直中线，两者不抢；
-   Toolstar 在左下，也不抢。顶部的发丝进度线在它之上 2px 处，不打架。
+   第一版是一枚裸的细箭 + 一个小字，太像一段调试文字，站在雾里没有分量。
+   这一版做成一块**磨砂树脂片**：与左下角工具栏（Toolstar）同一套材质 ——
+   半透明底 + 1px 上亮下暗的边 + 一道内侧高光，边缘一圈很淡的光。
+   它不是按钮（没有填充色、没有圆角胶囊、没有投影堆叠），
+   是一小片从雾里切出来的、可以按下去的东西。
 
-   双态：字随醒梦换面（[data-morph]）——「回到随笔 / 退回断章」，与页头那四项同一套换字。
-   z 40：在正文之上、工具栏（更低的位置）之下的等次。
+   信息层次：一行小字（去处）+ 一枚向左的细箭（方向）。悬停时整片略微抬亮、
+   箭往回走一点点 —— 只动这些，不位移、不放大。
+
+   双态：字随醒梦换面（[data-morph]）——「回到随笔 / 退回断章」。
+   位置固定在左上角，Gauge 起于视口左缘的垂直中线、Toolstar 在左下，互不遮挡。
+   z 40：正文之上、工具栏之下的等次。
    ───────────────────────────────────────────────────────────── */
 interface Props {
   href: string;
-  /** 醒面文案；不给就用「返回」 */
+  /** 醒面文案 */
   label?: string;
-  /** 梦面文案；不给就由 BaseLayout 的双语推导管不着，这里给默认 */
+  /** 梦面文案 */
   dream?: string;
 }
 const { href, label = '回到随笔', dream = '退回断章' } = Astro.props;
 ---
 
-<a class="reback" href={href} data-morph data-true={label} data-dream={dream}>
-  <span class="reback-arrow" aria-hidden="true">
-    <svg viewBox="0 0 18 8" fill="none" aria-hidden="true">
-      <path d="M17 4H1.6M1.6 4 4.6 1M1.6 4 4.6 7" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
-      ></path>
+<a class="reback" href={href} aria-label={label}>
+  <span class="reback-glyph" aria-hidden="true">
+    <svg viewBox="0 0 16 16" fill="none">
+      <path
+        d="M13.4 8H2.9M2.9 8 6.6 4.3M2.9 8 6.6 11.7"
+        stroke="currentColor"
+        stroke-width="1.05"
+        stroke-linecap="round"
+        stroke-linejoin="round"></path>
     </svg>
   </span>
-  <span class="reback-t">{label}</span>
+  <span class="reback-t" data-morph data-true={label} data-dream={dream}>{label}</span>
 </a>
 
 <style>
   .reback {
+    /* 材质：与 Toolstar 的玻璃同一族值，浅色一套 */
+    --rb-glass: color-mix(in srgb, var(--bg) 62%, transparent);
+    --rb-edge: rgb(255 255 255 / 0.72);
+    --rb-edge-lo: color-mix(in srgb, var(--fg) 12%, transparent);
+    --rb-hi: rgb(255 255 255 / 0.62);
+    --rb-sh: rgb(38 44 51 / 0.16);
+
     position: fixed;
-    left: max(1.35rem, env(safe-area-inset-left));
-    top: 1.45rem;
+    left: max(1.15rem, env(safe-area-inset-left));
+    top: 1.15rem;
     z-index: 40;
+
     display: inline-flex;
     align-items: center;
-    gap: 0.55rem;
+    gap: 0.62rem;
+    padding: 0.5rem 0.95rem 0.5rem 0.72rem;
+
     color: var(--fg-soft);
     text-decoration: none;
-    font-family: var(--font-mono);
-    font-size: 0.68rem;
-    letter-spacing: 0.22em;
-    padding: 0.45rem 0.35rem 0.45rem 0;
+    font-family: var(--font-display);
+    font-size: 0.82rem;
+    letter-spacing: 0.1em;
+    line-height: 1;
+
+    border-radius: 999px;
+    background: var(--rb-glass);
+    border: 1px solid var(--rb-edge);
+    /* 上亮下暗的收口 + 一层极淡的落影：薄片从雾里浮起一点，但不飘 */
+    box-shadow:
+      inset 0 1px 0 var(--rb-hi),
+      inset 0 -1px 0 var(--rb-edge-lo),
+      0 10px 24px -16px var(--rb-sh);
+    -webkit-backdrop-filter: blur(7px) saturate(1.05);
+    backdrop-filter: blur(7px) saturate(1.05);
+
     outline: none;
     transition:
       color 0.24s ease,
-      opacity 0.24s ease;
+      background 0.3s ease,
+      border-color 0.3s ease,
+      box-shadow 0.3s ease;
   }
 
-  .reback-arrow {
-    display: block;
-    width: 18px;
-    height: 8px;
-    opacity: 0.75;
+  /* 箭：一枚 16px 见方的细线，视觉重心与字对齐 */
+  .reback-glyph {
+    display: grid;
+    place-items: center;
+    width: 1.05rem;
+    height: 1.05rem;
+    opacity: 0.72;
     transition:
-      transform 0.34s cubic-bezier(0.2, 0.8, 0.3, 1),
+      transform 0.36s cubic-bezier(0.2, 0.8, 0.3, 1),
       opacity 0.24s ease;
   }
 
-  .reback-arrow svg {
+  .reback-glyph svg {
     display: block;
     width: 100%;
     height: 100%;
   }
 
-  /* 悬停：箭稍向回走一点，字升到正文色。不位移、不缩放整件 */
+  .reback-t {
+    display: block;
+    /* 双态溶变时字会短暂变宽变窄，给一点余量免得整片跳动 */
+    white-space: nowrap;
+  }
+
+  /* 悬停 / 聚焦：片被雾里的光抬起一点，箭往回走半格 */
   .reback:hover,
   .reback:focus-visible {
     color: var(--fg);
+    background: color-mix(in srgb, var(--bg) 78%, transparent);
+    border-color: rgb(255 255 255 / 0.9);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.78),
+      inset 0 -1px 0 color-mix(in srgb, var(--fg) 14%, transparent),
+      0 12px 26px -14px var(--rb-sh);
   }
 
-  .reback:hover .reback-arrow,
-  .reback:focus-visible .reback-arrow {
+  .reback:hover .reback-glyph,
+  .reback:focus-visible .reback-glyph {
     opacity: 1;
-    transform: translateX(-3px);
+    transform: translateX(-2px);
+  }
+
+  /* 按下去：收进来一点，像真的按到一层薄片上 */
+  .reback:active {
+    background: color-mix(in srgb, var(--bg) 86%, transparent);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.6),
+      inset 0 -1px 0 color-mix(in srgb, var(--fg) 16%, transparent),
+      0 4px 12px -10px var(--rb-sh);
   }
 
   .reback:focus-visible {
     outline: 1px solid var(--amber);
-    outline-offset: 4px;
+    outline-offset: 3px;
+  }
+
+  /* 不支持 backdrop-filter 的老引擎：退回一块更实的底，免得半透明到看不清 */
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .reback {
+      background: color-mix(in srgb, var(--bg) 88%, transparent);
+    }
   }
 
   @media (prefers-reduced-motion: reduce) {
     .reback,
-    .reback-arrow {
-      transition: color 0.24s ease;
+    .reback-glyph {
+      transition:
+        color 0.24s ease,
+        background 0.3s ease;
     }
-    .reback:hover .reback-arrow,
-    .reback:focus-visible .reback-arrow {
+    .reback:hover .reback-glyph,
+    .reback:focus-visible .reback-glyph {
       transform: none;
     }
   }
 
   @media (max-width: 560px) {
     .reback {
-      left: 1.1rem;
-      top: 1.1rem;
+      left: max(0.9rem, env(safe-area-inset-left));
+      top: 0.9rem;
+      font-size: 0.78rem;
+      padding: 0.46rem 0.86rem 0.46rem 0.66rem;
     }
   }
 </style>

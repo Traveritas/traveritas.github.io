@@ -123,7 +123,14 @@ const HOURS: [prefix: string, hour: string, tone: 'light' | 'dark'][] = [
   ['/legacy/thread', 'home', 'light'], // 旧主页存档
 ];
 const path = Astro.url.pathname;
-const [, hour, tone] = HOURS.find(([p]) => path.startsWith(p)) ?? ['', path === '/' ? 'home' : 'none', 'light'];
+const [, hour, baseTone] =
+  HOURS.find(([p]) => path.startsWith(p)) ?? ['', path === '/' ? 'home' : 'none', 'light'];
+
+/* 昼雾地面（mist）的页自己决定明暗：那两页的时辰只是「这个版块原本住哪一段夜色」，
+   底色由 src/scripts/mist.ts 的四档色板给，全是浅色。
+   不覆盖的话 /projects 会带着深眠的深色墨（fg #e6e9ef）落到浅雾上 —— 字几乎看不见。
+   时辰本身留着（data-hour 仍决定别的东西），只把 tone 掰回 light。 */
+const tone = mist ? 'light' : baseTone;
 ---
 
 <!doctype html>
@@ -186,6 +193,7 @@ const [, hour, tone] = HOURS.find(([p]) => path.startsWith(p)) ?? ['', path === 
     data-mask-lines={maskLines ? 'true' : undefined}
     data-field-veil={fieldVeil === 'narrow' ? 'narrow' : fieldVeil ? 'wide' : undefined}
     data-bgm={bgm === 'reading' ? 'reading' : undefined}
+    data-mist={mist ? '' : undefined}
   >
     <div class="wash-backdrop" aria-hidden="true"></div>
     {/* wash-backdrop 全站常驻（z −5，7% 醒梦洗染）；page-ambient 只在传了 ambient 的页面出现；
