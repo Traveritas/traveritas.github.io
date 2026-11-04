@@ -15,12 +15,12 @@ const TB = 30; // 标题栏高
 // 画卡的先后：随笔 → 瞬间 → 项目（与屏上从左到右一致，首屏每栏取前几张）
 const SCENE_ORDER = ['essay', 'moment', 'project'];
 
-/* 纸上那套墨：与 wander.css 里三栏的值偏移一起定的（对照 design/mocks/cards-r8 的 value 一版）。
-   浅底（随笔）压暗、两种深底（瞬间 / 项目）提亮；chip 是标签那一圈细边。 */
+/* 纸上那套墨：与 wander.css 里三栏的值偏移一起定的（2026-11-04 换成 A「同阶冷夜」那一版）。
+   随笔的纸比底亮（白纸盖在浅灰蓝上），两种深底的纸比底亮一层光；chip 是标签那一圈细边。 */
 const INK = {
-  essay: { fg: '#232830', soft: '#49525f', faint: '#5c6675', ink: '#4f4a66', dot: '#3a414c', chip: 'rgba(79, 74, 102, 0.3)' },
-  project: { fg: 'rgba(232, 240, 252, 0.93)', soft: 'rgba(213, 226, 247, 0.62)', faint: 'rgba(213, 226, 247, 0.45)', ink: '#988bb6', dot: '#cfdbe6', chip: 'rgba(152, 139, 182, 0.3)' },
-  moment: { fg: 'rgba(246, 240, 246, 0.93)', soft: 'rgba(237, 228, 239, 0.64)', faint: 'rgba(237, 228, 239, 0.47)', ink: '#9c92c8', dot: '#e8dcec', chip: 'rgba(156, 146, 200, 0.3)' },
+  essay: { fg: '#232830', soft: '#4f5866', faint: '#6b7280', ink: '#4f4a66', dot: '#3a414c', chip: 'rgba(79, 74, 102, 0.3)' },
+  project: { fg: 'rgba(226, 231, 240, 0.93)', soft: 'rgba(205, 214, 230, 0.62)', faint: 'rgba(205, 214, 230, 0.45)', ink: '#a088a5', dot: '#cfdbe6', chip: 'rgba(160, 136, 165, 0.3)' },
+  moment: { fg: 'rgba(244, 240, 249, 0.93)', soft: 'rgba(232, 226, 240, 0.64)', faint: 'rgba(232, 226, 240, 0.47)', ink: '#b49cba', dot: '#e8dcec', chip: 'rgba(180, 156, 186, 0.3)' },
 };
 const LABEL = { essay: ['随笔', 'ESSAY'], project: ['项目', 'PROJECT'], moment: ['瞬间', 'MOMENT'] };
 const SERIF = "'Noto Serif SC', 'Source Han Serif SC', SimSun, serif";
