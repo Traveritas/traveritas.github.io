@@ -40,7 +40,7 @@
 
 - **站点框架**：Astro 纯静态生成。正文内容在无 JS 时仍须完整可读；交互（页内导览轨、入梦检验等）可以使用客户端脚本。
 - **核心逻辑概览**：
-  - `src/data/night.ts`：以 23:07 到 06:31 的时间轴驱动昼夜色板插值；
+  - `src/data/night.ts`：一夜的时间轴数据源（23:07 → 06:31，444 分钟）——睡眠分期段 `SEGMENTS`、主页五幕的分钟区间 `SECTIONS`、轨图几何；底色不在它这里（主页的昼夜色板在 `src/scripts/home-storyboard.ts` 的 `PALETTE`，目录页三栏在 `src/styles/wander.css` 与 `src/scripts/wander/light.js`）；
   - `src/scripts/reality.ts` & `src/scripts/morph.ts`：负责“入梦检验”与双声轨文字转换；
   - `src/components/chrome/Gauge.astro` & `src/scripts/gauge.ts`：阅读页左侧的页内导览轨（滚动进度与节点）；
   - `src/components/chrome/Toolstar.astro` & `src/scripts/toolstar.ts`：全站左下角的工具栏——一颗三轴六芒星开关，点开是绕星的同心轨道（去处 / 寻找 / 本页 / 换面 / 环境声 / 设置），阅读页的目录与字号、行距在「本页」里；
