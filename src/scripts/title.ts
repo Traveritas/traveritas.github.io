@@ -7,7 +7,7 @@
    · 页面可见性（切换/离开标签页）：
      - 当切出当前标签页（document.hidden 为 true）时：
        醒态：呈现「世界在此处悬停 — Traveritas」
-       梦态：呈现「在边缘处留白 — AveritA」
+       梦态：呈现「留白？ — AveritA」
      - 当切回本站时即刻无缝恢复当前现实状态对应的页面标题。
    · 无 JS / SSR 爬虫：静态呈现醒面标题，保证 SEO 与可访问性。
    ───────────────────────────────────────────────────────────── */
@@ -16,7 +16,7 @@ import { onRealityChange, type Reality } from './reality';
 
 const DEFAULT_AWAY: Record<Reality, string> = {
   wake: '世界在此处悬停 — Traveritas',
-  dream: '在边缘处留白 — AveritA',
+  dream: '留白？ — AveritA',
 };
 
 export function initTitle(): void {
