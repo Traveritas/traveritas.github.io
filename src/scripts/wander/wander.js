@@ -1041,6 +1041,9 @@ export async function initWander(host) {
   });
 
   let lightT = 0;
+  /* bias 是交给着色器的值；hotClock 是它背后那根线性的时钟（0→1），涨的时候 bias 由它折出来（见下面那段注释）。
+     别叫 pool：这个作用域里已经有一个 pool（窗元素的空闲池）。 */
+  const hotClock = [0, 0, 0];
   const bias = [0, 0, 0];
   let homeHot = -1;
   function tick(ts) {
@@ -1122,10 +1125,14 @@ export async function initWander(host) {
     split = splitAt(t);
     face += (faceTo - face) * (RM ? 1 : 1 - Math.exp(-dt / 0.3));
     lightT += dt * lerp(1, 0.55, face);
-    // 悬停的池子匀速涨满整屏（约 1.1s，着色器里再缓进缓出），离开时退得快一点（约 0.6s）
+    // 悬停的池子：hotClock 是线性的时钟（涨约 1.1s、退约 0.6s），交给着色器的 bias 再折一次。
+    // 折法是 ease-in（0.25p + 0.75p²）：开头几乎不动，临近末尾才一下漫满整屏；
+    // 着色器里还有一层 smoothstep，两层叠起来观感是「先抿住 → 后涌开」。退回不折，退得快一点。
     for (let k = 0; k < 3; k++) {
       const up = k === homeHot;
-      bias[k] = RM ? (up ? 1 : 0) : clamp(bias[k] + (up ? dt / 1.1 : -dt / 0.6), 0, 1);
+      hotClock[k] = RM ? (up ? 1 : 0) : clamp(hotClock[k] + (up ? dt / 1.1 : -dt / 0.6), 0, 1);
+      const p = hotClock[k];
+      bias[k] = up ? 0.25 * p + 0.75 * p * p : p;
     }
     // 脑电线的起伏：主页完全合拢时起来（0.7s），离开主页时在 CALM 里收平
     if (mode === 'home' && split < 0.001) eegAmp = Math.min(1, eegAmp + (RM ? 1 : dt / 0.7));
