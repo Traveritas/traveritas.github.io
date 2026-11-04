@@ -1,7 +1,6 @@
 ---
 import '../styles/tokens.css';
 import '../styles/global.css';
-import '../styles/hours.css';
 /* Noto Serif SC 不走 @fontsource：由 scripts/fonts.mjs 按站内实际用字自切（dev / build 前自动跑），
    产物在 public/fonts/noto-serif-sc/，下面 head 里用 <link> 引。全站只有 500 / 600 两个字重：
    写 400 的正文会匹配到 500；不要再写 300 / 700 / 900，写了也只会落到这两档。 */
@@ -112,29 +111,14 @@ const resolvedDreamTitle = dreamTitle ?? deriveDreamTitle(title);
 
 const canonical = Astro.site && !noindex ? new URL(Astro.url.pathname, Astro.site).href : undefined;
 
-// 版块＝时辰：主页把站点讲成一夜，每个版块页沿用主页给它的那一段夜色（色板在 styles/hours.css）。
-// tone 决定玻璃与强调墨走浅色还是深色那一套
-const HOURS: [prefix: string, hour: string, tone: 'light' | 'dark'][] = [
-  ['/articles', 'shallow', 'light'], // 浅梦 23:19 — 01:11
-  ['/tags', 'shallow', 'light'],
-  ['/projects', 'deep', 'dark'], // 深眠 01:11 — 02:08
-  ['/moments', 'rem', 'dark'], // 异相 02:08 — 04:59
-  ['/gate', 'dawn', 'light'], // 晨光 06:31（NEXUS 的入口）
-  ['/legacy/thread', 'home', 'light'], // 旧主页存档
-];
-const path = Astro.url.pathname;
-const [, hour, baseTone] =
-  HOURS.find(([p]) => path.startsWith(p)) ?? ['', path === '/' ? 'home' : 'none', 'light'];
-
-/* 昼雾地面（mist）的页自己决定明暗：那两页的时辰只是「这个版块原本住哪一段夜色」，
-   底色由 src/scripts/mist.ts 的四档色板给，全是浅色。
-   不覆盖的话 /projects 会带着深眠的深色墨（fg #e6e9ef）落到浅雾上 —— 字几乎看不见。
-   时辰本身留着（data-hour 仍决定别的东西），只把 tone 掰回 light。 */
-const tone = mist ? 'light' : baseTone;
+/* 「版块＝时辰」（styles/hours.css）2026-11-04 撤掉：那套色板只兑现了 /tags/ 与 /gate/ 两页，
+   而其余版块页早就被 wander（目录页）与 mist（阅读页）接管了底色。
+   目录页的三种夜色现在在 styles/wander.css 的三组 --w-* 与 scripts/wander/light.js 的调色板里；
+   全站其余页面就是 tokens.css 那一张底。 */
 ---
 
 <!doctype html>
-<html lang="zh-CN" data-hour={hour} data-tone={tone}>
+<html lang="zh-CN">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -193,7 +177,6 @@ const tone = mist ? 'light' : baseTone;
     data-mask-lines={maskLines ? 'true' : undefined}
     data-field-veil={fieldVeil === 'narrow' ? 'narrow' : fieldVeil ? 'wide' : undefined}
     data-bgm={bgm === 'reading' ? 'reading' : undefined}
-    data-mist={mist ? '' : undefined}
   >
     <div class="wash-backdrop" aria-hidden="true"></div>
     {/* wash-backdrop 全站常驻（z −5，7% 醒梦洗染）；page-ambient 只在传了 ambient 的页面出现；
