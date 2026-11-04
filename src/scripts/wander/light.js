@@ -164,48 +164,9 @@ vec4 poolW(vec2 fc){
   return vec4(w, 1.0 - min(1.0, s));
 }
 
-/* 一片光在某个采样点的颜色（未量化）。gr 带回这一点的抖动/阶数参数。
-   开屏的粗格只用它在块内取中心一点：一个块一个颜色，等于真的低分辨率画布。
-   （块很大时点采样会随格边界移动轻微翻色，粗段用 uLv=16 把一跳压到 1/16。） */
-vec3 shadeAt(vec2 fcS, out vec3 grOut){
-  vec2 ysS = vec2(fcS.x, uRes.y - fcS.y);
-  float k1 = clamp(dot(ysS - uSeamP.xy, uSeamN) + 0.5, 0.0, 1.0);
-  float k2 = clamp(dot(ysS - uSeamP.zw, uSeamN) + 0.5, 0.0, 1.0);
-  vec4 w = vec4(1.0 - k1, max(0.0, k1 - k2), k2, 0.0);
-  if (uSplit < 0.999) w = mix(poolW(fcS), w, uSplit);
-
-  float vp = flowV(fcS, false);
-  vec3 col = vec3(0.0);
-  vec3 gr = vec3(0.0);
-  if (w.x > 0.0) { col += w.x * colorize(0, uWind > 0.0 ? flowV(fcS, true) : vp, fcS); gr += w.x * uG[0]; }
-  if (w.y > 0.0) { col += w.y * colorize(1, vp, fcS); gr += w.y * uG[1]; }
-  if (w.z > 0.0) { col += w.z * colorize(2, vp, fcS); gr += w.z * uG[2]; }
-  if (w.w > 0.0) { col += w.w * colorize(3, vp, fcS); gr += w.w * uG[3]; }
-  col *= 1.0 - uDim * 0.42;
-  grOut = gr;
-  return col;
-}
-
 void main(){
   vec2 fc0 = gl_FragCoord.xy;
   vec2 ys0 = vec2(fc0.x, uRes.y - fc0.y);
-
-  /* ── 开屏颗粒：格宽从「比视口还大」收到 1 画布 px ──
-     每个像素只取它所在块的中心（块超过视口时取视口中心）——一个块只有一个颜色，
-     和真正的低分辨率画布等价，成本与日常渲染同一量级。
-     日常（uGrainOn=0）走下面的原路径，逐像素不变。 */
-  if (uGrainOn > 0.5) {
-    float cell = max(uCell, 1.0);
-    vec2 b0 = floor(ys0 / cell) * cell;
-    vec2 b1 = min(b0 + vec2(cell), uRes);
-    vec2 center = (max(b0, vec2(0.0)) + b1) * 0.5;
-    vec3 gr;
-    vec3 col = shadeAt(vec2(center.x, uRes.y - center.y), gr);
-    float Lq = max(uLv, 1.0);
-    col = floor(col * Lq + 0.5 + (bayer(fc0) - 0.5) * gr.x * uDither) / Lq;
-    o = vec4(clamp(col, 0.0, 1.0), 1.0);
-    return;
-  }
 
   // 塌缩圈：按 8×8 的块取级别，级别越高采样格越粗（1 / 2 / 4 / 8 画布 px）
   float L = 0.0;
@@ -219,6 +180,19 @@ void main(){
       vec2 cell = (floor(ys0 / cs) + 0.5) * cs;
       fc = vec2(cell.x, uRes.y - cell.y);
     }
+  }
+
+  /* ── 开屏颗粒：格宽从「比视口还大」收到 1 画布 px ──
+     每个像素只取它所在块的中心（块超过视口时取视口中心）——一个块只有一个颜色，
+     和真正的低分辨率画布等价。日常（uGrainOn=0）这一行不进来，逐像素不变。
+     （块很大时点采样会随格边界移动轻微翻色，粗段用 uLv=16 把一跳压到 1/16。）
+     开屏期不打塌缩圈，所以这里排在圈之后直接覆盖 fc；L 为 0，下面那格按 L 减亮也跟着失效。 */
+  if (uGrainOn > 0.5) {
+    float gcell = max(uCell, 1.0);
+    vec2 gb0 = floor(ys0 / gcell) * gcell;
+    vec2 gb1 = min(gb0 + vec2(gcell), uRes);
+    vec2 gc = (max(gb0, vec2(0.0)) + gb1) * 0.5;
+    fc = vec2(gc.x, uRes.y - gc.y);
   }
   vec2 ys = vec2(fc.x, uRes.y - fc.y);
 
@@ -238,8 +212,12 @@ void main(){
   col *= 1.0 - uDim * 0.42;
   col *= 1.0 - 0.055 * L;
 
-  float Lq = gr.z;
-  col = floor(col * Lq + 0.5 + (bayer(fc0) - 0.5) * gr.x) / Lq;
+  /* 量化 + 抖动。日常用这一区自己的阶数与抖动；开屏期（uGrainOn）换成开屏给的
+     uLv / uDither——栅格里的每一块都按这一组走，于是整屏一起从粗到细。
+     抖动索引仍锁在真实像素 fc0 上（不是块中心），一个块里才有颗粒的疏密。 */
+  float Lq = uGrainOn > 0.5 ? max(uLv, 1.0) : gr.z;
+  float dth = uGrainOn > 0.5 ? gr.x * uDither : gr.x;
+  col = floor(col * Lq + 0.5 + (bayer(fc0) - 0.5) * dth) / Lq;
   o = vec4(clamp(col, 0.0, 1.0), 1.0);
 }`;
 
