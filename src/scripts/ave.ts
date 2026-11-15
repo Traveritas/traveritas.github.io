@@ -23,6 +23,7 @@ import { getReality } from './reality';
 import { playVoice, preloadVoice, prefetchVoices } from './sound';
 import { reducedMotion } from './lib';
 import { createAveFlow } from './ave-flow';
+import { createAveStar, type AveStar } from './ave-star';
 import type { AvePageLine } from '../lib/ave-page';
 
 /* ── 参数 ───────────────────────────────────────────── */
@@ -154,6 +155,8 @@ let card: HTMLElement;
 let textEl: HTMLElement;
 let lead: HTMLElement;
 let sr: HTMLElement;
+/** 框后面那颗晶体星（拿不到 WebGL2 时为 null，框照常） */
+let star: AveStar | null = null;
 /** 台词表 + 本页自带的那句 */
 const lines: AveLine[] = [...AVE_LINES];
 /** 本句逐字的 span */
@@ -345,6 +348,8 @@ function show(line: AveLine, idle = false, at?: Element | null) {
   const whole = reducedMotion() || pref('reveal') === 'whole';
   paint(clip && !whole ? 0 : chars.length);
 
+  // 框已经在场（连说原地换句）：星原地转一下；否则星从小转进来
+  const wasOn = !root.hidden && root.classList.contains('is-on');
   root.classList.remove('is-leaving', 'is-done', 'is-quick');
   root.hidden = false;
   balance();
@@ -354,6 +359,13 @@ function show(line: AveLine, idle = false, at?: Element | null) {
   else root.style.left = root.style.top = '';
   void root.offsetWidth; // 先落下 hidden=false 再起过渡
   root.classList.add('is-on');
+  if (star) {
+    // 深底：框里的字是浅色的那种场景
+    const [r, g, b] = (getComputedStyle(card).color.match(/[\d.]+/g) || ['0', '0', '0']).map(Number);
+    star.look(0.299 * r + 0.587 * g + 0.114 * b > 140, getReality() === 'dream');
+    if (wasOn) star.spin();
+    else star.enter();
+  }
   if (anchor) follow();
   if (!USE_FACES) flow?.start();
 
@@ -450,6 +462,7 @@ function hide(natural = false, quick = false) {
   root.classList.remove('is-on');
   // 收起多久：平时先让线退掉再淡出（--ave-out），换位置时快收
   const out = quick ? QUICK_OUT : Number(getComputedStyle(root).getPropertyValue('--ave-out')) || 520;
+  star?.leave(quick ? 0 : out / 1000);
   hideT = window.setTimeout(() => {
     root.hidden = true;
     root.classList.remove('is-leaving', 'is-done', 'is-anchored', 'is-quick');
@@ -760,6 +773,7 @@ export function initAve(): void {
   textEl = el.querySelector('.ave-text')!;
   lead = el.querySelector('.ave-lead')!;
   sr = el.querySelector('.ave-sr')!;
+  star = createAveStar(el.querySelector<HTMLCanvasElement>('.ave-star')!, reducedMotion, card);
   if (!USE_FACES) flow = createAveFlow(el.querySelector('.ave-flow')!);
 
   el.querySelector('.ave-x')!.addEventListener('click', () => {

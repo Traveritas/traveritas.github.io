@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>星 · 对话框接法</title>
+<style>
+  :root {
+    --bg: #f0f3f6; --fg: #232830; --fg-soft: #56606d; --fg-faint: #858f9d; --line: rgba(35, 40, 48, 0.12);
+    --ave-tint: #a1b8cf; --ave-hue: #6f8bab; --ave-deep: #415369;
+    --ink: color-mix(in srgb, var(--fg) 46%, transparent);
+    --glass: color-mix(in srgb, var(--bg) 62%, transparent);
+    --wash: color-mix(in srgb, var(--ave-tint) 10%, transparent);
+    --rim: color-mix(in srgb, rgb(255 255 255 / .75) 76%, var(--ave-tint));
+    --serif: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', SimSun, serif;
+    --mono: 'IBM Plex Mono', Consolas, 'Microsoft YaHei UI', monospace;
+    --seam: 14deg;
+  }
+  body.dream { --ave-tint: #a399c7; --ave-hue: #8a7cb8; --ave-deep: #4f4a66; --bg: #eeecf3; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.9 system-ui, 'Microsoft YaHei UI', sans-serif; overflow: hidden; transition: background .6s; }
+
+  /* 假装底下是一页长文 */
+  .page { position: absolute; inset: 0; overflow: hidden; padding: 9vh 0 0; }
+  .page article { width: min(34em, 86vw); margin: 0 auto; color: color-mix(in srgb, var(--fg) 70%, transparent); }
+  .page h1 { font: 500 30px/1.4 var(--serif); letter-spacing: .04em; margin: 0 0 .3em; color: var(--fg); }
+  .page .meta { font: 12px var(--mono); color: var(--fg-faint); margin-bottom: 2.4em; }
+  .page p { margin: 0 0 1.2em; font: 16px/2.05 var(--serif); }
+
+  /* 控件 */
+  .bar { position: fixed; top: 14px; right: 16px; z-index: 50; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; justify-content: flex-end;
+    font: 12px var(--mono); color: var(--fg-soft); }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; background: color-mix(in srgb, var(--bg) 85%, transparent); }
+  .seg button, .btn { border: 0; background: none; padding: 3px 11px; font: inherit; color: inherit; cursor: pointer; }
+  .seg button[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
+  .btn { border: 1px solid var(--line); border-radius: 999px; background: color-mix(in srgb, var(--bg) 85%, transparent); }
+  .bar a { color: inherit; }
+
+  /* 公共：名牌 / 字 */
+  .chip { display: inline-flex; align-items: center; gap: .55em; height: 18px; padding: 0 .85em 0 .9em; background: var(--ave-deep);
+    color: color-mix(in srgb, var(--ave-tint) 18%, #fff); font: 10px var(--mono); letter-spacing: .16em; position: relative; transition: background .6s; }
+  .chip i { width: 6px; height: 6px; border: 1px solid color-mix(in srgb, var(--ave-tint) 70%, #fff); rotate: 45deg; }
+  .say { margin: 0; overflow-wrap: anywhere; }
+  .say .c { padding-bottom: 3px; background: linear-gradient(var(--ink), var(--ink)) 0 100% / 0 1px no-repeat;
+    transition: background-size .22s cubic-bezier(.3,.7,.2,1), color .3s; }
+  .say .c:not(.on) { color: transparent; }
+  .say .c.on { background-size: 100% 1px; }
+  .say .c.head { background-image: linear-gradient(var(--ave-hue), var(--ave-hue)); background-size: 100% 2px; }
+  .glass { background: linear-gradient(var(--wash), var(--wash)), var(--glass); backdrop-filter: blur(18px) saturate(1.06); -webkit-backdrop-filter: blur(18px) saturate(1.06); }
+  .host canvas { display: block; }
+  .layout { display: none; }
+  body[data-layout="band"] .L-band, body[data-layout="behind"] .L-behind, body[data-layout="half"] .L-half { display: block; }
+
+  /* ── A 半壁：贴底一条宽带，左半是一颗巨大的星，冲出带子上沿；14° 斜缝隔开字 ── */
+  .L-band .band { position: fixed; left: 0; right: 0; bottom: 0; height: max(210px, 30vh); z-index: 10;
+    border-top: 1px solid var(--rim); }
+  .L-band .band::after { content: ''; position: absolute; top: 0; bottom: 0; left: 46%; width: 1px; background: var(--rim);
+    transform-origin: top; transform: skewX(calc(-1 * var(--seam))); }
+  .L-band .host { position: fixed; z-index: 11; pointer-events: none; }
+  .L-band .text { position: absolute; left: calc(46% + 7vh); right: 7vw; top: 50%; translate: 0 -50%; }
+  .L-band .say { font: 500 clamp(18px, 2.1vw, 24px)/1.9 var(--serif); margin-top: 14px; }
+  .L-band .band { transform: translateY(100%); transition: transform .7s cubic-bezier(.16,1,.3,1); }
+  .L-band.on .band { transform: none; }
+
+  /* ── B 越界：站上原来的位置与尺寸；星在框后面，比框大一圈——框内被磨砂糊开，框外是清楚的 ── */
+  .L-behind .host { position: fixed; z-index: 10; pointer-events: none; }
+  .L-behind .card { position: fixed; right: 22px; bottom: 58px; width: min(24rem, calc(100vw - 44px)); z-index: 11; padding: 22px 26px 18px;
+    border: 1px solid var(--rim); clip-path: polygon(0 0, 100% 0, 100% 100%, 9px 100%, 0 calc(100% - 9px));
+    opacity: 0; translate: 0 6px; transition: opacity .45s cubic-bezier(.16,1,.3,1), translate .5s cubic-bezier(.16,1,.3,1); }
+  .L-behind.on .card { opacity: 1; translate: 0 0; transition-delay: .18s; }
+  .L-behind .say { font: 500 15px/2 var(--serif); margin-top: 10px; }
+
+  /* ── C 左半：整个左半边升起一面斜切的玻璃，星在里面，字压在底部 ── */
+  .L-half .panel { --glass: color-mix(in srgb, var(--bg) 90%, transparent); position: fixed; left: 0; top: 0; bottom: 0; width: 52vw; z-index: 10; overflow: hidden;
+    clip-path: polygon(0 0, 100% 0, calc(100% - 100vh * 0.2493) 100%, 0 100%);
+    transform: translateX(-104%); transition: transform .8s cubic-bezier(.16,1,.3,1); }
+  .L-half.on .panel { transform: none; }
+  .L-half .edge { position: fixed; top: 0; bottom: 0; left: 52vw; width: 1px; background: var(--rim); z-index: 11; transform-origin: top;
+    transform: skewX(calc(-1 * var(--seam))) translateX(-100vw); transition: transform .8s cubic-bezier(.16,1,.3,1); }
+  .L-half.on .edge { transform: skewX(calc(-1 * var(--seam))); }
+  .L-half .host { position: absolute; pointer-events: none; }
+  .L-half .text { position: absolute; left: 7vw; right: 30%; bottom: 11vh; }
+  .L-half .say { font: 500 clamp(20px, 2.4vw, 30px)/1.85 var(--serif); margin-top: 16px; }
+
+  @media (max-width: 760px) {
+    .L-band .text { left: 7vw; top: auto; bottom: 22px; translate: none; }
+    .L-band .band::after { display: none; }
+    .L-half .panel { width: 100vw; clip-path: none; }
+    .L-half .edge { display: none; }
+    .L-half .text { right: 7vw; }
+  }
+</style>
+</head>
+<body data-layout="band">
+  <div class="page" aria-hidden="true">
+    <article>
+      <h1>一页长文的样子</h1>
+      <div class="meta">2026 · 11 · 15</div>
+      <p>这一页只是垫在底下的样子，用来看对话框落在真实阅读环境里时，占多大、压住了什么、让开了什么。正文的颜色和行距照站上的长文走，字本身没有意思。</p>
+      <p>窗外的光很平，像一张没有折痕的纸。桌上放着一只杯子，杯沿上有一圈很淡的水痕，看久了会觉得它在慢慢地转。</p>
+      <p>有些东西只在余光里才是清楚的：一转过去看，它就退回成普通的样子。于是只好不看它，让它在那里待着。</p>
+      <p>路口的灯换了三次颜色，没有人走过去。风从街的另一头过来，带着一点刚下过雨的气味，又好像只是想起来的。</p>
+      <p>这一页只是垫在底下的样子，用来看对话框落在真实阅读环境里时，占多大、压住了什么、让开了什么。</p>
+    </article>
+  </div>
+
+  <div class="bar">
+    <span class="seg" id="layout"><button data-v="band" aria-pressed="true">A 半壁</button><button data-v="behind">B 越界</button><button data-v="half">C 左半</button></span>
+    <button class="btn" id="next">下一句</button>
+    <button class="btn" id="close">收起</button>
+    <span class="seg" id="mode"><button data-v="0" aria-pressed="true">醒</button><button data-v="1">梦</button></span>
+    <a href="./">← 星</a>
+  </div>
+
+  <section class="layout L-band">
+    <div class="host"></div>
+    <div class="band glass">
+      <div class="text"><span class="chip">AVE<i></i></span><p class="say"></p></div>
+    </div>
+  </section>
+
+  <section class="layout L-behind">
+    <div class="host"></div>
+    <div class="card glass"><span class="chip">AVE<i></i></span><p class="say"></p></div>
+  </section>
+
+  <section class="layout L-half">
+    <div class="panel glass">
+      <div class="host"></div>
+      <div class="text"><span class="chip">AVE<i></i></span><p class="say"></p></div>
+    </div>
+    <i class="edge"></i>
+  </section>
+
+<script type="module">
+  import { mount, spin, set } from './star-set.js';
+
+  // 台词取自 src/data/ave-lines.ts（作者原句，不改）
+  const LINES = ['欢迎来到这里，这里有不少有意思的东西哦~', '这颗星星里有很多有用的东西，比如说：让祢听到我的声音', '这边是随笔，长一些的字都放在这里。', '读完啦。要不要去别处看看？'];
+  let li = 0;
+  const vw = innerWidth, vh = innerHeight;
+
+  /* 每种接法：星多大、放哪（中心点，CSS px，相对 host 的定位父级） */
+  const L = {
+    band: (() => {
+      const bandH = Math.max(210, vh * 0.3);
+      const size = Math.round(Math.min(vh * 0.78, vw * 0.5));
+      return { size, cx: vw * 0.22, cy: vh - bandH * 0.62 };
+    })(),
+    behind: (() => {
+      const cardW = Math.min(384, vw - 44);
+      const size = Math.round(Math.min(440, vw * 0.7));
+      return { size, cx: vw - 22 - cardW + 30, cy: vh - 58 - 92 };
+    })(),
+    half: (() => {
+      const size = Math.round(Math.min(vh * 1.05, vw * 0.62));
+      return { size, cx: vw * 0.2, cy: vh * 0.36 };
+    })(),
+  };
+
+  const slots = {};
+  for (const [k, g] of Object.entries(L)) {
+    const host = document.querySelector(`.L-${k} .host`);
+    host.style.width = host.style.height = g.size + 'px';
+    host.style.left = g.cx - g.size / 2 + 'px';
+    host.style.top = g.cy - g.size / 2 + 'px';
+    slots[k] = mount(host, 'mid', { size: g.size, noAuto: true, hidden: true });
+  }
+  set('auto', 0);
+
+  const cur = () => document.body.dataset.layout;
+  const sec = (k = cur()) => document.querySelector(`.L-${k}`);
+  let timers = [];
+
+  function type(el, text) {
+    timers.forEach(clearTimeout); timers = [];
+    el.innerHTML = [...text].map((c, i) => `<span class="c" style="--i:${i}">${c}</span>`).join('');
+    const cs = el.querySelectorAll('.c');
+    cs.forEach((c, i) => timers.push(setTimeout(() => {
+      c.classList.add('on');
+      cs.forEach((x, j) => x.classList.toggle('head', j > i - 2 && j <= i));
+    }, 420 + i * 70)));
+  }
+
+  function enter() {
+    const s = sec();
+    s.classList.remove('on'); void s.offsetWidth; s.classList.add('on');
+    type(s.querySelector('.say'), LINES[li]);
+    spin(slots[cur()], { entry: true });
+  }
+  function leave(after) {
+    const s = sec();
+    timers.forEach(clearTimeout);
+    spin(slots[cur()], { exit: true, done: () => { s.classList.remove('on'); after && after(); } });
+  }
+
+  document.getElementById('next').onclick = () => { li = (li + 1) % LINES.length; enter(); };
+  document.getElementById('close').onclick = () => leave();
+  document.getElementById('layout').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    e.currentTarget.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', x === b));
+    sec().classList.remove('on');
+    document.body.dataset.layout = b.dataset.v;
+    enter();
+  });
+  document.getElementById('mode').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    e.currentTarget.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', x === b));
+    document.body.classList.toggle('dream', b.dataset.v === '1');
+    set('dream', +b.dataset.v);
+  });
+
+  const qs = new URLSearchParams(location.search);
+  if (qs.get('layout')) {
+    document.body.dataset.layout = qs.get('layout');
+    document.querySelectorAll('#layout button').forEach((x) => x.setAttribute('aria-pressed', x.dataset.v === qs.get('layout')));
+  }
+  if (qs.has('still')) {
+    // 截图用：跳过动画，直接是落定的样子
+    document.body.insertAdjacentHTML('beforeend', '<style>*{transition:none!important}</style>');
+    sec().classList.add('on');
+    const el = sec().querySelector('.say');
+    el.innerHTML = [...LINES[li]].map((c) => `<span class="c on">${c}</span>`).join('');
+    slots[cur()].mesh.scale.setScalar(1); slots[cur()].dirty = true;
+  } else setTimeout(enter, 500);
+</script>
+</body>
+</html>
