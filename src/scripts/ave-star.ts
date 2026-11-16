@@ -388,8 +388,11 @@ export function createAveStar(canvas: HTMLCanvasElement, reduced: () => boolean,
         a.done?.();
         return;
       }
-      draw();
     }
+    // 位姿只在节拍上跳，但每一帧都重画：框与星现在各滑各的（星更远也更久），
+    // 遮罩「框落在画布里的那一块」得按两块的实到位置每帧重算，只有节拍上画就会一格一格地错开。
+    // 静止时（anim 为 null）仍然不渲染。
+    draw();
     raf = requestAnimationFrame(frame);
   }
 

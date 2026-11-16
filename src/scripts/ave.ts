@@ -56,8 +56,8 @@ const QUICK_OUT = 250;
 const THEN_GAP = 60;
 /** 鼠标移开后再停多久（ms） */
 const HOLD_AFTER_HOVER = 2400;
-/** 贴元素时：句子离元素多远（牵线的最短长度，px）、离视口边至少多远 */
-const ANCHOR_GAP = 28;
+/** 贴元素时：句子离元素多远（px，中间不再牵线，这个距离就是框与元素之间的空）、离视口边至少多远 */
+const ANCHOR_GAP = 16;
 const VIEW_PAD = 14;
 /** 人声还没到手时，字幕最多等它这么久（ms）再自己先走——不让人对着空白卡片等网络。
     整包预取之后几乎不会走到这里；真走到了（刚开声那一两句、或网络确实很差），
@@ -153,7 +153,6 @@ let root: HTMLElement;
 let face: HTMLImageElement;
 let card: HTMLElement;
 let textEl: HTMLElement;
-let lead: HTMLElement;
 let sr: HTMLElement;
 /** 框后面那颗晶体星（拿不到 WebGL2 时为 null，框照常） */
 let star: AveStar | null = null;
@@ -172,6 +171,10 @@ let current: AveLine | null = null;
 let pending: { line: AveLine; at?: Element | null; gap?: number } | null = null;
 let holdT = 0;
 let hideT = 0;
+/** 星那一侧的进场 / 退场计时（它比框晚出场、也晚退场，见 --ave-star-in-delay / --ave-star-out-delay） */
+let starT = 0;
+/** 这一次 show() 是「连说中途换位置」接过来的（那段只有 250ms，星不能等延迟） */
+let quickReturn = false;
 let revealRaf = 0;
 let revealDone = false;
 let hovering = false;
@@ -238,6 +241,20 @@ function pick(lines: AveLine[]) {
 }
 
 /* ── 显示 ───────────────────────────────────────────── */
+/** 从样式里读一个毫秒数（--ave-out 这些就写在 Ave.astro 上，值改了这里跟着变） */
+function cssNum(name: string, fallback: number) {
+  return Number(getComputedStyle(root).getPropertyValue(name)) || fallback;
+}
+/** 读一条以秒写的延迟 / 时长变量（如 --ave-star-in-delay: 0.7s），换成 ms */
+function cssDelay(name: string, fallbackMs: number) {
+  const raw = getComputedStyle(root).getPropertyValue(name).trim();
+  if (!raw) return fallbackMs;
+  if (raw.endsWith('ms')) return parseFloat(raw);
+  if (raw.endsWith('s')) return parseFloat(raw) * 1000;
+  // 写成无单位的数字就按毫秒算（与 --ave-out 那些保持一致）
+  return Number(raw) || fallbackMs;
+}
+
 function clipOf(line: AveLine): { text: string; clip: AveVoiceClip | null } {
   const dream = getReality() === 'dream' && !!line.dream;
   const text = dream ? line.dream! : line.text;
@@ -350,6 +367,12 @@ function show(line: AveLine, idle = false, at?: Element | null) {
 
   // 框已经在场（连说原地换句）：星原地转一下；否则星从小转进来
   const wasOn = !root.hidden && root.classList.contains('is-on');
+  // 连说中途换位置接过来的这一句：星不演出场延迟（那段只有 QUICK_OUT + THEN_GAP）。
+  // 必须在挂 is-on 之前就把 .is-swap 定好——过渡按挂上那一刻的 transition-delay 起跑，
+  // 事后再改只会影响下一次，不会重启已经在等的这一趟
+  const fast = quickReturn;
+  quickReturn = false;
+  root.classList.toggle('is-swap', fast && !wasOn && !reducedMotion());
   root.classList.remove('is-leaving', 'is-done', 'is-quick');
   root.hidden = false;
   balance();
@@ -364,7 +387,15 @@ function show(line: AveLine, idle = false, at?: Element | null) {
     const [r, g, b] = (getComputedStyle(card).color.match(/[\d.]+/g) || ['0', '0', '0']).map(Number);
     star.look(0.299 * r + 0.587 * g + 0.114 * b > 140, getReality() === 'dream');
     if (wasOn) star.spin();
-    else star.enter();
+    else {
+      // 星比框晚出场：CSS 的位移等 --ave-star-in-delay，这里让 WebGL 的转进来等同一个数，
+      // 否则它会趁框还在淡入时先原地转掉，再干等位移开始。
+      // 例外不等：连说中途换位置（.is-swap 已把它压成 0）、以及开了减少动效
+      clearTimeout(starT);
+      const wait = fast || reducedMotion() ? 0 : cssDelay('--ave-star-in-delay', 700);
+      if (wait) starT = window.setTimeout(() => current && star?.enter(), wait);
+      else star.enter();
+    }
   }
   if (anchor) follow();
   if (!USE_FACES) flow?.start();
@@ -460,17 +491,28 @@ function hide(natural = false, quick = false) {
   root.classList.toggle('is-quick', quick);
   root.classList.add('is-leaving');
   root.classList.remove('is-on');
-  // 收起多久：平时先让线退掉再淡出（--ave-out），换位置时快收
-  const out = quick ? QUICK_OUT : Number(getComputedStyle(root).getPropertyValue('--ave-out')) || 520;
-  star?.leave(quick ? 0 : out / 1000);
+  // 收起多久：平时先让字底下的线退掉、框淡出，再等星滑远（--ave-out 盖住整段）；换位置时快收
+  const out = quick ? QUICK_OUT : cssNum('--ave-out', 1700);
+  // 星的退场比整个窗口短：它的位移与 WebGL 的转走缩没共用 --ave-star-out（ms）。
+  // 星比框晚退场：CSS 那一侧等 --ave-star-out-delay，这里让 WebGL 的转走等同一个数。
+  clearTimeout(starT);
+  if (quick) star?.leave(0);
+  else {
+    const wait = cssDelay('--ave-star-out-delay', 620);
+    const sec = cssNum('--ave-star-out', 950) / 1000;
+    if (wait) starT = window.setTimeout(() => star?.leave(sec), wait);
+    else star?.leave(sec);
+  }
   hideT = window.setTimeout(() => {
     root.hidden = true;
-    root.classList.remove('is-leaving', 'is-done', 'is-anchored', 'is-quick');
+    root.classList.remove('is-leaving', 'is-done', 'is-anchored', 'is-quick', 'is-swap');
     root.style.maxWidth = '';
     anchor = null;
     flow?.stop();
     const next = pending;
     pending = null;
+    // 连说换位置接过来的下一句：show() 里让星跳过出场延迟（QUICK_OUT + THEN_GAP 只有 310ms）
+    quickReturn = !!next && quick;
     if (next && fresh(next.line)) setTimeout(() => show(next.line, false, next.at), next.gap ?? 900);
   }, out);
 }
@@ -488,8 +530,8 @@ function resolveAnchor(at?: Element | string | null) {
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 
-/** 量元素和句子，挑一侧放下，再把牵线从元素边上拉到句子的线上 */
-/** 元素里字实际占到哪（标题这类块元素整行宽，牵线要从字的末尾牵出，不是从块边） */
+/** 量元素和句子，挑一侧放下（框自己滑到位，不牵线） */
+/** 元素里字实际占到哪（标题这类块元素整行宽，框要从字的末尾起算，不是从块边） */
 function inkRect(el: Element, box: DOMRect) {
   const range = document.createRange();
   range.selectNodeContents(el);
@@ -499,7 +541,7 @@ function inkRect(el: Element, box: DOMRect) {
 
 function place() {
   if (!anchor) return;
-  // 放哪一侧按元素的盒子算（句子留在页边、不压正文），牵线从字上起
+  // 放哪一侧按元素的盒子算（句子留在页边、不压正文），上下那一路按字的位置对齐
   const r = anchor.getBoundingClientRect();
   const ink = inkRect(anchor, r);
   const cy = r.top + r.height / 2;
@@ -516,44 +558,29 @@ function place() {
   if (root.style.maxWidth) balance();
   const w = card.offsetWidth;
   const h = card.offsetHeight;
-  // 第一行字的线在卡片里的位置（句子的线从这里起）
+  // 第一行字在卡片里的位置：句子第一行与元素的中线对齐，读起来是同一行
   const c0 = chars[0]?.getBoundingClientRect();
   const k = card.getBoundingClientRect();
   const lineY = c0 ? c0.bottom - k.top : h / 2;
-  const lineX = c0 ? c0.left - k.left : 0;
 
   let x: number;
   let y: number;
-  let from: [number, number];
-  let to: [number, number];
   if (side === 'r') {
-    // 右边：第一行的线和元素的中线对齐，牵线水平接进句子
+    // 右边：第一行的线和元素的中线对齐，框从右侧贴上去
     x = r.right + ANCHOR_GAP;
     y = clamp(cy - lineY, VIEW_PAD, innerHeight - h - VIEW_PAD);
-    to = [x, y + lineY]; // 接到薄片的左边上（第一行线的高度）
-    from = [ink.right + 10, clamp(to[1], ink.top, ink.bottom)];
   } else if (side === 'l') {
-    // 左边：牵线从元素左缘接到薄片右边
+    // 左边
     x = r.left - ANCHOR_GAP - w;
     y = clamp(cy - lineY, VIEW_PAD, innerHeight - h - VIEW_PAD);
-    from = [ink.left - 10, clamp(y + lineY, ink.top, ink.bottom)];
-    to = [x + w, y + lineY];
   } else {
-    // 上下：元素太宽，放在下面（下面放不下就上面），左缘对齐元素
-    x = clamp(r.left, VIEW_PAD, innerWidth - w - VIEW_PAD);
+    // 上下：元素太宽，放在下面（下面放不下就上面），左缘与字对齐
+    x = clamp(ink.left, VIEW_PAD, innerWidth - w - VIEW_PAD);
     const below = innerHeight - r.bottom - ANCHOR_GAP - VIEW_PAD >= h;
     y = below ? r.bottom + ANCHOR_GAP : r.top - ANCHOR_GAP - h;
-    const fx = clamp(x + lineX + 6, ink.left + 4, ink.right - 4);
-    from = [fx, below ? r.bottom + 4 : r.top - 4];
-    to = [fx, below ? y + 2 : y + h - 2];
   }
   root.style.left = `${Math.round(x)}px`;
   root.style.top = `${Math.round(y)}px`;
-
-  const dx = to[0] - from[0];
-  const dy = to[1] - from[1];
-  lead.style.width = `${Math.hypot(dx, dy)}px`;
-  lead.style.transform = `translate(${from[0]}px, ${from[1]}px) rotate(${Math.atan2(dy, dx)}rad)`;
 }
 
 function onMove() {
@@ -771,7 +798,6 @@ export function initAve(): void {
   face = el.querySelector('.ave-face')!;
   card = el.querySelector('.ave-card')!;
   textEl = el.querySelector('.ave-text')!;
-  lead = el.querySelector('.ave-lead')!;
   sr = el.querySelector('.ave-sr')!;
   star = createAveStar(el.querySelector<HTMLCanvasElement>('.ave-star')!, reducedMotion, card);
   if (!USE_FACES) flow = createAveFlow(el.querySelector('.ave-flow')!);
