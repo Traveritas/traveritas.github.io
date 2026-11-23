@@ -88,8 +88,13 @@ const VOLS: { id: 'bgm' | 'voice' | 'fx'; wake: string; en: string }[] = [
 ---
 
 <div class="ts" id="ts" data-reading={reading ? '' : undefined}>
+  <button class="ts-star" type="button" data-nofx aria-expanded="false" aria-label="工具">
+    <svg viewBox="-20 -20 40 40" aria-hidden="true"><g class="ts-star-g"></g></svg>
+  </button>
+
   <div class="ts-orbit" aria-hidden="false">
     <svg class="ts-tracks" aria-hidden="true"></svg>
+    <p class="ts-caption mono" aria-live="polite"></p>
 
     <div class="ts-ring" data-ring="tools" role="toolbar" aria-label="工具" hidden>
       {
@@ -277,10 +282,6 @@ const VOLS: { id: 'bgm' | 'voice' | 'fx'; wake: string; en: string }[] = [
       </section>
     )
   }
-
-  <button class="ts-star" type="button" data-nofx aria-expanded="false" aria-label="工具">
-    <svg viewBox="-20 -20 40 40" aria-hidden="true"><g class="ts-star-g"></g></svg>
-  </button>
 </div>
 
 <script>
@@ -291,10 +292,10 @@ const VOLS: { id: 'bgm' | 'voice' | 'fx'; wake: string; en: string }[] = [
 <!-- 轨道上的条目是运行时摆的，样式一律 .ts / .ts- 前缀自守 -->
 <style is:global>
   .ts {
-    --ts-glass: color-mix(in srgb, var(--bg) 72%, transparent);
-    --ts-edge: rgb(255 255 255 / 0.7);
-    --ts-hi: rgb(255 255 255 / 0.6);
-    --ts-sh: rgb(38 44 51 / 0.22);
+    --ts-glass: var(--chrome-bg);
+    --ts-edge: var(--chrome-edge);
+    --ts-hi: var(--chrome-hi);
+    --ts-sh: var(--chrome-sh);
     font-family: var(--font-body);
   }
 
@@ -359,15 +360,16 @@ const VOLS: { id: 'bgm' | 'voice' | 'fx'; wake: string; en: string }[] = [
     z-index: 60;
     pointer-events: none;
   }
-  /* 以星为圆心的一块磨砂玻璃圆盘，半径跟着最外一圈走：
-     漫游空间里每一栏底色都不同（主页整片靛夜），轨道上的字得落在同一种材质上才读得清 */
+  /* 以星为圆心的一块磨砂玻璃圆盘，使用 GPU transform: scale() 缩扩避免布局重排 */
   .ts-orbit::before {
     content: '';
     position: absolute;
-    left: calc(var(--ts-cx, 46px) - var(--ts-sr, 0px));
-    top: calc(var(--ts-cy, 100vh) - var(--ts-sr, 0px));
-    width: calc(var(--ts-sr, 0px) * 2);
-    height: calc(var(--ts-sr, 0px) * 2);
+    left: var(--ts-cx, 46px);
+    top: var(--ts-cy, 100vh);
+    width: 760px;
+    height: 760px;
+    margin-left: -380px;
+    margin-top: -380px;
     border-radius: 50%;
     background: var(--ts-glass);
     border: 1px solid var(--ts-edge);
@@ -377,15 +379,37 @@ const VOLS: { id: 'bgm' | 'voice' | 'fx'; wake: string; en: string }[] = [
       inset 0 1px 1px var(--ts-hi),
       0 18px 42px -18px var(--ts-sh);
     opacity: 0;
+    transform: scale(var(--ts-scale, 0.063));
     transition:
       opacity 0.35s,
-      left 0.45s cubic-bezier(0.16, 1, 0.3, 1),
-      top 0.45s cubic-bezier(0.16, 1, 0.3, 1),
-      width 0.45s cubic-bezier(0.16, 1, 0.3, 1),
-      height 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+      transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+    will-change: transform, opacity;
   }
   .ts-orbit.is-veiled::before {
     opacity: 1;
+  }
+  .ts-caption {
+    position: fixed;
+    left: 22px;
+    bottom: calc(46px + var(--ts-sr, 138px) + 10px);
+    margin: 0;
+    padding: 3px 9px;
+    border-radius: var(--chrome-radius);
+    background: var(--ts-glass);
+    border: 1px solid var(--ts-edge);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    color: var(--fg);
+    opacity: 0;
+    pointer-events: none;
+    transition:
+      opacity 0.25s ease,
+      bottom 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .ts-orbit.is-veiled .ts-caption:not(:empty) {
+    opacity: 0.96;
   }
   .ts-tracks {
     position: absolute;
@@ -731,7 +755,7 @@ const VOLS: { id: 'bgm' | 'voice' | 'fx'; wake: string; en: string }[] = [
     transform: translate(calc(var(--c) * 24px), calc(var(--s) * -24px))
       translate(calc(-50% + max(var(--c), 0.6) * 50%), calc(-50% - var(--s) * 50%));
     padding: 3px 9px;
-    border-radius: 999px;
+    border-radius: var(--chrome-radius);
     background: var(--ts-glass);
     border: 1px solid var(--ts-edge);
     -webkit-backdrop-filter: blur(10px);
@@ -745,7 +769,7 @@ const VOLS: { id: 'bgm' | 'voice' | 'fx'; wake: string; en: string }[] = [
     transition: opacity 0.2s;
   }
   .ts-lab small {
-    font: 10px var(--font-mono);
+    font: 11px var(--font-mono);
     letter-spacing: 0.1em;
     color: var(--fg-faint);
     margin-left: 0.5em;
@@ -798,7 +822,7 @@ const VOLS: { id: 'bgm' | 'voice' | 'fx'; wake: string; en: string }[] = [
     font: 12px/1.2 var(--font-mono);
   }
   .ts-ray small {
-    font: 10px var(--font-mono);
+    font: 11px var(--font-mono);
     color: var(--fg-faint);
   }
   .ts-opt b {
@@ -826,7 +850,7 @@ const VOLS: { id: 'bgm' | 'voice' | 'fx'; wake: string; en: string }[] = [
     overscroll-behavior: contain;
     scrollbar-width: none;
     padding: 1.05rem 1.2rem 1.15rem;
-    border-radius: 6px;
+    border-radius: var(--chrome-radius);
     background: var(--ts-glass);
     border: 1px solid var(--ts-edge);
     -webkit-backdrop-filter: blur(18px) saturate(1.08);
@@ -871,7 +895,7 @@ const VOLS: { id: 'bgm' | 'voice' | 'fx'; wake: string; en: string }[] = [
   }
   .ts-h {
     margin: 0 0 0.6rem;
-    font-size: 10px;
+    font-size: 11px;
     letter-spacing: 0.14em;
     color: var(--fg-faint);
   }
@@ -920,7 +944,7 @@ const VOLS: { id: 'bgm' | 'voice' | 'fx'; wake: string; en: string }[] = [
   .ts-seg button {
     padding: 2px 9px;
     border: 1px solid var(--line);
-    border-radius: 999px;
+    border-radius: var(--chrome-radius);
     background: none;
     font-size: 12px;
     color: var(--fg-soft);
@@ -943,6 +967,7 @@ const VOLS: { id: 'bgm' | 'voice' | 'fx'; wake: string; en: string }[] = [
       transition: none;
     }
     .ts-sheet,
+    .ts-caption,
     .ts-orbit::before {
       transition: none;
     }

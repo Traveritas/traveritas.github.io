@@ -12,13 +12,13 @@ import { reducedMotion } from './lib';
 import type { NexusEl } from './nexus-slice';
 import type { DecorEl } from './about-decor';
 
-/* 时间轴（ms）：一处改节奏 */
+/* 时间轴（ms）：收紧至 ~1.85s 轻盈浮现，不再用 inert 锁死入口交互 */
 const T = {
-  line: [0, 1100],
-  water: [500, 1900],
-  grow: [800, 2500],
-  slices: [1700, 3000],
-  tag: [2700, 3300],
+  line: [0, 750],
+  water: [280, 1150],
+  grow: [420, 1450],
+  slices: [950, 1650],
+  tag: [1350, 1850],
 } as const;
 
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
@@ -42,7 +42,6 @@ export function initGateArrive() {
   const box = stage.querySelector<HTMLElement>('.about-crystal');
   const ctl = crystal ? (crystal.nexus ??= { grow: 1, line: 1 }) : null;
   if (ctl) ctl.grow = 0;
-  if (box) box.inert = true;
 
   let t0 = 0;
   function frame(now: number) {
@@ -59,15 +58,11 @@ export function initGateArrive() {
     const [k0, k1] = T.slices;
     for (const el of slices) {
       const i = Number(el.dataset.i ?? 0);
-      const a = k0 + (i / 4) * (k1 - k0 - 400);
-      el.style.opacity = smooth(clamp((t - a) / 400, 0, 1)).toFixed(3);
+      const a = k0 + (i / 4) * (k1 - k0 - 320);
+      el.style.opacity = smooth(clamp((t - a) / 320, 0, 1)).toFixed(3);
     }
     if (tag) tag.style.opacity = smooth(seg(t, T.tag)).toFixed(3);
-    if (t < T.tag[0]) requestAnimationFrame(frame);
-    else {
-      if (box) box.inert = false;
-      if (t < T.tag[1]) requestAnimationFrame(frame);
-    }
+    if (t < T.tag[1]) requestAnimationFrame(frame);
   }
   // 等开屏面纱揭开再开始（没有面纱 / 已看过则立即）
   const go = () => requestAnimationFrame(frame);

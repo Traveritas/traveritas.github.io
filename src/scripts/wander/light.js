@@ -59,6 +59,7 @@ uniform float uCell;    // 开屏颗粒：一格几画布 px（1 = 首页原样�
 uniform float uLv;      // 开屏期的量化阶（首页 26）
 uniform float uDither;  // 开屏期的抖动强度 0–1
 uniform float uGrainOn; // 0 = 常规（分区阶数），1 = 用 uCell/uLv/uDither
+uniform float uWake;    // 0 = 梦（12fps 步进 + 满档像素抖动），1 = 醒（60fps 光学平滑）
 out vec4 o;
 
 float h21(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
@@ -85,10 +86,9 @@ float bayer(vec2 p){
 }
 
 /* 流光的明暗值（量化之前，0–1）；wind = 随笔区的风 */
-float flowV(vec2 fc, bool wind){
+float flowV(vec2 fc, bool wind, float t){
   vec2 uv = (fc - 0.5 * uRes) / uRes.y;
   vec2 pan = vec2(uPan.x, -uPan.y);
-  float t = uTime;
   if (wind) {
     vec2 d = normalize(vec2(1.0, uTan));
     vec2 n = vec2(-d.y, d.x);
@@ -111,7 +111,7 @@ float flowV(vec2 fc, bool wind){
 }
 
 /* 第 r 区按明暗值 v 上色 */
-vec3 colorize(int r, float v, vec2 fc){
+vec3 colorize(int r, float v, vec2 fc, float t){
   vec3 c0 = uP[r * 4], c1 = uP[r * 4 + 1], c2 = uP[r * 4 + 2], c3 = uP[r * 4 + 3];
   vec3 gr = uG[r];
   vec3 col = mix(c0, c1, smoothstep(0.08, 0.5, v));
@@ -126,7 +126,6 @@ vec3 colorize(int r, float v, vec2 fc){
   if (r < 3) col += c3 * 0.05 * uLift[r];
   if (r == 0 && uWind > 0.0) {
     // 风痕：沿 14° 拉得很长、横向很窄的亮纹，顺风很快地流走；一阵一阵的（gust）
-    float t = uTime;
     vec2 d = normalize(vec2(1.0, uTan));
     vec2 n = vec2(-d.y, d.x);
     float al = dot(uv, d);
@@ -142,9 +141,8 @@ vec3 colorize(int r, float v, vec2 fc){
 
 /* 主页的池：三种夜色各自浮成一池池的，偏在它将来那一栏的方向。
    字不靠池子让路：字自己按底下的明暗换墨（wander.js 的 ink） */
-vec4 poolW(vec2 fc){
+vec4 poolW(vec2 fc, float t){
   vec2 uv = (fc - 0.5 * uRes) / uRes.y;
-  float t = uTime;
   float ax = 0.5 * uRes.x / uRes.y; // 半屏宽（uv）
   vec3 w;
   float B = uBias[0] + uBias[1] + uBias[2];
@@ -167,6 +165,8 @@ vec4 poolW(vec2 fc){
 void main(){
   vec2 fc0 = gl_FragCoord.xy;
   vec2 ys0 = vec2(fc0.x, uRes.y - fc0.y);
+  /* 梦面 12fps 离散步进，醒面 60fps 光学平滑流光 */
+  float qt = mix(floor(uTime * 12.0) / 12.0, uTime, uWake);
 
   // 塌缩圈：按 8×8 的块取级别，级别越高采样格越粗（1 / 2 / 4 / 8 画布 px）
   float L = 0.0;
@@ -196,27 +196,34 @@ void main(){
   }
   vec2 ys = vec2(fc.x, uRes.y - fc.y);
 
-  // 分区：这一格落在缝「后一侧」的比例，缝上那一格按覆盖量混两边
-  float k1 = clamp(dot(ys - uSeamP.xy, uSeamN) + 0.5, 0.0, 1.0);
-  float k2 = clamp(dot(ys - uSeamP.zw, uSeamN) + 0.5, 0.0, 1.0);
+  // 解析抗锯齿斜缝：去锯齿的光学玻璃切面
+  float dSeam1 = dot(ys - uSeamP.xy, uSeamN);
+  float dSeam2 = dot(ys - uSeamP.zw, uSeamN);
+  float k1 = smoothstep(-0.55, 0.55, dSeam1);
+  float k2 = smoothstep(-0.55, 0.55, dSeam2);
   vec4 w = vec4(1.0 - k1, max(0.0, k1 - k2), k2, 0.0);
-  if (uSplit < 0.999) w = mix(poolW(fc), w, uSplit);
+  if (uSplit < 0.999) w = mix(poolW(fc, qt), w, uSplit);
 
-  float vp = flowV(fc, false);
+  float vp = flowV(fc, false, qt);
   vec3 col = vec3(0.0);
   vec3 gr = vec3(0.0);
-  if (w.x > 0.0) { col += w.x * colorize(0, uWind > 0.0 ? flowV(fc, true) : vp, fc); gr += w.x * uG[0]; }
-  if (w.y > 0.0) { col += w.y * colorize(1, vp, fc); gr += w.y * uG[1]; }
-  if (w.z > 0.0) { col += w.z * colorize(2, vp, fc); gr += w.z * uG[2]; }
-  if (w.w > 0.0) { col += w.w * colorize(3, vp, fc); gr += w.w * uG[3]; }
+  if (w.x > 0.0) { col += w.x * colorize(0, uWind > 0.0 ? flowV(fc, true, qt) : vp, fc, qt); gr += w.x * uG[0]; }
+  if (w.y > 0.0) { col += w.y * colorize(1, vp, fc, qt); gr += w.y * uG[1]; }
+  if (w.z > 0.0) { col += w.z * colorize(2, vp, fc, qt); gr += w.z * uG[2]; }
+  if (w.w > 0.0) { col += w.w * colorize(3, vp, fc, qt); gr += w.w * uG[3]; }
   col *= 1.0 - uDim * 0.42;
   col *= 1.0 - 0.055 * L;
 
-  /* 量化 + 抖动。日常用这一区自己的阶数与抖动；开屏期（uGrainOn）换成开屏给的
-     uLv / uDither——栅格里的每一块都按这一组走，于是整屏一起从粗到细。
-     抖动索引仍锁在真实像素 fc0 上（不是块中心），一个块里才有颗粒的疏密。 */
-  float Lq = uGrainOn > 0.5 ? max(uLv, 1.0) : gr.z;
-  float dth = uGrainOn > 0.5 ? gr.x * uDither : gr.x;
+  /* 14° 水晶斜缝微光：分区展开时给切线添一道极薄的棱镜微光 */
+  float sd1 = abs(dot(ys0 - uSeamP.xy, uSeamN));
+  float sd2 = abs(dot(ys0 - uSeamP.zw, uSeamN));
+  float gleam = exp(-pow(sd1 / 0.55, 2.0)) + exp(-pow(sd2 / 0.55, 2.0));
+  float seamVis = smoothstep(0.4, 1.0, uSplit) * (1.0 - step(0.5, uGrainOn));
+  col += mix(vec3(0.86, 0.83, 0.98), vec3(1.0), uWake) * gleam * 0.22 * seamVis;
+
+  /* 量化 + 抖动：梦面用满档有序 Bayer 抖动，醒面适度柔化，开屏期走 uLv / uDither */
+  float Lq = uGrainOn > 0.5 ? max(uLv, 1.0) : mix(gr.z, 56.0, uWake * 0.55);
+  float dth = uGrainOn > 0.5 ? gr.x * uDither : gr.x * mix(1.0, 0.35, uWake);
   col = floor(col * Lq + 0.5 + (bayer(fc0) - 0.5) * dth) / Lq;
   o = vec4(clamp(col, 0.0, 1.0), 1.0);
 }`;
@@ -248,7 +255,7 @@ export function createLight(canvas, PX, { wind = true } = {}) {
   gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
   const U = (n) => gl.getUniformLocation(prog, n);
   const u = {};
-  for (const n of ['uRes', 'uTime', 'uPan', 'uZoom', 'uMouse', 'uDim', 'uSeamP', 'uSeamN', 'uTan', 'uWind', 'uSplit', 'uBias', 'uRing', 'uRingStep', 'uP', 'uG', 'uLift', 'uCell', 'uLv', 'uDither', 'uGrainOn']) u[n] = U(n);
+  for (const n of ['uRes', 'uTime', 'uPan', 'uZoom', 'uMouse', 'uDim', 'uSeamP', 'uSeamN', 'uTan', 'uWind', 'uSplit', 'uBias', 'uRing', 'uRingStep', 'uP', 'uG', 'uLift', 'uCell', 'uLv', 'uDither', 'uGrainOn', 'uWake']) u[n] = U(n);
 
   const flat = (set) => ORDER.flatMap((s) => set[s].flat());
   const PD = flat(DREAM);
@@ -261,6 +268,7 @@ export function createLight(canvas, PX, { wind = true } = {}) {
     lastFace = f;
     for (let i = 0; i < pal.length; i++) pal[i] = PD[i] + (PW[i] - PD[i]) * f;
     gl.uniform3fv(u.uP, pal);
+    gl.uniform1f(u.uWake, f);
   }
   setFace(0);
   gl.uniform3fv(u.uG, new Float32Array(ORDER.flatMap((s) => GRAIN[s])));

@@ -502,21 +502,29 @@ function wireGestures() {
 }
 
 /* ---------- 启动 ---------- */
-function enterDream() {
+function markReady() {
+  requestAnimationFrame(() => requestAnimationFrame(() => body.classList.add('reality-ready')));
+}
+
+function enterDream(instant = false) {
   // 入场只演一次，且不写 reality。若这之前已有人显式落定醒面（样式预览页的 forceReality），就此让位
   if (reality !== 'dream') return;
   setMorphReality('dream');
   const duals = getDuals();
-  const vis: typeof duals = [];
-  for (const d of duals) {
-    const r = d.el.getBoundingClientRect();
-    if (r.bottom > 0 && r.top < innerHeight && r.width > 0) vis.push(d);
+  if (instant) {
+    for (const d of duals) morphText(d.el, d.dream, 0);
+  } else {
+    const vis: typeof duals = [];
+    for (const d of duals) {
+      const r = d.el.getBoundingClientRect();
+      if (r.bottom > 0 && r.top < innerHeight && r.width > 0) vis.push(d);
+    }
+    vis.forEach((d, j) => {
+      setTimeout(() => morphText(d.el, d.dream, 820), 260 + j * 120);
+    });
+    const visSet = new Set(vis);
+    for (const d of duals) if (!visSet.has(d)) morphText(d.el, d.dream, 0);
   }
-  vis.forEach((d, j) => {
-    setTimeout(() => morphText(d.el, d.dream, 820), 260 + j * 120);
-  });
-  const visSet = new Set(vis);
-  for (const d of duals) if (!visSet.has(d)) morphText(d.el, d.dream, 0);
   c = 0;
   setTint(0);
 }
@@ -545,6 +553,7 @@ export function initReality() {
     c = 1;
     setTint(1);
     wireGestures();
+    markReady();
     return;
   }
 
@@ -558,6 +567,7 @@ export function initReality() {
     for (const d of getDuals()) morphText(d.el, d.wake, 0);
     c = 1;
     setTint(1);
+    markReady();
     return;
   }
 
@@ -566,14 +576,14 @@ export function initReality() {
   notifyReality(reality);
   c = 0;
   setTint(0);
-  // 等开屏校准揭幕后入梦（无开屏/已看过则立即）
-  const enter = () => setTimeout(enterDream, 120);
-  if (docEl.classList.contains('booted')) enter();
+  // 首帧直接对齐梦面文案，消除揭开时的乱码闪烁；等开屏揭幕后再开放块级切换过渡
+  enterDream(true);
+  if (docEl.classList.contains('booted')) markReady();
   else {
     const t0 = performance.now();
     const waitBoot = () => {
-      if (docEl.classList.contains('booted') || performance.now() - t0 > 3200) enter();
-      else setTimeout(waitBoot, 120);
+      if (docEl.classList.contains('booted') || performance.now() - t0 > 3200) markReady();
+      else setTimeout(waitBoot, 100);
     };
     waitBoot();
   }

@@ -80,9 +80,9 @@ class Ring {
   layout() {
     this.R = this.R0 * scaleK();
     const m = Math.asin(clamp((C.x - 6) / this.R, 0, 1)) / DEG;
-    this.lo = -m;
-    this.hi = 90 + m;
-    this.start = this.startPref ?? Math.min(84, this.hi - 6);
+    this.lo = this.loop ? Math.max(-2, -m + 6) : -m;
+    this.hi = this.loop ? Math.min(82, 90 + m - 10) : 90 + m;
+    this.start = this.startPref ?? (this.loop ? Math.min(78, this.hi - 4) : Math.min(84, this.hi - 6));
     const N = this.originals.length;
     for (const it of this.items) if (it.src) it.el.remove();
     this.items = this.originals.map((el, i) => ({ el, k: i, ray: el.classList.contains('ts-ray') }));
@@ -118,7 +118,7 @@ class Ring {
 
   angle(k: number) {
     if (!this.P) return this.start - (k + (this.gapAfter >= 0 && k > this.gapAfter ? 0.7 : 0)) * this.step + this.offset;
-    const hiE = this.hi + 12;
+    const hiE = this.hi + 6;
     return hiE - mod(k * this.step - this.offset + (hiE - this.start), this.P);
   }
 
@@ -221,7 +221,7 @@ export function initToolstar() {
 
   const toolsN = root.querySelectorAll('[data-ring="tools"] > .ts-item').length;
   const rings = {
-    tools: new Ring(ringEl('tools'), 104, 88 / Math.max(1, toolsN - 1 + 0.7), 92, 0),
+    tools: new Ring(ringEl('tools'), 104, 88 / Math.max(1, toolsN - 1 + 0.7), 86, 0),
     go: new Ring(ringEl('go'), 180, 17),
     tags: new Ring(ringEl('tags'), 170, 15),
     months: new Ring(ringEl('months'), 246, 12, 62),
@@ -322,11 +322,14 @@ export function initToolstar() {
     const r = star.getBoundingClientRect();
     C.x = r.left + r.width / 2;
     C.y = r.top + r.height / 2;
+    orbit.style.setProperty('--ts-cx', `${C.x}px`);
+    orbit.style.setProperty('--ts-cy', `${C.y}px`);
   }
   function drawTracks() {
     tracks.replaceChildren();
     if (!open) {
       orbit.style.setProperty('--ts-sr', '24px');
+      orbit.style.setProperty('--ts-scale', (24 / 380).toFixed(4));
       orbit.classList.remove('is-veiled');
       return;
     }
@@ -343,7 +346,9 @@ export function initToolstar() {
       const band = add({ class: 'ts-band', cx: C.x, cy: C.y, r: ring.R, 'data-nofx': '' });
       bindTurn(band as unknown as HTMLElement, ring);
     }
-    orbit.style.setProperty('--ts-sr', `${discR().toFixed(1)}px`);
+    const sr = discR();
+    orbit.style.setProperty('--ts-sr', `${sr.toFixed(1)}px`);
+    orbit.style.setProperty('--ts-scale', (sr / 380).toFixed(4));
     orbit.style.setProperty('--ts-cx', `${C.x}px`);
     orbit.style.setProperty('--ts-cy', `${C.y}px`);
     orbit.classList.add('is-veiled');
@@ -616,16 +621,38 @@ export function initToolstar() {
       setTimeout(() => !el.classList.contains('is-on') && (el.hidden = true), RM ? 0 : 380);
     }
   }
+  const captionEl = root.querySelector<HTMLElement>('.ts-caption');
+  function setCaption(txt: string) {
+    if (captionEl) captionEl.textContent = txt;
+  }
+  for (const b of toolBtns) {
+    const readLabel = () => b.querySelector('.ts-lab')?.textContent?.replace(/\s+/g, ' ').trim() || '';
+    b.addEventListener('pointerenter', () => setCaption(readLabel()));
+    b.addEventListener('focus', () => setCaption(readLabel()));
+    b.addEventListener('pointerleave', () => {
+      const cur = toolBtns.find((x) => x.dataset.t === tool);
+      setCaption(cur?.querySelector('.ts-lab')?.textContent?.replace(/\s+/g, ' ').trim() || '');
+    });
+  }
+
   function setOpen(v: boolean) {
     if (v === open) return;
     open = v;
-    if (!v) tool = null;
+    if (!v) {
+      tool = null;
+      setCaption('');
+    } else {
+      const first = toolBtns[0];
+      if (first) setCaption(first.querySelector('.ts-lab')?.textContent?.replace(/\s+/g, ' ').trim() || '');
+    }
     ST.spinTo += 90;
     sync();
   }
   function setTool(t: Tool | null) {
     tool = t;
     sync();
+    const cur = toolBtns.find((x) => x.dataset.t === t);
+    setCaption(cur?.querySelector('.ts-lab')?.textContent?.replace(/\s+/g, ' ').trim() || '');
     if (t === 'find') setTimeout(() => field.focus({ preventScroll: true }), 60);
     if (t === 'page') markToc();
   }

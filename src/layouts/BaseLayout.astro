@@ -178,8 +178,9 @@ const canonical = Astro.site && !noindex ? new URL(Astro.url.pathname, Astro.sit
     data-field-veil={fieldVeil === 'narrow' ? 'narrow' : fieldVeil ? 'wide' : undefined}
     data-bgm={bgm === 'reading' ? 'reading' : undefined}
   >
+    <a class="skip-link" href="#main">跳至正文</a>
     <div class="wash-backdrop" aria-hidden="true"></div>
-    {/* wash-backdrop 全站常驻（z −5，7% 醒梦洗染）；page-ambient 只在传了 ambient 的页面出现；
+    {/* wash-backdrop 全站常驻（z −5，醒梦洗染）；page-ambient 只在传了 ambient 的页面出现；
         mist（z −4）是阅读页那一层会走的昼雾，与 ambient 同一层地面，同时传只认 mist */}
     {mist && !immersive && <Mist hole={mist === 'hole'} calm={mist === 'hole' ? 'none' : undefined} />}
     {ambient && !immersive && !mist && <div class="page-ambient" aria-hidden="true" />}
@@ -191,7 +192,7 @@ const canonical = Astro.site && !noindex ? new URL(Astro.url.pathname, Astro.sit
     {gauge && <Gauge {...gauge} />}
     <div class="page">
       {!bare && <SiteHeader />}
-      <main>
+      <main id="main">
         <slot />
       </main>
       {!bare && <SiteFooter />}
@@ -224,22 +225,6 @@ const canonical = Astro.site && !noindex ? new URL(Astro.url.pathname, Astro.sit
       // 屏外的「定格漂浮族」不跑：这一族走主线程，一页 50 多条同时跑会白烧半个核
       // （实测随笔页静置 36.8% → 27.8%）。放在最后：此时逐字浮起、序号、流光都已在 DOM 里。
       pauseOffscreenFloats();
-
-      // 进页停在页头之下（p11-h 终选）：页头恰好被遮住，上滚才露出；
-      // 浏览器还原了滚动位置或带锚点进入时不干预。
-      // 主页首屏（千层纸）例外：整幅视口构图 + 页头为叠压式（不占布局），
-      // 进页必须停在 scrollY=0，公式全部按视口坐标书写
-      const siteHeader = document.querySelector('.site-header');
-      if (siteHeader && !document.getElementById('ns-hero')) {
-        addEventListener('load', () => {
-          if (scrollY === 0 && !location.hash) {
-            scrollTo({
-              top: siteHeader.getBoundingClientRect().bottom + scrollY + 1,
-              behavior: 'instant',
-            });
-          }
-        });
-      }
     </script>
   </body>
 </html>

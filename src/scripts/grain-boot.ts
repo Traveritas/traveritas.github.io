@@ -62,15 +62,15 @@ type GrainWindow = Window & {
   __grainLate?: boolean;
 };
 
-const TOTAL = 1780;
-const REVEAL_AT = 1480;
-const RISE0 = 120; // 起始粗格停住的时间
-const RISE1 = 1720; // 收细到 5 屏 px 的时间
-const HAND0 = 1540; // 交接开始：真界面露出来、栅格开始淡出
-const HAND1 = 1762; // 交接结束：栅格没了，字也回到 0 blur
+const TOTAL = 1280;
+const REVEAL_AT = 980;
+const RISE0 = 80; // 起始粗格停住的时间
+const RISE1 = 1220; // 收细到 5 屏 px 的时间
+const HAND0 = 1040; // 交接开始：真界面露出来、栅格开始淡出
+const HAND1 = 1260; // 交接结束：栅格没了，字也回到 0 blur
 /* 加载幕：开门条件里「字体到位」最多等这么久（等不到也开门，栅格会在字体到了之后再量一次）；
    淡出时长与 GrainBoot.astro 里 #boot-load 的 transition 对齐 */
-const FONT_WAIT = 2500;
+const FONT_WAIT = 2000;
 const COVER_FADE = 260;
 
 const BLUR_MAX = 3.0; // 交接起点的真实 blur（≈ 交接时的格宽的一半）
@@ -194,10 +194,17 @@ export function initGrainBoot(): void {
     }, COVER_FADE + 30);
   }
 
+  function onSkip(): void {
+    if (!paused) finish();
+  }
+
   function cleanup(): void {
     if (raf) cancelAnimationFrame(raf);
     raf = 0;
     removeEventListener('resize', onResize);
+    removeEventListener('pointerdown', onSkip);
+    removeEventListener('wheel', onSkip);
+    removeEventListener('keydown', onSkip);
   }
 
   function finish(): void {
@@ -248,19 +255,19 @@ export function initGrainBoot(): void {
 
     /* 字：这几条 alpha 既是真界面的 opacity，也是栅格里的字有多亮 */
     if (title) title.style.opacity = '1';
-    const brandA = fontsReady ? easeInOut(seg(t, 420, 1300)) : 0;
-    const kickerA = fontsReady ? easeOut(seg(t, 380, 700)) : 0;
-    const headsA = fontsReady ? easeOut(seg(t, 820, 1180)) : 0;
-    const footA = fontsReady ? easeOut(seg(t, 1120, 1420)) : 0;
+    const brandA = fontsReady ? easeInOut(seg(t, 280, 920)) : 0;
+    const kickerA = fontsReady ? easeOut(seg(t, 240, 500)) : 0;
+    const headsA = fontsReady ? easeOut(seg(t, 560, 840)) : 0;
+    const footA = fontsReady ? easeOut(seg(t, 760, 1000)) : 0;
     if (box) {
       box.style.opacity = String(brandA);
       box.style.filter = brandA >= 0.999 ? '' : `blur(${((1 - brandA) * 14).toFixed(2)}px)`;
     }
     setOpacity(kicker, kickerA);
     setOpacity(heads, headsA);
-    setOpacity(stage, easeOut(seg(t, 1080, 1480)));
+    setOpacity(stage, easeOut(seg(t, 740, 1040)));
     for (const el of foot) setOpacity(el, footA);
-    setOpacity(ts, easeOut(seg(t, 1300, 1560)));
+    setOpacity(ts, easeOut(seg(t, 900, 1120)));
 
     /* 流光：格宽从「比视口还大」收到 5 屏 px；阶数 3 → 26；抖动从 0 长出来 */
     const p = clamp01((t - RISE0) / (RISE1 - RISE0));
@@ -274,7 +281,7 @@ export function initGrainBoot(): void {
     wander?.setGrain({ cellPx: cell, lv, dither });
 
     /* 脑电线：真线由 worker 逐帧画（reveal 决定画到哪儿），栅格里只做降采样 */
-    const reveal = easeOut(seg(t, 560, 1380));
+    const reveal = easeOut(seg(t, 360, 960));
     wander?.setReveal(reveal);
 
     /* 界面栅格：整屏同格；交接段淡出，同时把真界面的 blur 收掉 */
@@ -463,6 +470,9 @@ export function initGrainBoot(): void {
     if (/[?&]grain-pause=1/.test(location.search)) {
       paused = true;
     } else {
+      addEventListener('pointerdown', onSkip, { passive: true });
+      addEventListener('wheel', onSkip, { passive: true });
+      addEventListener('keydown', onSkip);
       if (!done) raf = requestAnimationFrame(loop);
     }
   }

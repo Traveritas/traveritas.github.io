@@ -150,7 +150,7 @@ interface Session {
 
 /* ── 状态 ───────────────────────────────────────────── */
 let root: HTMLElement;
-let face: HTMLImageElement;
+let face: HTMLImageElement | null = null;
 let card: HTMLElement;
 let textEl: HTMLElement;
 let sr: HTMLElement;
@@ -357,7 +357,21 @@ function show(line: AveLine, idle = false, at?: Element | null) {
   // 连说：这句一开口就把下一句的声音取好、解好，接上时不用等
   const nextClip = line.then ? clipOf(lines.find((l) => l.id === line.then) ?? line).clip : null;
   if (nextClip) preloadVoice(nextClip.src);
-  if (USE_FACES) face.src = `/ave/face/${line.face ?? 'smile'}.webp`;
+  if (USE_FACES) {
+    if (!face) {
+      const portrait = root.querySelector('.ave-portrait');
+      if (portrait) {
+        face = document.createElement('img');
+        face.className = 'ave-face';
+        face.alt = '';
+        face.width = 45;
+        face.height = 45;
+        face.decoding = 'async';
+        portrait.appendChild(face);
+      }
+    }
+    if (face) face.src = `/ave/face/${line.face ?? 'smile'}.webp`;
+  }
   sr.textContent = `Ave：${text}`;
   revealDone = false;
   build(text);
@@ -382,6 +396,10 @@ function show(line: AveLine, idle = false, at?: Element | null) {
   else root.style.left = root.style.top = '';
   void root.offsetWidth; // 先落下 hidden=false 再起过渡
   root.classList.add('is-on');
+  if (!star) {
+    const starCv = root.querySelector<HTMLCanvasElement>('.ave-star');
+    if (starCv) star = createAveStar(starCv, reducedMotion, card);
+  }
   if (star) {
     // 深底：框里的字是浅色的那种场景
     const [r, g, b] = (getComputedStyle(card).color.match(/[\d.]+/g) || ['0', '0', '0']).map(Number);
@@ -795,11 +813,9 @@ export function initAve(): void {
   const entry = el.dataset.entry;
   const page = entry && pages[entry] ? pageToLine(pages[entry], ENTER_AFTER) : null;
   if (page) lines.push(page);
-  face = el.querySelector('.ave-face')!;
   card = el.querySelector('.ave-card')!;
   textEl = el.querySelector('.ave-text')!;
   sr = el.querySelector('.ave-sr')!;
-  star = createAveStar(el.querySelector<HTMLCanvasElement>('.ave-star')!, reducedMotion, card);
   if (!USE_FACES) flow = createAveFlow(el.querySelector('.ave-flow')!);
 
   el.querySelector('.ave-x')!.addEventListener('click', () => {

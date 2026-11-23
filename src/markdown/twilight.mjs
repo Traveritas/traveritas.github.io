@@ -167,12 +167,29 @@ function splitInline(value) {
   const out = [];
   let last = 0;
   let m;
+  const KINSOKU = /^[，。；：、！？》」』）】]/;
   while ((m = INLINE.exec(value))) {
     if (m.index > last) out.push({ type: 'text', value: value.slice(last, m.index) });
-    if (m[1] !== undefined) out.push({ type: 'html', value: inlineDualHtml(m[1], m[2]) });
-    else if (m[3] !== undefined) out.push({ type: 'html', value: inlineFloatHtml(m[3]) });
-    else out.push({ type: 'html', value: inlineSheenHtml(m[4]) });
-    last = m.index + m[0].length;
+    if (m[1] !== undefined) {
+      out.push({ type: 'html', value: inlineDualHtml(m[1], m[2]) });
+      last = m.index + m[0].length;
+    } else {
+      let fxHtml = m[3] !== undefined ? inlineFloatHtml(m[3]) : inlineSheenHtml(m[4]);
+      last = m.index + m[0].length;
+      const tailMatch = KINSOKU.exec(value.slice(last));
+      if (tailMatch) {
+        const punct = escapeHtml(tailMatch[0]);
+        last += tailMatch[0].length;
+        const idx = fxHtml.lastIndexOf('<span ');
+        if (idx >= 0 && fxHtml.endsWith('</span>')) {
+          const lastSpan = fxHtml.slice(idx, -'</span>'.length);
+          fxHtml = `${fxHtml.slice(0, idx)}<span class="fx-kinsoku">${lastSpan}${punct}</span></span>`;
+        } else {
+          fxHtml = `<span class="fx-kinsoku">${fxHtml}${punct}</span>`;
+        }
+      }
+      out.push({ type: 'html', value: fxHtml });
+    }
   }
   if (last < value.length) out.push({ type: 'text', value: value.slice(last) });
   return out;
