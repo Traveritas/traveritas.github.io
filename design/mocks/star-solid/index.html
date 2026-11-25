@@ -1,0 +1,745 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>星体 · 实心六芒星原语</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      /* 令牌取自 src/styles/tokens.css（这里只抄本站要用的那几个，留一份自足的原型） */
+      :root {
+        --bg: #f0f3f6;
+        --bg-sunken: #e5ebf2;
+        --fg: #232830;
+        --fg-soft: #56606d;
+        --fg-faint: #858f9d;
+        --line: rgba(35, 40, 48, 0.12);
+        --wake: #a7b1ba;
+        --dream: #9389ae;
+        --amber: #9a86c4;
+        --glass: rgba(255, 255, 255, 0.5);
+        --edge: rgba(255, 255, 255, 0.72);
+        --sh: rgba(38, 44, 51, 0.14);
+        --font-display: 'Noto Serif SC', 'Palatino Linotype', Palatino, Georgia, 'Source Han Serif SC', serif;
+        --font-body: system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+        --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, 'Microsoft YaHei UI', monospace;
+      }
+      * { box-sizing: border-box; }
+      html { color-scheme: light; }
+      body {
+        margin: 0;
+        padding: 3.5rem 3rem 6rem;
+        background: var(--bg);
+        color: var(--fg);
+        font-family: var(--font-body);
+        -webkit-font-smoothing: antialiased;
+      }
+      .wrap { max-width: 76rem; margin: 0 auto; }
+      h1, h2, h3 { font-family: var(--font-display); font-weight: 500; margin: 0; }
+      h1 { font-size: 1.55rem; letter-spacing: 0.02em; }
+      h2 { font-size: 1.06rem; letter-spacing: 0.04em; }
+      h3 { font-size: 0.95rem; color: var(--fg-soft); letter-spacing: 0.03em; }
+      p { margin: 0; font-size: 0.9rem; line-height: 1.85; color: var(--fg-soft); }
+      small { font-size: 0.78rem; }
+      .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+      .k { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--fg-faint); }
+      .lede { max-width: 44rem; }
+      hr.rule { height: 1px; border: 0; background: var(--line); margin: 0; }
+
+      header.top { display: flex; align-items: baseline; gap: 1.2rem; padding-bottom: 1.1rem; }
+      header.top .tag { margin-left: auto; }
+
+      section { padding: 2.6rem 0 0.4rem; }
+      section > .hd { display: flex; align-items: baseline; gap: 1rem; padding-bottom: 1.2rem; }
+      section > .hd .n { font-family: var(--font-mono); font-size: 0.72rem; color: var(--fg-faint); letter-spacing: 0.16em; }
+      section > .hd .note { margin-left: auto; max-width: 34rem; text-align: right; }
+
+      .panel {
+        position: relative;
+        border-radius: 8px;
+        border: 1px solid var(--edge);
+        background: var(--glass);
+        -webkit-backdrop-filter: blur(14px) saturate(1.06);
+        backdrop-filter: blur(14px) saturate(1.06);
+        box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.5), 0 14px 34px -22px var(--sh);
+        padding: 1.4rem 1.5rem;
+      }
+      .panel + .panel { margin-top: 1rem; }
+      .cap { font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.08em; color: var(--fg-faint); }
+
+      /* 星 */
+      .star { color: var(--fg); display: block; }
+      .star svg { display: block; overflow: visible; }
+
+      /* ① 旋转一整圈：每格一块 120px 的画布，13 格分两行摆（7 + 6）。
+         不缩格子 —— 缩了就看不出轮廓呼吸的幅度。 */
+      .yawrow {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 0.5rem 0.4rem;
+        padding: 0.3rem 0 0.9rem;
+        justify-items: center;
+      }
+      .yawcell {
+        width: 120px;
+        text-align: center;
+      }
+      .yawcell .box {
+        height: 128px;
+        display: grid;
+        place-items: center;
+        border-radius: 6px;
+        border: 1px solid transparent;
+      }
+      .yawcell.is-edge .box { border-color: var(--line); background: rgba(255, 255, 255, 0.42); }
+      .yawcell .deg { margin-top: 0.35rem; }
+      .yawcell .bd { margin-top: 0.1rem; color: var(--fg-faint); }
+      .yawcell.is-pose .deg { color: var(--amber); }
+      .eq { color: var(--amber); }
+
+      /* ② 定格 */
+      .rigs { display: flex; gap: 2.6rem; align-items: flex-end; flex-wrap: wrap; }
+      .rig { text-align: center; }
+      .rig .lab { margin-top: 0.6rem; }
+      .rig .lab b { font-weight: 500; color: var(--fg); }
+      .rig .lab .sub { display: block; margin-top: 0.15rem; color: var(--fg-faint); }
+      .controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1.6rem;
+        align-items: center;
+        margin-top: 1.5rem;
+        padding-top: 1.2rem;
+        border-top: 1px solid var(--line);
+      }
+      .grp { display: flex; align-items: center; gap: 0.5rem; }
+      .grp > span { font-size: 0.82rem; color: var(--fg-soft); }
+      .seg { display: inline-flex; gap: 3px; }
+      button {
+        font: inherit;
+        color: var(--fg-soft);
+        background: none;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 3px 11px;
+        cursor: pointer;
+        font-size: 0.78rem;
+        transition: color 0.16s, border-color 0.16s;
+      }
+      button:hover { color: var(--fg); }
+      button[aria-pressed='true'] {
+        color: var(--amber);
+        border-color: color-mix(in srgb, var(--amber) 55%, transparent);
+      }
+      button:focus-visible { outline: 1.5px solid var(--amber); outline-offset: 2px; }
+      input[type='range'] { width: 9rem; accent-color: var(--amber); }
+      .readout { margin-left: auto; display: flex; gap: 1.4rem; }
+      .readout div { text-align: right; }
+
+      /* ③ 尺寸 */
+      .sizes { display: flex; align-items: flex-end; gap: 2.4rem; flex-wrap: wrap; }
+      .size { text-align: center; }
+      .size .box { display: grid; place-items: center; }
+      .size .cap { margin-top: 0.7rem; }
+      .size .cap .dim { color: var(--fg-faint); }
+      .size-verdict {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1.4rem;
+        margin-top: 1.5rem;
+        padding-top: 1.2rem;
+        border-top: 1px solid var(--line);
+      }
+      .size-verdict p { margin-top: 0.35rem; font-size: 0.82rem; line-height: 1.7; }
+      .verdict { color: var(--fg); }
+      .verdict .no { color: var(--fg-faint); text-decoration: line-through; text-decoration-thickness: 1px; }
+
+      /* ④ 立体感对比 */
+      .variants { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+      .vcard { padding: 1.1rem 1rem 1.2rem; text-align: center; border-radius: 8px; border: 1px solid var(--edge); background: rgba(255, 255, 255, 0.34); }
+      .vcard .big { height: 200px; display: grid; place-items: center; }
+      .vcard .small { display: grid; place-items: center; height: 62px; margin-top: 0.2rem; }
+      .vcard h3 { margin-top: 0.7rem; }
+      .vcard p { font-size: 0.8rem; line-height: 1.7; text-align: left; margin-top: 0.5rem; color: var(--fg-soft); }
+      .vcard.is-best { border-color: color-mix(in srgb, var(--amber) 55%, transparent); background: rgba(255, 255, 255, 0.62); }
+      .vcard.is-best h3 { color: var(--amber); }
+      .verdict-row { margin-top: 1rem; display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+      .verdict-row .panel { margin: 0; }
+
+      /* 现役姿势 */
+      .live { display: flex; align-items: center; gap: 1.6rem; flex-wrap: wrap; }
+      .btn {
+        width: 48px; height: 48px; border-radius: 50%;
+        display: grid; place-items: center;
+        background: rgba(255, 255, 255, 0.5);
+        border: 1px solid var(--edge);
+        -webkit-backdrop-filter: blur(12px) saturate(1.08);
+        backdrop-filter: blur(12px) saturate(1.08);
+        box-shadow: 0 6px 18px -8px rgba(38, 44, 51, 0.22);
+        color: var(--fg-soft);
+        flex: none;
+      }
+      .btn svg { width: 40px; height: 40px; display: block; overflow: visible; }
+      .ok { color: var(--amber); }
+
+      pre {
+        margin: 0.9rem 0 0;
+        padding: 1rem 1.1rem;
+        border-radius: 6px;
+        background: rgba(35, 40, 48, 0.045);
+        border: 1px solid var(--line);
+        font-family: var(--font-mono);
+        font-size: 0.74rem;
+        line-height: 1.7;
+        color: var(--fg-soft);
+        overflow-x: auto;
+      }
+      footer { margin-top: 3rem; padding-top: 1.2rem; border-top: 1px solid var(--line); display: flex; gap: 1rem; align-items: baseline; }
+      footer .mono { margin-left: auto; color: var(--fg-faint); }
+      @media (max-width: 900px) {
+        body { padding: 2rem 1.2rem 4rem; }
+        .variants { grid-template-columns: 1fr 1fr; }
+        .verdict-row { grid-template-columns: 1fr; }
+      }
+    </style>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="/fonts/noto/font.css" />
+    <link rel="stylesheet" href="/fonts/plex/latin-400.css" />
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="top">
+        <h1>星体 · 实心六芒星原语</h1>
+        <span class="cap tag mono">octaStar() · design/mocks/star-solid</span>
+      </header>
+      <hr class="rule" />
+      <p class="lede" style="margin-top: 1.1rem">
+        三轴正交的六支（±x ±y ±z），按 yaw / pitch 旋转后做正交投影，得到平面上的一块六边形星。这一页只做一件事：把
+        <span class="mono">toolstar.ts</span> 里每帧手画的那一颗，变成可传参数的原语，再把姿势、尺寸、材质三种判断一次摊开看。
+      </p>
+
+      <!-- 现役姿势 -->
+      <section id="live">
+        <div class="hd">
+          <span class="n">00</span>
+          <h2>现役姿势</h2>
+          <p class="note">yaw 45° / pitch 35.264° / 支长 16 / 半宽 1.9 / 支尾 1.4 —— 与 <span class="mono">drawStar()</span> 逐字节对齐</p>
+        </div>
+        <div class="panel">
+          <div class="live">
+            <div class="btn"><div class="star" id="live-star"></div></div>
+            <div>
+              <p>
+                48px 玻璃钮，里面 40px 的 <span class="mono">viewBox="-20 -20 40 40"</span>。六支等长（13.06 用户单位），互成 60°，
+                这是整周里唯一像六芒星的一格 —— 其余姿势都长短相间。
+              </p>
+              <p class="cap mono" id="parity" style="margin-top: 0.5rem"></p>
+            </div>
+            <div style="margin-left: auto; text-align: right">
+              <div class="cap">剪影直径 / 支长</div>
+              <div class="mono" id="live-span" style="font-size: 1.05rem; color: var(--fg)"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ① 旋转一整圈 -->
+      <section id="turn">
+        <div class="hd">
+          <span class="n">01</span>
+          <h2>旋转一整圈</h2>
+          <p class="note">
+            yaw 0° → 90°，12 步（7.5°/格）。立方对称：90° 与 0° 同形，所以一整圈其实只有 90°。
+            每格下面写六支的投影半径 —— 数字一样，就是同一颗星。
+          </p>
+        </div>
+        <div class="panel">
+          <div class="yawrow" id="yawrow"></div>
+          <div class="verdict-row" style="margin-top: 0.2rem">
+            <div class="panel">
+              <h3>0° 与 90° 是同一颗</h3>
+              <p id="eq-proof" style="margin-top: 0.5rem"></p>
+            </div>
+            <div class="panel">
+              <h3>轮廓在呼吸</h3>
+              <p style="margin-top: 0.5rem">
+                支长固定，投影半径却在 9.24–16.00 之间摆动：0° 时有三长三短，到 45° 收成六支等长。
+                观感上不是「转」，是每一次呼吸都把星形压扁、再撑圆。
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ② 定格 -->
+      <section id="hold">
+        <div class="hd">
+          <span class="n">02</span>
+          <h2>定格</h2>
+          <p class="note">
+            yaw 一格一格往前跳，每一格停住不动。左边是定格，右边是连续 —— 同一速率、同一姿势表，只为把差别摊开。
+            路径 <span class="mono">d</span> 从不被 CSS 补间，靠计时器写属性。
+          </p>
+        </div>
+        <div class="panel">
+          <div class="rigs">
+            <div class="rig">
+              <div class="star" id="rig-step" style="width: 200px; height: 200px"></div>
+              <div class="lab">
+                <b>定格</b>
+                <span class="sub cap" id="rig-step-sub">—</span>
+              </div>
+            </div>
+            <div class="rig">
+              <div class="star" id="rig-smooth" style="width: 200px; height: 200px"></div>
+              <div class="lab">
+                <b>连续</b>
+                <span class="sub cap">对照组 · 不采用</span>
+              </div>
+            </div>
+            <div style="flex: 1; min-width: 12rem">
+              <div class="cap">这一格停在哪</div>
+              <div class="mono" id="rig-deg" style="font-size: 1.9rem; color: var(--fg); line-height: 1.2">0.0°</div>
+              <div class="cap">这一格的六支投影半径</div>
+              <div class="mono" id="rig-radii" style="margin-top: 0.2rem; color: var(--fg-soft); font-size: 0.74rem">—</div>
+            </div>
+          </div>
+          <div class="controls">
+            <div class="grp"><span>圈内格数</span><span class="seg" id="seg-steps"></span></div>
+            <div class="grp"><span>每格停</span><input type="range" id="hold" min="60" max="200" step="10" value="120" /><span class="mono" id="hold-v">120 ms</span></div>
+            <div class="grp"><span class="seg" id="seg-mode"></span></div>
+            <div class="readout">
+              <div>
+                <div class="cap">一圈</div>
+                <div class="mono" id="period">1.44 s</div>
+              </div>
+              <div>
+                <div class="cap">重画</div>
+                <div class="mono" id="rate">6.9 /s</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ③ 尺寸 -->
+      <section id="size">
+        <div class="hd">
+          <span class="n">03</span>
+          <h2>尺寸</h2>
+          <p class="note">
+            同一颗星、同一套几何，只换画布。凹口半径（相邻两支之间那个内角到星心的距离）是判断「还认不认得出」的尺子：
+            2.8 用户单位，按画布折算成像素写在每一格下面。
+          </p>
+        </div>
+        <div class="panel">
+          <div class="sizes" id="sizes"></div>
+          <div class="size-verdict">
+            <div>
+              <div class="cap">最小还读得出</div>
+              <p class="verdict mono" id="size-min">—</p>
+            </div>
+            <div>
+              <div class="cap">再小就成了一团</div>
+              <p class="mono" id="size-blob" style="color: var(--fg-soft)">—</p>
+            </div>
+            <div>
+              <div class="cap">最大还立得住</div>
+              <p class="verdict mono" id="size-max">—</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ④ 立体感对比 -->
+      <section id="body">
+        <div class="hd">
+          <span class="n">04</span>
+          <h2>立体感对比</h2>
+          <p class="note">现行预设（平风筝 + 按深的透明度）对上三种别的做法。上排 200px 看形，下排 40px 看它在钮里还成不成立。</p>
+        </div>
+        <div class="variants" id="variants"></div>
+        <div class="verdict-row">
+          <div class="panel">
+            <h3>哪一种像晶体</h3>
+            <p id="crystal" style="margin-top: 0.5rem"></p>
+          </div>
+          <div class="panel">
+            <h3>为什么</h3>
+            <p id="why" style="margin-top: 0.5rem"></p>
+          </div>
+        </div>
+      </section>
+
+      <footer>
+        <span class="cap mono">star-solid.js · octaStar()</span>
+        <span class="cap mono" id="cost" style="margin-left: auto"></span>
+      </footer>
+    </div>
+
+    <script type="module">
+      import { octaStar, toMarkup, TOOLBAR_PRESET, legacyDrawStar, ISO_PITCH } from './star-solid.js';
+
+      /* 收集报错，截图脚本读它 */
+      window.__errs = [];
+      addEventListener('error', (e) => window.__errs.push(String(e.message)));
+      addEventListener('unhandledrejection', (e) => window.__errs.push(String(e.reason)));
+
+      const $ = (s) => document.querySelector(s);
+      const VIEW = '-20 -20 40 40';
+      /** 发丝线宽：给的是「屏幕上想要几 px」，换成用户单位（viewBox 40 单位宽） */
+      const hair = (pxSize, wantPx) => +((wantPx * 40) / pxSize).toFixed(3);
+
+      /* ── 画进一个 svg；节点数不变时只改属性，变了才整块换 ── */
+      const paints = new WeakMap();
+      function paint(host, result) {
+        let svg = host.querySelector('svg');
+        if (!svg) {
+          svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+          svg.setAttribute('viewBox', VIEW);
+          svg.setAttribute('aria-hidden', 'true');
+          if (host.dataset.size) {
+            svg.style.width = svg.style.height = host.dataset.size + 'px';
+          } else {
+            svg.style.width = svg.style.height = '100%';
+          }
+          host.append(svg);
+        }
+        const prev = paints.get(host);
+        const sameShape =
+          prev && prev.length === result.paths.length && prev.every((p, i) => p.role === result.paths[i].role);
+        if (sameShape) {
+          const nodes = svg.children;
+          result.paths.forEach((p, i) => {
+            const el = nodes[i];
+            el.setAttribute('d', p.d);
+            if (p.role === 'hub') return;
+            const key = p.role === 'edge' ? 'stroke-opacity' : 'fill-opacity';
+            el.setAttribute(key, String(p.opacity));
+            if (p.role === 'edge') el.setAttribute('stroke-width', String(p.stroke));
+          });
+        } else {
+          svg.innerHTML = toMarkup(result, { color: 'currentColor', hub: 'var(--amber)' });
+        }
+        paints.set(host, result.paths.map((p) => ({ role: p.role })));
+        return svg;
+      }
+
+      const star = (opts) => octaStar({ ...TOOLBAR_PRESET, ...opts });
+
+      /* ── 00 现役姿势 ── */
+      {
+        const r = star({});
+        paint($('#live-star'), r);
+        $('#live-span').textContent = `${r.breadth.max.toFixed(2)} / ${r.opts.r}`;
+        const mine = toMarkup(r, { attrs: false, hub: 'HUB' }).replace(/<path d="[^"]*" fill="HUB"\/>$/, '');
+        const same = mine === legacyDrawStar({ r: r.opts.r, pitch: r.opts.pitch });
+        $('#parity').innerHTML = same
+          ? '<span class="ok">六支与 drawStar() 逐字节一致</span> · pitch ' + ISO_PITCH.toFixed(6) + '°'
+          : '<span style="color:#a3452f">与 drawStar() 不一致</span>';
+        window.__parity = same;
+      }
+
+      /* ── 01 旋转一整圈 ── */
+      {
+        const row = $('#yawrow');
+        const cells = [];
+        for (let i = 0; i <= 12; i++) {
+          const deg = i * 7.5;
+          const cell = document.createElement('div');
+          cell.className = 'yawcell' + (i === 0 || i === 12 ? ' is-edge' : '') + (i === 6 ? ' is-pose' : '');
+          const box = document.createElement('div');
+          box.className = 'box';
+          const host = document.createElement('div');
+          host.className = 'star';
+          host.style.width = host.style.height = '120px';
+          box.append(host);
+          const degEl = document.createElement('div');
+          degEl.className = 'deg mono cap';
+          degEl.textContent = deg.toFixed(1) + '°';
+          const bdEl = document.createElement('div');
+          bdEl.className = 'bd mono cap';
+          cell.append(box, degEl, bdEl);
+          row.append(cell);
+          const res = star({ yaw: deg });
+          paint(host, res);
+          const radii = res.tips.map((t) => t.radius);
+          bdEl.textContent = `${Math.max(...radii).toFixed(1)} / ${Math.min(...radii).toFixed(1)}`;
+          cells.push({ deg, res, radii });
+        }
+        // 0° 与 90° 的同一性：比较六支半径的重数表与 z 深度表
+        const A = cells[0];
+        const B = cells[12];
+        const key = (r) => r.map((v) => v.toFixed(3)).sort().join(' ');
+        const same = key(A.radii) === key(B.radii);
+        $('#eq-proof').innerHTML = same
+          ? `<span class="ok mono">0.0° ≡ 90.0°</span> —— 六支投影半径的重数表相同（${A.radii
+              .slice()
+              .sort((a, b) => b - a)
+              .map((v) => v.toFixed(2))
+              .join(' / ')}）。绕 y 轴转 90° 把 x 轴与 z 轴互换，而 ±x、±z 本来都在，所以整组支不动，只换了名字。`
+          : '半径表不同 —— 对称性不成立，需要复查旋转。';
+        window.__symmetry = same;
+      }
+
+      /* ── 02 定格 ── */
+      {
+        const RIG = { steps: 12, hold: 120, mode: 'steps' };
+        const hostStep = $('#rig-step');
+        const hostSmooth = $('#rig-smooth');
+
+        const segSteps = $('#seg-steps');
+        for (const n of [8, 12, 16, 24]) {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.textContent = String(n);
+          b.dataset.n = n;
+          b.addEventListener('click', () => {
+            RIG.steps = n;
+            syncSegs();
+            syncMeta();
+            t0 = performance.now();
+            lastIdx = -1;
+            drawStep(t0);
+          });
+          segSteps.append(b);
+        }
+        const segMode = $('#seg-mode');
+        for (const [k, label] of [
+          ['steps', '定格'],
+          ['off', '关（连续）'],
+        ]) {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.textContent = label;
+          b.dataset.k = k;
+          b.addEventListener('click', () => {
+            RIG.mode = k;
+            syncSegs();
+            t0 = performance.now();
+            drawStep(0);
+          });
+          segMode.append(b);
+        }
+        function syncSegs() {
+          for (const b of segSteps.children) b.setAttribute('aria-pressed', String(+b.dataset.n === RIG.steps));
+          for (const b of segMode.children) b.setAttribute('aria-pressed', String(b.dataset.k === RIG.mode));
+        }
+        const hold = $('#hold');
+        hold.addEventListener('input', () => {
+          RIG.hold = +hold.value;
+          $('#hold-v').textContent = RIG.hold + ' ms';
+          syncMeta();
+          t0 = performance.now();
+          lastIdx = -1;
+          drawStep(t0);
+        });
+
+        let t0 = performance.now();
+        let lastIdx = -1;
+        let redraws = 0;
+        let rateT = t0;
+        let shown = 0;
+
+        const periodMs = () => RIG.steps * RIG.hold;
+        function syncMeta() {
+          $('#period').textContent = (periodMs() / 1000).toFixed(2) + ' s';
+        }
+
+        function drawStep(now) {
+          const T = periodMs();
+          const p = ((now - t0) % T + T) % T;
+          const idx = Math.min(RIG.steps - 1, Math.floor(p / RIG.hold));
+          const deg = (idx * 90) / RIG.steps;
+          if (idx !== lastIdx) {
+            lastIdx = idx;
+            const res = star({ yaw: 45 + deg });
+            paint(hostStep, res);
+            redraws++;
+            $('#rig-deg').textContent = deg.toFixed(1) + '°';
+            $('#rig-radii').textContent = res.tips
+              .map((t) => t.radius)
+              .sort((a, b) => b - a)
+              .map((v) => v.toFixed(2))
+              .join(' · ');
+            $('#rig-step-sub').textContent = `第 ${idx + 1} / ${RIG.steps} 格 · 停 ${RIG.hold} ms`;
+          }
+          // 对照组：同一段时间内连续走完这一圈
+          const degS = 45 + (90 * p) / T;
+          paint(hostSmooth, star({ yaw: degS }));
+        }
+
+        function loop(now) {
+          if (RIG.mode === 'off') {
+            // 关掉定格：两支都连续走完这一圈（差别的对照组就没了，这条曲线只是「不抽帧的样子」）
+            const ph = ((((now - t0) % periodMs()) + periodMs()) % periodMs()) / periodMs();
+            paint(hostStep, star({ yaw: 45 + 90 * ph }));
+            paint(hostSmooth, star({ yaw: 45 + 90 * ph }));
+            $('#rate').textContent = '连续';
+          } else {
+            drawStep(now);
+            if (now - rateT > 1000) {
+              $('#rate').textContent = ((redraws * 1000) / (now - rateT)).toFixed(1) + ' /s';
+              redraws = 0;
+              rateT = now;
+            }
+          }
+          requestAnimationFrame(loop);
+        }
+
+        syncSegs();
+        syncMeta();
+        hold.addEventListener('input', syncMeta);
+        drawStep(performance.now());
+        requestAnimationFrame(loop);
+        window.__rig = RIG;
+      }
+
+      /* ③ 尺寸 */
+      {
+        const sizes = [24, 40, 48, 96, 200];
+        const box = $('#sizes');
+        /* 凹口半径：相邻两支「侧顶点 → 支尾」两条边相交的那个凹角，到星心的距离（用户单位）。
+           六对相邻支各算两遍（两种配对），取半径大的那个 —— 小的那个是两支在中心附近的内交点，
+           不是轮廓上的凹角。halfWidth / notch 与 r 无关，直接用现役 r 求即可。 */
+        const notchR = (() => {
+          const s0 = octaStar({ ...TOOLBAR_PRESET, hub: 0 });
+          const angs = s0.tips.map((t) => Math.atan2(t.y, t.x)).sort((a, b) => a - b);
+          const w = TOOLBAR_PRESET.halfWidth;
+          const t = TOOLBAR_PRESET.notch;
+          const side = (a, sgn) => [-Math.sin(a) * w * sgn, Math.cos(a) * w * sgn];
+          const tail = (a) => [-Math.cos(a) * t, -Math.sin(a) * t];
+          const meet = (p1, p2, p3, p4) => {
+            const d1 = [p2[0] - p1[0], p2[1] - p1[1]];
+            const d2 = [p4[0] - p3[0], p4[1] - p3[1]];
+            const den = d1[0] * d2[1] - d1[1] * d2[0];
+            if (Math.abs(den) < 1e-12) return 0;
+            const u = ((p3[0] - p1[0]) * d2[1] - (p3[1] - p1[1]) * d2[0]) / den;
+            return Math.hypot(p1[0] + u * d1[0], p1[1] + u * d1[1]);
+          };
+          let best = 0;
+          for (let i = 0; i < 6; i++) {
+            const A = angs[i];
+            const B = angs[(i + 1) % 6];
+            best = Math.max(
+              best,
+              meet(side(A, 1), tail(A), side(B, -1), tail(B)),
+              meet(side(A, -1), tail(A), side(B, 1), tail(B)),
+            );
+          }
+          return best;
+        })();
+        const perPx = (size) => (notchR * size) / 40; // viewBox 40 单位宽
+        for (const s of sizes) {
+          const cell = document.createElement('div');
+          cell.className = 'size';
+          const b = document.createElement('div');
+          b.className = 'box';
+          b.style.width = b.style.height = Math.max(s, 24) + 'px';
+          const host = document.createElement('div');
+          host.className = 'star';
+          host.dataset.size = s;
+          host.style.width = host.style.height = s + 'px';
+          b.append(host);
+          const cap = document.createElement('div');
+          cap.className = 'cap';
+          cap.innerHTML = `${s} px<span class="dim"> · 凹口 ${perPx(s).toFixed(1)} px</span>`;
+          cell.append(b, cap);
+          box.append(cell);
+          paint(host, star({}));
+        }
+        $('#size-min').innerHTML = '40 px —— 凹口 2.8 px，六支分得开，还认得出是六芒星。';
+        $('#size-blob').textContent = '24 px 凹口只有 1.7 px，六个内角糊在一起，读成一团深色墨点（细看还有形状，但 1 秒内读不出来）。';
+        $('#size-max').innerHTML =
+          '96 px —— 再往上（200 px、400 px）六片风筝各是各的平三角，交界处只有一条线、没有面，读成立起来的贴纸。' +
+          '要更大，得换成折脊或四棱锥。';
+        window.__notch = notchR;
+      }
+
+      /* ── 04 立体感对比 ── */
+      const VARIANTS = [
+        {
+          id: 'flat',
+          name: '平风筝',
+          sub: '现行 · flat',
+          note: '每支一张四角风筝，按支的 z 深浅给透明度。六片各自独立地贴在屏幕上，支与支的边缘完全共线时也不互相压暗 —— 所以只能读到「六个贴片」。',
+        },
+        {
+          id: 'ridge',
+          name: '折脊',
+          sub: 'ridge · 两片',
+          note: '把同一张风筝沿脊线折起：两侧的肩同时朝观者抬起，每支成了两片互成夹角的面。轮廓一个像素不改，路径数恒为 12，明暗按面法线算；脊线上那道亮线就是「厚度」的证据。',
+        },
+        {
+          id: 'pyramid',
+          name: '四棱锥',
+          sub: 'faceted · 面棱',
+          note: '真正的四面锥：底面是一枚细菱形，背面剔除，面与面之间留一道发丝棱。唯一面数随姿势变的一种，因此只能整块重画。',
+        },
+        {
+          id: 'silhouette',
+          name: '剪影 + 轴线',
+          sub: 'silhouette · 线描',
+          note: '六支并成一块，透明度统一，里面只留六道轴线。最干净也最平 —— 它是图，不是体。',
+        },
+      ];
+      {
+        const wrap = $('#variants');
+        const small = 40;
+        const big = 200;
+        for (const v of VARIANTS) {
+          const card = document.createElement('div');
+          card.className = 'vcard' + (v.id === 'ridge' ? ' is-best' : '');
+          const bigBox = document.createElement('div');
+          bigBox.className = 'big';
+          const bigHost = document.createElement('div');
+          bigHost.className = 'star';
+          bigHost.style.width = bigHost.style.height = big + 'px';
+          bigBox.append(bigHost);
+          const smallBox = document.createElement('div');
+          smallBox.className = 'small';
+          const smallHost = document.createElement('div');
+          smallHost.className = 'star';
+          smallHost.dataset.size = small;
+          smallHost.style.width = smallHost.style.height = small + 'px';
+          smallBox.append(smallHost);
+          const h = document.createElement('h3');
+          h.textContent = v.name;
+          const sub = document.createElement('div');
+          sub.className = 'cap';
+          sub.textContent = v.sub;
+          const p = document.createElement('p');
+          p.textContent = v.note;
+          card.append(bigBox, smallBox, h, sub, p);
+          wrap.append(card);
+          const extra = { edgeWidth: hair(big, 0.75), lineWidth: hair(big, 0.8), hub: 0 };
+          paint(bigHost, star({ variant: v.id, ...(v.id === 'flat' ? { hub: 1.7 } : extra) }));
+          const extraS = { edgeWidth: hair(small, 0.7), lineWidth: hair(small, 0.7), hub: 0 };
+          paint(smallHost, star({ variant: v.id, ...(v.id === 'flat' ? { hub: 1.7 } : extraS) }));
+        }
+      }
+
+      /* ── 结论（判断句写死，量化的部分从几何里算） ── */
+      {
+        $('#crystal').innerHTML =
+          '<b style="font-weight:500;color:var(--amber)">折脊（ridge）</b> 是唯一读成晶体的：每支被折成两片，' +
+          '脊线上留出一道亮线，两侧一明一暗，六支在星心交会处的暗面又和相邻那支的亮面接上 —— ' +
+          '整颗星像一块被切过、又透过光的透明体。「四棱锥」有真三维的棱与剔除，但底面把支根撑宽，轮廓变钝；' +
+          '平风筝与剪影都只是贴在屏幕上的六个／一块平面。';
+        $('#why').innerHTML =
+          '晶体的读法要三件事同时成立：<b style="font-weight:500">支内部有明暗分界</b>（不是整支一个色）、' +
+          '<b style="font-weight:500">分界落在脊线上</b>（与轮廓不重合，所以看得出「有厚度」）、' +
+          '<b style="font-weight:500">相邻支的明暗要相反</b>（交界处才有一道立起来的转折）。' +
+          '平风筝三条全无；剪影只有轮廓；四棱锥有前两条但丢了轮廓的锐；折脊三条都成立，' +
+          '而轮廓一个像素不改 —— 代价只是路径数从 7 涨到 12。';
+        const counts = VARIANTS.map((v) => {
+          const r = star({ variant: v.id });
+          return `${v.name} ${r.paths.length}`;
+        });
+        $('#cost').textContent = '路径数 · ' + counts.join(' / ');
+      }
+    </script>
+  </body>
+</html>
+
+
+

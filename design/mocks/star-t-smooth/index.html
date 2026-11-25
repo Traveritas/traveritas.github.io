@@ -1,0 +1,696 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>星 · 平滑程度</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      /* 令牌取自 src/styles/tokens.css（只抄这一页要用的几个，留一份自足的原型） */
+      :root {
+        --bg: #f0f3f6;
+        --fg: #232830;
+        --fg-soft: #56606d;
+        --fg-faint: #858f9d;
+        --line: rgba(35, 40, 48, 0.12);
+        --amber: #9a86c4;
+        --umber: #4f4a66;
+        --dream: #9389ae;
+        --glass: rgba(255, 255, 255, 0.5);
+        --edge: rgba(255, 255, 255, 0.72);
+        --sh: rgba(38, 44, 51, 0.14);
+        --font-display: 'Noto Serif SC', 'Palatino Linotype', Palatino, Georgia, serif;
+        --font-body: system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei UI', 'Microsoft YaHei', sans-serif;
+        --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+      }
+      * { box-sizing: border-box; }
+      html { color-scheme: light; }
+      body {
+        margin: 0;
+        padding: 3.4rem 3rem 6rem;
+        background: var(--bg);
+        color: var(--fg);
+        font-family: var(--font-body);
+        -webkit-font-smoothing: antialiased;
+      }
+      .wrap { max-width: 74rem; margin: 0 auto; }
+      h1, h2, h3 { font-family: var(--font-display); font-weight: 500; margin: 0; }
+      h1 { font-size: 1.5rem; letter-spacing: 0.02em; }
+      h2 { font-size: 1.05rem; letter-spacing: 0.04em; }
+      h3 { font-size: 0.9rem; color: var(--fg-soft); letter-spacing: 0.03em; }
+      p { margin: 0; font-size: 0.875rem; line-height: 1.85; color: var(--fg-soft); }
+      .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+      .k { font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--fg-faint); }
+      .lede { max-width: 46rem; }
+      hr.rule { height: 1px; border: 0; background: var(--line); margin: 0; }
+
+      header.top { display: flex; align-items: baseline; gap: 1.2rem; padding-bottom: 1.1rem; }
+      header.top .tag { margin-left: auto; }
+
+      section { padding: 2.5rem 0 0.4rem; }
+      section > .hd { display: flex; align-items: baseline; gap: 1rem; padding-bottom: 1.1rem; flex-wrap: wrap; }
+      section > .hd .n { font-family: var(--font-mono); font-size: 0.7rem; color: var(--fg-faint); letter-spacing: 0.16em; }
+      section > .hd .note { margin-left: auto; max-width: 36rem; text-align: right; font-size: 0.82rem; }
+
+      .panel {
+        position: relative;
+        border-radius: 8px;
+        border: 1px solid var(--edge);
+        background: var(--glass);
+        -webkit-backdrop-filter: blur(14px) saturate(1.06);
+        backdrop-filter: blur(14px) saturate(1.06);
+        box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.5), 0 14px 34px -22px var(--sh);
+        padding: 1.3rem 1.4rem;
+      }
+      .panel + .panel { margin-top: 0.9rem; }
+      .cap { font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.08em; color: var(--fg-faint); }
+
+      /* 星 */
+      .s { display: grid; place-items: center; }
+      .s svg { display: block; }
+      .cell { text-align: center; }
+      .cell .lab { margin-top: 0.45rem; font-size: 0.76rem; color: var(--fg-soft); line-height: 1.5; }
+      .cell .lab b { font-weight: 500; color: var(--fg); }
+      .cell .lab .sub { display: block; color: var(--fg-faint); font-family: var(--font-mono); font-size: 0.66rem; letter-spacing: 0.04em; }
+
+      .row { display: flex; gap: 1.1rem; align-items: flex-end; flex-wrap: wrap; }
+      .row.tight { gap: 0.6rem; }
+      .row.spread { justify-content: space-between; }
+
+      /* 00 现役 */
+      .btn {
+        width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center;
+        background: rgba(255, 255, 255, 0.5);
+        border: 1px solid var(--edge);
+        -webkit-backdrop-filter: blur(12px) saturate(1.08);
+        backdrop-filter: blur(12px) saturate(1.08);
+        box-shadow: 0 6px 18px -8px rgba(38, 44, 51, 0.22);
+        color: var(--fg-soft);
+        flex: none;
+      }
+      .btn svg { width: 40px; height: 40px; display: block; }
+      .live { display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap; }
+      .live .rd { margin-left: auto; text-align: right; }
+
+      /* 旋钮 */
+      .sweep { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.7rem 0.5rem; }
+      .sweep .cell { padding: 0.5rem 0 0.2rem; border-radius: 6px; border: 1px solid transparent; }
+      .sweep .cell.is-pick { border-color: color-mix(in srgb, var(--amber) 45%, transparent); background: rgba(255, 255, 255, 0.5); }
+      .sweep .cell.is-pick .lab b { color: var(--amber); }
+
+      .verdict { margin-top: 1.1rem; padding-top: 1rem; border-top: 1px solid var(--line); display: grid; grid-template-columns: 1fr 1fr; gap: 1rem 1.4rem; }
+      .verdict p { font-size: 0.82rem; line-height: 1.72; }
+      .yes { color: var(--fg); }
+      .no { color: var(--fg-faint); }
+
+      /* 预设 */
+      .presets { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
+      .pcard { padding: 1rem 0.9rem 1.1rem; border-radius: 8px; border: 1px solid var(--edge); background: rgba(255, 255, 255, 0.36); text-align: center; }
+      .pcard h3 { margin-bottom: 0.2rem; }
+      .pcard .big { display: grid; place-items: center; height: 404px; }
+      .pcard .mid { display: grid; place-items: center; height: 210px; margin-top: 0.4rem; }
+      .pcard p { font-size: 0.76rem; line-height: 1.65; text-align: left; margin-top: 0.7rem; }
+      .pcard .num { margin-top: 0.5rem; display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 0.68rem; color: var(--fg-faint); }
+
+      /* 中心 */
+      .cores { display: flex; gap: 1.2rem; align-items: flex-end; flex-wrap: wrap; }
+
+      /* 读数 */
+      table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+      th, td { text-align: left; padding: 0.42rem 0.5rem; border-bottom: 1px solid var(--line); }
+      th { font-weight: 500; color: var(--fg-faint); font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; }
+      td.mono { font-variant-numeric: tabular-nums; }
+      tr.is-pick td { color: var(--amber); }
+
+      pre {
+        margin: 0.9rem 0 0; padding: 0.9rem 1rem; border-radius: 6px;
+        background: rgba(35, 40, 48, 0.045); border: 1px solid var(--line);
+        font-family: var(--font-mono); font-size: 0.72rem; line-height: 1.7;
+        color: var(--fg-soft); overflow-x: auto;
+      }
+      footer { margin-top: 3rem; padding-top: 1.2rem; border-top: 1px solid var(--line); display: flex; gap: 1rem; align-items: baseline; flex-wrap: wrap; }
+      footer .mono { margin-left: auto; color: var(--fg-faint); }
+      @media (max-width: 1000px) {
+        body { padding: 2rem 1.1rem 4rem; }
+        .presets { grid-template-columns: 1fr 1fr; }
+        .verdict { grid-template-columns: 1fr; }
+        section > .hd .note { text-align: left; margin-left: 0; }
+      }
+    </style>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="/fonts/noto/font.css" />
+    <link rel="stylesheet" href="/fonts/plex/latin-400.css" />
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="top">
+        <h1>星 · 平滑程度</h1>
+        <span class="cap tag mono">design/mocks/star-t-smooth</span>
+      </header>
+      <hr class="rule" />
+      <p class="lede" style="margin-top: 1.1rem">
+        结构定了：三轴正交的六支（±x ±y ±z），停在 yaw 45° / pitch 35.264°。这一页不再问「该长什么样」，只问一件事
+        —— 同一颗星，把棱角磨到什么程度最好看。五个旋钮各自扫一遍，然后合成四档完成度，摆在一起挑。
+        所有判断都在这个姿势下做出（只有这一格六支投影等长、互成 60°）。
+      </p>
+
+      <!-- 00 现役 -->
+      <section id="live">
+        <div class="hd">
+          <span class="n">00</span>
+          <h2>起点</h2>
+          <p class="note">现役 <span class="mono">drawStar()</span>：六张四角风筝，明暗只按深度分两层。下面每一档都从它改出来。</p>
+        </div>
+        <div class="panel">
+          <div class="live">
+            <div class="btn" id="live-btn" aria-label="现役那颗星，48px 玻璃钮"></div>
+            <div>
+              <p>
+                每支一张平的风筝：<span class="mono">半宽 1.9 / 支长 16 / 支尾 1.4</span>。整支一个色，支内没有任何分界；
+                六支之间靠 <span class="mono">z</span> 分两档透明（0.486 / 0.774）。所以在 200px 上它读成「六张贴片」，
+                而不是一块东西。
+              </p>
+              <p class="cap" style="margin-top: 0.45rem">支内落差 0 ／ 相邻两支明暗序：六对全相同（没有转折）</p>
+            </div>
+            <div class="rd">
+              <div class="cap">这一档的读数</div>
+              <div class="mono" style="font-size: 0.95rem; color: var(--fg)">7 path · 2 档</div>
+              <div class="cap" style="margin-top: 0.2rem">凹口半径 3.04</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ① 尖端 -->
+      <section id="k1-tip">
+        <div class="hd">
+          <span class="n">01</span>
+          <h2>尖端</h2>
+          <p class="note">同一支放大到 7 个单位宽。取景框跟着尖走 —— 收圆会把尖往回退，固定框会把它裁掉。</p>
+        </div>
+        <div class="panel">
+          <div class="sweep" id="sw-tip"></div>
+          <div class="verdict">
+            <div>
+              <h3>200px 上，一半的档位与「不做」没差别</h3>
+              <p>
+                硬尖、削平 0.6、收圆 0.06（退 0.4）—— 这三者在 200px 上找不出区别，因为那点差别落在
+                <b>一个像素以内</b>。削平要到 <b>1.8 以上</b>（页里摆的是 2.8）、收圆要到 <b>0.2 以上</b>，
+                才读得出「这个尖被处理过了」。
+              </p>
+            </div>
+            <div>
+              <h3>收圆很贵</h3>
+              <p>
+                圆弧要与两条刃相切，半径 <span class="mono">ρ</span> 就得退 <span class="mono">ρ·(1/sin α − 1)</span>，
+                这里 <span class="mono">α</span> 只有 6.77°，退让是半径的 7.5 倍：<span class="mono">ρ 0.2</span> 退 1.5，
+                <span class="mono">ρ 0.42</span> 退 3.1。想保住尖的长度就只能配小半径，而小半径又看不出来。
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ② 脊 -->
+      <section id="k2-spine">
+        <div class="hd">
+          <span class="n">02</span>
+          <h2>脊</h2>
+          <p class="note">
+            折高 <span class="mono">fold</span> = 截面脊高 ÷ 半宽。<span class="mono">0</span> 就是现役那张平风筝。
+          </p>
+        </div>
+        <div class="panel">
+          <div class="sweep" id="sw-fold"></div>
+          <div class="verdict">
+            <div>
+              <h3>最要紧的一个旋钮</h3>
+              <p>
+                支内出现一道明暗分界，而且这道分界落在脊线上、不落在剪影上 —— 「有厚度」就是这么来的。
+                用「量化前的最小支内落差」当地尺子（它是单调的，见右下读数）：0.25 → 0.11，0.5 → 0.21，
+                0.75 → 0.32，1.0 → 0.39，1.5 → 0.49，之后到 2.2 才爬到 0.57。所以
+                <b>0.5 起才真的看得见，0.75–1.5 是甜区</b>，1.5 之后每一格只多挣 0.04，不值。
+              </p>
+            </div>
+            <div>
+              <h3>过了 1.5 就开始反噬</h3>
+              <p>
+                折得太狠，两侧的面往屏幕纵深里收，正面变窄；1.8 起六支的刃开始互相压，剪影的凹口被吃掉一块，
+                再高下去就成了「两支并排」，不再是「一支折过」。这条是看着 400px 才敢下的判断，
+                200px 上到 2.2 都还不算难看。
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ③ 棱 -->
+      <section id="k3-rim">
+        <div class="hd">
+          <span class="n">03</span>
+          <h2>棱</h2>
+          <p class="note">
+            轮廓那条棱的角上换一段内切圆弧（半径 <span class="mono">fillet</span>，在截面参数平面上取）。
+            上排看中心，下排把取景框压到一条刃的边上。
+          </p>
+        </div>
+        <div class="panel">
+          <div class="row" id="rim-core" style="margin-bottom:0.8rem"></div>
+          <div class="row" id="rim-edge"></div>
+          <div class="verdict">
+            <div>
+              <h3>有，但是配角</h3>
+              <p>
+                它买到的是「轮廓上那圈微光」—— 一支的边缘多一条自己的调子，比两侧都亮或都暗。
+                放大到看一条刃才读得出来；200px 上只是让边不那么死。整体观感的差别，比折高那一项小一个量级。
+              </p>
+            </div>
+            <div>
+              <h3>它不该把轮廓啃掉</h3>
+              <p>
+                第一版我把这条带做成「边缘回沉」—— 那条刃往内让出一截，于是轮廓真的变窄了，六支立刻显得发虚。
+                现在这版圆弧是 <b>内切</b> 的：原来的角点还在，只是被切成两小段，所以剪影一个像素没动。
+                片数从 43 涨到 91，path 只从 21 涨到 23。
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ④ 截面 -->
+      <section id="k4-section">
+        <div class="hd">
+          <span class="n">04</span>
+          <h2>截面</h2>
+          <p class="note">每支横着切下去是几边形。四边 → 正面两片；六边 → 三片；八边 → 四片。</p>
+        </div>
+        <div class="panel" style="padding-bottom:0.9rem">
+          <div class="cap" style="margin-bottom:0.55rem">整颗 · 200px</div>
+          <div class="row" id="sec-full"></div>
+        </div>
+        <div class="panel">
+          <div class="cap" style="margin-bottom:0.55rem">放大 —— 差别只在这两处看得清</div>
+          <div class="row" id="sec-core" style="margin-bottom:1.1rem"></div>
+          <div class="row" id="sec-tip"></div>
+          <div class="verdict">
+            <div>
+              <h3>边数的差别不在「圆不圆」，在脊上有几道台阶</h3>
+              <p>
+                四边的脊是一道折线，明暗一分为二，最利；六边脊上是一条平面，整条一起亮，折的感觉反而没了；
+                八边在脊上多做一道台阶，每支有明—次明—暗三段。这差别在 200px 上几乎看不见，
+                放大到中心与尖端才读得出 —— 四边与八边的距离，比五档与四档的距离还小。
+              </p>
+            </div>
+            <div>
+              <h3>贵，而且是这一页最贵的一项</h3>
+              <p>
+                片数：四边 25、六边 37、八边 43；棱上加圆角每侧多两小片，六边涨到 79、八边 91。
+                成熟制后写出的 path：16 / 20 / 21 条（带圆角 22 / 23）。加圆角把片数翻了一倍，
+                却只多出一两条 path —— 圆角那两小片与邻近的片同色，并掉了。
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ⑤ 明暗 -->
+      <section id="k5-tone">
+        <div class="hd">
+          <span class="n">05</span>
+          <h2>明暗</h2>
+          <p class="note">
+            把连续明暗压成 <span class="mono">steps</span> 档，再乘到 <span class="mono">min–max</span> 的跨度上。
+          </p>
+        </div>
+        <div class="panel">
+          <div class="sweep" id="sw-tones"></div>
+          <div class="verdict">
+            <div>
+              <h3>两档不够，五档看不出比四档多</h3>
+              <p>
+                现役那两档（0.486 / 0.774）是在为「远与近」服务，不是在为「面与面」服务 —— 它同一个数既管远的支又管暗的面，
+                于是中间那档 0.288 的跳空撑不起体积。三档就够立住，四档最稳，五档在 200px 上已经与四档无从分辨。
+              </p>
+            </div>
+            <div>
+              <h3>跨度比档数重要</h3>
+              <p>
+                同样是四档，跨度收到 0.24–0.80 就发灰，拉到 0.05–0.97 又发花（最亮那片与底色撞上）。
+                0.10–0.92 附近是这一颗的平衡点。注意档是 <b>先归一化再乘跨度</b>：不归一化，六个调子会全挤在亮的一头。
+              </p>
+            </div>
+            <div>
+              <h3>量化会把折吃掉</h3>
+              <p>
+                这一项最该记的一条：档数不是「越少越干净」。四边截面 + 四档时，有一支的两侧刚好被切进同一档，
+                支内落差从 0.15 直接变成 <b>0</b> —— 那支就成了一整片，折白折了。
+                所以档数要给得比「看起来够用」多一档：八边截面用四档时最小落差 0.42，是安全的。
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 完成度预设 -->
+      <section id="presets">
+        <div class="hd">
+          <span class="n">06</span>
+          <h2>完成度预设</h2>
+          <p class="note">四档打磨程度，同一组几何与同一束光，只换那五个旋钮。每一档都给 200 与 400 两个尺寸。</p>
+        </div>
+        <div class="presets" id="preset-cards"></div>
+        <div class="panel" style="margin-top: 0.9rem">
+          <div class="cap" style="margin-bottom: 0.7rem">同一组四档，深底（#2a2b38）</div>
+          <div class="row" id="preset-dark"></div>
+        </div>
+      </section>
+
+      <!-- 中心 -->
+      <section id="centre">
+        <div class="hd">
+          <span class="n">07</span>
+          <h2>中心</h2>
+          <p class="note">
+            六支支尾越过星心 1.7 个单位，在那里互相压着。看各处六条支尾是怎么收口的。
+          </p>
+        </div>
+        <div class="panel">
+          <div class="cores" id="core-cases"></div>
+          <div class="verdict">
+            <div>
+              <h3>碎条只出在「薄」的那一档</h3>
+              <p>
+                中心之所以成一堆看不出意义的交叉，是因为六条支尾都是 <b>越到末端越窄的尖</b>：
+                它们在中心附近都只剩一两个像素宽，六条窄片叠在一起，交出来的就是十几个小三角，
+                每一个都不属于任何一条支。板子一厚，端点就有宽度，那些小三角就变成看得懂的小面。
+              </p>
+            </div>
+            <div>
+              <h3>于是给它一个明确的交代</h3>
+              <p>
+                三档做法：<b>平顶</b>（一小块朝观者的六边形，有面、有方向）、<b>劈开</b>（同一块沿光的方向分两半，一明一暗，
+                与六支的明暗结构接得上）、<b>退淡</b>（几乎与底色同值，只当一层底）。
+                一块只有一种调子的中心也能用，但它与周围的六支脱钩，看起来像盖上去的。
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 尺寸 -->
+      <section id="sizes">
+        <div class="hd">
+          <span class="n">08</span>
+          <h2>尺寸</h2>
+          <p class="note">48 / 96 / 200。凹口半径固定 3.04 用户单位，尺寸一小它就跟着小。</p>
+        </div>
+        <div class="panel">
+          <div id="size-rows"></div>
+          <div class="verdict">
+            <div>
+              <h3>48px：只有「锐利」这一档还站着</h3>
+              <p>
+                凹口在这个尺寸上只有 4.8px（3.04 用户单位 ÷ 30.2 的取景框 × 48）。柔钝那档因为大圆角，整支的边宽被吃掉一角，六支之间的空隙进一步收窄，
+                于是在 48px 上已经读成一团。锐利那档保留的角最多，反而是小尺寸里最清楚的。
+              </p>
+            </div>
+            <div>
+              <h3>96px 起才有得挑</h3>
+              <p>
+                96px 时四档的差别第一次变得可辨 —— 但也只是「可辨」，不是「可选」。真正能拿来比的是 200px。
+                如果要落进 40px 的工具栏钮，这一套里只有「锐利」勉强，而现役那张平风筝在 48px 上其实更干净。
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 读数 -->
+      <section id="readout">
+        <div class="hd">
+          <span class="n">09</span>
+          <h2>读数</h2>
+          <p class="note">
+            path 条数是线性代价：<span class="mono">drawStar()</span> 每帧写 6 条 + 一个心。
+          </p>
+        </div>
+        <div class="panel">
+          <table id="tbl"></table>
+          <pre id="dump">读取中…</pre>
+        </div>
+      </section>
+
+      <footer>
+        <span class="cap mono">star-t-smooth</span>
+        <span class="cap">五旋钮 · 四档完成度 · 正交投影 SVG</span>
+        <span class="cap mono" id="foot-note"></span>
+      </footer>
+    </div>
+
+    <script type="module">
+      import { svg, star, PRESETS, PRESET_KEYS, LIGHT, notchRadius, DEFAULTS } from './src.js';
+
+      const el = (html) => {
+        const d = document.createElement('div');
+        d.innerHTML = html.trim();
+        return d.firstElementChild;
+      };
+
+      /* 一个格子：星 + 标签 */
+      const cell = (o, { label, sub, size = 172, view = 'full', ground = 'light', pick = false, box = 7.2 }) =>
+        `<div class="cell${pick ? ' is-pick' : ''}">
+           <div class="s">${svg(o, { size, view, ground, box })}</div>
+           <div class="lab"><b>${label}</b>${sub ? `<span class="sub">${sub}</span>` : ''}</div>
+         </div>`;
+
+      const fill = (id, list) => {
+        const host = document.getElementById(id);
+        if (host) host.innerHTML = list.join('');
+      };
+
+      /* 00 起点：40px 玻璃钮里的现役那颗（与 toolstar.ts 同尺寸） */
+      document.getElementById('live-btn').innerHTML = svg(
+        { legacy: true, tones: { steps: 2, min: 0.486, max: 0.774, depth: 1 }, hub: { mode: 'table', radius: 1.7 } },
+        { size: 40 },
+      );
+
+      const F = 1.2; // 扫旋钮时的公共折高
+      const base = { fold: F };
+      /** 04 与 09 共用的同条件明暗（五档 0.10–0.94），两节的 path 数才对得上 */
+      const T5 = { steps: 5, min: 0.1, max: 0.94, depth: 0.22 };
+
+      /* ① 尖端 */
+      fill('sw-tip', [
+        cell({ ...base, tip: { kind: 'cusp' } }, { label: '硬尖', sub: 'cusp · 退让 0', view: 'tip', pick: true }),
+        cell({ ...base, tip: { kind: 'flat', len: 0.6 } }, { label: '削平 0.6', sub: 'flat · 退 0.6', view: 'tip' }),
+        cell({ ...base, tip: { kind: 'flat', len: 1.8 } }, { label: '削平 1.8', sub: 'flat · 退 1.8', view: 'tip' }),
+        cell({ ...base, tip: { kind: 'flat', len: 2.8 } }, { label: '削平 2.8', sub: 'flat · 退 2.8', view: 'tip' }),
+        cell({ ...base, tip: { kind: 'round', rho: 0.06, segs: 3 } }, { label: '收圆 0.06', sub: 'ρ .06 · 3 段 · 退 0.4', view: 'tip' }),
+        cell({ ...base, tip: { kind: 'round', rho: 0.12, segs: 3 } }, { label: '收圆 0.12', sub: 'ρ .12 · 3 段 · 退 0.9', view: 'tip' }),
+        cell({ ...base, tip: { kind: 'round', rho: 0.2, segs: 3 } }, { label: '收圆 0.20 · 3 段', sub: '退 1.5', view: 'tip' }),
+        cell({ ...base, tip: { kind: 'round', rho: 0.2, segs: 4 } }, { label: '收圆 0.20 · 4 段', sub: '退 1.5 · 多一条 path', view: 'tip' }),
+        cell({ ...base, tip: { kind: 'round', rho: 0.42, segs: 4 } }, { label: '收圆 0.42 · 4 段', sub: '退 3.1', view: 'tip' }),
+      ]);
+
+      /* ② 脊 */
+      fill('sw-fold', [
+        [0, '平（= 现役）', 'fold 0', true],
+        [0.25, '微', 'fold .25', false],
+        [0.5, '浅折', 'fold .50', true],
+        [0.75, '可见', 'fold .75', false],
+        [1.0, '稳', 'fold 1.00', true],
+        [1.2, '稳（本页默认）', 'fold 1.20', true],
+        [1.5, '深', 'fold 1.50', true],
+        [1.8, '偏深', 'fold 1.80', false],
+        [2.2, '过折', 'fold 2.20', false],
+      ].map(([fold, label, sub, pick]) => {
+        const r = star({ ...base, fold, sides: 8, fillet: 0.12 });
+        const sp = Math.min(...r.stats.spineRaw);
+        return cell({ ...base, fold, sides: 8, fillet: 0.12 }, { label, sub: `${sub} · 支内落差 ${sp.toFixed(2)}`, pick });
+      }));
+
+      /* ③ 棱：圆角带，中心看一遍、压到一条刃上再看一遍 */
+      const RIM = [0, 0.06, 0.12, 0.18, 0.24];
+      document.getElementById('rim-core').innerHTML = RIM.map((fillet) => {
+        const o = { sides: 8, fold: 1.2, fillet, tones: { steps: 5, min: 0.1, max: 0.94, depth: 0.22 } };
+        const st = star(o).stats;
+        return cell(o, { label: `圆角 ${fillet}`, sub: `${st.paths} path / ${st.cells} 片`, view: 'core', box: 11, size: 172, pick: fillet === 0.12 });
+      }).join('');
+      document.getElementById('rim-edge').innerHTML = RIM.map((fillet) => {
+        const o = { sides: 8, fold: 1.2, fillet, tones: { steps: 5, min: 0.1, max: 0.94, depth: 0.22 } };
+        const edgeView = { box: 4.6, cx: -4.6, cy: 4.4 };
+        return cell(o, { label: `圆角 ${fillet}`, sub: '取景框 4.6 单位，对在左下那条刃上', view: edgeView, size: 172, pick: fillet === 0.12 });
+      }).join('');
+
+      /* ④ 截面：同条件（同光、同 5 档、同折高）只换边数与圆角 */
+      const secCase = (sides, fillet) => ({ sides, fold: 1.2, fillet, tones: T5 });
+      const secFull = [
+        [4, 0, '四边 · 无圆角'],
+        [6, 0, '六边 · 无圆角'],
+        [8, 0, '八边 · 无圆角'],
+        [6, 0.14, '六边 · 圆角 .14'],
+        [8, 0.14, '八边 · 圆角 .14'],
+      ].map(([sides, fillet, label]) => {
+        const o = secCase(sides, fillet);
+        const st = star(o).stats;
+        return cell(o, { label, sub: `${st.paths} path / ${st.cells} 片`, size: 190 });
+      });
+      document.getElementById('sec-full').innerHTML = secFull.join('');
+
+      const zoomFor = (view, box, tag) =>
+        [[4, 0], [6, 0], [8, 0], [8, 0.14]].map(([sides, fillet]) => {
+          const o = secCase(sides, fillet);
+          return cell(o, { label: `${tag} · ${sides} 边${fillet ? ' 圆角' : ''}`, sub: '', view, box, size: 176 });
+        });
+      document.getElementById('sec-core').innerHTML = zoomFor('core', 11, '中心').join('');
+      document.getElementById('sec-tip').innerHTML = zoomFor('tip', 8, '尖端').join('');
+      window.__sec = Object.fromEntries(
+        [4, 6, 8].flatMap((s) => [0, 0.14].map((f) => [`s${s}f${f}`, star(secCase(s, f)).stats.paths])),
+      );
+
+      /* ⑤ 明暗 */
+      fill('sw-tones', [
+        [{ steps: 2, min: 0.486, max: 0.774, depth: 1 }, '2 档 · 现役', '0.486 / 0.774 · 跨度 .288'],
+        [{ steps: 2, min: 0.12, max: 0.92, depth: 0.22 }, '2 档 · 拉宽', '跨度 .80'],
+        [{ steps: 3, min: 0.12, max: 0.92, depth: 0.22 }, '3 档', '跨度 .80', true],
+        [{ steps: 4, min: 0.12, max: 0.92, depth: 0.22 }, '4 档', '跨度 .80', true],
+        [{ steps: 5, min: 0.12, max: 0.92, depth: 0.22 }, '5 档', '跨度 .80', true],
+        [{ steps: 4, min: 0.24, max: 0.8, depth: 0.22 }, '4 档 · 窄', '跨度 .56'],
+        [{ steps: 4, min: 0.05, max: 0.97, depth: 0.22 }, '4 档 · 极宽', '跨度 .92'],
+        [{ steps: 4, min: 0.12, max: 0.92, depth: 0.0 }, '4 档 · 只看面', 'depth 0'],
+        [{ steps: 4, min: 0.12, max: 0.92, depth: 0.5 }, '4 档 · 掺一半深度', 'depth .5'],
+      ].map(([tones, label, sub, pick]) =>
+        cell({ ...base, sides: 8, fillet: 0.12, tones }, { label, sub: `${sub} · ${star({ ...base, sides: 8, fillet: 0.12, tones }).stats.tones.length} 个值`, pick }),
+      ));
+
+      /* 06 预设：200 与 400 两个尺寸，摆在同一个卡片里 */
+      const cards = PRESET_KEYS.map((k) => {
+        const p = PRESETS[k];
+        const st = star(p.opts);
+        return `<div class="pcard">
+          <h3>${p.name}</h3>
+          <div class="cap">${k}</div>
+          <div class="mid"><span style="display:block"><span class="cap">200</span>${svg(p.opts, { size: 200 })}</span></div>
+          <div class="big"><span style="display:block"><span class="cap">400</span>${svg(p.opts, { size: 400 })}</span></div>
+          <p>${p.note}</p>
+          <div class="num"><span>${st.stats.paths} path</span><span>${st.stats.cells} 片</span><span>${st.stats.tones.length} 档</span></div>
+        </div>`;
+      }).join('');
+      document.getElementById('preset-cards').innerHTML = cards;
+
+      document.getElementById('preset-dark').innerHTML = PRESET_KEYS.map((k) =>
+        cell(PRESETS[k].opts, { label: PRESETS[k].name, sub: `${star(PRESETS[k].opts).stats.paths} path`, size: 190, ground: 'dark' }),
+      ).join('');
+
+      /* 07 中心 */
+      const CO = { sides: 8, fold: 1.2, fillet: 0.12 };
+      fill('core-cases', [
+        cell({ ...CO, hub: { mode: 'none' } }, { label: '不交代', sub: '让六条支尾自己叠', view: 'core', size: 200 }),
+        cell({ ...CO, hub: { mode: 'table', radius: 2.3 } }, { label: '平顶', sub: 'hub table 2.3', view: 'core', size: 200, pick: true }),
+        cell({ ...CO, hub: { mode: 'split', radius: 2.5, split: 0.55 } }, { label: '劈开', sub: 'hub split 2.5', view: 'core', size: 200, pick: true }),
+        cell({ ...CO, hub: { mode: 'pale', radius: 2.6 } }, { label: '退淡', sub: 'hub pale 2.6', view: 'core', size: 200 }),
+        cell({ sides: 4, fold: 0.02, hub: { mode: 'none' } }, { label: '平风筝 · 不交代', sub: '对照：现役的薄', view: 'core', size: 200 }),
+      ]);
+
+      /* 08 尺寸 */
+      const sizeCell = (o, label, size) =>
+        `<div class="cell" style="width:${Math.max(size + 16, 74)}px">
+           <div class="s" style="height:${size}px">${svg(o, { size })}</div>
+           <div class="lab"><span class="sub">${label}</span></div>
+         </div>`;
+      const sizeRows = [48, 96, 200].map(
+        (size) => `<div class="row tight" style="align-items:flex-end;gap:1rem;margin-bottom:1rem;flex-wrap:nowrap">
+          <div class="cap" style="width:3.2rem;flex:none">${size}px</div>
+          ${PRESET_KEYS.map((k) => sizeCell(PRESETS[k].opts, PRESETS[k].name, size)).join('')}
+          ${sizeCell({ legacy: true }, '现役', size)}
+        </div>`,
+      );
+      document.getElementById('size-rows').innerHTML = sizeRows.join('');
+
+      /* 09 读数 */
+      const RO = [
+        ['现役 <span class="mono">drawStar()</span>', { legacy: true, tones: { steps: 2, min: 0.486, max: 0.774, depth: 1 }, hub: { mode: 'table', radius: 1.7 } }, '六张平风筝 + 一个心'],
+        ['四边 · 硬棱 · 4 档', { sides: 4, fold: 1.2, fillet: 0, tones: { steps: 4, min: 0.1, max: 0.92, depth: 0.22 } }, '最小的一组：只有脊'],
+        ['六边 · 小圆角 · 4 档', { sides: 6, fold: 1.0, fillet: 0.1, tones: { steps: 4, min: 0.12, max: 0.9, depth: 0.22 } }, ''],
+        ['八边 · 小圆角 · 5 档', { sides: 8, fold: 1.2, fillet: 0.12, tones: { steps: 5, min: 0.1, max: 0.94, depth: 0.22 } }, '页内扫旋钮用的这一组'],
+        ...PRESET_KEYS.map((k) => [`预设 ${PRESETS[k].name}`, PRESETS[k].opts, PRESETS[k].note]),
+      ];
+      const tbl = RO.map(([name, opts, memo], i) => {
+        const st = star(opts);
+        const t = st.stats.tones;
+        return `<tr${i >= 4 ? ' class="is-pick"' : ''}>
+          <td>${name}</td>
+          <td class="mono">${st.stats.paths}</td>
+          <td class="mono">${st.stats.cells}</td>
+          <td class="mono">${t.length}</td>
+          <td class="mono">${t[0].toFixed(2)}–${t[t.length - 1].toFixed(2)}</td>
+          <td class="mono">${Math.min(...st.stats.spineRaw).toFixed(2)}</td>
+          <td class="mono">${st.stats.sameOrder}</td>
+          <td style="color:var(--fg-faint);font-size:0.72rem">${memo}</td>
+        </tr>`;
+      }).join('');
+      document.getElementById('tbl').innerHTML = `<thead><tr>
+        <th>档</th><th>path</th><th>片</th><th>调子档</th><th>调子范围</th><th>最小支内落差（量化前）</th><th>同序对数</th><th>说明</th>
+      </tr></thead><tbody>${tbl}</tbody>`;
+
+      /* 自检读数：给截图脚本与外面的人看 */
+      const dump = {
+        light: LIGHT.map((x) => +x.toFixed(4)),
+        notchRadius: notchRadius(DEFAULTS),
+        defaults: {
+          r: DEFAULTS.r,
+          halfWidth: DEFAULTS.halfWidth,
+          notch: DEFAULTS.notch,
+          fold: DEFAULTS.fold,
+          sides: DEFAULTS.sides,
+        },
+        presets: Object.fromEntries(
+          PRESET_KEYS.map((k) => {
+            const st = star(PRESETS[k].opts);
+            return [k, { name: PRESETS[k].name, paths: st.stats.paths, cells: st.stats.cells, tones: st.stats.tones }];
+          }),
+        ),
+        sweeps: {
+          fold: [0, 0.25, 0.5, 0.75, 1, 1.2, 1.5, 1.8, 2.2].map((f) => {
+            const st = star({ ...base, fold: f, sides: 8, fillet: 0.12 });
+            return { fold: f, minSpine: Math.min(...st.stats.spineRaw), paths: st.stats.paths };
+          }),
+          /* 与 04 那一节同条件（5 档），否则两组数字对不上 */
+          sides: [4, 6, 8].map((s) => ({ sides: s, paths: star({ ...base, sides: s, fillet: s > 4 ? 0.12 : 0, tones: T5 }).stats.paths })),
+          tip: [['cusp', { kind: 'cusp' }], ['flat0.6', { kind: 'flat', len: 0.6 }], ['round0.12', { kind: 'round', rho: 0.12, segs: 3 }], ['round0.2', { kind: 'round', rho: 0.2, segs: 3 }], ['round0.42', { kind: 'round', rho: 0.42, segs: 4 }]].map(
+            ([k, tip]) => {
+              const st = star({ ...base, tip });
+              return { tip: k, retreat: st.stats.retreat, paths: st.stats.paths };
+            },
+          ),
+        },
+      };
+      window.__readout = dump;
+      /* 页面上那一段只列结论性的几个数；完整的（含每次扫的读数）走 window.__readout 给截图脚本 */
+      const L = (v) => v.map((x) => x.toFixed(2)).join(' / ');
+      const sw = dump.sweeps;
+      document.getElementById('dump').textContent = [
+        `光向  ${L(LIGHT)}`,
+        `凹口半径  ${dump.notchRadius} 用户单位（正等轴视角下六支投影半径都是 13.06）`,
+        ``,
+        `折高 fold  × 最小支内落差（量化前）`,
+        ...sw.fold.map((x) => `  ${String(x.fold).padEnd(5)}  ${String(x.minSpine).padEnd(6)}  ${x.paths} path`),
+        ``,
+        `截面  × path（六边与八边带圆角 .12）`,
+        ...sw.sides.map((x) => `  ${x.sides} 边  ${x.paths} path`),
+        ``,
+        `尖端  × 退让 / path`,
+        ...sw.tip.map((x) => `  ${x.tip.padEnd(11)}  退 ${String(x.retreat).padEnd(6)} ${x.paths} path`),
+        ``,
+        `现役 drawStar()  7 path · 2 档（0.486 / 0.774）· 支内落差 0`,
+      ].join('\n');
+      document.getElementById('dump').style.whiteSpace = 'pre';
+      document.getElementById('foot-note').textContent = `光向 ${LIGHT.map((x) => x.toFixed(2)).join(' / ')} · 凹口 ${notchRadius(DEFAULTS)}`;
+
+      /* 段坐标自检：截图脚本按 section 切图，先确认每一段都有高度 */
+      window.__sections = Object.fromEntries(
+        [...document.querySelectorAll('section')].map((s) => [s.id, Math.round(s.getBoundingClientRect().height)]),
+      );
+      window.__ready = true;
+    </script>
+  </body>
+</html>

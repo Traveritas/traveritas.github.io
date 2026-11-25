@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="zh-CN" data-arrived="no" data-view="1" data-look="level">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>一处室内 · r0 底子</title>
+    <link rel="stylesheet" href="./r.css" />
+    <style>
+      .rx-room { position: fixed; inset: 0; z-index: 2; image-rendering: pixelated; pointer-events: none; }
+      .rx-approach { z-index: 20; }
+    </style>
+  </head>
+  <body>
+    <canvas id="light"></canvas>
+    <a class="rx-corner rx-tl" href="./index.html">SOMEWHERE · 室内 · 底子</a>
+    <div class="rx-corner rx-br" id="stat"></div>
+    <p class="rx-hint"><span>向下</span><i></i></p>
+
+    <script type="module">
+      import { initFlow, options } from './shell2.js';
+      import { createRoom, trace } from './room.js';
+      import { createApproach, hint } from './approach.js';
+
+      const opt = options();
+      /* 一套色：靛夜偏紫，亮芯压得很低。三段填同一份，分区在这里不存在。 */
+      const theme = [
+        [0.048, 0.05, 0.086],
+        [0.1, 0.1, 0.155],
+        [0.24, 0.22, 0.32],
+        [0.68, 0.62, 0.78],
+      ];
+
+      const flow = initFlow({
+        canvas: document.getElementById('light'),
+        theme,
+        grain: [0.85, 0.3, 28],
+        face: opt.face,
+        px: opt.px,
+        autoArrive: opt.autoArrive,
+        dur: 3000,
+      });
+
+      const room = createRoom({ autoArrive: opt.autoArrive, dur: 3000 });
+      const approach = createApproach(document.body);
+      const h = document.querySelector('.rx-hint');
+      const stat = document.getElementById('stat');
+
+      /* ── 房间的画法（底子版，验几何 + 验「两种画风交界」）：
+         梦线以下压成暗面，再叠一层极淡的横向排线（版画的笔）；
+         梦线以上什么都不画，流光从那一片透进来；梦线本身只留一条亮边。 ── */
+      room.onPaint(({ faces, g, arrive, sink }) => {
+        for (const f of faces) {
+          if (f.below.length) {
+            g.fillStyle = f.k === 'floor' ? `rgba(3,4,8,${(0.96 * sink).toFixed(3)})` : `rgba(7,8,15,${(0.9 * sink).toFixed(3)})`;
+            trace(g, f.below);
+            g.fill();
+            // 排线：越近越疏，勾出版画的笔
+            g.save();
+            trace(g, f.below);
+            g.clip();
+            const bb = f.bbox;
+            const gap = Math.max(3, 9 - f.depth * 0.5);
+            g.strokeStyle = `rgba(150,148,180,${(0.05 * sink).toFixed(3)})`;
+            g.lineWidth = 1;
+            for (let y = bb.y0; y < bb.y1; y += gap) {
+              g.beginPath();
+              g.moveTo(bb.x0, y);
+              g.lineTo(bb.x1, y);
+              g.stroke();
+            }
+            g.restore();
+          }
+          // 梦线：一条亮边
+          if (f.line.length === 2) {
+            g.strokeStyle = `rgba(216,208,238,${(0.34 * sink).toFixed(3)})`;
+            g.lineWidth = 1;
+            g.beginPath();
+            g.moveTo(f.line[0].x, f.line[0].y);
+            g.lineTo(f.line[1].x, f.line[1].y);
+            g.stroke();
+          }
+          // 墙角：只画下半截的竖线，读成「屋子有角」
+          if (f.below.length >= 4) {
+            g.strokeStyle = `rgba(170,166,198,${(0.13 * sink).toFixed(3)})`;
+            g.beginPath();
+            const p = f.below;
+            g.moveTo(p[0].x, p[0].y);
+            g.lineTo(p[3].x, p[3].y);
+            g.moveTo(p[1].x, p[1].y);
+            g.lineTo(p[2].x, p[2].y);
+            g.stroke();
+          }
+        }
+      });
+
+      flow.onFrame((s) => {
+        approach.update(s.sink, s.vw);
+        stat.textContent = `${s.arrive.toFixed(2)} · 视角 ${document.documentElement.dataset.view} · ${Math.round(s.vw)}×${Math.round(s.vh)}`;
+      });
+
+      flow.start();
+      room.start();
+      void h;
+      void hint;
+    </script>
+  </body>
+</html>

@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>probe4</title>
+    <style>
+      body { margin: 0; background: #f0f3f6; font: 12px system-ui, sans-serif; }
+      .row { display: flex; gap: 6px; padding: 6px 8px; flex-wrap: wrap; align-items: flex-end; }
+      .c { text-align: center; }
+      .c span { display: block; font-size: 10px; color: #56606d; }
+      .lead { padding: 8px 10px 0; font-weight: 600; color: #232830; }
+      .d { background: #2a2b38; }
+      svg { display: block; }
+    </style>
+  </head>
+  <body>
+    <div id="wrap"></div>
+    <script type="module">
+      import { svg, star } from './src.js';
+      const nrm = (v) => { const l = Math.hypot(...v); return v.map((x) => x / l); };
+      const rows = [];
+      const add = (title, list) => {
+        rows.push(`<div class="lead">${title}</div><div class="row">`);
+        for (const [o, lab, size, view, ground] of list)
+          rows.push(`<div class="c${ground === 'dark' ? ' d' : ''}">${svg(o, { size, view, ground: ground || 'light' })}<span>${lab}</span></div>`);
+        rows.push('</div>');
+      };
+      const F = 1.2;
+      // 尖端（跟尖走）
+      const tips = [];
+      for (const rho of [0, 0.06, 0.12, 0.2, 0.3, 0.42]) {
+        const o = rho ? { fold: F, tip: { kind: 'round', rho, segs: 3 } } : { fold: F, tip: { kind: 'cusp' } };
+        const st = star(o).stats;
+        tips.push([o, `${rho ? 'r' + rho : 'cusp'} / 退${st.retreat.toFixed(1)}`, 200, 'tip']);
+      }
+      for (const len of [0.4, 1.0, 1.8, 3.0]) tips.push([{ fold: F, tip: { kind: 'flat', len } }, 'flat ' + len, 200, 'tip']);
+      add('① 尖端 · 取景框 7.2', tips);
+
+      // 截面 × fold
+      for (const sides of [4, 6, 8]) {
+        const list = [];
+        for (const fold of [0, 0.5, 1.0, 1.5, 2.2])
+          list.push([{ sides, fold, rim: sides > 4 ? 0.16 : 0 }, `f${fold}`, 170, 'full']);
+        add(`④ 截面 ${sides} 边 × 脊 fold`, list);
+      }
+      // 8 边放大看台阶
+      add('8 边 · 中心放大', [
+        [{ sides: 8, fold: 1.2, rim: 0.16 }, '8边 f1.2', 220, 'core'],
+        [{ sides: 8, fold: 1.2, rim: 0 }, '8边 无棱', 220, 'core'],
+        [{ sides: 6, fold: 1.2, rim: 0.16 }, '6边 f1.2', 220, 'core'],
+        [{ sides: 6, fold: 1.2, rim: 0 }, '6边 无棱', 220, 'core'],
+      ]);
+      // 明暗 steps
+      add('⑤ 明暗 steps × 跨度 · 8边', [
+        [{ sides: 8, fold: 1.2, rim: 0.16, tones: { steps: 2, min: 0.486, max: 0.774, depth: 1 } }, '2档 旧', 200, 'full'],
+        [{ sides: 8, fold: 1.2, rim: 0.16, tones: { steps: 2, min: 0.12, max: 0.92, depth: 0.22 } }, '2档 宽', 200, 'full'],
+        [{ sides: 8, fold: 1.2, rim: 0.16, tones: { steps: 3, min: 0.12, max: 0.92, depth: 0.22 } }, '3档', 200, 'full'],
+        [{ sides: 8, fold: 1.2, rim: 0.16, tones: { steps: 4, min: 0.12, max: 0.92, depth: 0.22 } }, '4档', 200, 'full'],
+        [{ sides: 8, fold: 1.2, rim: 0.16, tones: { steps: 5, min: 0.12, max: 0.92, depth: 0.22 } }, '5档', 200, 'full'],
+        [{ sides: 8, fold: 1.2, rim: 0.16, tones: { steps: 4, min: 0.24, max: 0.8, depth: 0.22 } }, '4档 窄', 200, 'full'],
+        [{ sides: 8, fold: 1.2, rim: 0.16, tones: { steps: 4, min: 0.05, max: 0.97, depth: 0.22 } }, '4档 极宽', 200, 'full'],
+      ]);
+      // 深底
+      add('深底 · 8边', [
+        [{ sides: 8, fold: 1.2, rim: 0.16 }, '8边', 200, 'full', 'dark'],
+        [{ sides: 4, fold: 1.2 }, '4边', 200, 'full', 'dark'],
+        [{ sides: 8, fold: 1.2, rim: 0.16, tones: { steps: 3, min: 0.2, max: 0.85, depth: 0.22 } }, '8边 3档', 200, 'full', 'dark'],
+      ]);
+      document.getElementById('wrap').innerHTML = rows.join('');
+    </script>
+  </body>
+</html>

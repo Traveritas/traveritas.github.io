@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>六芒星 · 姿态与定格</title>
+<style>
+  :root {
+    --bg: #f0f3f6;
+    --fg: #232830;
+    --fg-soft: #56606d;
+    --fg-faint: #858f9d;
+    --amber: #9a86c4;
+    --umber: #4f4a66;
+    --dream: #9389ae;
+    --line: rgba(35, 40, 48, 0.12);
+    --edge: rgba(35, 40, 48, 0.08);
+    --font-display: 'Noto Serif SC', 'Songti SC', SimSun, serif;
+    --font-body: system-ui, 'PingFang SC', 'Microsoft YaHei UI', sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.75;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 4.5rem 1.5rem 7rem; }
+
+  h1 { font-family: var(--font-display); font-weight: 500; font-size: 1.9rem; letter-spacing: 0.06em; margin: 0 0 0.6rem; }
+  h2 {
+    font-family: var(--font-display); font-weight: 500; font-size: 1.24rem;
+    letter-spacing: 0.05em; margin: 4.2rem 0 0.4rem;
+    padding-top: 2.2rem; border-top: 1px solid var(--line);
+  }
+  h3 { font-family: var(--font-display); font-weight: 500; font-size: 1rem; letter-spacing: 0.04em; margin: 2.4rem 0 0.5rem; }
+  p { margin: 0.7rem 0; max-width: 62ch; }
+  .lede { color: var(--fg-soft); max-width: 60ch; font-size: 1rem; }
+  .note { color: var(--fg-faint); font-size: 0.84rem; line-height: 1.7; max-width: 66ch; }
+  .mono { font-family: var(--font-mono); font-size: 0.82rem; letter-spacing: 0; }
+  code { font-family: var(--font-mono); font-size: 0.86em; background: rgba(79, 74, 102, 0.07); padding: 0.05em 0.32em; border-radius: 3px; }
+  em { font-style: normal; color: var(--amber); }
+  a { color: var(--fg-soft); }
+
+  /* ── 姿态地图 ── */
+  /* 地图要能整张看见才谈得上判读，所以它从 .wrap 的窄栏里越出来。
+     窄视口下退回横向滚动，不缩 —— 缩过的姿态判断不了。 */
+  .mapbox {
+    margin-top: 1.6rem;
+    margin-left: calc(50% - 50vw);
+    margin-right: calc(50% - 50vw);
+    padding-left: max(1.5rem, calc(50vw - 52rem));
+    overflow-x: auto; padding-bottom: 0.9rem;
+  }
+  .mapwrap { display: inline-block; position: relative; }
+  .mapc { display: block; border-radius: 4px; }
+  .badv {
+    position: absolute; pointer-events: none;
+    border-radius: 3px; background: rgba(35, 40, 48, 0.055);
+    border: 1px solid rgba(35, 40, 48, 0.08);
+  }
+  .goodv {
+    position: absolute; pointer-events: none; border-radius: 3px;
+    border: 1px solid rgba(154, 134, 196, 0.75);
+  }
+  .pickv {
+    position: absolute; width: 0; height: 0; pointer-events: none;
+    border: 2px solid var(--amber); border-radius: 4px;
+    box-shadow: 0 0 0 3px rgba(154, 134, 196, 0.16);
+    transition: none;
+  }
+  .maplabel {
+    position: absolute; font-family: var(--font-mono); font-size: 9px;
+    color: var(--fg-faint); pointer-events: none;
+  }
+  .maps {
+    position: absolute; width: 64px; height: 12px; pointer-events: none;
+    font-family: var(--font-mono); font-size: 8.5px; line-height: 12px;
+    text-align: right; padding-right: 3px; color: var(--fg-faint);
+    text-shadow: 0 0 3px rgba(240, 243, 246, 0.9);
+  }
+  .hittable { position: absolute; inset: 0; display: grid; }
+  .hit { cursor: crosshair; }
+
+  .legend { display: flex; gap: 1.4rem; flex-wrap: wrap; align-items: center; margin-top: 0.9rem; }
+  .legend .k { display: flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; color: var(--fg-soft); }
+  .legend .sw { width: 14px; height: 14px; border-radius: 2px; border: 1px solid rgba(35,40,48,0.12); }
+
+  table { border-collapse: collapse; font-size: 0.84rem; margin: 1rem 0; }
+  th, td { text-align: left; padding: 0.32rem 0.9rem 0.32rem 0; border-bottom: 1px solid var(--edge); vertical-align: baseline; }
+  th { font-weight: 500; color: var(--fg-faint); font-size: 0.76rem; letter-spacing: 0.06em; }
+  td.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+  tr.is-key td { color: var(--amber); }
+
+  /* ── 运动对照 ── */
+  .motions { display: grid; grid-template-columns: repeat(auto-fit, minmax(238px, 1fr)); gap: 1.1rem; margin-top: 1.5rem; }
+  .mcard {
+    border: 1px solid var(--edge); border-radius: 6px; padding: 1rem 1rem 0.85rem;
+    background: rgba(255, 255, 255, 0.34);
+  }
+  .mcard.is-pick { border-color: rgba(154, 134, 196, 0.5); background: rgba(255, 255, 255, 0.62); }
+  .mcard .hd { display: flex; justify-content: space-between; align-items: baseline; gap: 0.6rem; }
+  .mcard .nm { font-family: var(--font-display); font-size: 0.96rem; letter-spacing: 0.03em; }
+  .mcard .sc { font-family: var(--font-mono); font-size: 0.78rem; color: var(--fg-faint); }
+  .mcard.is-pick .sc { color: var(--amber); }
+  .mcard canvas { display: block; margin: 0.7rem auto 0.3rem; border-radius: 3px; }
+  .mcard .nt { font-size: 0.78rem; color: var(--fg-faint); line-height: 1.6; min-height: 3.1em; }
+  .strip { display: block; }
+  .warn { color: #a3452f; }
+
+  .controls { display: flex; gap: 2rem; flex-wrap: wrap; margin-top: 1.6rem; align-items: flex-start; }
+  .ctl { display: flex; flex-direction: column; gap: 0.4rem; }
+  .ctl .lb { font-size: 0.76rem; letter-spacing: 0.08em; color: var(--fg-faint); }
+  .seg { display: flex; gap: 2px; background: rgba(35,40,48,0.05); padding: 2px; border-radius: 5px; }
+  .seg button {
+    font-family: var(--font-mono); font-size: 0.78rem; border: 0; background: transparent;
+    color: var(--fg-soft); padding: 0.3rem 0.62rem; border-radius: 4px; cursor: pointer;
+  }
+  .seg button[aria-pressed='true'] { background: var(--bg); color: var(--fg); box-shadow: 0 1px 2px rgba(35,40,48,0.1); }
+  .seg button[aria-pressed='true'].hot { color: var(--amber); }
+  .ctl .hint { font-size: 0.75rem; color: var(--fg-faint); }
+
+  /* ── 静止帧条 ── */
+  .frames { display: grid; grid-template-columns: 1fr; gap: 1.1rem; margin-top: 1.5rem; }
+  .fcard { border: 1px solid var(--edge); border-radius: 6px; padding: 1rem 1rem 0.8rem; background: rgba(255,255,255,0.3); overflow-x: auto; }
+  .fcard .hd { font-family: var(--font-display); font-size: 0.94rem; margin-bottom: 0.2rem; }
+  .fcard .sub { font-family: var(--font-mono); font-size: 0.72rem; color: var(--fg-faint); }
+  .frow { margin-top: 0.7rem; }
+  .frow canvas { display: block; border-radius: 3px; }
+
+  /* ── 尺寸 ── */
+  .sizes { display: flex; align-items: flex-end; gap: 2.2rem; flex-wrap: wrap; margin-top: 1.6rem; }
+  .sz { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
+  .sz .cap { font-family: var(--font-mono); font-size: 0.72rem; color: var(--fg-faint); }
+  .dark { background: #2a2b38; border-radius: 6px; padding: 1.6rem; margin-top: 1.4rem; }
+  .dark .cap { color: rgba(240, 243, 246, 0.42); }
+  .darkrow { display: flex; gap: 1.6rem; align-items: flex-end; flex-wrap: wrap; }
+
+  .big { display: flex; gap: 2.6rem; flex-wrap: wrap; align-items: flex-start; margin-top: 1.4rem; }
+  .hero { display: flex; flex-direction: column; align-items: center; gap: 0.6rem; }
+  .hero .cap { font-family: var(--font-mono); font-size: 0.72rem; color: var(--fg-faint); }
+
+  .shine { position: relative; }
+  .shine::before {
+    content: ''; position: absolute; inset: -18px;
+    background: radial-gradient(circle at 50% 45%, rgba(255,255,255,0.55), rgba(255,255,255,0) 68%);
+    pointer-events: none;
+  }
+  footer { margin-top: 5rem; color: var(--fg-faint); font-size: 0.8rem; border-top: 1px solid var(--line); padding-top: 1.4rem; }
+  .kbd { font-family: var(--font-mono); font-size: 0.78rem; color: var(--fg-faint); }
+</style>
+<script type="importmap">
+{ "imports": { "three": "/three/build/three.module.js" } }
+</script>
+</head>
+<body>
+<main class="wrap">
+
+  <h1>六芒星 · 姿态与定格</h1>
+  <p class="lede">
+    这颗星只有一种「对」的看法。整页要说的就是这一句，以及由此推出的走法。
+    运动与停驻是这里的主题；几何与材质只做到能看，另外两位负责。
+  </p>
+
+  <h2>姿态地图</h2>
+  <p>
+    把 yaw 与 pitch 各 0–90° 扫一遍（3° 一格，961 格），每一格按三项打分：
+    <em>六支投影半径的 min/max</em>（平衡）、<em>剪影协方差主轴比</em>（会不会塌成一条）、
+    <em>极径剖面里的六重谐波</em>（读不读得出六个角）。右上角小字是分数。
+  </p>
+  <p class="note">
+    只扫 0–90° 就够，不是偷懒：这颗星是八面体对称的，绕任何一个体轴转 90°、
+    或绕体对角线转 120°，剪影回到自己（实测 IoU = 1.000）。所以 90°×90° 这一格已含全部不同的看法。
+  </p>
+
+  <div class="legend">
+    <span class="k"><span class="sw" style="background:rgba(255,255,255,0.86);border-color:rgba(154,134,196,0.55)"></span>≥ 70 · 可以停住</span>
+    <span class="k"><span class="sw" style="background:rgba(255,255,255,0.6)"></span>55–70 · 能过，但不该久停</span>
+    <span class="k"><span class="sw" style="background:rgba(35,40,48,0.055)"></span>&lt; 55 · 不该被停住</span>
+    <span class="k"><span class="sw" style="background:transparent;border-color:var(--amber)"></span>点击 = 钉住这一格</span>
+  </div>
+
+  <div class="mapbox"><div class="mapwrap" id="mapwrap"></div></div>
+  <p class="note" id="mapstat"></p>
+
+  <div class="big">
+    <div class="hero"><canvas id="pick" width="200" height="200"></canvas><span class="cap" id="pickcap">—</span></div>
+    <div>
+      <table id="probe"><caption style="text-align:left;color:var(--fg-faint);font-size:0.76rem;letter-spacing:0.06em;padding-bottom:0.4rem">几个点名角度</caption></table>
+    </div>
+  </div>
+
+  <h2>运动对照</h2>
+  <p>
+    四条候选，加两条对照。每一条都只在<em>分数 ≥ 55</em> 的姿态上停。
+    卡片里那一排是它一圈里会被真正看到的每一格 —— 不是示意，是按保持时钟取的帧。
+  </p>
+
+  <div class="controls">
+    <div class="ctl">
+      <span class="lb">每格保持 holdMs</span>
+      <div class="seg" id="holdseg"></div>
+      <span class="hint" id="holdhint"></span>
+    </div>
+    <div class="ctl">
+      <span class="lb">步数 steps</span>
+      <div class="seg" id="stepseg"></div>
+      <span class="hint">整圈被切成几格。摆动的步数是去程格数 ×2。</span>
+    </div>
+    <div class="ctl">
+      <span class="lb">材质</span>
+      <div class="seg" id="matseg"></div>
+      <span class="hint">resin = 磨砂树脂；edge 多一层深色剪影壳。</span>
+    </div>
+  </div>
+
+  <div class="motions" id="motions"></div>
+
+  <h3>粒度：什么时候从闪烁变成呼吸</h3>
+  <p class="note" id="grainnote"></p>
+  <table id="graintable"></table>
+
+  <h2>静止帧条</h2>
+  <p>两条决赛运动，各自把一圈里被停住的姿态摆成一排。看的是「每一格都像不像一颗星」。</p>
+  <div class="frames" id="frames"></div>
+
+  <h2>尺寸</h2>
+  <p>240px 是主推。64px 以下六支的剪影开始互相糊在一起，3D 换不到任何东西。</p>
+  <div class="sizes" id="sizes">
+    <div class="szcaps" style="display:flex;gap:26px;margin-top:0.4rem">
+      <span class="cap" style="width:240px">240 px</span>
+      <span class="cap" style="width:144px">144 px</span>
+      <span class="cap" style="width:96px">96 px</span>
+      <span class="cap" style="width:64px">64 px</span>
+    </div>
+  </div>
+
+  <h3>深底：只看剪影</h3>
+  <p class="note">同样的姿态换到 #2a2b38 上。白底会替材质遮掉一半问题，深底只留剪影，好坏立刻分开。</p>
+  <div class="dark">
+    <div id="darkrow"></div>
+    <p class="cap" style="margin:1.1rem 0 0;font-family:var(--font-mono);font-size:0.72rem">
+      100 分（体对角） · 79 分（偏得对称） · 51 分（水平看） · 26 分（正对一支）
+    </p>
+  </div>
+
+  <footer>
+    <p class="note" style="max-width:70ch">
+      所有姿态由 <span class="mono">posecore.mjs</span> 在 Node 里算，页面只读它的结果；
+      three 只负责把同一个矩阵画出来。自检见 <span class="mono">window.__star.check()</span>。
+    </p>
+  </footer>
+</main>
+
+<script type="module" src="./main.js"></script>
+</body>
+</html>

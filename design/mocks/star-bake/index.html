@@ -1,0 +1,839 @@
+<!doctype html>
+<html lang="zh-CN" data-reality="wake">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>星 · 预渲染烘焙</title>
+<style>
+/* ─────────────────────────────────────────────────────────────
+   这一页不复刻站点的版式，只借用它的令牌与气质：
+   --bg #f0f3f6、低饱和、留白、克制的分隔线。
+   星的着色一律走 --ink（一个色相 × alpha 掩码），所以这一页本身
+   就等于在演示第 1 条硬要求：换色只改一个 CSS 变量。
+   ───────────────────────────────────────────────────────────── */
+/* 站点字体。Noto Serif SC 是 scripts/fonts.mjs 按站内用字切出来的分片，
+   所以这里引它的 font.css（不能单引某一个 woff2 —— 那是按 unicode-range 分的片）。
+   Plex 走 @fontsource 的 400.css。 */
+@import url('/fonts/noto/font.css');
+@import url('/fonts/plex/400.css');
+
+:root {
+  --bg: #f0f3f6;
+  --fg: #232830;
+  --fg-soft: #5b6470;
+  --fg-faint: #8b95a1;
+  --line: rgb(35 40 48 / 0.12);
+  --line-soft: rgb(35 40 48 / 0.06);
+  /* 这颗星的「一个色相」。真站点里这一句是 --amber 或 --umber，
+     由 reality.ts 按醒度插值后写到 documentElement 上。 */
+  --ink: #232830;
+  --deep-bg: #2a2b38;
+  --deep-fg: #cfd2e2;
+  --font-body: 'Noto Serif SC', 'Songti SC', serif;
+  --font-mono: 'IBM Plex Mono', 'Plex Mono', ui-monospace, monospace;
+}
+
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.85;
+  -webkit-font-smoothing: antialiased;
+}
+main { max-width: 1330px; margin: 0 auto; padding: 0 40px 160px; }
+
+/* ── 抬头 ── */
+header {
+  padding: 96px 0 40px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 8px;
+}
+h1 {
+  font-size: 26px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  margin: 0 0 14px;
+}
+.lede { color: var(--fg-soft); max-width: 62ch; margin: 0; }
+.meta {
+  margin-top: 26px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--fg-faint);
+  text-transform: uppercase;
+}
+.meta span + span::before { content: ' · '; }
+
+/* ── 段 ── */
+section { padding: 64px 0 8px; border-bottom: 1px solid var(--line-soft); }
+section:last-of-type { border-bottom: 0; }
+.sec-head {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+.sec-no {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: var(--fg-faint);
+}
+h2 {
+  font-size: 19px;
+  font-weight: 500;
+  letter-spacing: 0.10em;
+  margin: 0;
+}
+.sec-note { color: var(--fg-soft); max-width: 64ch; margin: 8px 0 34px; font-size: 14px; }
+
+/* ── 星位 ──
+   一个纯色方块 + 一张 alpha 掩码。元素框就是星位尺寸，掩码只提供 alpha，
+   颜色由 --ink 这一个色相给 —— 于是「换色」永远只是改一句话。 */
+.star {
+  position: relative;
+  display: inline-block;
+  line-height: 0;
+  background: var(--ink);
+  -webkit-mask-image: var(--m);
+  mask-image: var(--m);
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  /* 掩码图加载完之前不显示，免得闪一下实心方块 */
+  opacity: 1;
+}
+.star img { width: 100%; height: 100%; display: none; }
+
+/* ── 01 对照 ── */
+.grounds { display: grid; gap: 40px; }
+.ground-light, .ground-deep {
+  padding: 30px 34px 34px;
+  border-radius: 3px;
+}
+.ground-light { background: var(--bg); border: 1px solid var(--line); }
+.ground-deep {
+  background: var(--deep-bg);
+  color: var(--deep-fg);
+  --ink: #cfd2e2;
+}
+.gl-title {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  opacity: 0.55;
+  margin-bottom: 22px;
+}
+.row {
+  display: flex;
+  align-items: flex-end;
+  gap: 38px;
+  flex-wrap: wrap;
+}
+.cell { text-align: center; }
+.cell .label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  opacity: 0.5;
+  margin-top: 10px;
+}
+.cell .cap {
+  font-size: 11px;
+  opacity: 0.4;
+  margin-top: 2px;
+}
+
+/* ── 02 中心 ── */
+.core-wrap { display: flex; gap: 44px; align-items: flex-start; flex-wrap: wrap; }
+.core-grid { display: grid; grid-template-columns: repeat(3, 400px); gap: 30px; }
+.core-cell { text-align: center; }
+.core-cell .t {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  color: var(--fg-faint);
+  margin-top: 12px;
+  text-align: left;
+}
+/* 中心放大：把 400px 的中间 12 单位（120px）取出来放到 400 上 */
+.core-zoom {
+  width: 400px; height: 400px;
+  overflow: hidden;
+  position: relative;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+}
+.core-zoom .inner {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: calc(400px * 400 / 120);
+  height: calc(400px * 400 / 120);
+  transform: translate(-50%, -50%);
+}
+
+/* ── 03 运动 ── */
+.motion {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 48px;
+  align-items: start;
+}
+.stage {
+  width: 300px; height: 300px;
+  position: relative;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  display: grid;
+  place-items: center;
+  background: var(--bg);
+}
+button.flip {
+  font-family: var(--font-body);
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  color: var(--fg);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  padding: 9px 22px;
+  margin-top: 18px;
+  cursor: pointer;
+  transition: background-color 0.2s, border-color 0.2s;
+}
+button.flip:hover { background: rgb(35 40 48 / 0.04); border-color: rgb(35 40 48 / 0.24); }
+.readout {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--fg-faint);
+  margin-top: 12px;
+  min-height: 3em;
+}
+.strip { display: flex; gap: 6px; flex-wrap: wrap; align-items: flex-start; }
+.strip figure { margin: 0; text-align: center; }
+.strip .n {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--fg-faint);
+  margin-top: 5px;
+}
+.strip .s {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--fg-faint);
+}
+.strip .s.bad { color: #b0453c; }
+.strip .s.mid { color: #b08a3c; }
+.bar {
+  height: 2px;
+  background: rgb(35 40 48 / 0.12);
+  position: relative;
+  margin-top: 4px;
+}
+.bar i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--fg); }
+
+.picks {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+  margin-top: 34px;
+}
+.pick {
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 16px 18px;
+}
+.pick h3 {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.10em;
+  margin: 0 0 10px;
+  color: var(--fg-faint);
+  font-weight: 400;
+}
+.pick dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; font-size: 12.5px; }
+.pick dt { color: var(--fg-faint); }
+.pick dd { margin: 0; text-align: right; font-family: var(--font-mono); font-size: 11.5px; }
+
+/* ── 04 体积 ── */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+th, td {
+  text-align: right;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line-soft);
+}
+th {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  font-weight: 400;
+  color: var(--fg-faint);
+  text-transform: uppercase;
+  border-bottom-color: var(--line);
+}
+th:first-child, td:first-child { text-align: left; }
+td.best { font-weight: 500; }
+tr.pick-row td { background: rgb(35 40 48 / 0.028); }
+.verdict {
+  margin-top: 40px;
+  padding: 26px 30px;
+  border-left: 2px solid var(--fg);
+  background: rgb(35 40 48 / 0.022);
+}
+.verdict p { margin: 0 0 12px; }
+.verdict p:last-child { margin-bottom: 0; }
+.big {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  letter-spacing: 0.02em;
+}
+.big.two { font-size: 15px; line-height: 1.95; letter-spacing: 0; }
+
+/* ── 05 纪律 ── */
+.proof {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+}
+.proof div {
+  background: var(--bg);
+  padding: 22px 24px;
+}
+.proof .k {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--fg-faint);
+  text-transform: uppercase;
+}
+.proof .v {
+  font-family: var(--font-mono);
+  font-size: 26px;
+  margin-top: 6px;
+  letter-spacing: -0.01em;
+}
+.proof .v.small { font-size: 15px; line-height: 1.6; }
+
+.note {
+  color: var(--fg-soft);
+  font-size: 13.5px;
+  max-width: 68ch;
+}
+.note code {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  background: rgb(35 40 48 / 0.05);
+  padding: 1px 5px;
+  border-radius: 2px;
+}
+ul.tight { margin: 10px 0 0; padding-left: 18px; }
+ul.tight li { margin-bottom: 7px; font-size: 13.5px; color: var(--fg-soft); }
+hr.thin { border: 0; border-top: 1px solid var(--line-soft); margin: 44px 0; }
+h3.sub {
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  margin: 40px 0 12px;
+}
+</style>
+</head>
+<body>
+<main>
+
+<header>
+  <h1>星 · 预渲染烘焙</h1>
+  <p class="lede">
+    上一轮把三轴六芒星合起来时，中心撞到一件不可调和的事：<code>halfWidth 0.26</code> 让每支宽 8.32 单位，六支都穿过原点，半径 4 以内每个像素被三层以上的料盖住。平风筝时它们在同一张平面上，画序怎么排都对；一旦截面有了厚度，六支在中心是真穿插，任何按片排序的画家算法都排不出正确遮挡。
+  </p>
+  <p class="lede" style="margin-top:14px">
+    这一轮换一条路：离线用真深度缓冲画成像素，只交成品。深度缓冲不排片、逐像素比 z，所以根部的收坡可以取消，中心那一段重新长出脊来。
+  </p>
+  <div class="meta">
+    <span>端口 4671</span><span>离线 24 位深度缓冲</span><span>16 格定格 · 每格 110ms</span><span>只交 alpha 掩码</span>
+  </div>
+</header>
+
+<!-- ══════════════ 01 对照 ══════════════ -->
+<section id="cmp">
+  <div class="sec-head"><span class="sec-no">01</span><h2>对照</h2></div>
+  <p class="sec-note">
+    左边是现役 <code>drawStar()</code>：六张平风筝、两个调子（来自深度，不是来自面的朝向）、中心压一张紫色圆心。右边是这一轮烘出来的那颗。四个尺寸，两个底色，同一个 40 单位的画框 —— 与 <code>Toolstar.astro</code> 的 <code>viewBox="-20 -20 40 40"</code> 同一个尺度。
+  </p>
+
+  <div class="grounds">
+    <div class="ground-light">
+      <div class="gl-title">浅底 · #f0f3f6（站点昼面的底色）</div>
+      <div class="row" id="rows-light"></div>
+    </div>
+    <div class="ground-deep">
+      <div class="gl-title">深底 · #2a2b38</div>
+      <div class="row" id="rows-deep"></div>
+    </div>
+  </div>
+
+  <h3 class="sub">逐档的判断</h3>
+  <table id="cmp-table">
+    <thead>
+      <tr><th>尺寸</th><th>现役</th><th>烘焙</th><th>这一档的结论</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</section>
+
+<!-- ══════════════ 02 中心 ══════════════ -->
+<section id="core">
+  <div class="sec-head"><span class="sec-no">02</span><h2>中心</h2></div>
+  <p class="sec-note">
+    这是这一轮唯一真正要回答的问题。400px、正位，中间 12 单位（120px）取出来放大到 400（3.33×，所以是插值放大的，边缘那点糊是放大带出来的，不是渲染的）。
+    三格并排：现役的六张平风筝 + 紫圆心；上一轮的 SVG 合成（为了让排序成立，根部厚度按 smoothstep 收到 0，中心那一段因此没有脊，而且逐片排序在穿插处漏出深色细刺）；离线烘焙（根部不收坡，脊从支根一直起，遮挡由深度缓冲逐像素判定）。
+  </p>
+
+  <div class="core-wrap">
+    <div class="core-grid">
+      <div class="core-cell">
+        <div class="core-zoom"><div class="inner" id="core-prod"></div></div>
+        <div class="t">现役 drawStar() · 中心放大 3.33×</div>
+      </div>
+      <div class="core-cell">
+        <div class="core-zoom"><div class="inner" id="core-sync"></div></div>
+        <div class="t">SVG 合成（上一轮）· 同一个放大倍数</div>
+      </div>
+      <div class="core-cell">
+        <div class="core-zoom"><div class="inner" id="core-bake"></div></div>
+        <div class="t">离线烘焙 · 同一个放大倍数</div>
+      </div>
+    </div>
+  </div>
+
+  <h3 class="sub">读数</h3>
+  <table id="core-table">
+    <thead><tr><th>量</th><th>现役</th><th>SVG 合成（上一轮）</th><th>烘焙</th></tr></thead>
+    <tbody></tbody>
+  </table>
+
+  <hr class="thin" />
+  <p class="note">
+    深度的读法在这里是唯一可信的：六支的 z 区间互相包住（每支的近端从 0 爬到 9.2），
+    所以「哪一片在上面」不是一个排序问题，而是一个逐像素的问题。
+    烘焙把这件事交给 24 位深度缓冲，一次算清。
+  </p>
+</section>
+
+<!-- ══════════════ 03 运动 ══════════════ -->
+<section id="motion">
+  <div class="sec-head"><span class="sec-no">03</span><h2>运动</h2></div>
+  <p class="sec-note">
+    路径沿用 <code>star-final</code> 那条：三轴各转 90°（体 x −90° / 体 y −90° / 体 z +90°），
+    起止错开 12% / 0% / 5%，欠阻尼弹簧 k 7 / w 5，全长 1550ms。
+    终点是 90° 的整数倍，即立方群的一个元素，所以落定的剪影与正位**严格重合**（不是近似）。
+    这一页把它切成 N 格定格 —— N 就是这一节要定的那个数。
+  </p>
+
+  <div class="motion">
+    <div>
+      <div class="stage">
+        <div class="star" id="pl-star" style="width:240px;height:240px"></div>
+      </div>
+      <button class="flip" id="pl-btn" type="button">翻一次</button>
+      <div class="readout" id="pl-readout">静 · 零帧</div>
+    </div>
+    <div>
+      <div class="strip" id="mo-strip"></div>
+    </div>
+  </div>
+
+  <h3 class="sub">难看账：步进会不会撞进坏角度</h3>
+  <p class="sec-note" style="margin-bottom:20px">
+    评分器沿用 <code>star-v-motion</code> 的四项加权（balance 0.44 / aspect 0.26 / a6 0.20 / sixShare 0.10），
+    <code>a6</code> 的归一化基准换成正位实测的 0.434（见 star-final §7.7）。
+    门槛 <code>&lt;55</code> 记难看、<code>55–70</code> 记能过、<code>≥70</code> 记好 —— 门槛是我选的，报数必须带着它。
+  </p>
+  <table id="mo-table">
+    <thead>
+      <tr><th>采样</th><th>格数</th><th>难看</th><th>能过</th><th>好</th><th>最低分</th><th>难看时长</th><th>全片</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <div class="picks" id="mo-picks"></div>
+
+  <hr class="thin" />
+  <p class="note">
+    <strong>结论。</strong>均匀切 16 格时，第 2 格（u ≈ 0.067）恰好落在一个 45 分的姿态上 ——
+    连续路径上那一段只占 36ms（2.3%），但定格会把它**停住 110ms**，难看曝光反而从 36ms 涨到 110ms。
+    这是「步进可能比连续更难看」的具体形状：切得粗，坏角度不是被躲开，而是被放大。
+    贪心取格（每格在 ±半格内滑到最高分）把 16 格的最低分从 45 抬到 77。
+  </p>
+
+  <h3 class="sub">为什么用 setTimeout 链，不用 CSS steps()</h3>
+  <ul class="tight">
+    <li>这一页要的是「一格停 110ms」，不是「每屏一次」。<code>requestAnimationFrame</code> 在隐藏标签页里会停，回来会把落下的那一串补成一跳 —— 定格的样子就破了。</li>
+    <li><code>steps()</code> 的每一格仍然由合成器推进：即使这一帧与上一帧的画面完全相同，合成器也不会跳过。这颗星在页面上是装饰，静置时连合成器都不该醒。</li>
+    <li>定时器链的长度是有限的（N 格），最后一下自己收尾。所以「一直在转」在结构上就不可能发生。</li>
+  </ul>
+</section>
+
+<!-- ══════════════ 04 体积 ══════════════ -->
+<section id="size">
+  <div class="sec-head"><span class="sec-no">04</span><h2>体积</h2></div>
+  <p class="sec-note">
+    这一节决定这颗星能不能上站。所有数字都是量出来的：每一帧单独编码一遍再求和，
+    精灵图是「所有帧横排一张」再编码。<code>WebP 无损</code> 保住了 alpha 的四个精确档位，
+    有损档会把四个台阶之间抹出过渡带 —— 这张表上的差额就是那个代价。
+  </p>
+
+  <h3 class="sub">整段动画的总字节</h3>
+  <table id="size-table">
+    <thead>
+      <tr>
+        <th>尺寸</th><th>格数</th><th>PNG</th><th>WebP 无损</th><th>WebP 有损带 alpha</th><th>AVIF</th>
+        <th>精灵图 WebP 无损</th><th>精灵图 PNG</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <h3 class="sub">单帧</h3>
+  <table id="frame-table">
+    <thead><tr><th>尺寸</th><th>最小</th><th>中位</th><th>最大</th><th>休息态（默认加载的那一张）</th></tr></thead>
+    <tbody></tbody>
+  </table>
+
+  <h3 class="sub">动画单文件能不能用</h3>
+  <ul class="tight" id="anim-list"></ul>
+
+  <div class="verdict" id="verdict"></div>
+</section>
+
+<!-- ══════════════ 05 纪律 ══════════════ -->
+<section id="disc">
+  <div class="sec-head"><span class="sec-no">05</span><h2>纪律</h2></div>
+  <p class="sec-note">
+    静置是零帧，不是「零到很少」。下面四个数在页面加载完 1.2 秒后读出来，
+    之后再按一次「翻一次」并等它落定，再读一次。
+  </p>
+
+  <div class="proof">
+    <div><div class="k">页面起的 rAF</div><div class="v" id="pf-raf">—</div></div>
+    <div><div class="k">活着的 timer</div><div class="v" id="pf-timer">—</div></div>
+    <div><div class="k">落定后 timer</div><div class="v" id="pf-after">—</div></div>
+    <div><div class="k">prefers-reduced-motion</div><div class="v small" id="pf-rm">—</div></div>
+  </div>
+
+  <hr class="thin" />
+  <ul class="tight">
+    <li>休息态是一张图：<code>frames/&lt;set&gt;/&lt;size&gt;/&lt;set&gt;-&lt;size&gt;-00.png</code>。页面加载完不再排任何帧、不再挂任何定时器。</li>
+    <li>翻动时每格换一次 <code>src</code>，最后一格落定之后 <code>clearTimeout</code> 并把句柄置 0。</li>
+    <li><code>prefers-reduced-motion: reduce</code> 下按钮不播任何一格；落定后的剪影与休息态严格重合，所以这一步在画面上什么也没发生。</li>
+    <li>对外只有 <code>window.__star.flip()</code>。不依赖页面上的按钮。</li>
+  </ul>
+
+  <h3 class="sub">色相跟着醒度走</h3>
+  <p class="note">
+    图上只有 alpha，颜色来自一层 CSS 纯色。下面四个方块是同一个掩码、四个不同的 <code>--ink</code>：
+    换色只改一句话，不重烘任何一张图。真站点里这一句读的是 <code>reality.ts</code> 写到
+    <code>documentElement</code> 上的 <code>--amber / --umber</code>，所以星跟着醒度走。
+  </p>
+  <div class="row" id="tint-row" style="margin-top:20px"></div>
+</section>
+
+</main>
+
+<script type="module">
+import { mount } from './src.js';
+/* 上一轮的合成器，直接 import（服务把它挂在 /sf/）—— 比的是真的那一份文件 */
+import * as SF from '/sf/src.js';
+
+const F = (n) => n.toLocaleString('en-US');
+const KB = (n) => (n / 1024).toFixed(1) + 'K';
+const SIZE = 240;
+
+/* ── 数据 ─────────────────────────────────────────────────────────── */
+const geo = await fetch('/shots/geo.json').then((r) => r.json());
+const readings = await fetch('/shots/readings.json').then((r) => r.json());
+const centre = await fetch('/shots/centre.json').then((r) => r.json());
+
+const frameSrc = (set, size, i) =>
+  `frames/${set}/${size}/${set}-${size}-${String(i).padStart(2, '0')}.png`;
+
+/* ── 现役那张：照抄 toolstar.ts 的 drawStar() ─────────────────────────
+   不 import 站内模块（那是 .ts，这一页是纯静态原型），
+   而是把那段数学抄成一份最小实现。抄的是 20 行，不是 800 行，风险可控；
+   形状是否一致由 §01 的并排图自己回答。 */
+const DEG = Math.PI / 180;
+function drawStarMarkup(size, color = 'currentColor') {
+  const yaw = 45 * DEG;
+  const pit = 35.2643897 * DEG;
+  const cy = Math.cos(yaw), sy = Math.sin(yaw);
+  const cp = Math.cos(pit), sp = Math.sin(pit);
+  const pts = [];
+  for (const [ax, ay, az] of [[1,0,0],[0,1,0],[0,0,1]]) {
+    for (const s of [1, -1]) {
+      const x0 = ax * s, y0 = ay * s, z0 = az * s;
+      const x1 = x0 * cy + z0 * sy;
+      const z1 = -x0 * sy + z0 * cy;
+      const y2 = y0 * cp - z1 * sp;
+      const z2 = y0 * sp + z1 * cp;
+      pts.push({ x: x1 * 16, y: -y2 * 16, z: z2 });
+    }
+  }
+  pts.sort((a, b) => a.z - b.z);
+  let out = '';
+  for (const p of pts) {
+    const L = Math.hypot(p.x, p.y);
+    if (L < 0.6) continue;
+    const ux = p.x / L, uy = p.y / L, w = 1.9;
+    const op = (0.38 + (0.5 * (p.z + 1)) / 2).toFixed(3);
+    out += `<path d="M${(-uy*w).toFixed(2)} ${(ux*w).toFixed(2)}L${p.x.toFixed(2)} ${p.y.toFixed(2)}L${(uy*w).toFixed(2)} ${(-ux*w).toFixed(2)}L${(-ux*1.4).toFixed(2)} ${(-uy*1.4).toFixed(2)}Z" fill="${color}" fill-opacity="${op}"/>`;
+  }
+  out += `<circle r="1.7" fill="#9a86c4"/>`;
+  return out;
+}
+function prodSVG(size) {
+  return `<svg width="${size}" height="${size}" viewBox="-20 -20 40 40" style="display:block">${drawStarMarkup(size)}</svg>`;
+}
+/** 上一轮的 SVG 合成（根部收坡那一版）。逐字用它的 markup，不转述。 */
+function syncSVG(size) {
+  return `<svg width="${size}" height="${size}" viewBox="-20 -20 40 40" style="display:block">${SF.markup(SF.build(SF.SYNC))}</svg>`;
+}
+
+/* ── 01 对照 ─────────────────────────────────────────────────────── */
+const SIZES = [40, 96, 200, 400];
+/* 烘焙那一格：一个纯色方块当墨，--m 指到掩码 PNG（只读它的 alpha）。
+   尺寸要落在元素框上 —— 掩码是按元素框铺的，框是 0 高就什么都看不见。
+   display 是画出来的尺寸，file 是取哪一档像素的帧（掩码会被拉到框的大小）。 */
+function bakeCell(display, file = display) {
+  return `<div class="star" style="width:${display}px;height:${display}px;--m:url('${frameSrc('even16', file, 0)}')"></div>`;
+}
+function buildRow(host) {
+  host.innerHTML = SIZES.map(
+    (s) => `
+    <div class="cell" data-size="${s}">
+      <div class="cols" style="display:flex;gap:14px;align-items:flex-end;justify-content:center">
+        <div class="p">${prodSVG(s)}</div>
+        <div class="p">${syncSVG(s)}</div>
+        ${bakeCell(s)}
+      </div>
+      <div class="label">${s}PX</div>
+      <div class="cap">现役 · SVG 合成 · 烘焙</div>
+    </div>`,
+  ).join('');
+}
+buildRow(document.getElementById('rows-light'));
+buildRow(document.getElementById('rows-deep'));
+
+const CMP = {
+  400: '烘焙明显赢。六支各自有面、折过，中心是一块收在一处的料；现役仍是六张平贴三角加一枚紫圆心。',
+  200: '烘焙赢。四档明暗与脊还站得住，中心读成六块面而不是一堆碎条。',
+  96: '接近。烘焙的脊还能辨认，但四档在这尺寸上开始并拢；现役的两档干净，只是读成六张叠片。',
+  40: '现役赢。四档在 40px 上糊成一片灰，现役的两档反而更清楚 —— 与上一轮在 48px 上的判断一致。',
+};
+document.querySelector('#cmp-table tbody').innerHTML = SIZES.slice().reverse()
+  .map((s) => `<tr><td>${s}px</td><td>${s === 40 ? '胜' : '—'}</td><td>${s === 40 ? '—' : '胜'}</td><td style="text-align:left;font-size:12.5px">${CMP[s]}</td></tr>`)
+  .join('');
+
+/* ── 02 中心 ─────────────────────────────────────────────────────── */
+{
+  /* 放大：把 400px 那张的中间 12 单位（120px）取到 400 上，即 3.33 倍 */
+  const k = 400 / 120;
+  const big = 400 * k;
+  const holder = document.querySelector('#core-bake');
+  holder.style.width = big + 'px';
+  holder.style.height = big + 'px';
+  holder.innerHTML = bakeCell(big, 400);
+
+  const prod = document.querySelector('#core-prod');
+  prod.style.width = big + 'px';
+  prod.style.height = big + 'px';
+  prod.innerHTML = prodSVG(big);
+
+  const sync = document.querySelector('#core-sync');
+  sync.style.width = big + 'px';
+  sync.style.height = big + 'px';
+  sync.innerHTML = syncSVG(big);
+}
+
+document.querySelector('#core-table tbody').innerHTML = [
+  ['中心脊（支根到支身）', '无（平风筝）', '0.45·r 之后才有', '从支根起'],
+  ['中心层数', '六层平叠，画序正确', '六层共面（收坡到 0）', '穿插由深度缓冲逐像素解开'],
+  ['支内落差（最差一支）', '0.000', '0.187', '四档 0.10 / 0.37 / 0.65 / 0.92'],
+  ['落在四档上的像素', '—', '—',
+    `400px ${(centre.frames[0].onLevelShare * 100).toFixed(1)}% ／ 240px ${(centre.frames[3].onLevelShare * 100).toFixed(1)}%`],
+  ['假细线（跑到两档之外的像素）', '—', '这一轮的病', `${centre.frames[0].hairline} 个（${(centre.frames[0].hairlineShare * 100).toFixed(3)}%）`],
+  ['剪影 IoU（对 star-final 轮廓）', '—', '1.0000（同一条代码）', `400px ${centre.silhouette['400'].iou} ／ 240px ${centre.silhouette['240'].iou}`],
+  ['三角形', '7 path', '17 path', '756 三角形 / 24 位深度'],
+]
+  .map((r) => `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td></tr>`)
+  .join('');
+
+/* ── 03 运动 ─────────────────────────────────────────────────────── */
+const pl = mount('#pl-star', { set: 'even16', size: 240, n: 16, holdMs: 110 });
+await pl.preload();
+pl.reset();
+
+const readout = document.getElementById('pl-readout');
+function paintReadout(s) {
+  if (!s) return;
+  if (!s.busy) {
+    readout.textContent = s.frame === 0
+      ? '静 · 零帧 · ' + (s.meter.timersAlive === 0 ? '定时器 0' : '定时器 ' + s.meter.timersAlive)
+      : `定 · 第 ${s.frame} / ${s.n - 1} 格 · 定时器 0`;
+  } else {
+    readout.textContent = `动 · 第 ${s.frame} / ${s.n - 1} 格 · 定时器 ${s.meter.timersAlive}`;
+  }
+}
+pl.onstate = paintReadout;
+pl.state();
+
+document.getElementById('pl-btn').addEventListener('click', () => pl.flip());
+
+/* 定格帧条：16 格，下面标分数 */
+const scores16 = geo.sets.even16.map((r) => r.score);
+document.getElementById('mo-strip').innerHTML = scores16.map((s, i) => {
+  const cls = s < 55 ? 'bad' : s < 70 ? 'mid' : '';
+  return `<figure>
+    <div class="star" style="width:56px;height:56px;--m:url('${frameSrc('even16', 240, i)}')"></div>
+    <div class="n">${String(i).padStart(2, '0')}</div>
+    <div class="s ${cls}">${s}</div>
+    <div class="bar" style="width:56px"><i style="width:${s}%;${s < 55 ? 'background:#b0453c' : s < 70 ? 'background:#b08a3c' : ''}"></i></div>
+  </figure>`;
+}).join('');
+
+const SET_LABEL = {
+  even12: '均匀 · 12 格', even16: '均匀 · 16 格', even24: '均匀 · 24 格',
+  greedy12: '贪心 · 12 格', greedy16: '贪心 · 16 格', greedy24: '贪心 · 24 格',
+};
+document.querySelector('#mo-table tbody').innerHTML = Object.entries(geo.summary)
+  .map(([k, v]) => `<tr class="${k === 'greedy16' ? 'pick-row' : ''}">
+    <td>${SET_LABEL[k]}</td><td>${v.n}</td>
+    <td style="${v.ugly ? 'color:#b0453c' : ''}">${v.ugly}</td>
+    <td>${v.pass}</td><td>${v.good}</td>
+    <td>${v.min}</td><td>${v.uglyMs}ms</td><td>${v.totalMs}ms</td>
+  </tr>`)
+  .join('');
+
+document.getElementById('mo-picks').innerHTML = [
+  ['12 格', '最省。均匀切也只有一格掉到 69（正好在「能过」带上沿）。', '每格 110ms → 全片 1.32s'],
+  ['16 格', '均匀切有一格掉到 45；贪心之后最低 77，且全片 1.76s 仍落在 1.55s 的合理区间。', '推荐：贪心 16 格'],
+  ['24 格', '均匀与贪心都不再撞坏角度，但字节涨 1.4 倍、全片 2.64s 已经拖出「落定」的节奏。', '不值得'],
+].map(([t, d, m]) => `<div class="pick"><h3>${t}</h3><p style="margin:0;font-size:13px">${d}</p><p style="margin:8px 0 0;font-family:var(--font-mono);font-size:11px;color:var(--fg-faint)">${m}</p></div>`).join('');
+
+/* ── 04 体积 ─────────────────────────────────────────────────────── */
+const pick = (set, size) => readings.table.find((t) => t.set === set && t.size === size);
+const rows = [];
+for (const size of [240, 400]) {
+  for (const [set, n] of [['greedy12', 12], ['even16', 16], ['greedy24', 24]]) {
+    rows.push({ size, n, ...pick(set, size) });
+  }
+}
+document.querySelector('#size-table tbody').innerHTML = rows
+  .map((r) => `<tr class="${r.set === 'even16' ? 'pick-row' : ''}">
+    <td>${r.size}px</td><td>${r.n}</td>
+    <td>${KB(r.png)}</td><td class="best">${KB(r.webpLL)}</td><td>${KB(r.webpLossy)}</td><td>${KB(r.avif)}</td>
+    <td>${KB(r.sheet.webpLL)}</td><td>${KB(r.sheet.png)}</td>
+  </tr>`)
+  .join('');
+
+document.querySelector('#frame-table tbody').innerHTML = [40, 96, 200, 240, 400]
+  .map((size) => {
+    const r = pick('even16', size);
+    if (!r) return '';
+    const rest = (r.frameMed / 1).toFixed(0);
+    return `<tr><td>${size}px</td><td>${F(r.frameMin)} B</td><td>${F(r.frameMed)} B</td><td>${F(r.frameMax)} B</td><td>${F(rest)} B</td></tr>`;
+  })
+  .join('');
+
+document.getElementById('anim-list').innerHTML = [
+  '动画 WebP 单文件<strong>能编出来</strong>：240px、16 格、无损，<strong>21.4KB</strong>（比 16 张分开存的 21.9KB 还小一点，因为几帧之间共用了调色板）。<code>loop=0</code> 是无限循环。',
+  '<strong>但它不能用于触发式运动。</strong> 浏览器的 <code>&lt;img src&gt;</code> 一挂上去就自己播，没有「按下才播」的口子；<code>ImageDecoder</code> 虽然能逐帧解出来（于是可以自己做播放器），但那要求 JS 支持且要走一次解码，等于把「零帧静置」这条纪律换成了「解码管线」——不划算，而且 16 帧全解比 16 个已缓存的小 PNG 更重。',
+  '动画 AVIF：<code>avis</code> 容器编得出来（240px、16 格、crf 30，约 <strong>1.4KB</strong>），同样自动播、同样不可寻址。它的压缩率高得不正常，是因为这一套是 4 档平色的合成图 —— 真实的光照渐变不会这么便宜。',
+  '<strong>结论：单文件动画在这一页上不可用。</strong> 不是因为体积，是因为它拿不到「触发」。分开的 N 张 PNG + 一条定时器链是唯一能同时满足「触发」与「零帧静置」的形状。',
+].map((s) => `<li>${s}</li>`).join('');
+
+/* 判决 */
+const r16_400 = pick('even16', 400);
+const r12_400 = pick('greedy12', 400);
+const r16_240 = pick('even16', 240);
+const r16_96 = pick('even16', 96);
+const r16_40 = pick('even16', 40);
+document.getElementById('verdict').innerHTML = `
+  <p><strong>判决：能发，但要按尺寸分档，而且要按「真的用了才拉」的方式发。</strong>这是我要给的那几个数 ——</p>
+  <p class="big">240px · 16 格 · 精灵图 WebP 无损 <span style="color:#3a7a4a">${KB(r16_240.sheet.webpLL)}</span> ｜ 分帧 <span style="color:#3a7a4a">${KB(r16_240.webpLL)}</span> ｜ 休息态单帧 ${F(r16_240.frameMed)} B</p>
+  <p class="big two">400px · 16 格 · 精灵图 <span style="color:#8a6a2a">${KB(r16_400.sheet.webpLL)}</span> ｜ 分帧 <span style="color:#8a6a2a">${KB(r16_400.webpLL)}</span> ｜ 休息态单帧 ${F(r16_400.frameMed)} B<br>
+  96px · 16 格 · 精灵图 <span style="color:#3a7a4a">${KB(r16_96.sheet.webpLL)}</span> ｜ 40px（工具栏那一档）· 精灵图 <span style="color:#3a7a4a">${KB(r16_40.sheet.webpLL)}</span></p>
+  <p style="margin-top:18px">
+    分界线画在 <strong>30KB</strong>。一次翻动、一辈子看两三回，30KB 以内是一颗装饰星的合理价格。
+    240px 那一列（精灵图 ${KB(r16_240.sheet.webpLL)}）在线的内侧；默认只加载休息态的一张（${F(r16_240.frameMed)} B），
+    整叠帧留到真被按下的那一刻再拉。
+  </p>
+  <p>
+    400px 那一列（精灵图 ${KB(r16_400.sheet.webpLL)}）<strong>正好压线</strong>。能不能发取决于一个问题：
+    这个位置是不是「进页面就该看见」。是的话，${KB(r16_400.sheet.webpLL)} 精灵图 + 首帧 ${F(r16_400.frameMed)} B
+    这一组数字在这站上是站得住的；如果它只是「翻一下给人看」，那就退到 240（我把线画在这里，理由就这一条）。
+  </p>
+  <p>
+    700KB 那个量级在这里<strong>够不着</strong>：最贵的组合（400px、24 格、PNG 分帧）是 281KB，
+    而我会发的（240px、16 格、WebP 精灵图）是 ${KB(r16_240.sheet.webpLL)}。
+    <strong>贵 17 倍的不是格式选择，是「要不要 400px 与 24 格」。</strong>
+  </p>
+  <p>
+    另一条必须说清：**这不是一个能替代 SVG 的通用方案。** 它只在「一颗大星、触发式翻动、静置零帧」这一个场景里成立。
+    工具栏那颗 40px 的星如果换成这个，要多拉 ${F(r16_40.webpLL)} B 的分帧（或 ${F(r16_40.sheet.webpLL)} B 精灵图）
+    去换一个在 40px 上并不比现役更清楚的剪影 —— 不值得，见 §01 的 40px 那一格。
+  </p>`;
+
+/* ── 05 纪律 ─────────────────────────────────────────────────────── */
+{
+  const host = document.getElementById('tint-row');
+  const tints = [
+    ['--amber 醒 #a7b1ba', '#a7b1ba'],
+    ['--amber 梦 #9a86c4', '#9a86c4'],
+    ['--umber 醒 #556270', '#556270'],
+    ['--umber 梦 #4f4a66', '#4f4a66'],
+  ];
+  host.innerHTML = tints.map(([n, c]) => `
+    <div class="cell">
+      <div class="star" style="width:120px;height:120px;--m:url('${frameSrc('even16', 400, 0)}');--ink:${c}"></div>
+      <div class="label">${n}</div>
+    </div>`).join('');
+}
+
+const probe0 = await window.__star.idleProbe(1200);
+document.getElementById('pf-raf').textContent = String(probe0.pageRafStarted);
+document.getElementById('pf-timer').textContent = String(probe0.timersAlive);
+document.getElementById('pf-rm').textContent = window.__star.reducedMotion() ? 'reduce · 不播' : 'no-preference';
+
+window.__star.flip();
+await new Promise((r) => setTimeout(r, 2400));
+const after = window.__star.state();
+document.getElementById('pf-after').textContent = String(after.meter.timersAlive);
+
+/* 供截图脚本读 */
+window.__readout = {
+  geo,
+  readings,
+  idle: probe0,
+  after,
+  cmpTable: document.querySelector('#cmp-table tbody').innerText,
+  sizeRows: rows.length,
+};
+window.__ready = true;
+</script>
+</body>
+</html>

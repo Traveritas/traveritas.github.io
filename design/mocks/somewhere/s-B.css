@@ -1,0 +1,266 @@
+/* ─────────────────────────────────────────────────────────────
+  B · 走近才成形 —— 这片空间的样式
+
+  分两层，和「远处是像素、焦平面才清楚」这条语言对应：
+  · #board 是雾：一张 1/3 分辨率的 2D 画布，上百件东西都画在里面，
+    屏幕放大后每一块都是粗颗粒，分不清谁是谁——远处本来就不该有细节。
+  · #stage 里的 DOM 只给最近的那几件。它们才有边缘、有结构、有字。
+
+  所以这里不放 filter、不放模糊渐变。糊是靠「画小再放大」来的，
+  那是像素的糊，不是 CSS 的一层毛玻璃——同站 faces.js 远档也是这么降采样的。
+  ───────────────────────────────────────────────────────────── */
+
+:root {
+  /* 这一族色都从流光场里取：薄暮紫往冷里偏一点，亮部只给到柔白。
+     整片空间只有一个色相家族，差别只在明度与透明度上。
+     （--ink / --ink-soft / --ink-faint 来自 shell.css） */
+  --b-fog: rgb(198 192 226 / 0.62); /* 雾里那件的轮廓 */
+  --b-line: rgb(196 190 224 / 0.16);
+  --b-cyan: #a8c0cc; /* 极少的一点冷，只用在结构线与「写进去」的那道前缘 */
+}
+
+/* 低分辨率的雾：尺寸由 JS 设为 vw/3 × vh/3，CSS 再拉满整屏。
+   pixelated 是关键——它把那一格一格留成方的，不要让浏览器再给抹一遍。 */
+#board {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+  z-index: 2;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  opacity: 0;
+  transition: opacity 1.1s ease 0.15s;
+}
+html[data-arrived='go'] #board,
+html[data-arrived='done'] #board {
+  opacity: 1;
+}
+
+/* 地平线：一根发丝。它不画几何，只让人知道「上边是远，下边是近」。 */
+.b-horizon {
+  position: fixed;
+  left: 0;
+  right: 0;
+  height: 1px;
+  z-index: 3;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgb(226 220 246 / 0.14) 17%,
+    rgb(226 220 246 / 0.28) 50%,
+    rgb(226 220 246 / 0.14) 83%,
+    transparent
+  );
+  opacity: 0;
+  transition: opacity 1.6s ease 0.4s;
+}
+html[data-arrived='go'] .b-horizon,
+html[data-arrived='done'] .b-horizon {
+  opacity: 1;
+}
+
+/* 场景自己的一层：只装最近的那几件 */
+#stage {
+  z-index: 4;
+  pointer-events: none;
+}
+
+/* 屏读用的说明：给「这片地方是什么」留一句话，视觉上不占地方 */
+.b-sr {
+  position: fixed;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+  color: var(--ink-soft);
+}
+
+/* ══════════════════════════════════════════════════════════
+  最近的那一件：从雾里长出来的东西。
+
+  它是一个零尺寸的锚点，三个孩子各自 around 它：
+  · .b-halo   一圈很淡的外晕（先出现，模糊时只剩它）
+  · .b-body   主体（边框 + 一条结构线），用 clip-path 自上而下「写」出来
+  · .b-write  那条正在写的位置上的前缘线，只在成形途中亮
+  · .b-name   一小行字，最后才有，而且只有完全成形时
+  JS 只改 transform / opacity / clip-path，全都不碰 layout。
+   ══════════════════════════════════════════════════════════ */
+.b-item {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  will-change: transform, opacity;
+}
+
+/* 外晕：一层压得很低的径向光。它让「还没成形」的东西在雾里仍有一点点体温。
+   尺寸由 JS 设成实测的屏幕 px，不缩放（径向渐变的百分比自己就跟着铺开）。 */
+.b-halo {
+  position: absolute;
+  left: 0;
+  top: 0;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 50% 50%,
+    rgb(226 220 246 / 0.34),
+    rgb(196 190 224 / 0.1) 40%,
+    transparent 70%
+  );
+  opacity: 0;
+  transform: translate(-50%, -50%);
+}
+
+/* 主体：一个跟着 JS 缩放的盒子。transform-origin 定在左上，
+   这样「先缩放再平移半个盒宽」正好把盒子中心摆到锚点上。 */
+.b-body {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+}
+
+/* ── 三种形态，只用一块渐隐的面加一条结构线 ──
+   没有边框。一件从雾里成形的东西不该先长出一个直角框：
+   它的边是「面往边缘淡掉」来的，只有最上面那一线是实的。
+   左右沿与下沿统一用一层遮罩吃掉——不管哪种形态，
+   都不会在边界上留下一刀切平的直线。远处看它们本来就该几乎一样。 */
+
+.b-body .b-shape {
+  -webkit-mask-image:
+    linear-gradient(90deg, transparent, #000 11%, #000 89%, transparent),
+    linear-gradient(180deg, #000, #000 58%, transparent);
+  -webkit-mask-composite: source-in;
+  mask-image:
+    linear-gradient(90deg, transparent, #000 11%, #000 89%, transparent),
+    linear-gradient(180deg, #000, #000 58%, transparent);
+  mask-composite: intersect;
+}
+
+/* 立着的一面：最像一扇没开的门 */
+.b-body[data-kind='frame'] .b-shape {
+  position: absolute;
+  inset: 0;
+  /* 上实下虚、中间厚两边薄：一块立起来的雾。
+     值压得很低——成形的那件也不该是一块不透明的板，
+     它只是「比旁边那些更清楚一点」，不是贴上去的一张纸。 */
+  background:
+    linear-gradient(180deg, rgb(214 208 238 / 0.46) 0 1.5%, rgb(214 208 238 / 0.16) 8%, rgb(214 208 238 / 0.05) 56%, transparent 96%),
+    radial-gradient(120% 92% at 50% 0%, rgb(214 208 238 / 0.13), transparent 74%);
+  clip-path: polygon(3% 0, 97% 0, 100% 100%, 0 100%);
+}
+.b-body[data-kind='frame'] .b-core {
+  position: absolute;
+  left: 50%;
+  top: 14%;
+  bottom: 30%;
+  width: 1px;
+  margin-left: -0.5px;
+  background: linear-gradient(180deg, rgb(168 192 204 / 0.85), rgb(168 192 204 / 0.28) 62%, transparent);
+  opacity: 0;
+}
+
+/* 一段柱：底下宽、上面收，像一块还立在那里的东西 */
+.b-body[data-kind='brink'] .b-shape {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgb(214 208 238 / 0.48) 0 1.5%, rgb(214 208 238 / 0.17) 9%, rgb(214 208 238 / 0.045) 58%, transparent 95%),
+    radial-gradient(90% 80% at 50% 0%, rgb(214 208 238 / 0.14), transparent 74%);
+  /* 上窄下宽的那点透视：只切两个上角 */
+  clip-path: polygon(9% 0, 91% 0, 100% 100%, 0 100%);
+}
+.b-body[data-kind='brink'] .b-core {
+  position: absolute;
+  left: 26%;
+  top: 20%;
+  width: 48%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgb(168 192 204 / 0.9), transparent);
+  opacity: 0;
+}
+
+/* 一道贴地的边：三者里最矮的一件，越往下越没 */
+.b-body[data-kind='sill'] .b-shape {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(0deg, transparent 6%, rgb(214 208 238 / 0.06) 46%, rgb(214 208 238 / 0.2) 88%, rgb(214 208 238 / 0.46) 100%),
+    radial-gradient(80% 120% at 50% 100%, rgb(214 208 238 / 0.1), transparent 78%);
+  clip-path: polygon(0 8%, 100% 0, 96% 100%, 4% 100%);
+}
+.b-body[data-kind='sill'] .b-core {
+  position: absolute;
+  left: 10%;
+  right: 10%;
+  top: 72%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgb(168 192 204 / 0.85), transparent);
+  opacity: 0;
+}
+
+/* 正在写的那道前缘：一条 1px 的横线，压在最上面。
+   它只活过成形的那一小段——所以那一瞬有人会看见「光沿着它走了一遍」。 */
+.b-write {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 1px;
+  transform-origin: 0 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgb(190 214 226 / 0.9) 12%,
+    rgb(240 236 252 / 0.95) 50%,
+    rgb(190 214 226 / 0.9) 88%,
+    transparent
+  );
+  box-shadow: 0 0 10px 1px rgb(168 192 204 / 0.35);
+  opacity: 0;
+}
+
+/* ── 字：只在完全成形时露出，一行，压在件的下沿 ── */
+.b-name {
+  position: absolute;
+  left: 0;
+  top: 0;
+  white-space: nowrap;
+  font: 500 13.5px/1.5 var(--font-display);
+  letter-spacing: 0.2em;
+  color: var(--ink);
+  opacity: 0;
+  text-shadow: 0 1px 14px rgb(12 13 26 / 0.9), 0 0 3px rgb(12 13 26 / 0.7);
+  transform-origin: 0 0;
+}
+.b-name em {
+  display: block;
+  margin-top: 3px;
+  font: 400 9.5px/1.6 var(--font-mono);
+  font-style: normal;
+  letter-spacing: 0.22em;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+}
+
+/* 窄屏：字小一点，别在 390 上撞到边 */
+@media (max-width: 620px) {
+  .b-name {
+    font: 500 12px/1.6 var(--font-display);
+    letter-spacing: 0.14em;
+  }
+  .b-name em {
+    font-size: 8.5px;
+    letter-spacing: 0.16em;
+  }
+}
+
+/* 动效关掉时这里没有 keyframes 要停：雾里的浮、前缘那道光都由 JS 判偏好，
+   在 prefers-reduced-motion 下直接不跑，只剩相机跟着人走。 */

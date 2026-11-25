@@ -1,0 +1,220 @@
+/* ─────────────────────────────────────────────────────────────
+  somewhere · D · 可以往下沉 —— 这一场自己的层
+
+  · #veil  遮罩。它不是「一层黑」，是一扇会收的口子：椭圆形的透明芯随深度变小、变冷，
+           外面的部分盖住流光。越往下，口子越小，最后只剩顶上一小片。
+  · #ink   画布。层与层的规矩线、每层的东西、上面那点光的边。一个 canvas 画完，
+           不用 DOM + filter —— 软件渲染下面这样最省。
+  · 字      每层一句话，跟着那一层走；右侧一把尺，是以后可以点的地方。
+  背景流光、转场、相机都在 shell.* 里，这里一个字都不碰。
+  ───────────────────────────────────────────────────────────── */
+
+/* 拖拽要在触屏上真的拿到 pointermove，不能让它变成页面滚动 */
+html,
+body {
+  touch-action: none;
+}
+
+body {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* ══ 遮罩：随深度收拢的那扇口子 ══ */
+#veil {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  opacity: 0;
+
+  /* 下面这几个由 s-D.js 每帧（深度变了才）改写；--tint 是 "r, g, b" 三个数 */
+  --tint: 11, 10, 19;
+  --k: 0.03; /* 两侧吃掉多少 */
+  --bd: 0.02; /* 底下压多沉 */
+  --ax: 100vw; /* 口子横半轴：越深越窄，两侧被吃掉 */
+  --ay: 70vh;
+  --cy: 30vh; /* 口子中心 = 地平线 */
+
+  background:
+    /* ① 光往下缺：从地平线往下，越深越沉。这一层是主结构，不是装饰 —— 光只有一个来处。 */
+    linear-gradient(
+      to bottom,
+      rgba(var(--tint), 0) 0%,
+      rgba(var(--tint), 0) var(--cy),
+      rgba(var(--tint), calc(var(--bd) * 0.5)) calc(var(--cy) + 22vh),
+      rgba(var(--tint), var(--bd)) 100%
+    ),
+    /* ② 两侧被吃掉：一扇横向收窄的口子，竖着拉得很长，所以它只收左右、不动上下。
+          沉得越深，剩下的那口越小 —— 这就是「上面那点光只剩一点点」。 */
+    radial-gradient(
+      ellipse var(--ax) var(--ay) at 50% var(--cy),
+      rgba(var(--tint), 0) 0%,
+      rgba(var(--tint), 0) 46%,
+      rgba(var(--tint), calc(var(--k) * 0.55)) 74%,
+      rgba(var(--tint), var(--k)) 100%
+    );
+}
+
+/* ══ 画布：线、东西、光的边 ══ */
+#ink {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 3;
+  pointer-events: none;
+}
+
+/* ══ 每层的那一句话 ══ */
+.d-labels {
+  position: fixed;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+}
+.d-lab {
+  position: absolute;
+  left: 0;
+  top: 0;
+  white-space: nowrap;
+  font: 500 13.5px/1 var(--font-display);
+  letter-spacing: 0.16em;
+  color: rgb(233 231 244 / 0.5);
+  will-change: transform, opacity;
+}
+/* 你正待着的那一层，字实一点 —— 是这一层在说话 */
+.d-lab.on {
+  color: rgb(241 239 249 / 0.88);
+}
+
+/* ══ 右边那把尺 ══
+   现在是「你沉到第几层」的读数；以后每一格都可以点（点了就沉到那一层）。 */
+.d-scale {
+  position: fixed;
+  right: 26px;
+  top: 50%;
+  width: 1px;
+  height: 196px;
+  transform: translateY(-50%);
+  z-index: 6;
+  pointer-events: none;
+}
+.d-scale::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: linear-gradient(rgb(226 226 240 / 0.2), rgb(226 226 240 / 0.09));
+}
+.d-tick {
+  position: absolute;
+  left: 0;
+  width: 9px;
+  height: 1px;
+  margin-top: -0.5px;
+  background: rgb(226 226 240 / 0.28);
+}
+.d-tick b {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: block;
+  font: 400 9px/1 var(--font-mono);
+  letter-spacing: 0.12em;
+  color: rgb(150 145 172 / 0.85);
+}
+.d-mk {
+  position: absolute;
+  left: -2px;
+  width: 5px;
+  height: 5px;
+  margin-top: -2.5px;
+  border-radius: 50%;
+  background: rgb(238 236 248 / 0.9);
+  box-shadow: 0 0 6px rgb(238 236 248 / 0.35);
+}
+
+/* ══ 转完之后自己那行提示：第一次动手就退场 ══ */
+.d-hint {
+  position: fixed;
+  left: 50%;
+  bottom: 26px;
+  margin: 0;
+  transform: translateX(-50%);
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font: 400 10px/1 var(--font-mono);
+  letter-spacing: 0.22em;
+  color: rgb(150 145 172 / 0.9);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 1.4s ease 0.5s;
+}
+.d-hint i {
+  width: 1px;
+  height: 9px;
+  background: rgb(200 198 218 / 0.28);
+}
+.d-hint.go {
+  opacity: 1;
+}
+.d-hint.off {
+  opacity: 0;
+  transition-duration: 0.7s;
+  transition-delay: 0s;
+}
+
+/* 角落的读数用亮一点的颜色：9px 的字压在半黑的底上，得真能看清 */
+#stat {
+  color: rgb(150 145 172);
+}
+/* 回索引那一行压在读数上面一点（窄屏时它们会撞，见下面的媒体查询） */
+.sw-br.ret {
+  bottom: 46px;
+}
+
+@media (max-width: 720px) {
+  .d-lab {
+    font-size: 12px;
+    letter-spacing: 0.1em;
+  }
+  .d-scale {
+    right: 12px;
+    height: 150px;
+  }
+  .d-tick {
+    width: 7px;
+  }
+  .d-tick b {
+    right: 12px;
+    font-size: 8.5px;
+  }
+  /* 窄屏底部只留一行：三个角落的读数挤在一起会打架 */
+  .d-hint {
+    display: none;
+  }
+  /* 右下那两行跟屏幕右缘处的尺子撞了，往上让开 */
+  .sw-br {
+    right: 12px;
+    bottom: 82px;
+  }
+  .sw-br.ret {
+    bottom: 114px;
+  }
+  .sw-tl {
+    left: 12px;
+    top: 18px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .d-hint {
+    transition-duration: 0.01ms;
+  }
+}

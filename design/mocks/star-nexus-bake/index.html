@@ -1,0 +1,454 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>星 · 晶体 · 预渲染</title>
+<style>
+  :root {
+    --bg: #f0f3f6;
+    --fg: #232830;
+    --fg-soft: #6b7280;
+    --line: rgba(35, 40, 48, 0.10);
+    --line-soft: rgba(35, 40, 48, 0.06);
+    --umber: #4f4a66;
+    --amber: #9a86c4;
+    --wake: #a7b1ba;
+    --dream: #9389ae;
+    --reality-mix: 1;
+    --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    --serif: 'Noto Serif SC', 'Songti SC', 'Source Han Serif SC', serif;
+  }
+  /* 站点字体：Noto Serif SC 是按站内用字切片的，必须引它的 font.css（不能单引某个 woff2）；
+     Plex 走 @fontsource 的 400.css —— 与相邻原型同一个口径。 */
+  @import url('/fonts/noto/font.css');
+  @import url('/fonts/plex/400.css');
+  * { box-sizing: border-box; }
+  html { background: var(--bg); }
+  body {
+    margin: 0;
+    color: var(--fg);
+    background: var(--bg);
+    font: 400 16px/1.9 var(--serif);
+    -webkit-font-smoothing: antialiased;
+    letter-spacing: 0.01em;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 0 32px 128px; }
+  h1, h2, h3 { font-weight: 400; margin: 0; }
+  h1 { font-size: 26px; letter-spacing: 0.08em; }
+  h2 { font-size: 19px; letter-spacing: 0.12em; }
+  p { margin: 0 0 1.1em; }
+  .dim { color: var(--fg-soft); }
+  .mono { font-family: var(--mono); font-size: 12.5px; letter-spacing: 0.02em; font-variant-numeric: tabular-nums; }
+
+  header { padding: 120px 0 76px; }
+  header .lede { margin-top: 22px; max-width: 44em; color: var(--fg-soft); font-size: 15px; line-height: 2.0; }
+  header .meta { margin-top: 30px; color: var(--fg-soft); }
+
+  section { padding: 76px 0 8px; border-top: 1px solid var(--line-soft); }
+  section > .head { display: flex; align-items: baseline; gap: 18px; margin-bottom: 34px; }
+  section > .head .num { font-family: var(--mono); font-size: 11px; color: var(--amber); letter-spacing: 0.14em; }
+
+  /* ── 晶体 ── */
+  .crystal-stage { display: grid; grid-template-columns: minmax(0, 1fr) 268px; gap: 56px; align-items: center; }
+  #star {
+    position: relative;
+    width: 400px; height: 400px;
+    will-change: transform;
+  }
+  #star .cb-layer {
+    position: absolute; inset: 0;
+    background-repeat: no-repeat;
+    background-size: 1600% 100%;   /* 16 帧横排 */
+    background-position: 100% 0;
+    image-rendering: auto;
+  }
+  .side-note { font-size: 13.5px; line-height: 2.0; color: var(--fg-soft); }
+  .side-note dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 16px; }
+  .side-note dt { color: var(--fg); }
+  .side-note dd { margin: 0; font-family: var(--mono); font-size: 12px; }
+
+  /* ── 对照 ── */
+  .cmp { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; align-items: center; }
+  .cmp figure { margin: 0; }
+  .cmp .box {
+    background: var(--bg); border: 1px solid var(--line-soft); border-radius: 2px;
+    display: grid; place-items: center; padding: 18px;
+  }
+  .cmp img { width: 100%; height: auto; display: block; }
+  .cmp figcaption { margin-top: 12px; font-size: 12.5px; color: var(--fg-soft); font-family: var(--mono); }
+
+  /* ── 定格 ── */
+  .trigger-row { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; margin-bottom: 28px; }
+  button {
+    font: inherit; font-size: 13px; letter-spacing: 0.1em;
+    color: var(--fg); background: transparent;
+    border: 1px solid var(--line); border-radius: 2px;
+    padding: 9px 22px; cursor: pointer;
+    transition: border-color .25s, color .25s;
+  }
+  button:hover:not(:disabled) { border-color: var(--amber); color: var(--amber); }
+  button:disabled { opacity: .4; cursor: default; }
+  #readout { color: var(--fg-soft); }
+
+  .strip { display: grid; grid-template-columns: repeat(16, 1fr); gap: 3px; margin-top: 6px; }
+  .strip .cell {
+    position: relative; aspect-ratio: 1;
+    background-repeat: no-repeat; background-size: 1600% 100%;
+    border-radius: 1px;
+  }
+  .strip .cell.on { outline: 1px solid var(--amber); outline-offset: 1px; }
+  .strip-labels { display: grid; grid-template-columns: repeat(16, 1fr); gap: 2px; margin-top: 8px; }
+  .strip-labels span { font-family: var(--mono); font-size: 9.5px; color: var(--fg-soft); text-align: center; }
+
+  table { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 12px; }
+  th, td { text-align: right; padding: 7px 10px; border-bottom: 1px solid var(--line-soft); font-variant-numeric: tabular-nums; }
+  th:first-child, td:first-child { text-align: left; font-family: var(--serif); font-size: 13px; }
+  thead th { color: var(--fg-soft); font-weight: 400; font-size: 11px; letter-spacing: 0.06em; }
+  tbody tr:hover { background: rgba(154, 134, 196, 0.05); }
+  .bad { color: #a8574b; }
+  .good { color: #4a7a5c; }
+  .verdict { margin-top: 26px; padding: 18px 20px; border-left: 2px solid var(--amber); background: rgba(154,134,196,.045); font-size: 14px; }
+
+  /* ── 纪律 ── */
+  .disc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 44px; }
+  .proof { font-family: var(--mono); font-size: 12px; line-height: 1.9; }
+  .proof .row { display: flex; justify-content: space-between; gap: 16px; border-bottom: 1px dashed var(--line-soft); padding: 5px 0; }
+  .proof .k { color: var(--fg-soft); }
+  .proof .v { font-variant-numeric: tabular-nums; }
+
+  footer { padding-top: 60px; color: var(--fg-soft); font-size: 12px; }
+
+  @media (max-width: 860px) {
+    .crystal-stage, .cmp, .disc-grid { grid-template-columns: 1fr; gap: 34px; }
+    #star { width: min(80vw, 400px); height: min(80vw, 400px); }
+    .strip { grid-template-columns: repeat(8, 1fr); }
+    .strip-labels { grid-template-columns: repeat(8, 1fr); }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>星 · 晶体</h1>
+  <p class="lede">
+    NEXUS 页那颗水晶是一段手写片元着色器：折射、体内全反射、沿光程的丁香色吸收、一团近白的光核。
+    这里做的是另一件事 —— 把它<em>离线跑一遍</em>，只交像素。
+    翻动是触发式的一次性动作，读法又是定格，也就是说它全程只有十来个姿态；
+    那就不必每一帧都付一遍三次折射追踪的账。
+  </p>
+  <p class="meta mono" id="gpu-line">—</p>
+</header>
+
+<section id="core">
+  <div class="head"><span class="num">01</span><h2>晶体</h2></div>
+  <div class="crystal-stage">
+    <div id="star" aria-label="六芒星晶体"></div>
+    <div class="side-note">
+      <dl>
+        <dt>几何</dt><dd>三个正交方双锥之并</dd>
+        <dt>求交</dt><dd>闭式（半空间裁剪）</dd>
+        <dt>材质</dt><dd>照搬 NEXUS 的 FS</dd>
+        <dt>姿态</dt><dd>体对角 yaw 45 / pitch 35.264</dd>
+        <dt>出货</dt><dd>1 张精灵图 + 1 张落定帧</dd>
+      </dl>
+    </div>
+  </div>
+</section>
+
+<section id="cmp">
+  <div class="head"><span class="num">02</span><h2>对照 NEXUS</h2></div>
+  <p class="dim" style="max-width:44em">
+    左是这只星，右是 NEXUS 页的水晶，同尺度并排。两边用的是同一个 <code class="mono">env()</code>、
+    同一套吸收系数、同一个 <code class="mono">glowSeg()</code>、同一道 260 次方的高光。
+    不同只在几何：那是一个凸的切面，这是一颗凹的星。
+  </p>
+  <div class="cmp">
+    <figure>
+      <div class="box"><img src="frames/rest-400-wake.webp" alt="烘焙的六芒星晶体" /></div>
+      <figcaption>星 · 预渲染 400px</figcaption>
+    </figure>
+    <figure>
+      <div class="box"><img src="/nexus-slice/wake.webp" alt="NEXUS 页的水晶" /></div>
+      <figcaption>NEXUS · wake.webp 640px</figcaption>
+    </figure>
+  </div>
+  <p class="dim" style="margin-top:26px;max-width:44em;font-size:14px" id="cmp-note"></p>
+</section>
+
+<section id="motion">
+  <div class="head"><span class="num">03</span><h2>定格</h2></div>
+  <p class="dim" style="max-width:44em">
+    十六格，每格 110ms。均匀取格会把第 2 格停在分数 43 的位置 ——
+    而定格会在那一格<em>停住</em> 110ms，把一次 36ms 的路过变成一次凝视。
+    所以选格是解出来的：相邻两格的剪影必须真的变了，同时不许停在难看姿态上。
+  </p>
+  <div class="trigger-row">
+    <button id="btn" type="button">翻一次</button>
+    <span class="mono" id="readout">静止</span>
+  </div>
+  <div class="strip" id="strip"></div>
+  <div class="strip-labels" id="strip-labels"></div>
+  <div style="margin-top:36px;max-width:44em">
+    <table id="pose-table">
+      <thead><tr><th>取格</th><th>最低分</th><th>难看格</th><th>可停格</th><th>相邻 IoU</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</section>
+
+<section id="size">
+  <div class="head"><span class="num">04</span><h2>体积</h2></div>
+  <p class="dim" style="max-width:44em">
+    这一节决定这套做法能不能发。晶体是渐变（折射 + 色散 + 吸收），
+    上一轮平涂内容上「WebP 无损比有损小」的结论在这里<em>反过来了</em>：无损大两倍半到五倍。
+  </p>
+  <div style="overflow-x:auto;margin-top:26px">
+    <table id="size-table">
+      <thead>
+        <tr><th>精灵图 · 16 帧</th><th>PNG</th><th>WebP 无损</th><th>WebP 有损</th><th>AVIF</th><th>压底色 · WebP</th><th>压底色 · AVIF</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+  <div style="overflow-x:auto;margin-top:34px">
+    <table id="size-table2">
+      <thead>
+        <tr><th>单帧合计（N 张）</th><th>PNG</th><th>WebP 无损</th><th>WebP 有损</th><th>AVIF</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+  <div class="verdict" id="verdict">—</div>
+  <p class="dim" style="margin-top:26px;max-width:44em;font-size:13.5px">
+    动画 WebP / AVIF 单文件在这里<strong>不能用</strong>：它会自动播放、不能定位、不能暂停，
+    也没有「播完停住」的事件。这一支要的是「触发一次 → 翻到落定 → 完全静默」，
+    所以只能是精灵图加一次 <code class="mono">background-position</code> 的推进。
+  </p>
+</section>
+
+<section id="disc">
+  <div class="head"><span class="num">05</span><h2>纪律</h2></div>
+  <div class="disc-grid">
+    <div>
+      <p class="dim" style="font-size:14px">
+        静止时这一页不跑任何东西。没有常驻 rAF，没有定时器，没有着色器。
+        触发之后，末格落定，一切归零 —— 下面这三行是此刻的实测。
+      </p>
+      <div class="proof" id="proof">
+        <div class="row"><span class="k">定时器</span><span class="v" id="p-timers">—</span></div>
+        <div class="row"><span class="k">rAF</span><span class="v" id="p-raf">—</span></div>
+        <div class="row"><span class="k">已播格</span><span class="v" id="p-frame">—</span></div>
+        <div class="row"><span class="k">静置 1.2s 内状态变化</span><span class="v" id="p-idle">—</span></div>
+        <div class="row"><span class="k">减少动效</span><span class="v" id="p-rm">—</span></div>
+      </div>
+    </div>
+    <div>
+      <p class="dim" style="font-size:14px">
+        减少动效时按下按钮不出动画，直接停在落定帧 —— 那张图与精灵图末格是同一张，
+        所以「不动」和「动完」在画面上是同一个东西。
+      </p>
+      <p class="dim" style="font-size:14px">
+        醒梦两套是分别烘的（天顶、吸收色、光核中心、体内磨砂度都随醒度变），
+        两套叠在一起按 <code class="mono">--reality-mix</code> 调上层透明度。
+        拿一套去 CSS 染色不行：量出来的残差是 31/255，看得见。
+      </p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <span class="mono">design/mocks/star-nexus-bake · 端口 4675 · 离线烘焙，运行时只交像素</span>
+</footer>
+
+</div>
+
+<script type="module">
+import { mount } from './src.js';
+
+const $ = (s) => document.querySelector(s);
+const READINGS = await fetch('/readings.json').then((r) => (r.ok ? r.json() : null)).catch(() => null);
+
+/* ── 晶体 ── */
+const star = mount($('#star'), { size: 400, frames: 16, holdMs: 110 });
+star.watchReality();
+$('#gpu-line').textContent = `精灵图 ${star.frames} 格 · 每格 110ms · 落定后不跑任何东西`;
+
+/* ── 定格格的条带：每格一张小图，用同一张精灵图切出来 ── */
+const strip = $('#strip');
+const labels = $('#strip-labels');
+for (let i = 0; i < 16; i++) {
+  const c = document.createElement('div');
+  c.className = 'cell';
+  c.style.backgroundImage = 'url("frames/sheet-240-wake.webp")';
+  c.style.backgroundPosition = `${((i / 15) * 100).toFixed(4)}% 0`;
+  strip.append(c);
+  const l = document.createElement('span');
+  l.textContent = String(i);
+  labels.append(l);
+}
+const cells = [...strip.children];
+
+/* ── 姿态表 ── */
+if (READINGS?.sets) {
+  const tb = $('#pose-table tbody');
+  for (const key of ['even12', 'greedy12', 'even16', 'greedy16', 'even24', 'greedy24']) {
+    const s = READINGS.sets[key];
+    if (!s) continue;
+    const tr = document.createElement('tr');
+    const label = (key.startsWith('greedy') ? '贪心 ' : '均匀 ') + key.replace(/\D/g, '') + ' 格';
+    tr.innerHTML =
+      `<td>${label}</td>` +
+      `<td class="${s.min < 55 ? 'bad' : s.min >= 70 ? 'good' : ''}">${s.min}</td>` +
+      `<td class="${s.ugly ? 'bad' : 'good'}">${s.ugly}</td>` +
+      `<td>${s.good}</td>` +
+      `<td>${(s.iouMin ?? 0).toFixed(2)}–${(s.iouMax ?? 0).toFixed(2)}</td>`;
+    tb.append(tr);
+  }
+}
+
+/* ── 体积表 ── */
+const kb = (n) => (n / 1024).toFixed(1) + 'K';
+if (READINGS?.rows) {
+  const tb = $('#size-table tbody');
+  for (const row of READINGS.rows) {
+    const s = row.sheet;
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      `<td>${row.size}px · ${row.mood === 'wake' ? '醒' : '梦'}</td>` +
+      `<td>${kb(s.png)}</td><td>${kb(s.webpLL)}</td>` +
+      `<td class="good">${kb(s.webpQ)}</td><td>${kb(s.avif)}</td>` +
+      `<td>${kb(s.flat_webpQ)}</td><td>${kb(s.flat_avif)}</td>`;
+    tb.append(tr);
+  }
+  const tb2 = $('#size-table2 tbody');
+  for (const row of READINGS.rows) {
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      `<td>${row.size}px · ${row.mood === 'wake' ? '醒' : '梦'} · ${row.n} 张</td>` +
+      `<td>${kb(row.png.total)}</td><td>${kb(row.webpLL.total)}</td>` +
+      `<td class="good">${kb(row.webpQ.total)}</td><td>${kb(row.avif.total)}</td>`;
+    tb2.append(tr);
+  }
+  /* 判决：出口要下的全部字节。按尺寸分开报 —— 240 与 400 差一倍多，
+     合起来报一个数会掩盖「哪一档能发、哪一档不能」。 */
+  const ship = READINGS.ship || [];
+  const v = READINGS.verdict || {};
+  const row = (size) => {
+    const set = ship.filter((s) => s.size === size);
+    const total = set.reduce((a, s) => a + s.sheetBytes + s.restBytes, 0);
+    return { n: set.length, total };
+  };
+  const a = row(240), b = row(400);
+  const min12 = READINGS.subset12?.['240']?.sheet?.webpQ ?? 0;
+  $('#verdict').innerHTML =
+    `<strong>240 那份：${(a.total / 1024).toFixed(0)} KB</strong>（醒梦两张精灵图 + 两张落定帧）。` +
+    `<br><strong>400 那份：${(b.total / 1024).toFixed(0)} KB</strong> —— 同一个做法放大一点七倍，字节数翻近一倍。` +
+    `<br>结论：<strong>240 这一档可以发</strong>（比一张首屏大图还小，且它替代的是一段每帧三次折射追踪的着色器）；` +
+    `<strong>400 这一档不该无条件发</strong> —— 只该在主视觉真的用得上时才按需取，或者退到 12 格（${(min12 / 1024).toFixed(0)} KB）。`;
+  void v;
+}
+
+/* ── 醒梦对照的那句话，用真量出来的数 ── */
+if (READINGS?.color?.length) {
+  const c = READINGS.color[0];
+  const a = c.affine;
+  const amax = Math.max(a.r.max, a.g.max, a.b.max);
+  $('#cmp-note').textContent =
+    `醒梦两套的原始差异：最大 ${c.raw.max}/255、平均 ${c.raw.mean}。` +
+    `如果只发一套、用 CSS 把醒面推到梦面（逐通道仿射的最优拟合），残差最大 ${amax}/255、` +
+    `平均 ${Math.max(a.r.mean, a.g.mean, a.b.mean)} —— 这个量级在晶体上是一道看得见的色边，` +
+    `所以这里是两套真烘 + 交叉淡入，而不是一套加一个 filter。`;
+}
+
+/* ── 触发 ── */
+const btn = $('#btn');
+const readout = $('#readout');
+btn.addEventListener('click', async () => {
+  btn.disabled = true;
+  readout.textContent = '翻动中';
+  /* 条带跟着格走：用同一个 rAF 循环画，循环只在播放期间存在 */
+  let loop = 0;
+  const paint = () => {
+    const s = star.state();
+    if (s.frame !== lastFrame) {
+      lastFrame = s.frame;
+      cells.forEach((c, i) => c.classList.toggle('on', i === s.frame));
+      syncProof();
+    }
+    if (s.busy) loop = requestAnimationFrame(paint);
+    else { loop = 0; syncProof(); }
+  };
+  loop = requestAnimationFrame(paint);
+  const r = await star.play();
+  readout.textContent = r?.skipped === 'reduced-motion' ? '减少动效：直接落定' : '静止';
+  btn.disabled = false;
+  if (loop) { cancelAnimationFrame(loop); loop = 0; }
+  paintStrip();
+  syncProof();
+});
+
+/* 条带高亮：静止时不跑任何循环，只在状态变化被调用时画一次 */
+let lastFrame = -2;
+function paintStrip() {
+  const s = star.state();
+  lastFrame = s.frame;
+  cells.forEach((c, i) => c.classList.toggle('on', i === s.frame));
+}
+
+/* ── 零帧证明 ──
+   不用「自己数自己的 rAF」（那证明不了页面别处没在跑），而是用 PerformanceObserver
+   监听整个文档的 `long-animation-frame` + 采样 document.getAnimations() 的数量：
+   静止 1.2s 内既没有排队的定时器，也没有 CSS 动画在跑，rAF 只有别处（光标视差）才起。 */
+function syncProof() {
+  const s = star.state();
+  $('#p-timers').textContent = String(s.timers);
+  $('#p-raf').textContent = String(s.raf);
+  $('#p-frame').textContent = String(s.frame);
+  $('#p-rm').textContent = s.reduced ? '开（不播）' : '关';
+}
+
+/* 静置诊断：1.2s 内 (a) 状态是否变过、(b) 有没有正在运行的 CSS 动画、
+   (c) 主线程上有没有超过 50ms 的动画帧。
+   不用自数 rAF —— 那只能证明「我自己没跑」，证明不了这一页没别的东西在动。 */
+async function probeIdle() {
+  const before = JSON.stringify(star.state());
+  const anims0 = document.getAnimations().length;
+  let loaf = 0;
+  let po = null;
+  try {
+    po = new PerformanceObserver((list) => { loaf += list.getEntries().length; });
+    po.observe({ type: 'long-animation-frame', buffered: false });
+  } catch {
+    /* 浏览器不支持就报 null，不假装量到了 */
+  }
+  await new Promise((r) => setTimeout(r, 1200));
+  po?.disconnect();
+  const after = JSON.stringify(star.state());
+  const anims1 = document.getAnimations().length;
+  const same = before === after;
+  const el = $('#p-idle');
+  el.textContent =
+    same && anims1 === anims0
+      ? `0（状态未变 · CSS 动画 ${anims1} · 长动画帧 ${loaf}）`
+      : `变过：${same ? '状态相同' : '状态变了'} · 动画 ${anims0}→${anims1}`;
+  return { same, anims0, anims1, loaf };
+}
+window.__crystalBake = {
+  star,
+  state: () => star.state(),
+  idleProbe: probeIdle,
+  play: () => star.play(),
+  reset: () => star.reset(),
+  readings: READINGS,
+};
+star.reset();
+syncProof();
+paintStrip();
+window.__ready = true;
+/* 静置诊断自己跑一次并把结果写进「纪律」那一节 */
+probeIdle().then((r) => { window.__idleProof = r; });
+</script>
+</body>
+</html>

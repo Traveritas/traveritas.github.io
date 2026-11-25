@@ -1,0 +1,1022 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>星 · 扁平原型</title>
+<link rel="stylesheet" href="/fonts/noto/font.css">
+<link rel="icon" href="data:,">
+<style>
+  /* ─────────────────────────────────────────────────────────────
+     星 · 扁平原型 · 预览台
+     底子是站内昼面：--bg #f0f3f6 / 墨 #232830 / 薄暮紫 #9a86c4。
+     磨砂靠「一层半透白 + 一道 1px 亮边」，不用模糊光斑。
+     ───────────────────────────────────────────────────────────── */
+  :root {
+    color-scheme: light;
+    --bg: #f0f3f6;
+    --fg: #232830;
+    --fg-soft: #56606d;
+    --fg-faint: #858f9d;
+    --line: rgba(35, 40, 48, 0.12);
+    --wake: #a7b1ba;
+    --dream: #9389ae;
+    --amber: #9a86c4;
+    --seam: 14deg;
+
+    --font-display: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', SimSun, Georgia, serif;
+    --font-body: system-ui, -apple-system, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei UI',
+      'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+
+    --panel: rgba(255, 255, 255, 0.44);
+    --panel-rim: rgba(255, 255, 255, 0.78);
+    --panel-sh: rgba(38, 44, 51, 0.07);
+  }
+
+  * { box-sizing: border-box; }
+
+  html { -webkit-text-size-adjust: 100%; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-body);
+    font-size: 14px;
+    line-height: 1.7;
+    /* 一层极淡的冷灰底纹：让半透白面板有东西可压 */
+    background-image: radial-gradient(120% 90% at 12% 0%, #f6f8fa 0%, rgba(246, 248, 250, 0) 58%),
+      radial-gradient(90% 70% at 100% 30%, #eaedf2 0%, rgba(234, 237, 242, 0) 62%);
+    background-attachment: fixed;
+  }
+
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 40px 120px; }
+
+  /* ── 页头 ── */
+  header.top { padding: 76px 0 42px; }
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--fg-faint);
+    margin: 0 0 18px;
+  }
+  h1 {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 38px;
+    line-height: 1.32;
+    letter-spacing: 0.01em;
+    margin: 0 0 16px;
+  }
+  h1 .thin { color: var(--fg-soft); }
+  .lede {
+    margin: 0;
+    max-width: 34em;
+    color: var(--fg-soft);
+    font-size: 14.5px;
+  }
+  /* 14° 发丝线：站内那条缝的同一道斜 */
+  .seam {
+    height: 1px;
+    margin: 40px 0 0;
+    background: linear-gradient(
+      90deg,
+      rgba(35, 40, 48, 0) 0%,
+      rgba(35, 40, 48, 0.14) 14%,
+      rgba(35, 40, 48, 0.06) 62%,
+      rgba(35, 40, 48, 0) 100%
+    );
+    transform: rotate(-0.1deg);
+  }
+
+  /* ── 章节 ── */
+  section { margin-top: 76px; }
+  .sec-head { display: flex; align-items: baseline; gap: 16px; margin-bottom: 8px; }
+  .sec-no {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    color: var(--amber);
+    padding-top: 3px;
+  }
+  h2 {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 23px;
+    letter-spacing: 0.02em;
+    margin: 0;
+  }
+  .sec-note {
+    color: var(--fg-soft);
+    font-size: 13px;
+    margin: 0 0 26px;
+    max-width: 46em;
+  }
+  .sec-note b { font-weight: 600; color: var(--fg); }
+
+  /* ── 玻璃面板 ── */
+  .glass {
+    position: relative;
+    background: var(--panel);
+    border: 1px solid var(--panel-rim);
+    border-radius: 3px;
+    box-shadow: 0 1px 2px var(--panel-sh), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  }
+
+  /* ── 读数 ── */
+  .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+  .readout {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 30px;
+    margin: 22px 0 0;
+    padding: 16px 20px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--fg-soft);
+  }
+  .readout div { display: flex; gap: 9px; align-items: baseline; }
+  .readout .k { color: var(--fg-faint); letter-spacing: 0.04em; }
+  .readout .v { color: var(--fg); font-weight: 600; }
+  .readout .v.hi { color: var(--amber); }
+
+  /* ── 一 · 对照墙 ── */
+  .wall-row {
+    display: grid;
+    grid-template-columns: 132px 200px 200px 200px minmax(0, 1fr);
+    gap: 22px;
+    align-items: center;
+    padding: 26px 24px;
+  }
+  .cell-label {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    line-height: 1.9;
+    color: var(--fg-soft);
+  }
+  .cell-label .name {
+    display: block;
+    font-family: var(--font-display);
+    font-size: 15px;
+    color: var(--fg);
+    letter-spacing: 0.02em;
+    margin-bottom: 4px;
+  }
+  .cell-label .tag { color: var(--fg-faint); }
+  .frame {
+    position: relative;
+    width: 200px;
+    height: 200px;
+    display: grid;
+    place-items: center;
+    border-radius: 2px;
+    /* 取景框：一格里套一格的极淡方块，用来看清星占了多少 */
+    background-image: linear-gradient(rgba(35, 40, 48, 0.055) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(35, 40, 48, 0.055) 1px, transparent 1px);
+    background-size: 20px 20px;
+    background-position: center center;
+    background-color: rgba(255, 255, 255, 0.34);
+    box-shadow: inset 0 0 0 1px rgba(35, 40, 48, 0.075);
+  }
+  .frame svg { display: block; overflow: visible; }
+  .frame .cap {
+    position: absolute;
+    left: 8px;
+    bottom: 6px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    color: var(--fg-faint);
+  }
+  .dev-box {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    line-height: 1.95;
+    color: var(--fg-soft);
+    border-left: 1px solid var(--line);
+    padding-left: 20px;
+  }
+  .dev-box .big {
+    font-size: 19px;
+    font-weight: 600;
+    color: var(--fg);
+    letter-spacing: 0.01em;
+  }
+  .dev-box .big .u { font-size: 11px; color: var(--fg-faint); font-weight: 400; }
+  .dev-box .sub { color: var(--fg-faint); }
+  .dev-box .ok { color: var(--amber); }
+
+  /* ── 二 · 参数 ── */
+  .param-grid {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    gap: 34px;
+    padding: 30px 30px 26px;
+    align-items: start;
+  }
+  .sliders { display: grid; gap: 17px; }
+  .sl { display: grid; grid-template-columns: 96px 1fr 78px; gap: 14px; align-items: center; }
+  .sl label {
+    font-size: 12.5px;
+    color: var(--fg-soft);
+    letter-spacing: 0.02em;
+  }
+  .sl label .en {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    color: var(--fg-faint);
+  }
+  .sl output {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    text-align: right;
+    color: var(--fg);
+  }
+  input[type='range'] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 18px;
+    background: transparent;
+    cursor: pointer;
+  }
+  input[type='range']::-webkit-slider-runnable-track {
+    height: 1px;
+    background: rgba(35, 40, 48, 0.2);
+  }
+  input[type='range']::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 11px;
+    height: 11px;
+    margin-top: -5px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 0 0 1px var(--amber), 0 1px 3px rgba(35, 40, 48, 0.22);
+  }
+  input[type='range']:focus-visible { outline: none; }
+  input[type='range']:focus-visible::-webkit-slider-thumb {
+    box-shadow: 0 0 0 3px rgba(154, 134, 196, 0.35), 0 0 0 1px var(--amber);
+  }
+
+  .live {
+    display: grid;
+    grid-template-columns: 240px;
+    gap: 14px;
+    justify-items: center;
+    padding: 6px 0 0;
+  }
+  .live .stage {
+    width: 240px;
+    height: 240px;
+    display: grid;
+    place-items: center;
+    border-radius: 3px;
+    background:
+      radial-gradient(76% 76% at 50% 46%, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.24) 62%, rgba(255, 255, 255, 0) 100%),
+      rgba(229, 235, 242, 0.5);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.8), inset 0 0 22px rgba(120, 134, 152, 0.1);
+  }
+  .presets { display: flex; flex-wrap: wrap; gap: 7px; justify-content: center; }
+  .presets button {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    color: var(--fg-soft);
+    background: rgba(255, 255, 255, 0.5);
+    border: 1px solid rgba(35, 40, 48, 0.1);
+    border-radius: 999px;
+    padding: 4px 11px;
+    cursor: pointer;
+    transition: color 0.16s, border-color 0.16s, background 0.16s;
+  }
+  .presets button:hover { color: var(--fg); border-color: rgba(154, 134, 196, 0.5); }
+  .presets button[aria-pressed='true'] {
+    color: var(--fg);
+    background: rgba(154, 134, 196, 0.13);
+    border-color: rgba(154, 134, 196, 0.5);
+  }
+  .dstr {
+    grid-column: 1 / -1;
+    margin: 22px -30px -26px;
+    padding: 14px 30px 16px;
+    border-top: 1px solid var(--line);
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    line-height: 1.75;
+    color: var(--fg-soft);
+    word-break: break-all;
+    background: rgba(255, 255, 255, 0.3);
+  }
+  .dstr .k { color: var(--fg-faint); letter-spacing: 0.08em; }
+
+  /* ── 三 · 材质 ── */
+  .mat { padding: 8px 26px 26px; }
+  .mat table { width: 100%; border-collapse: collapse; }
+  .mat th {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.1em;
+    font-weight: 400;
+    color: var(--fg-faint);
+    text-align: center;
+    padding: 20px 8px 14px;
+    text-transform: uppercase;
+  }
+  .mat th.rowh { text-align: left; width: 150px; }
+  .mat td {
+    text-align: center;
+    padding: 10px 8px;
+    border-top: 1px solid rgba(35, 40, 48, 0.075);
+  }
+  .mat td.rowh {
+    text-align: left;
+    font-size: 12.5px;
+    color: var(--fg-soft);
+    line-height: 1.5;
+  }
+  .mat td.rowh b { display: block; color: var(--fg); font-weight: 500; font-size: 13px; }
+  .mat td.rowh .mono { display: block; font-size: 10.5px; color: var(--fg-faint); }
+  .mat td.rowh .desc { display: block; font-size: 11px; color: var(--fg-faint); line-height: 1.55; margin-top: 3px; }
+  .mat .box {
+    position: relative;
+    width: 96px;
+    height: 96px;
+    margin: 0 auto;
+    display: grid;
+    place-items: center;
+    border-radius: 2px;
+    background-color: rgba(255, 255, 255, 0.42);
+    box-shadow: inset 0 0 0 1px rgba(35, 40, 48, 0.06);
+    overflow: hidden;
+  }
+  .mat .box svg { position: absolute; left: 50%; top: 50%; translate: -50% -50%; display: block; }
+  .mat .box.on-cool { background-color: rgba(229, 235, 242, 0.85); }
+
+  /* ── 四 · 尺寸梯 ── */
+  .ladder { padding: 34px 30px 30px; }
+  /* 真尺寸光栅化后最近邻放大：这是屏幕上真实的那些格子 */
+  .zoom-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 20px;
+    padding-bottom: 30px;
+    margin-bottom: 30px;
+    border-bottom: 1px solid var(--line);
+    flex-wrap: wrap;
+  }
+  .zoom-row .zc { display: grid; justify-items: center; gap: 10px; }
+  .zoom-row canvas { image-rendering: pixelated; display: block; box-shadow: inset 0 0 0 1px rgba(35, 40, 48, 0.1); }
+  .zoom-row .cap {
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    line-height: 1.65;
+    color: var(--fg-faint);
+    text-align: center;
+  }
+  .zoom-row .cap b { color: var(--fg-soft); font-weight: 500; }
+  .zoom-row .cap .bad { color: var(--amber); }
+  .rungs {
+    display: flex;
+    align-items: flex-end;
+    gap: 30px;
+    flex-wrap: wrap;
+    padding-bottom: 6px;
+  }
+  .rung { display: grid; justify-items: center; gap: 12px; }
+  .rung .slot {
+    display: grid;
+    place-items: center;
+    /* 1 × 1 的落点：星就在格心，格子高度就是它的实际占位 */
+    min-width: 20px;
+  }
+  .rung .n {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--fg-faint);
+    letter-spacing: 0.04em;
+  }
+  .rung .note {
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    color: var(--fg-faint);
+    opacity: 0.8;
+  }
+  .rung.is-edge .n { color: var(--amber); }
+  .tick-legend {
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid var(--line);
+    font-size: 13px;
+    color: var(--fg-soft);
+    max-width: 52em;
+  }
+  .tick-legend b { color: var(--fg); font-weight: 600; }
+  .tick-legend .mono { font-size: 11.5px; }
+
+  /* ── 五 · 指向 ── */
+  .aim { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px 22px; padding: 30px; }
+  .aim .pick { display: grid; justify-items: center; gap: 12px; }
+  .aim .pick .frame { width: 168px; height: 168px; }
+  .aim .pick .cap2 {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--fg-faint);
+    letter-spacing: 0.04em;
+    text-align: center;
+    line-height: 1.7;
+  }
+  .aim .pick .cap2 b { color: var(--fg-soft); font-weight: 500; }
+  .aim .rowtie {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.1em;
+    color: var(--fg-faint);
+    margin-top: 6px;
+  }
+  .aim .rowtie::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+
+  footer { margin-top: 80px; padding-top: 22px; border-top: 1px solid var(--line); }
+  footer p { font-family: var(--font-mono); font-size: 11px; color: var(--fg-faint); margin: 0; letter-spacing: 0.03em; }
+
+  @media (max-width: 1060px) {
+    .wrap { padding: 0 22px 90px; }
+    .wall-row { grid-template-columns: 1fr; justify-items: start; }
+    .dev-box { border-left: 0; padding-left: 0; border-top: 1px solid var(--line); padding-top: 14px; }
+    .param-grid { grid-template-columns: 1fr; }
+    .aim { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <p class="eyebrow">醒梦 · 形状原型 · design/mocks/star-flat</p>
+    <h1>四芒星，一枚<span class="thin">参数化的扁平原型</span></h1>
+    <p class="lede">
+      站内四处手绘的四芒星，形状本来是一副。这里把它收成一条轮廓：每四分之一是两个二次曲线半弧，
+      腰落在 45° 上，尖端只在轴线上探出去。臂长、腰长、内凹深浅三点就能定完。
+    </p>
+    <div class="seam"></div>
+  </header>
+
+  <!-- ─────────── 一 · 对照墙 ─────────── -->
+  <section id="wall">
+    <div class="sec-head"><span class="sec-no">一</span><h2>对照墙</h2></div>
+    <p class="sec-note">
+      上排三层：站内原件、本原型的复刻、以及两者叠在一起（各 50% 不透明，原件取墨色、复刻取薄暮紫）。
+      偏差用<b>对称 Hausdorff</b>量——两条轮廓互相「最远够不着多远」的那个距离，单位是 path 单位（u），
+      200px 的显示尺寸下 1 u 约 9–10 px。
+    </p>
+    <div id="wall-rows"></div>
+    <div class="readout glass" id="wall-readout"></div>
+  </section>
+
+  <!-- ─────────── 二 · 参数 ─────────── -->
+  <section id="params">
+    <div class="sec-head"><span class="sec-no">二</span><h2>参数</h2></div>
+    <p class="sec-note">
+      五个数就够：<b>臂</b> 是竖向半长，<b>腰</b> 是横向半长，<b>内凹</b> 把直边推到曲边，
+      <b>肩点</b> 决定腰落在 45° 上的深与浅，<b>副芒</b> 决定要不要那枚转 45° 的次星。
+    </p>
+    <div class="glass param-grid">
+      <div class="sliders" id="sliders"></div>
+      <div class="live">
+        <div class="stage" id="live-stage"></div>
+        <div class="presets" id="presets"></div>
+      </div>
+      <div class="dstr"><span class="k">d =</span> <span id="d-str"></span></div>
+    </div>
+  </section>
+
+  <!-- ─────────── 三 · 材质 ─────────── -->
+  <section id="material">
+    <div class="sec-head"><span class="sec-no">三</span><h2>材质</h2></div>
+    <p class="sec-note">
+      同一条轮廓的三种上法：一线描边、实心、以及站内假装磨砂树脂的做法——两层叠着，
+      上层偏移 0.5px 压淡一点，边缘就浮起一道极薄的唇。四列分别是：素身、加 45° 副芒、加中心结、两者都有。
+    </p>
+    <div class="glass mat">
+      <table id="mat-table"></table>
+    </div>
+  </section>
+
+  <!-- ─────────── 四 · 尺寸梯 ─────────── -->
+  <section id="ladder">
+    <div class="sec-head"><span class="sec-no">四</span><h2>尺寸梯</h2></div>
+    <p class="sec-note">
+      从 8px 到 160px，落在真实底色上。星能不能读成星，全看 45° 那处腰有多少像素可以塌下去：
+      塌不满一格，四个芒连成横竖两条，就退成加号。
+    </p>
+    <div class="glass ladder">
+      <div class="zoom-row" id="zoom-row"></div>
+      <div class="rungs" id="rungs"></div>
+      <div class="tick-legend" id="tick-legend"></div>
+    </div>
+  </section>
+
+  <!-- ─────────── 五 · 指向 ─────────── -->
+  <section id="aim">
+    <div class="sec-head"><span class="sec-no">五</span><h2>指向</h2></div>
+    <p class="sec-note">
+      四芒的扁平面一转，「尖朝哪」立刻变了——上下左右都一样的立体星做不到这件事。
+      但两个变体的差别要分清楚：<b>等臂</b>的转 45° 是干净地换了朝向；<b>竖长横短</b>的转 45°，
+      长芒会摆到斜向、短芒换到另一条斜向，读起来是「歪了」而不是「转了」。
+    </p>
+    <div class="glass aim" id="aim-grid"></div>
+  </section>
+
+  <footer>
+    <p id="foot">design/mocks/star-flat · star.js · measure.js</p>
+  </footer>
+</div>
+
+<script type="module">
+import { starPath, starParts, knotPath, diamondPath, PRESETS } from './star.js';
+import { wall, ORIGINALS, deviation } from './measure.js';
+
+const INK = '#232830';
+const SOFT = '#56606d';
+const AMBER = '#9a86c4';
+const DREAM = '#9389ae';
+
+/* 给截图脚本与后面几段异步逻辑用的读数口，先开出来 */
+window.__star = window.__star || {};
+
+/* ── 造星：把「星的总高 = h 像素」做实 ──
+   arm 在 path 里是半高，所以 1 u = h / (2·arm) 像素；
+   viewBox 留 pad 倍余量给副芒和描边，svg 的边长相应放大。 */
+function starSVG(d, height, o = {}) {
+  const { arm = 10, waist = 6.5, pad = 1.2, fill = INK, opacity = 1, stroke = 0, strokeColor = INK,
+    rotate = 0, className = '' } = o;
+  const half = Math.max(arm, waist) * pad;
+  const side = height * pad;
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', `${-half} ${-half} ${half * 2} ${half * 2}`);
+  svg.setAttribute('width', side.toFixed(2));
+  svg.setAttribute('height', side.toFixed(2));
+  svg.setAttribute('aria-hidden', 'true');
+  if (className) svg.setAttribute('class', className);
+  const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  p.setAttribute('d', d);
+  p.setAttribute('fill', stroke ? 'none' : fill);
+  if (stroke) {
+    p.setAttribute('stroke', strokeColor);
+    p.setAttribute('stroke-width', stroke);
+    p.setAttribute('stroke-linejoin', 'round');
+  }
+  p.setAttribute('opacity', String(opacity));
+  if (rotate) p.setAttribute('transform', `rotate(${rotate})`);
+  svg.appendChild(p);
+  return svg;
+}
+
+/* ═════════════ 一 · 对照墙 ═════════════ */
+const rows = document.getElementById('wall-rows');
+const measured = wall(200);
+
+measured.forEach((m) => {
+  const row = document.createElement('div');
+  row.className = 'glass wall-row';
+
+  /* 原件 */
+  const label = document.createElement('div');
+  label.className = 'cell-label';
+  label.innerHTML = `<span class="name">${m.label}</span><span class="tag">${m.note}</span>`;
+  row.appendChild(label);
+
+  const fOrig = document.createElement('div');
+  fOrig.className = 'frame';
+  fOrig.appendChild(starSVG(m.origD, 200, { arm: m.arm, waist: m.waist, fill: INK }));
+  fOrig.insertAdjacentHTML('beforeend', '<span class="cap">原件</span>');
+  row.appendChild(fOrig);
+
+  const fGen = document.createElement('div');
+  fGen.className = 'frame';
+  fGen.appendChild(starSVG(m.genD, 200, { arm: m.arm, waist: m.waist, fill: INK }));
+  fGen.insertAdjacentHTML('beforeend', '<span class="cap">复刻</span>');
+  row.appendChild(fGen);
+
+  /* 叠合：原件墨色 50% + 复刻紫 50%；偏差最远点标一个圈 */
+  const fOv = document.createElement('div');
+  fOv.className = 'frame';
+  const arm = m.arm;
+  const half = Math.max(m.arm, m.waist) * 1.2;
+  const ovSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  ovSvg.setAttribute('viewBox', `${-half} ${-half} ${half * 2} ${half * 2}`);
+  ovSvg.setAttribute('width', (200 * 1.2).toFixed(2));
+  ovSvg.setAttribute('height', (200 * 1.2).toFixed(2));
+  const mk = (d, color) => {
+    const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    p.setAttribute('d', d);
+    p.setAttribute('fill', color);
+    p.setAttribute('opacity', '0.5');
+    return p;
+  };
+  ovSvg.appendChild(mk(m.origD, INK));
+  ovSvg.appendChild(mk(m.genD, AMBER));
+  if (m.at) {
+    /* 偏差最远点的标记：半径按臂长算，不然在小坐标系的星上会大得离谱 */
+    const ring = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    ring.setAttribute('cx', m.at[0]);
+    ring.setAttribute('cy', m.at[1]);
+    ring.setAttribute('r', (arm * 0.11).toFixed(3));
+    ring.setAttribute('fill', 'none');
+    ring.setAttribute('stroke', AMBER);
+    ring.setAttribute('stroke-width', (arm * 0.022).toFixed(3));
+    ring.setAttribute('opacity', '0.8');
+    ovSvg.appendChild(ring);
+  }
+  fOv.appendChild(ovSvg);
+  fOv.insertAdjacentHTML('beforeend', '<span class="cap">叠合 · 50%</span>');
+  row.appendChild(fOv);
+
+  const dev = document.createElement('div');
+  dev.className = 'dev-box';
+  dev.innerHTML =
+    `<div class="big">${m.dev.toFixed(4)} <span class="u">u</span></div>` +
+    `<div class="sub">${m.devPctArm.toFixed(3)}% 臂长 · ${m.devPctHeight.toFixed(3)}% 总高</div>` +
+    `<div class="sub">200px 下 ≈ ${m.devPx.toFixed(2)} px</div>` +
+    `<div class="sub ok">${m.dev < 0.06 ? '与原稿等价' : '略有出入'}</div>`;
+  row.appendChild(dev);
+
+  rows.appendChild(row);
+});
+
+/* 墙的总读数 */
+const worst = measured.reduce((a, b) => (a.dev > b.dev ? a : b));
+document.getElementById('wall-readout').innerHTML = [
+  ['最大偏差', `<span class="v hi">${worst.dev.toFixed(4)} u</span>`],
+  ['占臂长', `<span class="v">${worst.devPctArm.toFixed(3)}%</span>`],
+  ['占整高', `<span class="v">${worst.devPctHeight.toFixed(3)}%</span>`],
+  ['200px 下', `<span class="v">${worst.devPx.toFixed(2)} px</span>`],
+  ['出现在', `<span class="v">${worst.label}</span>`],
+  ['中心结', `<span class="v">${deviation('M0,-7L4.6,0L0,7L-4.6,0Z', knotPath(7)).d.toFixed(5)} u</span>`],
+].map(([k, v]) => `<div><span class="k">${k}</span>${v}</div>`).join('');
+
+/* ═════════════ 二 · 参数 ═════════════ */
+const P = { arm: 10, waist: 6.5, pinch: 1, shoulder: 0.214, turn: 0.024, minor: 0, minorScale: 0.5 };
+
+const SLIDERS = [
+  ['arm', '臂', 'arm', 4, 16, 0.5, (v) => v.toFixed(1)],
+  ['waist', '腰', 'waist', 2, 16, 0.25, (v) => v.toFixed(2)],
+  ['pinch', '内凹', 'pinch', 0, 1, 0.01, (v) => v.toFixed(2)],
+  ['shoulder', '肩点', 'shoulder', 0.08, 0.46, 0.002, (v) => v.toFixed(3)],
+  ['minor', '副芒', 'minor', 0, 1, 1, (v) => (v ? '开' : '关')],
+];
+
+const sliderBox = document.getElementById('sliders');
+const liveStage = document.getElementById('live-stage');
+const dStr = document.getElementById('d-str');
+
+SLIDERS.forEach(([key, label, en, min, max, step, fmt]) => {
+  const row = document.createElement('div');
+  row.className = 'sl';
+  row.innerHTML =
+    `<label for="s-${key}">${label}<span class="en">${en}</span></label>` +
+    `<input type="range" id="s-${key}" min="${min}" max="${max}" step="${step}" value="${P[key]}">` +
+    `<output id="o-${key}">${fmt(P[key])}</output>`;
+  sliderBox.appendChild(row);
+  const input = row.querySelector('input');
+  const out = row.querySelector('output');
+  input.addEventListener('input', () => {
+    P[key] = parseFloat(input.value);
+    out.textContent = fmt(P[key]);
+    setPressed(null);
+    drawLive();
+  });
+});
+
+const presetBox = document.getElementById('presets');
+function setPressed(name) {
+  presetBox.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.p === name)));
+}
+Object.keys(PRESETS).forEach((name) => {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.dataset.p = name;
+  b.textContent = name;
+  b.setAttribute('aria-pressed', 'false');
+  b.addEventListener('click', () => {
+    Object.assign(P, PRESETS[name], { minor: 0, minorScale: 0.5 });
+    syncSliders();
+    setPressed(name);
+    drawLive();
+  });
+  presetBox.appendChild(b);
+});
+
+function syncSliders() {
+  SLIDERS.forEach(([key, , , , , , fmt]) => {
+    const input = document.getElementById('s-' + key);
+    const out = document.getElementById('o-' + key);
+    if (!input) return;
+    input.value = P[key];
+    out.textContent = fmt(P[key]);
+  });
+}
+
+function drawLive() {
+  const d = starPath({ ...P, minor: P.minor ? 1 : 0 });
+  liveStage.replaceChildren(starSVG(d, 240, { arm: P.arm, waist: Math.max(P.waist, P.arm * 0.55), pad: 1.14 }));
+  dStr.textContent = d;
+  window.__star.live = { params: { ...P }, d };
+}
+
+/* ═════════════ 三 · 材质 ═════════════ */
+const MAT_ROWS = [
+  {
+    name: '一线',
+    en: 'stroke 1',
+    note: '1px 描边，无填充',
+    draw: (d, arm, waist) => {
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      const half = Math.max(arm, waist) * 1.2;
+      const side = 96 * 1.2;
+      svg.setAttribute('viewBox', `${-half} ${-half} ${half * 2} ${half * 2}`);
+      svg.setAttribute('width', side);
+      svg.setAttribute('height', side);
+      const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      p.setAttribute('d', d);
+      p.setAttribute('fill', 'none');
+      p.setAttribute('stroke', INK);
+      p.setAttribute('stroke-width', '0.85');
+      p.setAttribute('stroke-linejoin', 'round');
+      svg.appendChild(p);
+      return svg;
+    },
+  },
+  {
+    name: '实心',
+    en: 'solid',
+    note: '整片填墨，切边不描',
+    draw: (d, arm, waist) => starSVG(d, 96, { arm, waist, pad: 1.2, fill: INK }),
+  },
+  {
+    name: '磨砂双层',
+    en: 'frosted ×2',
+    note: '同形两层，上层偏 0.5px、压到 46%',
+    draw: (d, arm, waist) => {
+      const half = Math.max(arm, waist) * 1.2;
+      const side = 96 * 1.2;
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('viewBox', `${-half} ${-half} ${half * 2} ${half * 2}`);
+      svg.setAttribute('width', side);
+      svg.setAttribute('height', side);
+      const pxPerUnit = 96 / (2 * arm);
+      const off = 0.5 / pxPerUnit; /* 0.5 屏幕像素换成 path 单位 */
+      const mk = (dx, dy, color, opacity) => {
+        const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        p.setAttribute('d', d);
+        p.setAttribute('fill', color);
+        p.setAttribute('opacity', String(opacity));
+        p.setAttribute('transform', `translate(${dx.toFixed(3)} ${dy.toFixed(3)})`);
+        return p;
+      };
+      svg.appendChild(mk(off, off * 0.6, INK, 0.46));
+      svg.appendChild(mk(0, 0, INK, 0.9));
+      return svg;
+    },
+  },
+];
+
+const COLS = [
+  { head: '素身', minor: 0, knot: 0 },
+  { head: '+ 副芒', minor: 1, knot: 0 },
+  { head: '+ 中心结', minor: 0, knot: 1 },
+  { head: '副芒 + 结', minor: 1, knot: 1 },
+];
+
+(function buildMat() {
+  const table = document.getElementById('mat-table');
+  const thead = document.createElement('thead');
+  const hr = document.createElement('tr');
+  hr.innerHTML = '<th class="rowh">上法</th>' + COLS.map((c) => `<th>${c.head}</th>`).join('');
+  thead.appendChild(hr);
+  table.appendChild(thead);
+
+  const tbody = document.createElement('tbody');
+  MAT_ROWS.forEach((r) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td class="rowh"><b>${r.name}</b><span class="mono">${r.en}</span><span class="desc">${r.note}</span></td>`;
+    COLS.forEach((c, ci) => {
+      const td = document.createElement('td');
+      const box = document.createElement('div');
+      box.className = 'box' + (ci % 2 ? ' on-cool' : '');
+      const parts = starParts({ ...PRESETS.spire, minorScale: 0.5 });
+      const d = c.minor
+        ? starPath({ ...PRESETS.spire, minor: 1, minorScale: 0.5 })
+        : parts.main;
+      box.appendChild(r.draw(d, PRESETS.spire.arm, PRESETS.spire.waist));
+      /* 中心结另叠一枚（它比星小，是压在星心上的） */
+      if (c.knot) {
+        const k = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        const half = Math.max(PRESETS.spire.arm, PRESETS.spire.waist) * 1.2;
+        const side = 96 * 1.2;
+        k.setAttribute('viewBox', `${-half} ${-half} ${half * 2} ${half * 2}`);
+        k.setAttribute('width', side);
+        k.setAttribute('height', side);
+        const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        p.setAttribute('d', knotPath(4.2));
+        p.setAttribute('fill', r.name === '一线' ? 'none' : AMBER);
+        if (r.name === '一线') {
+          p.setAttribute('stroke', AMBER);
+          p.setAttribute('stroke-width', '0.7');
+        }
+        k.appendChild(p);
+        box.appendChild(k);
+      }
+      td.appendChild(box);
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+})();
+
+/* ═════════════ 四 · 尺寸梯 ═════════════ */
+/* 45° 那处腰能塌多深：腰点 (s,−s) 到「两尖端连线」的垂距。
+   这是「星」与「加号」之间唯一的那点差别，所以用它当阈值。 */
+function notchDepth(arm, waist, shoulder) {
+  const a = 0, b = -arm;
+  const c = waist, d = 0;
+  const px = shoulder * arm, py = -shoulder * arm;
+  const dx = c - a, dy = d - b;
+  return Math.abs(dx * (b - py) - dy * (a - px)) / Math.hypot(dx, dy);
+}
+
+const SIZES = [8, 12, 16, 24, 32, 48, 96, 160];
+const rungs = document.getElementById('rungs');
+const ZOOM_SIZES = [8, 10, 12, 16, 24, 32];
+const Z = 11;      /* 放大倍数 */
+const ZPAD = 2;    /* 每边留几格，看清边界 */
+
+/* 真尺寸光栅化 → 最近邻放大。用的是屏幕上那一刻真实分到的像素格，
+   所以「8px 到底长什么样」在这张条里是能数出来的。 */
+function pixelZoom(height, preset) {
+  const arm = preset.arm;
+  const waist = preset.waist;
+  const pad = 1.12;
+  const half = Math.max(arm, waist) * pad;
+  const side = height * pad;
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${-half} ${-half} ${half * 2} ${half * 2}"` +
+    ` width="${side}" height="${side}"><path d="${starPath(preset)}" fill="${INK}"/></svg>`;
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const S = Math.ceil(side);
+      const small = document.createElement('canvas');
+      small.width = S;
+      small.height = S;
+      const sx = small.getContext('2d');
+      sx.drawImage(img, 0, 0, S, S);
+      const px = sx.getImageData(0, 0, S, S).data;
+      const mid = Math.floor(S / 2);
+      let inkRow = 0;
+      let inkCol = 0;
+      for (let x = 0; x < S; x++) if (px[(mid * S + x) * 4 + 3] > 90) inkRow++;
+      for (let y = 0; y < S; y++) if (px[(y * S + mid) * 4 + 3] > 90) inkCol++;
+      /* 四条斜向（45°）在 0.3S 处空不空 = 腰塌下去没有 */
+      let clear = 0;
+      const r = Math.round(S * 0.3);
+      for (const [dx, dy] of [[1, -1], [1, 1], [-1, 1], [-1, -1]]) {
+        const x = mid + dx * r;
+        const y = mid + dy * r;
+        if (x >= 0 && y >= 0 && x < S && y < S && px[(y * S + x) * 4 + 3] < 60) clear++;
+      }
+      const big = document.createElement('canvas');
+      big.width = (S + ZPAD * 2) * Z;
+      big.height = (S + ZPAD * 2) * Z;
+      const bx = big.getContext('2d');
+      bx.imageSmoothingEnabled = false;
+      bx.fillStyle = '#f0f3f6';
+      bx.fillRect(0, 0, big.width, big.height);
+      bx.drawImage(small, ZPAD * Z, ZPAD * Z, S * Z, S * Z);
+      resolve({ canvas: big, S, inkRow, inkCol, clear });
+    };
+    img.onerror = () => resolve(null);
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  });
+}
+
+(async function buildZoomRow() {
+  const row = document.getElementById('zoom-row');
+  const probe = [];
+  for (const h of ZOOM_SIZES) {
+    const r = await pixelZoom(h, PRESETS.spire);
+    if (!r) continue;
+    probe.push({ h, px: r.S, inkRow: r.inkRow, inkCol: r.inkCol, clear: r.clear });
+    const cell = document.createElement('div');
+    cell.className = 'zc';
+    cell.appendChild(r.canvas);
+    const cap = document.createElement('div');
+    cap.className = 'cap';
+    /* 判据：中轴上的墨要「近中心细、远端粗」才像星；中轴墨量 ≤ 6 格时整条臂基本是一根等宽横杠 */
+    const plus = r.inkRow <= 6 || r.inkCol <= 6;
+    cap.innerHTML =
+      `<b>${h}px</b> · 实 ${r.S}×${r.S} 格<br>` +
+      `中轴 横${r.inkRow} 竖${r.inkCol}<br>` +
+      `<span class="${plus ? 'bad' : ''}">${plus ? '读成加号' : '读成星'}</span>`;
+    cell.appendChild(cap);
+    row.appendChild(cell);
+  }
+  window.__star.zoom = probe;
+})();
+
+SIZES.forEach((h) => {
+  const rung = document.createElement('div');
+  rung.className = 'rung';
+  const slot = document.createElement('div');
+  slot.className = 'slot';
+  slot.style.height = Math.max(h, 20) + 'px';
+  slot.appendChild(starSVG(starPath(PRESETS.spire), h, { ...PRESETS.spire, pad: 1.2 }));
+  const n = document.createElement('div');
+  n.className = 'n';
+  const nd = notchDepth(h / 2, (h / 2) * 0.65, PRESETS.spire.shoulder);
+  n.textContent = `${h}px`;
+  const nt = document.createElement('div');
+  nt.className = 'note';
+  nt.textContent = `腰 ${nd.toFixed(2)}px`;
+  if (nd < 1.2) rung.classList.add('is-edge');
+  rung.append(slot, n, nt);
+  rungs.appendChild(rung);
+});
+
+const SPIRE_NOTCH_PER_H = notchDepth(0.5, 0.5 * 0.65, PRESETS.spire.shoulder);
+document.getElementById('tick-legend').innerHTML =
+  `读数：8 / 12 / 16px 的腰只塌下 <b>1.0–2.0px</b>，圆角一压就并成横竖两条，读成加号；` +
+  `到 <b>24px</b> 腰有 <span class="mono">${(SPIRE_NOTCH_PER_H * 24).toFixed(1)}px</span>，四个芒才各自分开；` +
+  `<b>32px 起</b> 是稳的。等臂版（副芒那一路）腰塌得更深，阈值可以往下挪一格。`;
+
+/* ═════════════ 五 · 指向 ═════════════ */
+const aimGrid = document.getElementById('aim-grid');
+
+function aimRow(tie, items) {
+  const h = document.createElement('div');
+  h.className = 'rowtie';
+  h.textContent = tie;
+  aimGrid.appendChild(h);
+  items.forEach((a) => {
+    const pick = document.createElement('div');
+    pick.className = 'pick';
+    const f = document.createElement('div');
+    f.className = 'frame';
+    f.appendChild(
+      starSVG(starPath({ ...PRESETS[a.p], rotate: a.rotate }), a.size, { ...PRESETS[a.p], pad: 1.35 }),
+    );
+    const cap = document.createElement('div');
+    cap.className = 'cap2';
+    cap.innerHTML = `<b>${a.label}</b><br>${a.sub}`;
+    pick.append(f, cap);
+    aimGrid.appendChild(pick);
+  });
+}
+
+aimRow('120px · 看得清的那一档', [
+  { label: '竖长横短 · 正立', sub: 'spire 0°', p: 'spire', rotate: 0, size: 120 },
+  { label: '竖长横短 · 转 45°', sub: 'spire 45°', p: 'spire', rotate: 45, size: 120 },
+  { label: '等臂 · 正立', sub: 'equal 0°', p: 'equal', rotate: 0, size: 120 },
+  { label: '等臂 · 转 45°', sub: 'equal 45°', p: 'equal', rotate: 45, size: 120 },
+]);
+
+aimRow('24px · 实尺寸', [
+  { label: '竖长横短 · 正立', sub: 'spire 0°', p: 'spire', rotate: 0, size: 24 },
+  { label: '竖长横短 · 转 45°', sub: 'spire 45°', p: 'spire', rotate: 45, size: 24 },
+  { label: '等臂 · 正立', sub: 'equal 0°', p: 'equal', rotate: 0, size: 24 },
+  { label: '等臂 · 转 45°', sub: 'equal 45°', p: 'equal', rotate: 45, size: 24 },
+]);
+
+/* 给截图脚本一个读数口 */
+window.__star = window.__star || {};
+window.__star.measure = measured.map((m) => ({
+  key: m.key,
+  label: m.label,
+  dev: m.dev,
+  devPctArm: m.devPctArm,
+  devPctHeight: m.devPctHeight,
+  devPx: m.devPx,
+  from: m.from,
+}));
+window.__star.notch = Object.fromEntries(
+  SIZES.map((h) => [h, +notchDepth(h / 2, (h / 2) * 0.65, PRESETS.spire.shoulder).toFixed(3)]),
+);
+window.__star.presets = PRESETS;
+window.__star.ready = true;
+
+/* 首帧就把活星画出来 */
+syncSliders();
+setPressed('spire');
+drawLive();
+</script>
+</body>
+</html>

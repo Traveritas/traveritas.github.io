@@ -1,0 +1,107 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>refract2</title>
+<style>
+  body { margin:0; background:#f0f3f6; font:11px/1.4 monospace; }
+  #g { display:flex; flex-wrap:wrap; }
+  .c { width:200px; } canvas { display:block; width:200px; height:200px; }
+  .l { text-align:center; padding:2px 0 10px; color:#56606d; }
+  .h { width:100%; padding:6px 10px; color:#232830; font-weight:600; }
+</style></head>
+<body><div id="g"></div>
+<script type="importmap">{"imports":{"three":"/three/build/three.module.js"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import { buildStarGeometry } from './src.js';
+
+/* 四组：
+   A 透明画布、场景内无背景板  → 折射对象是空气，看到底牌是什么
+   B 透明画布、场景内有一块有色背景板（跨过星后方） → 真实的折射
+   C 不透明白底、无背景板
+   D 不透明白底 + 有色背景板
+   每组的材质档：front / double side、roughness 0.06 与 0.2 */
+const GROUPS = [
+  { h: 'A · 透明画布 / 场景内无衬底', clearAlpha: 0, style: '', backdrop: false },
+  { h: 'B · 透明画布 / 场景内有衬底条', clearAlpha: 0, style: '', backdrop: true },
+  { h: 'C · 不透明白底 / 无衬底', clearAlpha: 1, style: 'background:#f0f3f6', backdrop: false },
+  { h: 'D · 不透明白底 + 衬底条', clearAlpha: 1, style: 'background:#f0f3f6', backdrop: true },
+];
+const MATS = [
+  { k: 'tr1 front r.06', transmission: 1, side: THREE.FrontSide, roughness: 0.06 },
+  { k: 'tr1 double r.06', transmission: 1, side: THREE.DoubleSide, roughness: 0.06 },
+  { k: 'tr1 double r.25', transmission: 1, side: THREE.DoubleSide, roughness: 0.25 },
+];
+
+const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+renderer.setPixelRatio(1); renderer.setSize(200, 200, false);
+renderer.toneMapping = THREE.NeutralToneMapping;
+
+const cam = new THREE.PerspectiveCamera(28, 1, 0.1, 60);
+cam.position.set(0, 0, 5.4);
+
+const envRT = (() => {
+  const cv = document.createElement('canvas'); cv.width = 1024; cv.height = 512;
+  const g = cv.getContext('2d');
+  const sky = g.createLinearGradient(0, 0, 0, 512);
+  ['#ffffff','#f7f9fc','#dde4ee','#ffffff','#c3ccd9','#8b96a6','#454e5c'].forEach((c,i,a)=>sky.addColorStop(i/(a.length-1),c));
+  g.fillStyle = sky; g.fillRect(0,0,1024,512);
+  const blob=(x,y,r,c,al)=>{const rg=g.createRadialGradient(x,y,0,x,y,r);rg.addColorStop(0,c);rg.addColorStop(1,'rgba(255,255,255,0)');g.globalAlpha=al;g.fillStyle=rg;g.beginPath();g.arc(x,y,r,0,7);g.fill();g.globalAlpha=1;};
+  blob(268,132,210,'#ffffff',1); blob(760,96,150,'#ffffff',.9); blob(120,250,170,'#ffffff',.55);
+  blob(560,300,260,'#d6cfe6',.5); blob(900,210,190,'#6e7a8b',.55); blob(400,236,150,'#7b8494',.42);
+  blob(20,420,300,'#3f4854',.7);
+  const t = new THREE.CanvasTexture(cv);
+  t.mapping = THREE.EquirectangularReflectionMapping;
+  t.colorSpace = THREE.SRGBColorSpace;
+  const pm = new THREE.PMREMGenerator(renderer);
+  const rt = pm.fromEquirectangular(t);
+  t.dispose(); pm.dispose();
+  return rt;
+})();
+
+const geo = buildStarGeometry();
+const qBase = new THREE.Quaternion().setFromEuler(new THREE.Euler(35.264*Math.PI/180, 45*Math.PI/180, 0, 'YXZ'));
+const host = document.getElementById('g');
+
+/* 衬底条：一张带色块的平面，横在星后面，用来证明「折射只看得见同一场景里的东西」 */
+const mkBackdrop = () => {
+  const cv = document.createElement('canvas'); cv.width = 256; cv.height = 256;
+  const g = cv.getContext('2d');
+  g.fillStyle = '#f0f3f6'; g.fillRect(0,0,256,256);
+  const cols = ['#9a86c4', '#9389ae', '#56606d', '#a7b1ba'];
+  cols.forEach((c,i)=>{ g.fillStyle=c; g.fillRect(0, i*64, 256, 56); });
+  const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace;
+  return new THREE.Mesh(new THREE.PlaneGeometry(3.4, 3.4), new THREE.MeshBasicMaterial({ map: t }));
+};
+
+for (const grp of GROUPS) {
+  const h = document.createElement('div'); h.className='h'; h.textContent = grp.h; host.append(h);
+  for (const mc of MATS) {
+    const cv = document.createElement('canvas');
+    const box = document.createElement('div'); box.className='c'; box.style.cssText = grp.style;
+    box.append(cv);
+    const lab = document.createElement('div'); lab.className='l'; lab.textContent = mc.k;
+    box.append(lab); host.append(box);
+
+    const sc = new THREE.Scene();
+    sc.environment = envRT.texture;
+    renderer.setClearAlpha(grp.clearAlpha);
+    const k = new THREE.DirectionalLight(0xffffff, 2.1); k.position.set(3.2,4.4,4.6);
+    const f = new THREE.DirectionalLight(0xdce4f2, .85); f.position.set(-4.2,-1.6,2.4);
+    const r = new THREE.DirectionalLight(0x9a86c4, .8); r.position.set(-1.6,2.2,-4.4);
+    sc.add(k,f,r);
+    if (grp.backdrop) { const b = mkBackdrop(); b.position.set(0,0,-1.6); sc.add(b); }
+
+    const mat = new THREE.MeshPhysicalMaterial({
+      color: 0xffffff, metalness: 0, roughness: mc.roughness,
+      transmission: mc.transmission, ior: 1.72, thickness: 1.15,
+      iridescence: 0.6, iridescenceIOR: 1.3, iridescenceThicknessRange: [180, 520],
+      clearcoat: 1, clearcoatRoughness: 0.04, envMapIntensity: 1.2,
+      side: mc.side,
+    });
+    const m = new THREE.Mesh(geo, mat); m.quaternion.copy(qBase); sc.add(m);
+    renderer.render(sc, cam);
+    cv.width = 200; cv.height = 200;
+    cv.getContext('2d').drawImage(renderer.domElement, 0, 0, 200, 200);
+  }
+}
+document.title = 'ready';
+</script></body></html>

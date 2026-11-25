@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><title>尺寸像素真放大</title>
+<style>
+  body { margin: 0; background: #f0f3f6; font: 11px/1.6 monospace; color: #56606d; padding: 20px; }
+  .row { display: flex; align-items: flex-end; gap: 22px; }
+  .cell { display: grid; justify-items: center; gap: 8px; }
+  canvas { image-rendering: pixelated; display: block; box-shadow: inset 0 0 0 1px rgba(35,40,48,.08); }
+  .cap { font-size: 10px; color: #858f9d; }
+</style>
+</head>
+<body>
+<div class="row" id="row"></div>
+<script type="module">
+import { starPath, PRESETS } from './star.js';
+
+const SIZES = [8, 10, 12, 16, 24, 32];
+const Z = 14;              /* 放大倍数 */
+const PAD = 2;             /* 每边留几像素，好看清边界 */
+
+async function pixelZoom(height, preset) {
+  const arm = preset.arm, waist = preset.waist;
+  const pad = 1.12;
+  const half = Math.max(arm, waist) * pad;
+  const side = height * pad;
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${-half} ${-half} ${half*2} ${half*2}" width="${side}" height="${side}">` +
+    `<path d="${starPath(preset)}" fill="#232830"/></svg>`;
+  const img = new Image();
+  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  await img.decode();
+
+  /* 先按真实尺寸光栅化（这就是屏幕上看到的那一块像素），再最近邻放大 */
+  const small = document.createElement('canvas');
+  const S = Math.ceil(side);
+  small.width = S; small.height = S;
+  const sx = small.getContext('2d');
+  sx.imageSmoothingEnabled = true;
+  sx.drawImage(img, 0, 0, S, S);
+  const data = sx.getImageData(0, 0, S, S).data;
+
+  /* 数一下：星在中心那一行、那一列上有多少像素断开（判「是不是加号」） */
+  const mid = Math.floor(S / 2);
+  let inkRow = 0, inkCol = 0;
+  for (let x = 0; x < S; x++) if (data[(mid * S + x) * 4 + 3] > 90) inkRow++;
+  for (let y = 0; y < S; y++) if (data[(y * S + mid) * 4 + 3] > 90) inkCol++;
+  /* 45° 方向上、距中心 waist·?  处是不是空地（塌进去了没有） */
+  const diag = Math.round(S * 0.30);
+  const cx = mid + diag, cy = mid - diag;
+  const clearAtDiag = data[(cy * S + cx) * 4 + 3] < 60;
+  /* 四角（斜向 45°）有多少是空的 = 腰塌了多少 */
+  let emptyCorners = 0;
+  for (const [dx, dy] of [[1,-1],[1,1],[-1,1],[-1,-1]]) {
+    const x = mid + dx * Math.round(S * 0.28), y = mid + dy * Math.round(S * 0.28);
+    if (data[(y * S + x) * 4 + 3] < 60) emptyCorners++;
+  }
+
+  const big = document.createElement('canvas');
+  big.width = (S + PAD * 2) * Z; big.height = (S + PAD * 2) * Z;
+  const bx = big.getContext('2d');
+  bx.imageSmoothingEnabled = false;
+  bx.fillStyle = '#f0f3f6'; bx.fillRect(0, 0, big.width, big.height);
+  bx.drawImage(small, PAD * Z, PAD * Z, S * Z, S * Z);
+  return { canvas: big, S, inkRow, inkCol, clearAtDiag, emptyCorners, diagPx: diag };
+}
+
+const row = document.getElementById('row');
+const out = [];
+for (const h of SIZES) {
+  const r = await pixelZoom(h, PRESETS.spire);
+  const cell = document.createElement('div'); cell.className = 'cell';
+  cell.appendChild(r.canvas);
+  const cap = document.createElement('div'); cap.className = 'cap';
+  cap.innerHTML = `${h}px → 实际 ${r.S}×${r.S} 格<br>中轴横 ${r.inkRow} · 竖 ${r.inkCol}<br>斜向空 ${r.emptyCorners}/4`;
+  cell.appendChild(cap);
+  row.appendChild(cell);
+  out.push({ h, px: r.S, inkRow: r.inkRow, inkCol: r.inkCol, emptyCorners: r.emptyCorners });
+}
+window.__size = out;
+window.__ready = true;
+</script>
+</body>
+</html>

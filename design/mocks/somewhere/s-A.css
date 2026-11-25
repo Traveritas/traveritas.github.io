@@ -1,0 +1,161 @@
+/* ─────────────────────────────────────────────────────────────
+  s-A · 远处的地形 —— 场景自己的样式
+  这一片只有三层东西：流光（#light，shell.js 给的）、远景版画（#plate）、近景（#near）。
+  样式这边只管两张画布别抢事件、以及那两句字的落位与退场。
+   ───────────────────────────────────────────────────────────── */
+
+/* 两张 2D 画布都铺满屏、不接管鼠标（拖拽由 shell.js 统一处理）。
+   touch-action 要给上：shell.js 的拖拽在 window 上接 pointer 事件，
+   body 上不关掉手势的话，窄屏一拖就先把页面本身拽走了。 */
+body {
+  touch-action: none;
+}
+#plate,
+#near {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  opacity: 0; /* 转场前不出现；由 s-A.js 按 arrive 抬起来 */
+}
+/* 用普通混合、不用 screen：脊的身体要比底色更深（压下去），亮边要比底色更亮（浮上来）。
+   screen 混合压不深，山就会整片消失。 */
+#plate {
+  z-index: 1;
+}
+#near {
+  z-index: 2;
+}
+
+/* 顶上那一行场景名（.sw-tl 的样式来自 shell.css），转场时先退下去、转完再回来 */
+.sw-tl {
+  z-index: 40;
+  opacity: 0;
+  transition: opacity 1.1s ease 0.4s;
+}
+html[data-arrived='go'] .sw-tl,
+html[data-arrived='done'] .sw-tl {
+  opacity: 1;
+}
+
+/* ══ 那一句 ══
+   放在天的空白处（脊线之上、场景名之下），小一号、拉开字距，
+   读起来像一句题记而不是标题。颜色取 --ink 的 42%：能读清，又不亮。 */
+.sa-verse {
+  position: fixed;
+  z-index: 40;
+  left: 7vw;
+  top: 23vh;
+  margin: 0;
+  font: 500 13.5px/1.9 var(--font-display);
+  letter-spacing: 0.34em;
+  color: rgb(232 228 240 / 0.44);
+  text-shadow: 0 0 18px rgb(8 8 16 / 0.55); /* 底下偶尔流过一道亮光，给一点垫底 */
+  opacity: 0;
+  transform: translate3d(0, 6px, 0);
+  transition:
+    opacity 1.6s ease 1.1s,
+    transform 1.9s cubic-bezier(0.22, 0.7, 0.2, 1) 1.1s;
+  pointer-events: none;
+}
+html[data-arrived='done'] .sa-verse {
+  opacity: 1;
+  transform: none;
+}
+@media (max-width: 640px) {
+  .sa-verse {
+    left: 8vw;
+    top: 16vh;
+    font-size: 12px;
+    letter-spacing: 0.28em;
+  }
+}
+
+/* ══ 怎么走 ══
+   只在转完、而且还没动过的时候出现；一动就退掉，不再回来。
+   不做成按钮，是为了让人先看一眼空间、再自己发现手能推它。
+   竖着排：一道细线在上、两句话在下——和 shell.css 里那条「向下」的写法是同一个语法。 */
+.sa-cue {
+  position: fixed;
+  left: 50%;
+  bottom: 26px;
+  z-index: 40;
+  margin: 0;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 9px;
+  font: 400 10px/1 var(--font-mono);
+  letter-spacing: 0.22em;
+  color: rgb(169 163 189 / 0.52);
+  opacity: 0;
+  transition: opacity 0.9s ease 0.25s;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.sa-cue i {
+  width: 30px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgb(232 228 240 / 0.32), transparent);
+  animation: sa-drift 3.4s ease-in-out infinite;
+}
+/* 窄屏只说手势那一种说法；宽屏才把滚轮写出来 */
+.sa-cue-m {
+  display: none;
+}
+@media (max-width: 640px) {
+  .sa-cue-d {
+    display: none;
+  }
+  .sa-cue-m {
+    display: inline;
+  }
+}
+@keyframes sa-drift {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scaleX(0.75);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scaleX(1);
+  }
+}
+html[data-arrived='done'] .sa-cue {
+  opacity: 1;
+}
+/* s-A.js 在第一次真正推动之后给 body 挂 .sa-walked */
+body.sa-walked .sa-cue {
+  opacity: 0;
+  transition-delay: 0s;
+  transition-duration: 0.9s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* 关掉动效也还得是一处地方：字直接落位，浮动的那道细线停住。 */
+  .sa-cue i {
+    animation: none;
+    opacity: 0.5;
+  }
+  .sa-verse {
+    transform: none;
+  }
+}
+@media (max-width: 640px) {
+  /* 窄屏上「拖动」和「滚轮」都得换成手势的说法，而且要让开右下角那行回索引：
+     竖屏的底边是唯一的可停留处，字一挤就谁也读不清。 */
+  .sa-cue {
+    bottom: 96px;
+    font-size: 9.5px;
+    letter-spacing: 0.16em;
+    gap: 8px;
+    /* 窄屏上底子更暗、字更小，压到同一个灰度就读不清了：提一点 */
+    color: rgb(186, 180, 208 / 0.68);
+  }
+  .sa-cue i {
+    width: 18px;
+  }
+}

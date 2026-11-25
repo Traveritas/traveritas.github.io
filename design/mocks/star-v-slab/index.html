@@ -1,0 +1,690 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>立体星 · 挤出方向</title>
+<link rel="stylesheet" href="/fonts/noto/font.css">
+<link rel="icon" href="data:,">
+<style>
+  :root {
+    --bg: #f0f3f6;
+    --bg-sunken: #e5ebf2;
+    --fg: #232830;
+    --fg-soft: #56606d;
+    --fg-faint: #858f9d;
+    --line: rgba(35, 40, 48, 0.12);
+    --dream: #9389ae;
+    --umber: #4f4a66;
+    --amber: #9a86c4;
+    --deep: #2a2b38;
+    --font-display: 'Noto Serif SC', 'Palatino Linotype', Palatino, Georgia, serif;
+    --font-body: system-ui, 'PingFang SC', 'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.72;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 1760px; margin: 0 auto; padding: 60px 40px 140px; }
+
+  header.head { margin-bottom: 50px; }
+  header.head h1 {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 26px;
+    letter-spacing: 0.05em;
+    margin: 0 0 12px;
+  }
+  header.head p { margin: 0; max-width: 42em; color: var(--fg-soft); font-size: 14px; }
+  .kicker {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--fg-faint);
+    margin: 0 0 16px;
+  }
+
+  section { margin: 0 0 72px; }
+  section > h2 {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 17px;
+    letter-spacing: 0.04em;
+    margin: 0 0 8px;
+  }
+  section > .lede {
+    margin: 0 0 26px;
+    max-width: 44em;
+    color: var(--fg-soft);
+    font-size: 13.5px;
+  }
+  .num {
+    display: inline-block;
+    width: 1.7em;
+    color: var(--fg-faint);
+    font-family: var(--font-mono);
+    font-size: 12px;
+  }
+
+  /* ── 控件条 ── */
+  .bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px;
+    align-items: flex-end;
+    padding: 15px 18px;
+    margin-bottom: 28px;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    background: color-mix(in srgb, #ffffff 48%, transparent);
+  }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field > span {
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--fg-faint);
+  }
+  .seg { display: flex; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+  .seg button {
+    appearance: none;
+    border: 0;
+    border-right: 1px solid var(--line);
+    background: transparent;
+    color: var(--fg-soft);
+    font: 12px/1 var(--font-body);
+    padding: 7px 12px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  .seg button:last-child { border-right: 0; }
+  .seg button[aria-pressed='true'] { background: var(--fg); color: var(--bg); }
+  .seg button:hover:not([aria-pressed='true']) { background: color-mix(in srgb, var(--fg) 6%, transparent); }
+
+  /* ── 方格 ── */
+  .grid { position: relative; }
+  .grid canvas { display: block; }
+  .cell-label {
+    position: absolute;
+    transform: translateX(-50%);
+    text-align: center;
+    pointer-events: none;
+    line-height: 1.45;
+    width: 180px;
+  }
+  .cell-label b {
+    display: block;
+    font-weight: 500;
+    font-size: 12px;
+    color: var(--fg);
+    letter-spacing: 0.02em;
+  }
+  .cell-label i {
+    display: block;
+    font-style: normal;
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    letter-spacing: 0.06em;
+    color: var(--fg-faint);
+  }
+
+  .row-note {
+    margin: 6px 0 22px;
+    font-size: 12.5px;
+    color: var(--fg-faint);
+  }
+
+  /* ── 判定表 ── */
+  table.verdict {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 30px 0 0;
+    font-size: 13px;
+  }
+  table.verdict th, table.verdict td {
+    text-align: left;
+    padding: 9px 14px 9px 0;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+  }
+  table.verdict th {
+    font-weight: 500;
+    font-size: 10.5px;
+    font-family: var(--font-mono);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--fg-faint);
+  }
+  table.verdict td:first-child { white-space: nowrap; color: var(--fg); }
+  table.verdict td.mono { font-family: var(--font-mono); font-size: 11.5px; color: var(--fg-soft); white-space: nowrap; }
+  .keep { color: #6c6584; }
+  .drop { color: var(--fg-faint); }
+
+  .selfcheck {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    line-height: 1.9;
+    color: var(--fg-soft);
+    background: color-mix(in srgb, #ffffff 52%, transparent);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 14px 18px;
+    white-space: pre-wrap;
+  }
+  .selfcheck b { color: var(--fg); font-weight: 500; }
+
+  footer.end {
+    margin-top: 80px;
+    padding-top: 22px;
+    border-top: 1px solid var(--line);
+    font-size: 12.5px;
+    color: var(--fg-faint);
+    max-width: 44em;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="head">
+  <p class="kicker">醒梦 · 立体星 · 第三路</p>
+  <h1>挤出：给一颗平面星真实的厚度</h1>
+  <p>
+    截面就是 <code>star-flat</code> 那条已经验收过的等臂四芒星，一点没改。六种给厚度的方式并排摆着，
+    材质三档都只为一件难事服务 —— 让它在一片接近白的底色上把自己交代清楚。
+  </p>
+</header>
+
+<div class="bar">
+  <div class="field">
+    <span>材质</span>
+    <div class="seg" id="mat-seg"></div>
+  </div>
+  <div class="field">
+    <span>尺寸标注</span>
+    <div class="seg" id="switch-notes">
+      <button data-on="1" aria-pressed="true">显示</button>
+      <button data-on="0" aria-pressed="false">隐去</button>
+    </div>
+  </div>
+</div>
+
+<!-- 01 ─────────────────────────────────────────────── -->
+<section id="sec-cand">
+  <h2><span class="num">01</span>形状对照</h2>
+  <p class="lede">
+    同一姿态（三分之四视，pitch 16° / yaw 24°）、同一种材质、200px。上排落在页面底色 <code>#f0f3f6</code>，
+    下排落在深色 <code>#2a2b38</code> —— 下排只用来判剪影，材质在它上面不作数。
+  </p>
+  <div class="grid" id="cand-grid"></div>
+  <table class="verdict" id="verdict">
+    <thead><tr><th>形</th><th>读起来是什么</th><th>厚度 / 倒角</th><th>判断</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</section>
+
+<!-- 02 ─────────────────────────────────────────────── -->
+<section id="sec-thick">
+  <h2><span class="num">02</span>厚度与倒角</h2>
+  <p class="lede">
+    厚度一律是「厚度 ÷ 宽度」：星宽 2，所以 12% 就是半厚 0.12。上两排是同一档厚度的两种写法，
+    第三排把倒角宽度摊开，第四排只动倒角吃掉多深的厚度。
+  </p>
+  <div class="grid" id="thick-grid"></div>
+  <p class="row-note">
+    第三、四排是 400px，只为了把那条倒角带看清 —— 一个 200px 的星上，10% 的倒角只有 20px 宽，
+    过两枚像素就被抹平。
+  </p>
+</section>
+
+<!-- 03 ─────────────────────────────────────────────── -->
+<section id="sec-break">
+  <h2><span class="num">03</span>拆解</h2>
+  <p class="lede">
+    留下的两个形，各三个姿态、两种材质、400px。</p>
+  <div class="grid" id="break-grid"></div>
+</section>
+
+<!-- 04 ─────────────────────────────────────────────── -->
+<section id="sec-strip">
+  <h2><span class="num">04</span>静止帧条</h2>
+  <p class="lede">
+    定格的一整圈：12 格取其中 6 格（步长 2），160px。每一格都是真的停在那里的一帧，不是补间途中的某一瞬间。
+  </p>
+  <div class="grid" id="strip-grid"></div>
+</section>
+
+<!-- 05 ─────────────────────────────────────────────── -->
+<section id="sec-size">
+  <h2><span class="num">05</span>尺寸</h2>
+  <p class="lede">
+    64 / 96 / 144 / 240px，同一个姿态。上一份原型的结论是「3D 在 64px 以下换不到任何东西」——
+    这里复核它在有明确正面的形状上是否仍然成立。
+  </p>
+  <div class="grid" id="size-grid"></div>
+</section>
+
+<!-- 06 ─────────────────────────────────────────────── -->
+<section id="sec-axis">
+  <h2><span class="num">06</span>轴</h2>
+  <p class="lede">
+    同样的六格，四条不同的轴。绕板自己的法线转，正面整圈朝着观者；绕竖轴转，每圈有两次完全侧过去；
+    绕横轴翻，两次完全背过去；往返那一行永远不走满一整圈，只在两个好姿态之间来回。
+  </p>
+  <div class="grid" id="axis-grid"></div>
+  <table class="verdict" id="axis-table">
+    <thead><tr><th>轴</th><th>正面平均余弦</th><th>四支等长</th><th>压瘪的格数</th><th>最短 / 最长</th></tr></thead>
+    <tbody></tbody>
+  </table>
+  <p class="row-note" id="axis-note">
+    判据是四个尖端在屏幕上的实际投影长度（精确解，不渲染）：一支被压短，四芒星就朝透镜退了一步。
+    「四支等长」= 最短那支还有最长那支的 72% 以上；「压瘪」= 掉到 45% 以下。
+  </p>
+</section>
+
+<!-- 代价 ───────────────────────────────────────────── -->
+<section id="sec-cost">
+  <h2><span class="num">07</span>代价</h2>
+  <p class="lede">
+    480×480 缓冲、DPR 1，每档跑 0.42 s 纯提交 + 0.32 s 带 <code>gl.finish()</code> 的合成计时。
+    「每秒占用」＝ 合成成本 ÷ 保持时长 —— 定格模式下星不是每帧都在画，格与格之间完全不提交。
+  </p>
+  <button id="m-btn" style="appearance:none;border:1px solid var(--line);background:color-mix(in srgb,#fff 60%,transparent);color:var(--fg);font:12px/1 var(--font-body);padding:8px 16px;border-radius:4px;cursor:pointer;margin-bottom:20px">跑一次测算</button>
+  <div id="m-out" style="font-family:var(--font-mono);font-size:11.5px;color:var(--fg-soft)">未跑。</div>
+  <table class="verdict" id="m-table" hidden>
+    <thead><tr><th>形 · 材质</th><th>提交 ms/帧</th><th>合成 ms/帧</th><th>draw calls</th><th>三角形</th><th>programs</th></tr></thead>
+    <tbody></tbody>
+  </table>
+  <table class="verdict" id="h-table" hidden>
+    <thead><tr><th>保持时长</th><th>每秒画几次</th><th>每秒占用 ms</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</section>
+
+<!-- 自检 ───────────────────────────────────────────── -->
+<section id="sec-self">
+  <h2><span class="num">08</span>自检</h2>
+  <p class="lede">
+    截面没有重新画过 —— 它是把 <code>star-flat/star.js</code> 的 path 解析出来的。
+    下面第一段把解析出来的折线与浏览器自己沿那条 path 走的点对回来。
+  </p>
+  <div class="selfcheck" id="selfcheck">测量中…</div>
+</section>
+
+<footer class="end">
+  这一页只读 <code>star-flat/star.js</code> 与 <code>node_modules/three</code>，不写任何一处站点文件。
+  数值结论在 <code>notes.md</code>。
+</footer>
+
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "/three/build/three.module.js",
+    "three/addons/": "/three/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import {
+  PAGE, PAGE_HEX, CANDIDATES, CAND_ORDER, MAT_ORDER, MAT_LABEL,
+  AXIS_ORDER, AXES, mountGrid, SlabLayer, schedule,
+  starOutline, verifyOutline, geometryOf, geometryAny, poseReadout, measureCost,
+  tipSpans, edgeShare, bevelBandPx
+} from './src.js';
+
+const q = new URLSearchParams(location.search);
+const SHOW_NOTES = q.get('notes') !== '0';
+let MAT = q.get('mat') && MAT_ORDER.includes(q.get('mat')) ? q.get('mat') : 'resin';
+if (!q.get('mat') && !MAT_ORDER.includes(MAT)) MAT = 'resin';
+if (MAT_ORDER.includes(q.get('mat'))) MAT = q.get('mat');
+
+const STEPS = +(q.get('steps') || 12);
+const HOLD = +(q.get('holdMs') || 120);
+
+/* ── 小工具：把 mountGrid 的 layout 变成一层 HTML 标注 ── */
+function mountSection(el, rows, opts = {}) {
+  const wrap = document.createElement('div');
+  wrap.className = 'grid';
+  el.appendChild(wrap);
+  const canvas = document.createElement('canvas');
+  wrap.appendChild(canvas);
+  const grid = mountGrid(canvas, { rows, gap: opts.gap ?? 18, pad: 0, labelRoom: opts.labelRoom ?? 40 });
+  const labels = [];
+  const place = () => {
+    for (const l of labels) l.remove();
+    labels.length = 0;
+    for (const c of grid.layout) {
+      if (!c.label) continue;
+      const d = document.createElement('div');
+      d.className = 'cell-label';
+      d.style.left = `${c.left + c.size / 2}px`;
+      /* 标注落在这一行下面预留的那条带里，不会压到下一行 */
+      d.style.top = `${c.top + c.offsetY + c.size + 7}px`;
+      d.innerHTML = `<b>${c.label}</b>${c.sub ? `<i>${c.sub}</i>` : ''}`;
+      if (!SHOW_NOTES) d.style.display = 'none';
+      wrap.appendChild(d);
+      labels.push(d);
+    }
+    wrap.style.height = `${grid.height}px`;
+  };
+  place();
+  return { grid, wrap, canvas, place };
+}
+
+/* ── 01 形状对照 ─────────────────────────────────── */
+const candCells = CAND_ORDER.map((k) => ({
+  geo: { cand: k },
+  bg: 'light',
+  size: 200,
+  base: 'still',
+  label: CANDIDATES[k].label,
+  sub: k,
+}));
+const candSec = mountSection(document.getElementById('cand-grid'), [
+  { kind: 'row', cells: candCells },
+  {
+    kind: 'row',
+    cells: candCells.map((c) => ({ ...c, bg: 'deep', label: '', sub: '' })),
+  },
+].map((r) => ({ cells: r.cells.map((c) => ({ ...c, mat: MAT })) })), { gap: 20 });
+
+const verdictRows = [
+  ['直挤出 <span style="color:var(--fg-faint)">slab</span>', '一块切得干干净净的板。两个面法线一样，浅底上只有一个调子', '12%', 'drop', '删：看起来像一枚剪纸上贴了层玻璃'],
+  ['倒角厚板 <span style="color:var(--fg-faint)">bevel</span>', '板上多了一圈吃光的边。腰线把「厚」这件事说清了', '12% · 倒角 10% / 0.55', 'keep', '留下：最稳的一个'],
+  ['双锥 <span style="color:var(--fg-faint)">bipyramid</span>', '前后出双尖，棱面全从中心散开。更像宝石，但平面星的那张脸没了', '尖高 50%', 'drop', '删：正面份额 0.00 —— 没有一片脸朝向观者'],
+  ['单面尖 <span style="color:var(--fg-faint)">pointed</span>', '正面出尖，背面平。斜看像一枚切过的石头，正看又塌回平面', '尖高 55%', 'drop', '删：好的那一格太少，转起来忽立忽塌'],
+  ['内凹厚板 <span style="color:var(--fg-faint)">dished</span>', '正面凹成碟，法线散开，正面确实是一串台阶', '凹深 34%', 'drop', '删：台阶太碎，读成「表面不平」而不是「有体积」'],
+  ['六角星柱 <span style="color:var(--fg-faint)">hexagram</span>', '十二个尖围成一圈，一条腰线横穿整颗 —— 它是真六尖', '9% · 倒角 9% / 0.5', 'keep', '留下（另一支）：正面份额最高，但不再是站内那颗星'],
+];
+const tb = document.querySelector('#verdict tbody');
+for (const [name, what, num, cls, verdict] of verdictRows) {
+  const tr = document.createElement('tr');
+  tr.innerHTML = `<td>${name}</td><td>${what}</td><td class="mono">${num}</td><td class="${cls}">${verdict}</td>`;
+  tb.appendChild(tr);
+}
+
+/* ── 02 厚度与倒角 ───────────────────────────────── */
+const NARROW = { over: { bevelW: 0.1, bevelD: 0.55, bevelSteps: 2 } };
+const thickRows = [
+  {
+    cells: [0.06, 0.12, 0.2, 0.3].map((t) => ({
+      kind: 'slab', over: { thick: t }, mat: MAT, bg: 'light', size: 200, base: 'still',
+      label: `直挤出 ${Math.round(t * 100)}%`, sub: `thick ${t.toFixed(2)}`,
+    })),
+  },
+  {
+    cells: [0.06, 0.12, 0.2, 0.3].map((t) => ({
+      kind: 'bevel', over: { ...NARROW.over, thick: t }, mat: MAT, bg: 'light', size: 200, base: 'still',
+      label: `倒角板 ${Math.round(t * 100)}%`, sub: `thick ${t.toFixed(2)}`,
+    })),
+  },
+  {
+    cells: [0.03, 0.07, 0.11, 0.16].map((w) => ({
+      kind: 'bevel', over: { thick: 0.12, bevelW: w, bevelD: 0.55, bevelSteps: 2 }, mat: MAT, bg: 'light', size: 400, base: 'still',
+      label: `倒角宽 ${Math.round(w * 100)}%`, sub: `bevelW ${w.toFixed(2)}`,
+    })),
+  },
+  {
+    cells: [0.3, 0.55, 0.8, 1.0].map((d) => ({
+      kind: 'bevel', over: { thick: 0.12, bevelW: 0.1, bevelD: d, bevelSteps: 3 }, mat: MAT, bg: 'light', size: 400, base: 'still',
+      label: `倒角深 ${Math.round(d * 100)}%`, sub: `bevelD ${d.toFixed(2)}`,
+    })),
+  },
+];
+const thickSec = mountSection(document.getElementById('thick-grid'), thickRows.map((r) => ({ cells: r.cells })), { gap: 20 });
+
+/* ── 03 拆解 ─────────────────────────────────────── */
+/* 这一节用显式角度：poseQuat 认 pitchDeg / yawDeg。 */
+const BREAK = [
+  {
+    cells: [
+      { cand: 'bevel', label: '正对', sub: 'pitch 0 / yaw 0', pitchDeg: 0, yawDeg: 0 },
+      { cand: 'bevel', label: '三分之四视', sub: 'pitch 16 / yaw 24' },
+      { cand: 'bevel', label: '侧过去一半', sub: 'pitch 16 / yaw 48', yawDeg: 48 },
+    ],
+  },
+  {
+    cells: [
+      { cand: 'bevel', mat: 'crystal', label: '近白晶体', sub: '正对', pitchDeg: 0, yawDeg: 0, fixedMat: true },
+      { cand: 'bevel', mat: 'crystal', label: '近白晶体', sub: '三分之四视', fixedMat: true },
+      { cand: 'bevel', mat: 'edge', label: '淡体 + 棱线', sub: '三分之四视', fixedMat: true },
+    ],
+  },
+  {
+    cells: [
+      { cand: 'hexagram', label: '六角星柱', sub: '正对', pitchDeg: 0, yawDeg: 0 },
+      { cand: 'hexagram', label: '六角星柱', sub: 'yaw 20', yawDeg: 20 },
+      { cand: 'hexagram', mat: 'edge', label: '六角星柱 + 棱线', sub: 'yaw 20', yawDeg: 20, fixedMat: true },
+    ],
+  },
+];
+const breakSec = mountSection(
+  document.getElementById('break-grid'),
+  BREAK.map((r) => ({
+    cells: r.cells.map((c) => ({
+      geo: { cand: c.cand },
+      mat: c.mat || MAT,
+      bg: 'light',
+      size: 400,
+      ...(c.pitchDeg != null ? { pitchDeg: c.pitchDeg } : {}),
+      ...(c.yawDeg != null ? { yawDeg: c.yawDeg } : {}),
+      base: 'still',
+      fixedMat: !!c.fixedMat,
+      label: c.label,
+      sub: c.sub,
+    })),
+  })),
+  { gap: 20 },
+);
+
+/* ── 04 静止帧条 ─────────────────────────────────── */
+const STRIP_K = [0, 2, 4, 6, 8, 10];
+const stripSec = mountSection(document.getElementById('strip-grid'), [
+  {
+    cells: STRIP_K.map((k) => ({
+      geo: { cand: 'bevel' }, mat: MAT, bg: 'light', size: 160, steps: STEPS, holdMs: HOLD, axis: q.get('axis') || 'face', k,
+      label: `第 ${k} 格`, sub: `k=${k}`,
+    })),
+  },
+  {
+    cells: STRIP_K.map((k) => ({
+      geo: { cand: 'hexagram' }, mat: MAT, bg: 'light', size: 160, steps: STEPS, holdMs: HOLD, axis: q.get('axis') || 'face', k,
+      label: `第 ${k} 格`, sub: `k=${k}`,
+    })),
+  },
+], { gap: 16 });
+
+/* ── 05 尺寸 ─────────────────────────────────────── */
+const SIZES = [64, 96, 144, 240];
+const sizeSec = mountSection(document.getElementById('size-grid'), [
+  {
+    cells: SIZES.map((s) => ({
+      geo: { cand: 'bevel' }, mat: MAT, bg: 'light', size: s, base: 'still',
+      label: `${s} px`, sub: 'bevel',
+    })),
+  },
+  {
+    cells: SIZES.map((s) => ({
+      geo: { cand: 'hexagram' }, mat: MAT, bg: 'light', size: s, base: 'still',
+      label: `${s} px`, sub: 'hexagram',
+    })),
+  },
+  {
+    cells: SIZES.map((s) => ({
+      geo: { cand: 'bevel' }, mat: MAT, bg: 'light', size: s, steps: STEPS, holdMs: HOLD, axis: 'face', k: 3,
+      label: `${s} px`, sub: '面内自转 · 第 3 格',
+    })),
+  },
+], { gap: 20 });
+
+/* ── 06 轴 ───────────────────────────────────────── */
+const axisSec = mountSection(document.getElementById('axis-grid'), AXIS_ORDER.map((ax) => ({
+  cells: STRIP_K.map((k) => ({
+    geo: { cand: 'bevel' }, mat: MAT, bg: 'light', size: 150, steps: STEPS, holdMs: HOLD, axis: ax, k,
+    label: k === 0 ? AXES[ax].label : '', sub: k === 0 ? `k=${k}` : `${k}`,
+  })),
+})), { gap: 14 });
+
+/* 判据是四支在屏幕上的实际长度（tipSpans，精确解），不是包围盒、也不是数尖：
+   一块板侧过去时，透镜的两端也是尖，数尖会被它骗过去。 */
+const atb = document.querySelector('#axis-table tbody');
+const axisStats = [];
+for (const ax of AXIS_ORDER) {
+  const t = tipSpans({ axis: ax, steps: STEPS });
+  const r = poseReadout({ axis: ax, steps: STEPS });
+  axisStats.push({ ax, meanFace: r.meanFace, ...t });
+  const tr = document.createElement('tr');
+  tr.innerHTML = `<td>${AXES[ax].label}</td><td class="mono">${t.meanFace}</td>`
+    + `<td class="mono">${t.evenSteps} / ${STEPS}</td><td class="mono">${t.crushed}</td>`
+    + `<td class="mono">${t.meanRatio} · 最差 ${t.minRatio}</td>`;
+  atb.appendChild(tr);
+}
+
+/* ── 材质切换 ────────────────────────────────────── */
+const matSeg = document.getElementById('mat-seg');
+for (const m of MAT_ORDER) {
+  const b = document.createElement('button');
+  b.textContent = MAT_LABEL[m];
+  b.dataset.mat = m;
+  b.setAttribute('aria-pressed', String(m === MAT));
+  b.addEventListener('click', () => {
+    MAT = m;
+    for (const x of matSeg.children) x.setAttribute('aria-pressed', String(x.dataset.mat === m));
+    for (const sec of [candSec, thickSec, breakSec, stripSec, sizeSec, axisSec]) {
+      sec.grid.repaint((cells) => {
+        for (const c of cells) if (!c.fixedMat) c.mat = m;
+      });
+    }
+    const u = new URL(location.href);
+    u.searchParams.set('mat', m);
+    history.replaceState(null, '', u);
+  });
+  matSeg.appendChild(b);
+}
+
+document.querySelectorAll('#switch-notes button').forEach((b) => {
+  b.addEventListener('click', () => {
+    const on = b.dataset.on === '1';
+    document.querySelectorAll('#switch-notes button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    for (const sec of [candSec, thickSec, breakSec, stripSec, sizeSec, axisSec]) {
+      sec.wrap.querySelectorAll('.cell-label').forEach((n) => { n.style.display = on ? '' : 'none'; });
+    }
+  });
+});
+
+/* ── 代价 ────────────────────────────────────────── */
+document.getElementById('m-btn').addEventListener('click', async () => {
+  const btn = document.getElementById('m-btn');
+  btn.disabled = true;
+  btn.textContent = '测算中…';
+  try {
+    const { rows, holdPlan, size } = await measureCost();
+    const mt = document.getElementById('m-table');
+    const mb = mt.querySelector('tbody');
+    mb.innerHTML = '';
+    for (const r of rows) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${r.cand} · ${MAT_LABEL[r.mat] || r.mat}</td>`
+        + `<td class="mono">${r.cpu.toFixed(3)}</td><td class="mono">${r.gpu.toFixed(3)}</td>`
+        + `<td class="mono">${r.calls}</td><td class="mono">${r.tris}</td><td class="mono">${r.programs}</td>`;
+      mb.appendChild(tr);
+    }
+    mt.hidden = false;
+    const ht = document.getElementById('h-table');
+    const hb = ht.querySelector('tbody');
+    hb.innerHTML = '';
+    for (const h of holdPlan) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td class="mono">${h.holdMs} ms</td><td class="mono">${h.drawsPerSec}</td><td class="mono">${h.msPerSec}</td>`;
+      hb.appendChild(tr);
+    }
+    ht.hidden = false;
+    document.getElementById('m-out').textContent = `跑完。缓冲 ${size}×${size}，DPR 1。`;
+    window.__cost = { rows, holdPlan };
+  } catch (e) {
+    document.getElementById('m-out').textContent = '失败：' + e.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '再跑一次';
+  }
+});
+
+/* ── 自检 ────────────────────────────────────────── */
+const selfEl = document.getElementById('selfcheck');
+const lines = [];
+try {
+  for (const cross of ['equal', 'spire', 'facet']) {
+    const v = verifyOutline(cross);
+    const ol = starOutline(cross);
+    lines.push(`截面 ${cross.padEnd(7)} 顶点 ${String(ol.pts.length).padStart(3)}  ·  与 path 的最大偏差 ${v.maxDev} u（200px 下 ${v.at200px}px）  ${v.ok ? '✓' : '✗'}`);
+  }
+} catch (e) {
+  lines.push('截面自检失败：' + e.message);
+}
+
+const probes = [
+  ['cand', candSec.grid],
+  ['thick', thickSec.grid],
+  ['strip', stripSec.grid],
+  ['size', sizeSec.grid],
+  ['axis', axisSec.grid],
+];
+for (const [name, g] of probes) {
+  const p = g.probe();
+  const cov = p.cells.map((c) => c.coverage).join(' / ');
+  const con = p.cells.map((c) => c.contrast).join(' / ');
+  lines.push(`§${name.padEnd(6)} 缓冲 ${p.buffer}  calls ${p.calls}  覆盖 ${cov}`);
+  lines.push(`        与底色峰值差 ${con}`);
+}
+for (const s of axisStats) {
+  lines.push(`轴 ${s.ax.padEnd(5)} 正面均 ${s.meanFace}  四支等长 ${s.evenSteps}/${STEPS}  压瘪 ${s.crushed}  最短/最长 ${s.meanRatio} · 最差 ${s.minRatio}`);
+}
+
+selfEl.textContent = lines.join('\n');
+
+/* 暴露给截图脚本 */
+window.__slab = {
+  MAT,
+  CANDIDATES,
+  starOutline,
+  verifyOutline,
+  bevelBandPx,
+  edgeShare,
+  probe: () => ({
+    mat: MAT,
+    cand: candSec.grid.probe().cells,
+    strip: stripSec.grid.probe().cells,
+    axis: axisSec.grid.probe().cells,
+    axisStats,
+    readout: AXIS_ORDER.map((a) => poseReadout({ axis: a, steps: STEPS })),
+    candidates: CAND_ORDER.map((k) => ({
+      key: k,
+      ...edgeShare(CANDIDATES[k].kind, CANDIDATES[k].p),
+    })),
+    bevelBands: [0.03, 0.07, 0.1, 0.11, 0.16].map((w) => ({
+      bevelW: w,
+      at64: bevelBandPx(w, 64),
+      at200: bevelBandPx(w, 200),
+      at400: bevelBandPx(w, 400),
+    })),
+  }),
+};
+window.__ready = true;
+</script>
+</body>
+</html>

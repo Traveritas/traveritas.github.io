@@ -1,0 +1,89 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>refract</title>
+<style>
+  body { margin:0; background:#f0f3f6; font:11px/1.4 monospace; }
+  #g { display:flex; flex-wrap:wrap; }
+  .c { width:200px; } canvas { display:block; width:200px; height:200px; }
+  .l { text-align:center; padding:2px 0 10px; color:#56606d; }
+  .c.opaque { background:#f0f3f6; }
+</style></head>
+<body><div id="g"></div>
+<script type="importmap">{"imports":{"three":"/three/build/three.module.js"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import { buildStarGeometry } from './src.js';
+
+const CASES = [
+  { k: 'tr1 ior1.0 th0',   transmission: 1, ior: 1.0,  thickness: 0,    disp: 0 },
+  { k: 'tr1 ior1.5 th0',   transmission: 1, ior: 1.5,  thickness: 0,    disp: 0 },
+  { k: 'tr1 ior1.72 th0',  transmission: 1, ior: 1.72, thickness: 0,    disp: 0 },
+  { k: 'tr1 ior1.72 th.3', transmission: 1, ior: 1.72, thickness: 0.3,  disp: 0 },
+  { k: 'tr1 ior1.72 th1.1',transmission: 1, ior: 1.72, thickness: 1.15, disp: 0 },
+  { k: 'tr.6 ior1.72 th.5',transmission: 0.6, ior: 1.72, thickness: 0.5, disp: 0 },
+  { k: 'tr1 ior1.72 disp.4',transmission: 1, ior: 1.72, thickness: 0.3, disp: 0.4 },
+  { k: 'tr0 (opaque-ish)', transmission: 0, ior: 1.72, thickness: 0.3,  disp: 0, opacity: 0.55, transparent: true },
+];
+
+const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+renderer.setPixelRatio(1);
+renderer.setSize(200, 200, false);
+renderer.setClearAlpha(0);
+renderer.toneMapping = THREE.NeutralToneMapping;
+
+const cam = new THREE.PerspectiveCamera(28, 1, 0.1, 60);
+cam.position.set(0, 0, 5.4);
+
+const envRT = (() => {
+  const cv = document.createElement('canvas'); cv.width = 1024; cv.height = 512;
+  const g = cv.getContext('2d');
+  const sky = g.createLinearGradient(0, 0, 0, 512);
+  ['#ffffff','#f7f9fc','#dde4ee','#ffffff','#c3ccd9','#8b96a6','#454e5c'].forEach((c,i,a)=>sky.addColorStop(i/(a.length-1),c));
+  g.fillStyle = sky; g.fillRect(0,0,1024,512);
+  const blob=(x,y,r,c,al)=>{const rg=g.createRadialGradient(x,y,0,x,y,r);rg.addColorStop(0,c);rg.addColorStop(1,'rgba(255,255,255,0)');g.globalAlpha=al;g.fillStyle=rg;g.beginPath();g.arc(x,y,r,0,7);g.fill();g.globalAlpha=1;};
+  blob(268,132,210,'#ffffff',1); blob(760,96,150,'#ffffff',.9); blob(120,250,170,'#ffffff',.55);
+  blob(560,300,260,'#d6cfe6',.5); blob(900,210,190,'#6e7a8b',.55); blob(400,236,150,'#7b8494',.42);
+  blob(20,420,300,'#3f4854',.7);
+  const t = new THREE.CanvasTexture(cv);
+  t.mapping = THREE.EquirectangularReflectionMapping;
+  t.colorSpace = THREE.SRGBColorSpace;
+  const pm = new THREE.PMREMGenerator(renderer);
+  const rt = pm.fromEquirectangular(t);
+  t.dispose(); pm.dispose();
+  return rt;
+})();
+
+const geo = buildStarGeometry();
+const qBase = new THREE.Quaternion().setFromEuler(new THREE.Euler(35.264*Math.PI/180, 45*Math.PI/180, 0, 'YXZ'));
+const host = document.getElementById('g');
+
+for (const c of CASES) {
+  const cv = document.createElement('canvas');
+  const box = document.createElement('div'); box.className='c';
+  box.append(cv);
+  const lab = document.createElement('div'); lab.className='l'; lab.textContent = c.k;
+  box.append(lab); host.append(box);
+
+  const sc = new THREE.Scene();
+  sc.environment = envRT.texture;
+  const k = new THREE.DirectionalLight(0xffffff, 2.1); k.position.set(3.2,4.4,4.6);
+  const f = new THREE.DirectionalLight(0xdce4f2, .85); f.position.set(-4.2,-1.6,2.4);
+  const r = new THREE.DirectionalLight(0x9a86c4, .8); r.position.set(-1.6,2.2,-4.4);
+  sc.add(k,f,r);
+  const mat = new THREE.MeshPhysicalMaterial({
+    color: 0xffffff, metalness: 0, roughness: 0.06,
+    transmission: c.transmission, ior: c.ior, thickness: c.thickness,
+    dispersion: c.disp ?? 0,
+    iridescence: 0.6, iridescenceIOR: 1.3, iridescenceThicknessRange: [180, 520],
+    clearcoat: 1, clearcoatRoughness: 0.04,
+    envMapIntensity: 1.2,
+    opacity: c.opacity ?? 1, transparent: c.transparent ?? false,
+    side: THREE.DoubleSide,
+  });
+  const m = new THREE.Mesh(geo, mat); m.quaternion.copy(qBase);
+  sc.add(m);
+  renderer.render(sc, cam);
+  cv.width = 200; cv.height = 200;
+  cv.getContext('2d').drawImage(renderer.domElement, 0, 0, 200, 200);
+}
+document.title = 'ready';
+</script></body></html>

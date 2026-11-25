@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>probe3</title>
+    <style>
+      body { margin: 0; background: #f0f3f6; font: 12px system-ui, sans-serif; }
+      .row { display: flex; gap: 6px; padding: 6px 8px; flex-wrap: wrap; align-items: flex-end; }
+      .c { text-align: center; }
+      .c span { display: block; font-size: 10px; color: #56606d; }
+      .lead { padding: 8px 10px 0; font-weight: 600; color: #232830; }
+      svg { display: block; }
+    </style>
+  </head>
+  <body>
+    <div id="wrap"></div>
+    <script type="module">
+      import { svg, LIGHT } from './src.js';
+      const nrm = (v) => { const l = Math.hypot(...v); return v.map((x) => x / l); };
+      const rows = [];
+      const add = (title, list) => {
+        rows.push(`<div class="lead">${title}</div><div class="row">`);
+        for (const [o, lab, size, view] of list) rows.push(`<div class="c">${svg(o, { size, view })}<span>${lab}</span></div>`);
+        rows.push('</div>');
+      };
+      const F = 1.2;
+      // 光向扫描（4 边截面、整颗）
+      const dirs = {
+        'z 正向': [0, 0.05, 1],
+        'z+.3': [0, 0.2, 0.9],
+        '旧 light z.66': [-0.42, 0.62, 0.66],
+        '新 light z.79': [-0.34, 0.52, 0.79],
+        'y 主导': [0, 0.9, 0.43],
+        'y− 主导': [0, -0.9, 0.43],
+        'y−.5 z.8': [0, -0.5, 0.8],
+        'x− z.8': [-0.5, 0, 0.8],
+        '视角方向纯 z': [0.001, 0.001, 0.999],
+      };
+      add('光向扫描 · 4 边/整颗', Object.entries(dirs).map(([k, v]) => [{ fold: F, light: nrm(v) }, k, 200, 'full']));
+      add('光向扫描 · 8 边整颗', Object.entries(dirs).map(([k, v]) => [{ fold: F, sides: 8, light: nrm(v) }, k, 200, 'full']));
+      // 尖端放大
+      add('① 尖端 · 放大取景', [
+        [{ fold: F, tip: { kind: 'cusp' } }, 'cusp', 200, 'tip'],
+        [{ fold: F, tip: { kind: 'flat', len: 0.6 } }, 'flat .6', 200, 'tip'],
+        [{ fold: F, tip: { kind: 'flat', len: 1.4 } }, 'flat 1.4', 200, 'tip'],
+        [{ fold: F, tip: { kind: 'flat', len: 2.8 } }, 'flat 2.8', 200, 'tip'],
+        [{ fold: F, tip: { kind: 'round', rho: 0.35, segs: 3 } }, 'r .35/3', 200, 'tip'],
+        [{ fold: F, tip: { kind: 'round', rho: 0.7, segs: 3 } }, 'r .7/3', 200, 'tip'],
+        [{ fold: F, tip: { kind: 'round', rho: 1.2, segs: 4 } }, 'r 1.2/4', 200, 'tip'],
+        [{ fold: F, tip: { kind: 'round', rho: 2.0, segs: 4 } }, 'r 2.0/4', 200, 'tip'],
+      ]);
+      // 棱 放大
+      add('③ 棱 · 中心带（看轮廓）', [
+        [{ fold: F, rim: 0 }, 'rim 0', 200, 'core'],
+        [{ fold: F, rim: 0.08 }, 'rim .08', 200, 'core'],
+        [{ fold: F, rim: 0.18 }, 'rim .18', 200, 'core'],
+        [{ fold: F, rim: 0.3 }, 'rim .30', 200, 'core'],
+        [{ fold: F, rim: 0.18, turn: 0.3 }, 'r.18 t.3', 200, 'core'],
+        [{ fold: F, rim: 0.18, turn: -0.4 }, 'r.18 t−.4', 200, 'core'],
+        [{ fold: F, sides: 6, rim: 0.16 }, '6边 r.16', 200, 'core'],
+        [{ fold: F, sides: 8, rim: 0.16 }, '8边 r.16', 200, 'core'],
+      ]);
+      document.getElementById('wrap').innerHTML = rows.join('');
+    </script>
+  </body>
+</html>

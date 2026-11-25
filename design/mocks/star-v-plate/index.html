@@ -1,0 +1,624 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>六芒星 · 板与构造</title>
+<link rel="stylesheet" href="/fonts/noto/font.css">
+<link rel="icon" href="data:,">
+<style>
+  :root {
+    --bg: #f0f3f6;
+    --bg-sunken: #e5ebf2;
+    --fg: #232830;
+    --fg-soft: #56606d;
+    --fg-faint: #858f9d;
+    --line: rgba(35, 40, 48, 0.12);
+    --dream: #9389ae;
+    --umber: #4f4a66;
+    --amber: #9a86c4;
+    --deep: #2a2b38;
+    --font-display: 'Noto Serif SC', 'Palatino Linotype', Palatino, Georgia, serif;
+    --font-body: system-ui, 'PingFang SC', 'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.75;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 58px 32px 130px; }
+
+  header.head { margin-bottom: 52px; }
+  header.head h1 {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 27px;
+    letter-spacing: 0.05em;
+    margin: 0 0 12px;
+  }
+  header.head p { margin: 0 0 8px; max-width: 44em; color: var(--fg-soft); font-size: 14px; }
+  header.head p:last-child { margin-bottom: 0; }
+  .kicker {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--fg-faint);
+    margin: 0 0 16px;
+  }
+
+  section { margin: 0 0 76px; }
+  section > h2 {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 17.5px;
+    letter-spacing: 0.04em;
+    margin: 0 0 7px;
+  }
+  section > .lede {
+    margin: 0 0 26px;
+    max-width: 45em;
+    color: var(--fg-soft);
+    font-size: 13.5px;
+  }
+  .num {
+    display: inline-block;
+    width: 1.7em;
+    color: var(--fg-faint);
+    font-family: var(--font-mono);
+    font-size: 12px;
+  }
+  code {
+    font-family: var(--font-mono);
+    font-size: 0.92em;
+    color: var(--fg-soft);
+    background: color-mix(in srgb, var(--fg) 5%, transparent);
+    padding: 1px 4px;
+    border-radius: 3px;
+  }
+  b { font-weight: 600; }
+  em { font-style: normal; }
+
+  /* ── 控件条 ── */
+  .bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    align-items: flex-end;
+    padding: 15px 18px;
+    margin: 0 0 24px;
+    border-radius: 5px;
+    border: 1px solid var(--line);
+    background: color-mix(in srgb, #ffffff 42%, transparent);
+  }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field > span {
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--fg-faint);
+  }
+  .seg { display: flex; border: 1px solid var(--line); border-radius: 3px; overflow: hidden; }
+  .seg button {
+    appearance: none;
+    border: 0;
+    border-right: 1px solid var(--line);
+    background: transparent;
+    color: var(--fg-soft);
+    font: 11.5px/1 var(--font-mono);
+    padding: 7px 10px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  .seg button:last-child { border-right: 0; }
+  .seg button[aria-pressed='true'] { background: var(--fg); color: var(--bg); }
+  .seg button:hover:not([aria-pressed='true']) { background: color-mix(in srgb, var(--fg) 6%, transparent); }
+
+  /* ── 展台 ── */
+  .stagewrap { position: relative; margin: 0 auto; }
+  .stagewrap .stage { position: absolute; left: 0; top: 0; display: block; z-index: 1; }
+  .stagewrap .tile { position: absolute; z-index: 0; border-radius: 1px; }
+  .stagewrap .cap {
+    position: absolute;
+    z-index: 2;
+    text-align: center;
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    letter-spacing: 0.05em;
+    line-height: 1.5;
+    color: var(--fg-faint);
+  }
+  .stagewrap .cap em { display: block; font-size: 9px; opacity: 0.72; }
+
+  /* 拆解里那两格叠法 */
+  .stagewrap .fx { position: absolute; z-index: 3; pointer-events: none; }
+  .stagewrap .fx-glass {
+    border-radius: 4px;
+    border: 1px solid rgb(255 255 255 / 0.62);
+    background: color-mix(in srgb, #f0f3f6 46%, transparent);
+    backdrop-filter: blur(9px) saturate(112%);
+    -webkit-backdrop-filter: blur(9px) saturate(112%);
+    box-shadow: 0 1px 0 rgb(255 255 255 / 0.5) inset, 0 14px 40px rgb(38 44 51 / 0.14);
+  }
+  /* 被页面边裁掉一截：上缘用底色盖掉并渐隐 —— 它有一部分不在这张画面里 */
+  .stagewrap .fx-clip {
+    background: linear-gradient(to bottom, #f0f3f6 0 26%, rgb(240 243 246 / 0) 58%);
+  }
+
+  .tall { /* 大尺寸那两格 */
+    position: relative;
+  }
+
+  /* 一行分栏的地面说明 */
+  .gnd {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    letter-spacing: 0.12em;
+    color: var(--fg-faint);
+    text-transform: uppercase;
+    margin: 0 0 10px;
+  }
+
+  /* ── 表 ── */
+  table.perf {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    margin: 0 0 18px;
+  }
+  table.perf th, table.perf td {
+    text-align: left;
+    padding: 6px 10px 6px 0;
+    border-bottom: 1px solid var(--line);
+    font-weight: 400;
+    font-variant-numeric: tabular-nums;
+  }
+  table.perf th {
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--fg-faint);
+  }
+  table.perf td { font-family: var(--font-mono); color: var(--fg-soft); font-size: 11.5px; }
+  table.perf td.hi { color: var(--fg); font-weight: 500; }
+
+  .note {
+    font-size: 12px;
+    color: var(--fg-faint);
+    margin: 12px 0 0;
+    max-width: 52em;
+  }
+  .note b { color: var(--fg-soft); }
+
+  .measure { display: flex; gap: 14px; align-items: center; margin-bottom: 18px; }
+  .measure button {
+    appearance: none;
+    border: 1px solid var(--line);
+    background: color-mix(in srgb, #ffffff 55%, transparent);
+    color: var(--fg);
+    font: 12.5px/1 var(--font-body);
+    padding: 9px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .measure button:hover { background: #fff; }
+  .measure output { font-family: var(--font-mono); font-size: 11px; color: var(--fg-faint); }
+
+  .stripwrap { position: relative; }
+
+  .proto {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    color: var(--fg-faint);
+    border-top: 1px solid var(--line);
+    padding-top: 18px;
+  }
+
+  @media (max-width: 900px) {
+    .wrap { padding: 40px 18px 90px; }
+    .stagewrap { transform-origin: top left; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="head">
+    <p class="kicker">prototype · design/mocks/star-v-plate · port 4662</p>
+    <h1>六芒星 · 板与构造</h1>
+    <p>
+      这一版反着上一颗水晶下注。上一版把六个尖端做成一个实心尖球，剪影不对、白底上也没东西接光。
+      这里换一条路：<b>六个尖端不动，用薄的东西把它们连起来</b> ——
+      几条正交的薄板、一圈棱、一层壳。
+    </p>
+    <p>
+      看的不是「像不像宝石」，是它在浅底上还剩不剩一个<b>边界</b>，
+      并且那个边界后面还有没有<b>深度</b>。下面每一格都是同一套灯、同一个姿态时钟，
+      唯一的变量是构造与材质。
+    </p>
+  </header>
+
+  <section id="con-sec">
+    <h2><span class="num">01</span>构造对照</h2>
+    <p class="lede">
+      六种搭法，同一个姿态，各在两种底色上给一次：站点底色 <code>#f0f3f6</code>，
+      和一块更深的地面 <code>#2a2b38</code>。深底那一列只用来把剪影从材质里剥出来看 ——
+      它不代表站点上会出现这种底。姿态里绕竖轴自转的同时叠一个点头，
+      走一圈十二格；步数与保持时长的读数见第 06 段。
+    </p>
+    <div class="bar" id="con-bar">
+      <div class="field">
+        <span>材质</span>
+        <div class="seg" data-key="mat">
+          <button data-val="acrylic">磨砂亚克力</button>
+          <button data-val="edge">亚克力 + 暗边</button>
+          <button data-val="opaque">实心 + 暗边</button>
+        </div>
+      </div>
+      <div class="field">
+        <span>轮廓</span>
+        <div class="seg" data-key="profile">
+          <button data-val="facet">facet 直边</button>
+          <button data-val="equal">equal 等臂曲线</button>
+          <button data-val="spire">spire 竖长</button>
+        </div>
+      </div>
+      <div class="field">
+        <span>板厚</span>
+        <div class="seg" data-key="thickness">
+          <button data-val="0.03">3%</button>
+          <button data-val="0.045">4.5%</button>
+          <button data-val="0.07">7%</button>
+        </div>
+      </div>
+    </div>
+    <div class="stagewrap" id="con-stage"></div>
+    <p class="note">
+      读的时候问三句：<b>六个尖还在不在</b>；<b>看得见「前一层在把后一层挡住」吗</b>；
+      <b>它是一块贴着纸的图形，还是一个立着的东西</b>。
+    </p>
+    <p class="note">
+      轮廓默认是 <b>facet</b>（Ave 那条直边星），不是 equal。equal 的边是内凹二次曲线，
+      做成薄板之后四臂各是一条弧，三片正交起来读成一团弯曲的领结；
+      facet 的直边让每片板都是一块多边形，折痕与棱线才是直的。这一条是整个方向能成立的前提。
+    </p>
+  </section>
+
+  <section id="dis-sec">
+    <h2><span class="num">02</span>拆解 · 那一圈边</h2>
+    <p class="lede">
+      挑下来的两种构造放到 400px，四格并排：<b>不带暗边</b> / <b>带暗边</b> /
+      <b>同一姿态再压上一块磨砂玻璃</b> / <b>被页面边裁掉一截</b>。
+      前两格只差边，别的什么都不动。
+    </p>
+    <div class="stagewrap" id="dis-stage"></div>
+    <p class="note">
+      第三格是站点自己的 <code>backdrop-filter</code>（照 Toolstar 的玻璃卡），
+      用来回答「它能不能待在一层磨砂玻璃后面」。第四格用 <code>mask-image</code> 做底部渐隐。
+    </p>
+  </section>
+
+  <section id="strip-sec">
+    <h2><span class="num">03</span>静止帧条</h2>
+    <p class="lede">
+      一圈里连续六格，每格是它自己那一下定格。两件事要看：
+      相邻两格有没有真的不一样，以及整圈有没有两张几乎重合 ——
+      有的话，多出来的步数就是白花的。
+    </p>
+    <div class="measure" style="margin-bottom:12px">
+      <div class="seg" data-key="stripCon">
+        <button data-val="tri">三片正交薄板</button>
+        <button data-val="spine">一片 + 轴</button>
+        <button data-val="shell">空心棱壳</button>
+        <button data-val="frame">十二边框架</button>
+        <button data-val="fold">折起的星</button>
+        <button data-val="mixed">双片一环</button>
+      </div>
+      <div class="seg" data-key="stripMat">
+        <button data-val="acrylic">亚克力</button>
+        <button data-val="edge">+ 暗边</button>
+        <button data-val="opaque">实心</button>
+      </div>
+    </div>
+    <div class="stagewrap" id="strip-stage"></div>
+    <div class="stripwrap" id="live-stage" style="margin-top:26px"></div>
+    <p class="note">
+      上面那一排是停住的六帧；下面这一颗是活的，走的是同一台时钟：
+      <b>12 步 / 110ms</b>，整圈最后一格停 <b>3.2 倍</b>长。
+    </p>
+  </section>
+
+  <section id="size-sec">
+    <h2><span class="num">04</span>尺寸</h2>
+    <p class="lede">
+      同一构造在 240 / 144 / 96 / 64 上，上下两排分别是不带暗边与带暗边。
+      要找的是那条线：从哪一格往下，那圈发丝边就断成了点。
+    </p>
+    <div class="stagewrap" id="size-stage"></div>
+  </section>
+
+  <section id="perf-sec">
+    <h2><span class="num">05</span>代价</h2>
+    <p class="lede">
+      六种构造 × 三档材质，单帧重复采样，量的是 GPU 上那一段时间。
+      尺寸 320、光栅倍率 2，和上面那些格子的参数一致。全程约 20 秒。
+    </p>
+    <div class="measure">
+      <button id="m-btn" type="button">开始测算</button>
+      <output id="m-out">未运行</output>
+    </div>
+    <table class="perf" id="m-table" hidden>
+      <thead>
+        <tr><th>构造</th><th>材质</th><th>GPU ms/帧（中位）</th><th>p95</th><th>样本</th><th>draw calls</th><th>三角形</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <p class="note" id="m-note">
+      用 <code>EXT_disjoint_timer_query_webgl2</code> 量 GPU 上那一段，
+      单帧 40 个样本取中位与 p95。不是 wall clock —— 那东西在这里不可重复：
+      同一套参数连跑三轮，18 个格子里 14 个的读数自己抖超过 2 倍（最大 867 倍）。
+    </p>
+    <table class="perf" id="m-hold" hidden>
+      <thead>
+        <tr><th>保持时长</th><th>每秒绘制</th><th>三片薄板 ms/s</th><th>十二边框架 ms/s</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <section id="spread-sec">
+    <h2><span class="num">06</span>姿态离散度</h2>
+    <p class="lede">
+      把整圈的每一格渲成剪影，量相邻两格的 IoU 与整圈最像的一对。
+      这是「12 步到底买到了几个姿态」的硬读数 —— 这个构造对三个轴都有 90° 对称，
+      只自转的话一圈只有 4 个不重样的姿态，所以姿态里必须叠一个点头。
+    </p>
+    <div class="measure">
+      <button id="s-btn" type="button">量一轮</button>
+      <output id="s-out">未运行</output>
+    </div>
+    <table class="perf" id="s-table" hidden>
+      <thead>
+        <tr><th>构造</th><th>步数</th><th>相邻 IoU 均值</th><th>最像的一对</th><th>重复度</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <p class="note" id="s-note"></p>
+  </section>
+
+  <p class="proto">原型文件：src.js · index.html · notes.md ｜ 几何与材质全部程序化生成，无外部资源 ｜ 轮廓数学沿用 star-flat/star.js</p>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "/three/build/three.module.js",
+    "three/addons/": "/three/examples/jsm/"
+  }
+}
+</script>
+<script type="module" src="./src.js"></script>
+<script type="module">
+import * as V from './src.js';
+
+const q = new URLSearchParams(location.search);
+const num = (k, d) => (q.has(k) ? +q.get(k) : d);
+const str = (k, d) => q.get(k) ?? d;
+
+const state = {
+  mat: str('mat', 'edge'),
+  /* 默认 facet（Ave 那条直边星），不是 equal。
+     equal 的边是内凹二次曲线，做成薄板之后四臂各是一条弧，
+     三片正交起来读成一团「弯曲的领结」；facet 的直边让每片板都是一块多边形，
+     折痕与棱线才是直的 —— 这是这个方向能成立的前提。见 notes。 */
+  profile: str('profile', 'facet'),
+  thickness: +str('thickness', '0.045'),
+  stripCon: str('con', 'tri'),
+  stripMat: str('smat', 'edge'),
+  pose: num('pose', 2),
+  steps: num('steps', 12),
+  holdMs: num('hold', 110),
+};
+const ONCE = q.has('once'); /* 截图用：所有时钟都不启动 */
+
+const boards = [];
+
+function capOf(con) {
+  return V.CONSTRUCTIONS[con].label;
+}
+
+/* ── 01 构造对照：六行，每行 light / deep 两格 ── */
+let conBoard;
+function renderConstructs() {
+  conBoard?.dispose();
+  const rows = V.CON_ORDER.map((con) => [
+    { con, mat: state.mat, size: 200, ground: 'light', pose: { k: state.pose, steps: state.steps }, cap: capOf(con) },
+    { con, mat: state.mat, size: 200, ground: 'deep', pose: { k: state.pose, steps: state.steps } },
+  ]);
+  const host = document.getElementById('con-stage');
+  if (!conBoard) conBoard = new V.Board(host, { geoOpts: geoOpts() });
+  else conBoard.geoOpts = { ...conBoard.geoOpts, ...geoOpts() };
+  conBoard.clearGroups();
+  conBoard.layout(rows, { gap: 10, capH: 26 });
+}
+function geoOpts() {
+  return { profile: V.PROFILE_REF[state.profile], thickness: state.thickness, bevel: state.thickness * 0.22 };
+}
+
+/* ── 02 拆解：两行四格 400px ── */
+let disBoard;
+const BEST = ['tri', 'shell'];
+function renderDissect() {
+  disBoard?.dispose();
+  const host = document.getElementById('dis-stage');
+  disBoard = new V.Board(host, { geoOpts: geoOpts() });
+  const rows = BEST.map((con) => [
+    { con, mat: 'plain', size: 400, ground: 'light', pose: { k: state.pose, steps: state.steps }, cap: capOf(con) + ' · 不带暗边', zoom: 0.9 },
+    { con, mat: 'edge', size: 400, ground: 'light', pose: { k: state.pose, steps: state.steps }, cap: '· 带暗边' },
+    { con, mat: 'edge', size: 400, ground: 'light', pose: { k: state.pose, steps: state.steps }, cap: '· 磨砂玻璃后面', glass: true },
+    { con, mat: 'edge', size: 400, ground: 'light', pose: { k: state.pose, steps: state.steps }, cap: '· 被边裁掉一截', clip: true },
+  ]);
+  disBoard.layout(rows, { gap: 14, capH: 30 });
+  if (!ONCE) disBoard.startLive({ con: BEST[0], mat: 'edge', size: 400, ground: 'light', steps: state.steps, holdMs: state.holdMs });
+}
+
+/* ── 03 静止帧条 + 活的一颗 ── */
+let stripBoard;
+function renderStrip() {
+  stripBoard?.dispose();
+  const host = document.getElementById('strip-stage');
+  stripBoard = new V.Board(host, { geoOpts: geoOpts() });
+  const poses = [0, 2, 4, 6, 8, 10];
+  stripBoard.layout([poses.map((k) => ({
+    con: state.stripCon, mat: state.stripMat, size: 150, ground: 'light',
+    pose: { k, steps: state.steps }, cap: `第 ${k} 格`,
+  }))], { gap: 10, capH: 26 });
+}
+
+let liveBoard;
+let liveCell;
+function renderLive() {
+  const host = document.getElementById('live-stage');
+  if (liveBoard) { liveBoard.clock?.stop(); liveBoard.dispose(); }
+  liveBoard = new V.Board(host, { geoOpts: geoOpts() });
+  liveBoard.layout([[{ con: state.stripCon, mat: state.stripMat, size: 240, ground: 'light', pose: { k: 0, steps: state.steps } }]]);
+  liveCell = liveBoard.cells[0];
+  if (!ONCE) {
+    const clock = new V.Clock(liveBoard, liveCell, { steps: state.steps, holdMs: state.holdMs });
+    clock.bindVisibility();
+    clock.start();
+    liveBoard.clock = clock;
+  }
+}
+
+/* ── 04 尺寸 ── */
+let sizeBoard;
+function renderSizes() {
+  sizeBoard?.dispose();
+  const host = document.getElementById('size-stage');
+  sizeBoard = new V.Board(host, { geoOpts: geoOpts() });
+  const sizes = [240, 144, 96, 64];
+  const mk = (mat) => sizes.map((s) => ({
+    con: state.stripCon, mat, size: s, ground: 'light',
+    pose: { k: state.pose, steps: state.steps },
+    cap: `${s}px${mat === 'plain' ? ' · 无暗边' : ''}`,
+  }));
+  sizeBoard.layout([mk('plain'), mk('edge')], { gap: 26, capH: 26, align: 'bottom' });
+}
+
+/* ── 控件 ── */
+function wireSeg(sel, key, apply) {
+  const host = document.querySelector(sel);
+  if (!host) return;
+  host.querySelectorAll('button').forEach((b) => {
+    if (String(b.dataset.val) === String(state[key])) b.setAttribute('aria-pressed', 'true');
+    b.addEventListener('click', () => {
+      host.querySelectorAll('button').forEach((x) => x.removeAttribute('aria-pressed'));
+      b.setAttribute('aria-pressed', 'true');
+      state[key] = b.dataset.val;
+      apply();
+    });
+  });
+}
+
+wireSeg('#con-bar [data-key="mat"]', 'mat', () => renderConstructs());
+wireSeg('#con-bar [data-key="profile"]', 'profile', () => { renderConstructs(); renderSizes(); renderStrip(); renderLive(); });
+wireSeg('#con-bar [data-key="thickness"]', 'thickness', () => { state.thickness = +state.thickness; renderConstructs(); renderSizes(); renderStrip(); renderLive(); });
+wireSeg('#strip-sec [data-key="stripCon"]', 'stripCon', () => { renderStrip(); renderLive(); });
+wireSeg('#strip-sec [data-key="stripMat"]', 'stripMat', () => { renderStrip(); renderLive(); });
+
+/* ── 测算 ── */
+document.getElementById('m-btn').addEventListener('click', async () => {
+  const out = document.getElementById('m-out');
+  out.textContent = '跑着…（约 12 秒，期间别切走标签页）';
+  const r = await V.measure();
+  if (!r.timerQuery) {
+    out.textContent = '这台机器没有 EXT_disjoint_timer_query_webgl2 —— 不报数（wall clock 在这里不可重复，见下方说明）';
+    return;
+  }
+  const tb = document.querySelector('#m-table tbody');
+  tb.innerHTML = r.rows.map((x) => `<tr>
+    <td>${V.CONSTRUCTIONS[x.con].label}</td><td>${V.MATERIALS[x.mat].label}</td>
+    <td class="hi">${x.gpu == null ? '—' : x.gpu.toFixed(3)}</td>
+    <td>${x.gpuP95 == null ? '—' : x.gpuP95.toFixed(2)}</td>
+    <td>${x.samples}</td><td>${x.calls}</td><td>${x.tris}</td></tr>`).join('');
+  document.getElementById('m-table').hidden = false;
+
+  /* 按保持时长折算成每秒毫秒 —— 定格模式下这才是页面真正付的钱 */
+  const get = (con, mat) => r.rows.find((x) => x.con === con && x.mat === mat)?.gpu ?? 0;
+  const tri = get('tri', 'edge');
+  const frame = get('frame', 'edge');
+  document.querySelector('#m-hold tbody').innerHTML = [60, 90, 110, 160].map((h) => `<tr>
+    <td>${h} ms</td><td>${(1000 / h).toFixed(1)}</td>
+    <td class="hi">${((tri * 1000) / h).toFixed(2)}</td>
+    <td class="hi">${((frame * 1000) / h).toFixed(2)}</td></tr>`).join('');
+  document.getElementById('m-hold').hidden = false;
+  out.textContent = `完成 · 尺寸 ${r.size} · 光栅 ×${r.dpr} · GPU timer query`;
+  window.__lastMeasure = r;
+});
+
+/* ── 姿态离散度 ── */
+document.getElementById('s-btn').addEventListener('click', async () => {
+  const out = document.getElementById('s-out');
+  out.textContent = '量着…';
+  const host = document.getElementById('strip-stage');
+  const rows = [];
+  for (const con of V.CON_ORDER) {
+    for (const steps of [8, 12]) {
+      const r = V.poseSpread(stripBoard, { con, mat: state.stripMat, steps });
+      rows.push({ con, ...r });
+    }
+  }
+  document.querySelector('#s-table tbody').innerHTML = rows.map((x) => `<tr>
+    <td>${V.CONSTRUCTIONS[x.con].label}</td><td>${x.steps}</td>
+    <td class="hi">${x.adjMean}</td>
+    <td>${x.samePair ? `第 ${x.samePair[0]} / ${x.samePair[1]} 格` : '—'}</td>
+    <td>${x.sameIou}</td></tr>`).join('');
+  document.getElementById('s-table').hidden = false;
+  out.textContent = '完成';
+  document.getElementById('s-note').innerHTML =
+    '相邻 IoU 越小＝相邻两格越不像（定格才读得出来）；最像的一对如果逼近 1，说明步数和姿态重复了。';
+  window.__lastSpread = rows;
+});
+
+/* ── 启动 ── */
+renderConstructs();
+renderDissect();
+renderStrip();
+renderLive();
+renderSizes();
+
+window.__star = {
+  V,
+  state,
+  parity: V.parity,
+  probe: () => (conBoard ? conBoard.probe() : null),
+  probeDissect: () => (disBoard ? disBoard.probe() : null),
+  probeSizes: () => (sizeBoard ? sizeBoard.probe() : null),
+  spread: (o) => V.poseSpread(stripBoard, o),
+  measure: (o) => V.measure(o),
+  measureSizes: (o) => V.measureSizes(o),
+  poseQuaternion: V.poseQuaternion,
+  set: (p) => {
+    Object.assign(state, p);
+    renderConstructs(); renderStrip(); renderLive(); renderSizes();
+  },
+};
+window.__ready = true;
+</script>
+</body>
+</html>

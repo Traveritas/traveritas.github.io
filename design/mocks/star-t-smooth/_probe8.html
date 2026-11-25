@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>probe8 light final</title>
+    <style>
+      body { margin: 0; background: #f0f3f6; font: 11px system-ui, sans-serif; }
+      .row { display: flex; gap: 16px; padding: 10px 14px; flex-wrap: wrap; align-items: flex-end; }
+      .c { text-align: center; } .c span { display: block; font-size: 10px; color: #56606d; margin-top: 3px; }
+      .lead { padding: 10px 14px 0; font-weight: 600; } svg { display: block; }
+    </style>
+  </head>
+  <body>
+    <div id="wrap"></div>
+    <script type="module">
+      import { svg, star } from './src.js';
+      const nrm = (v) => { const l = Math.hypot(...v); return v.map((x) => x / l); };
+      const rows = [];
+      const cands = {
+        'az90/el30 (现)': [0, 0.5, 0.866],
+        'az30/el25': [0.78, 0.42, 0.45],
+        'az15/el30': [0.835, 0.5, 0.224],
+        'az50/el20': [0.6, 0.34, 0.72],
+        'az120/el20': [-0.47, 0.34, 0.81],
+        'az20/el40': [0.72, 0.64, 0.26],
+        'az35/el40': [0.63, 0.64, 0.44],
+        'az160/el20': [-0.82, 0.34, 0.30],
+      };
+      for (const size of [280, 170]) {
+        rows.push(`<div class="lead">光向 · 8 边 / ${size}px</div><div class="row">`);
+        for (const [k, v] of Object.entries(cands)) {
+          const o = { sides: 8, fold: 1.2, fillet: 0.12, light: nrm(v) };
+          const st = star(o).stats;
+          rows.push(`<div class="c">${svg(o, { size })}<span>${k}<br>minS ${Math.min(...st.spineRaw).toFixed(2)} minN ${Math.min(...st.notch).toFixed(2)}</span></div>`);
+        }
+        rows.push('</div>');
+      }
+      rows.push(`<div class="lead">深底</div><div class="row">`);
+      for (const [k, v] of Object.entries(cands)) {
+        const o = { sides: 8, fold: 1.2, fillet: 0.12, light: nrm(v) };
+        rows.push(`<div class="c">${svg(o, { size: 190, ground: 'dark' })}<span>${k}</span></div>`);
+      }
+      rows.push('</div>');
+      document.getElementById('wrap').innerHTML = rows.join('');
+    </script>
+  </body>
+</html>

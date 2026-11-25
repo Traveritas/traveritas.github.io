@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="zh-CN" data-arrived="no">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>底子自检 · somewhere</title>
+    <link rel="stylesheet" href="./shell.css" />
+    <style>
+      .dot {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 10px;
+        height: 10px;
+        margin: -5px;
+        border-radius: 50%;
+        background: #e8e4f0;
+        will-change: transform, opacity;
+      }
+      .hline {
+        position: fixed;
+        left: 0;
+        right: 0;
+        height: 1px;
+        background: rgb(232 228 240 / 0.3);
+        z-index: 5;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="light"></canvas>
+    <div class="sw-stage" id="stage"></div>
+    <div class="hline" id="hline"></div>
+
+    <div class="sw-corner sw-tl">somewhere · 底子自检</div>
+    <a class="sw-corner sw-br" href="./index.html" style="bottom: 46px">← 回索引</a>
+    <div class="sw-corner sw-br" id="stat"></div>
+    <p class="sw-hint"><span>向下</span><i></i></p>
+
+    <script type="module">
+      import { initWorld, options, rng, clamp } from './shell.js';
+
+      const opt = options();
+      const stage = document.getElementById('stage');
+
+      const themes = {
+        sky: [[0.05, 0.055, 0.1], [0.11, 0.12, 0.2], [0.26, 0.28, 0.42], [0.72, 0.7, 0.86]],
+        band: [[0.06, 0.05, 0.09], [0.14, 0.1, 0.18], [0.34, 0.22, 0.3], [0.9, 0.66, 0.5]],
+        ground: [[0.04, 0.05, 0.07], [0.09, 0.12, 0.16], [0.2, 0.3, 0.34], [0.62, 0.8, 0.8]],
+      };
+
+      const world = initWorld({
+        canvas: document.getElementById('light'),
+        themes,
+        horizon: 0.58,
+        autoArrive: opt.autoArrive,
+        face: opt.face,
+        px: opt.px,
+        wind: !opt.face,
+      });
+
+      const hline = document.getElementById('hline');
+      const stat = document.getElementById('stat');
+
+      const R = rng(11);
+      const dots = [];
+      for (let i = 0; i < 90; i++) {
+        const el = document.createElement('div');
+        el.className = 'dot';
+        stage.appendChild(el);
+        dots.push({ el, x: (R() - 0.5) * 3.2, y: (R() - 0.5) * 1.1, z: 0.35 + R() * 2.4 });
+      }
+
+      world.onFrame((s) => {
+        hline.style.top = `${s.horizon}px`;
+        hline.style.opacity = String(clamp(s.arrive * 1.4, 0, 0.8));
+
+        for (const d of dots) {
+          const p = world.project(d.x, d.y, d.z);
+          const a = clamp(1.15 - p.blur, 0, 1) * clamp(s.arrive * 1.3, 0, 1);
+          const sz = clamp(p.s * 0.5, 0.6, 4.5);
+          d.el.style.transform = `translate3d(${p.x.toFixed(1)}px,${p.y.toFixed(1)}px,0) scale(${sz.toFixed(2)})`;
+          d.el.style.opacity = a.toFixed(3);
+          d.el.style.filter = p.blur > 0.45 ? `blur(${(p.blur * 3).toFixed(1)}px)` : 'none';
+        }
+
+        stat.textContent = `z ${s.cam.z.toFixed(2)} · ${s.arrive.toFixed(2)} · ${Math.round(s.vw)}×${Math.round(s.vh)}`;
+      });
+      world.start();
+    </script>
+  </body>
+</html>

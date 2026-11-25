@@ -1,0 +1,798 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>星 · 晶体折射</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E" />
+    <link rel="stylesheet" href="/fonts/noto/font.css" />
+    <link rel="stylesheet" href="/fonts/plex/index.css" />
+    <style>
+      /* 令牌抄自 src/styles/tokens.css，只留这一页要用的 —— 自足的原型。
+         --amber / --umber / --wake / --dream / --reality-mix 五个由 reality.ts 在
+         每一个换面帧里覆写；这一页用滑块写同一组变量、走同一条插值表，
+         所以「星跟着醒度走」这件事是可以被亲手验的，不是一句声明。 */
+      :root {
+        --bg: #f0f3f6;
+        --bg-sunken: #e5ebf2;
+        --fg: #232830;
+        --fg-soft: #56606d;
+        --fg-faint: #858f9d;
+        --line: rgba(35, 40, 48, 0.12);
+        --amber: #9a86c4;
+        --umber: #4f4a66;
+        --wake: #a7b1ba;
+        --dream: #9389ae;
+        --reality-mix: 1;
+        --still: calc(1 - var(--reality-mix));
+        --deep: #2a2b38;
+        --glass: rgba(255, 255, 255, 0.46);
+        --edge: rgba(255, 255, 255, 0.72);
+        --sh: rgba(38, 44, 51, 0.14);
+        --font-display: 'Noto Serif SC', 'Palatino Linotype', Palatino, Georgia, serif;
+        --font-body: system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei UI', 'Microsoft YaHei', sans-serif;
+        --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+      }
+      * { box-sizing: border-box; }
+      html { color-scheme: light; }
+      body {
+        margin: 0;
+        padding: 3rem 2.6rem 7rem;
+        background: var(--bg);
+        color: var(--fg);
+        font-family: var(--font-body);
+        -webkit-font-smoothing: antialiased;
+      }
+      .wrap { max-width: 72rem; margin: 0 auto; }
+      h1, h2, h3 { font-family: var(--font-display); font-weight: 500; margin: 0; }
+      h1 { font-size: 1.4rem; letter-spacing: 0.02em; }
+      h2 { font-size: 0.98rem; letter-spacing: 0.04em; }
+      h3 { font-size: 0.82rem; color: var(--fg-soft); letter-spacing: 0.03em; }
+      p { margin: 0; font-size: 0.84rem; line-height: 1.9; color: var(--fg-soft); }
+      code { font-family: var(--font-mono); font-size: 0.78em; color: var(--fg-soft); }
+      .mono, .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+      .k {
+        font-family: var(--font-mono);
+        font-size: 0.64rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--fg-faint);
+      }
+      .lede { max-width: 44rem; }
+      .lede p + p { margin-top: 0.72rem; }
+
+      header.top { display: flex; align-items: baseline; gap: 1rem; padding-bottom: 1.6rem; }
+      header.top .tag { margin-left: auto; }
+
+      section { padding: 2.1rem 0 0.4rem; }
+      section > .hd {
+        display: flex; align-items: baseline; gap: 1rem; flex-wrap: wrap;
+        padding: 1rem 0 1.1rem; border-top: 1px solid var(--line);
+      }
+      section > .hd .n { font-family: var(--font-mono); font-size: 0.66rem; color: var(--fg-faint); letter-spacing: 0.16em; }
+      section > .hd .note { margin-left: auto; max-width: 34rem; text-align: right; font-size: 0.78rem; line-height: 1.75; }
+
+      /* ── 舞台：一张画布上摊开 N 格 ── */
+      .stage-host { position: relative; }
+      .stage-canvas { position: absolute; inset: 0; z-index: 0; display: block; border-radius: 8px; }
+      .cell {
+        position: relative; z-index: 1;
+        display: grid; place-items: center;
+        margin: 0; border-radius: 8px;
+        touch-action: none; cursor: grab;
+      }
+      .cell:not([data-orbit='off']) { cursor: grab; }
+      .cell[data-dragging] { cursor: grabbing; }
+      .cell-mat {
+        position: absolute; left: 0; bottom: -0.1rem;
+        font-family: var(--font-mono); font-size: 0.6rem; letter-spacing: 0.05em;
+        color: var(--fg-faint); pointer-events: none;
+      }
+      .cell .cell-mat { left: 50%; transform: translateX(-50%); }
+
+      .row { display: flex; gap: 1.1rem; align-items: flex-start; flex-wrap: wrap; }
+      .g5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.5rem 0.7rem; }
+      .g4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem 0.7rem; }
+      .g3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.7rem; }
+      .g2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.9rem; }
+      .c200 { width: 100%; aspect-ratio: 1; max-width: 200px; }
+      .c240 { width: 100%; aspect-ratio: 1; max-width: 240px; }
+      .c320 { width: 320px; height: 320px; }
+      .c380 { width: 100%; aspect-ratio: 1; max-width: 380px; }
+
+      .cap { font-family: var(--font-mono); font-size: 0.62rem; letter-spacing: 0.05em; color: var(--fg-faint); }
+      .cap + .cap { margin-top: 0.2rem; }
+      .hd-line { display: flex; align-items: baseline; gap: 0.6rem; margin: 1.1rem 0 0.55rem; }
+      .hd-line b { font-weight: 500; font-size: 0.78rem; color: var(--fg); }
+      .hd-line .cap { margin-left: auto; }
+
+      .panel {
+        border-radius: 8px; border: 1px solid var(--edge); background: var(--glass);
+        -webkit-backdrop-filter: blur(14px) saturate(1.06);
+        backdrop-filter: blur(14px) saturate(1.06);
+        box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.5), 0 14px 34px -22px var(--sh);
+        padding: 1.1rem 1.2rem;
+      }
+      .deep-band {
+        background: var(--deep); border-radius: 10px; padding: 1rem 1.1rem 1.3rem; margin-top: 0.4rem;
+      }
+      .deep-band .cap, .deep-band .hd-line b { color: rgba(210, 213, 228, 0.62); }
+      .deep-band .cell-mat { color: rgba(210, 213, 228, 0.5); }
+
+      /* ── 读数 ── */
+      .ro { display: flex; justify-content: space-between; gap: 0.8rem; font-size: 0.74rem;
+            color: var(--fg-soft); border-bottom: 1px solid var(--line); padding: 0.22rem 0; }
+      .ro b { font-family: var(--font-mono); font-weight: 400; color: var(--fg); font-variant-numeric: tabular-nums; }
+      .ro.warn b { color: #8a5a3c; }
+
+      table { border-collapse: collapse; width: 100%; font-size: 0.74rem; }
+      th, td { text-align: left; padding: 0.34rem 0.5rem; border-bottom: 1px solid var(--line); }
+      th { font-weight: 400; font-family: var(--font-mono); font-size: 0.62rem; letter-spacing: 0.08em;
+           text-transform: uppercase; color: var(--fg-faint); }
+      td.n { font-family: var(--font-mono); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+      th.n { text-align: right; }
+
+      /* ── 控件 ── */
+      .ctrls { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; margin: 0.2rem 0 0.9rem; }
+      button {
+        font-family: var(--font-body); font-size: 0.76rem; color: var(--fg-soft);
+        background: rgba(255, 255, 255, 0.62); border: 1px solid var(--line);
+        border-radius: 999px; padding: 0.32rem 0.9rem; cursor: pointer;
+        transition: background 0.18s, color 0.18s;
+      }
+      button:hover { background: #fff; color: var(--fg); }
+      button[aria-pressed='true'] { background: var(--fg); border-color: var(--fg); color: var(--bg); }
+      input[type='range'] { width: 13rem; accent-color: var(--amber); }
+      .swatch { width: 1.6rem; height: 1.6rem; border-radius: 50%; border: 1px solid var(--line); }
+
+      /* 光向的小条 */
+      .bars { display: grid; gap: 0.36rem; }
+      .bar-row { display: grid; grid-template-columns: 5.6rem 1fr 4.6rem; gap: 0.6rem; align-items: center; font-size: 0.7rem; }
+      .bar-row .lab { color: var(--fg-soft); }
+      .bar-row .track { display: block; height: 0.42rem; background: rgba(35, 40, 48, 0.08); border-radius: 999px; overflow: hidden; }
+      .bar-row .fill { display: block; height: 100%; background: var(--umber); border-radius: 999px; }
+      .bar-row.dim .fill { background: rgba(35, 40, 48, 0.2); }
+      .bar-row .val { font-family: var(--font-mono); font-size: 0.66rem; color: var(--fg-faint); text-align: right; }
+
+      .pairs { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.4rem 2.2rem; }
+      .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.6rem; align-items: start; }
+      @media (max-width: 900px) {
+        .g5, .g4 { grid-template-columns: repeat(3, 1fr); }
+        .grid2, .pairs { grid-template-columns: 1fr; }
+        body { padding: 2rem 1.1rem 5rem; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="top">
+        <h1>星 · 晶体折射</h1>
+        <span class="k">design/mocks/star-crystal3d · 材质与光</span>
+        <span class="k tag">2026-11-10</span>
+      </header>
+
+      <div class="lede">
+        <p>
+          六支沿 ±x ±y ±z，结构一个数没改。这一轮只动两件事：<b>材质</b>与<b>光</b>。
+          几何故意做得便宜 —— 六边截面、十一站、不收坡、六支照原样互插，遮挡交给深度缓冲。
+        </p>
+        <p>
+          每颗星都可以按住拖，转到任意角度；松手不动，停在哪就是哪。
+          两处底色用的是同一个星：浅底 <code>#f0f3f6</code>（站点的地面）与深底 <code>#2a2b38</code>（只为对照）。
+        </p>
+        <p>
+          颜色不写死在代码里：亮端与暗端都从 <code>--amber</code> / <code>--umber</code> / <code>--wake</code> /
+          <code>--dream</code> 算出来，醒度一变整颗星跟着换调。第三节可以自己拉。
+        </p>
+      </div>
+
+      <!-- ═══════════ 01 材质 ═══════════ -->
+      <section id="mat">
+        <div class="hd">
+          <span class="n">01</span>
+          <h2>材质</h2>
+          <span class="note">
+            五档，同一姿态、同一组光。浅底上先看 200px，那是最苛刻的尺寸；
+            再往下是 400px 的细节与深底对照。
+          </span>
+        </div>
+
+        <div class="hd-line">
+          <b>浅底 · 200px</b>
+          <span class="cap">透明画布（这四档都不需要吃掉底色）</span>
+        </div>
+        <div class="stage-host" id="light-a">
+          <div class="g4">
+            <figure class="cell c200" data-mat="frosted" data-ground="light"></figure>
+            <figure class="cell c200" data-mat="crystal" data-ground="light"></figure>
+            <figure class="cell c200" data-mat="dusk" data-ground="light"></figure>
+            <figure class="cell c200" data-mat="shell" data-ground="light"></figure>
+          </div>
+        </div>
+
+        <div class="hd-line">
+          <b>浅底 · 折射档</b>
+          <span class="cap">唯一需要不透明画布的一档 —— 清屏色＝页面底色，代价是这块方形不再透下去</span>
+        </div>
+        <div class="row">
+          <div class="stage-host" id="light-b" style="width: 200px; flex: none">
+            <figure class="cell c200" data-mat="refract" data-ground="light"></figure>
+          </div>
+          <div class="panel" style="flex: 1; min-width: 18rem">
+            <p style="font-size: 0.78rem">
+              这一档在场景里多摆了一块带斜带的衬底。没有它，折射出来的是清屏色 —— 一片几乎无信息的白。
+              下面第一节的光向对照会说明：<b>折射贵，但它折射的东西大部分来自环境贴图与这块衬底，不是来自页面</b>。
+            </p>
+          </div>
+        </div>
+
+        <div class="hd-line">
+          <b>浅底 · 400px</b>
+          <span class="cap">白底上这两档真正的取舍在这里</span>
+        </div>
+        <div class="stage-host" id="light-c">
+          <div class="g2" style="max-width: 820px">
+            <figure class="cell c380" data-mat="frosted" data-ground="light"></figure>
+            <figure class="cell c380" data-mat="crystal" data-ground="light"></figure>
+          </div>
+        </div>
+
+        <div class="hd-line">
+          <b>深底 · 200px</b>
+          <span class="cap">不在站点里，只作对照 —— 它能告诉你浅底上少拿到了什么</span>
+        </div>
+        <div class="deep-band">
+          <div class="stage-host" id="deep-a">
+            <div class="g5">
+              <figure class="cell c200" data-mat="frosted" data-ground="deep"></figure>
+              <figure class="cell c200" data-mat="crystal" data-ground="deep"></figure>
+              <figure class="cell c200" data-mat="dusk" data-ground="deep"></figure>
+              <figure class="cell c200" data-mat="shell" data-ground="deep"></figure>
+              <figure class="cell c200" data-mat="refract" data-ground="deep"></figure>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══════════ 02 光 ═══════════ -->
+      <section id="light">
+        <div class="hd">
+          <span class="n">02</span>
+          <h2>光</h2>
+          <span class="note">
+            光向决定棱面有没有折。这一节是反例优先：两个坏光并排摆出来，让失败自己说话。
+          </span>
+        </div>
+
+        <p class="lede" style="margin-bottom: 0.9rem">
+          六支的两肩在屏幕上落在 0° / 60° / 120° 三个方位。若光也落在屏幕平面里，
+          它总与某一对肩方向平行 —— 那一对支的左右两肩就同色，整支没有折，调子白算。
+          判据取<b>六支里最差的那一支</b>的支内落差（一颗星里只要有一支是平的，整颗就塌），不是取平均。
+        </p>
+
+        <div class="stage-host" id="lights">
+          <div class="g4">
+            <figure class="cell c240" data-mat="crystal" data-ground="light" data-lights="good" data-plain="1"></figure>
+            <figure class="cell c240" data-mat="crystal" data-ground="light" data-lights="frontLeft" data-plain="1"></figure>
+            <figure class="cell c240" data-mat="crystal" data-ground="light" data-lights="screenUp" data-plain="1"></figure>
+            <figure class="cell c240" data-mat="crystal" data-ground="light" data-lights="inPlane" data-plain="1"></figure>
+          </div>
+        </div>
+        <div class="g4" style="margin-top: 0.2rem">
+          <div class="cap">① 采用 · 屏幕外，az 30° / el 25°<br><code>[0.78, 0.42, 0.45]</code></div>
+          <div class="cap">② 斜前方<br><code>[−0.34, 0.52, 0.79]</code></div>
+          <div class="cap">③ 屏幕正上<br><code>[0, 1, 0.02]</code></div>
+          <div class="cap">④ 纯屏幕侧向<br><code>[1, 0, 0]</code></div>
+        </div>
+
+        <div class="grid2" style="margin-top: 1.5rem">
+          <div class="panel">
+            <div class="cap" style="margin-bottom: 0.6rem">六支的支内落差（越短＝那支越平；⑥ 是死平）</div>
+            <div class="bars" id="spine-bars"></div>
+          </div>
+          <div class="panel">
+            <div class="cap" style="margin-bottom: 0.6rem">读数</div>
+            <div id="light-readout"></div>
+            <p style="margin-top: 0.7rem; font-size: 0.76rem">
+              ③ 是 t-smooth 笔记里记过的那次翻车：竖直那两支退成一整片，其余四支全黑。
+              ④ 更差 —— 它在屏幕平面里，六对肩方向同序，整颗星像被一块板挡了一半。
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══════════ 03 醒梦 ═══════════ -->
+      <section id="wake">
+        <div class="hd">
+          <span class="n">03</span>
+          <h2>醒梦</h2>
+          <span class="note">
+            星的颜色不是常量。拖动滑块就是 <code>reality.ts</code> 在换面时做的事：覆写四个强调色变量与
+            <code>--reality-mix</code>。星在这里重算一次调色板，不重建几何。
+          </span>
+        </div>
+
+        <div class="ctrls">
+          <button id="w-wake">醒</button>
+          <button id="w-dream">梦</button>
+          <input id="w-mix" type="range" min="0" max="1" step="0.02" value="1" aria-label="醒度" />
+          <span class="cap" id="w-label">醒度 1.00</span>
+          <span class="swatch" id="sw-amber" title="--amber"></span>
+          <span class="swatch" id="sw-umber" title="--umber"></span>
+          <span class="swatch" id="sw-dream" title="--dream"></span>
+          <span class="swatch" id="sw-wake" title="--wake"></span>
+        </div>
+
+        <div class="stage-host" id="wake-stage">
+          <div class="g3">
+            <figure class="cell c240" data-mat="crystal" data-ground="light"></figure>
+            <figure class="cell c240" data-mat="dusk" data-ground="light"></figure>
+            <figure class="cell c240" data-mat="frosted" data-ground="light"></figure>
+          </div>
+        </div>
+
+        <div class="grid2" style="margin-top: 1.2rem">
+          <div class="panel">
+            <div class="cap" style="margin-bottom: 0.5rem">同一个滑块位置，两个端点的并排</div>
+            <div class="stage-host" id="endpoints">
+              <div class="g2">
+                <figure class="cell c200" data-mat="dusk" data-ground="light" data-mix="1"></figure>
+                <figure class="cell c200" data-mat="dusk" data-ground="light" data-mix="0"></figure>
+              </div>
+            </div>
+            <div class="g2" style="margin-top: 0.2rem">
+              <div class="cap" style="text-align: center">醒度 1 · 冷灰<br>--amber → #a7b1ba</div>
+              <div class="cap" style="text-align: center">醒度 0 · 薄暮<br>--amber → #9a86c4</div>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="cap" style="margin-bottom: 0.6rem">当前调色板（从强调色算出来的四个面调）</div>
+            <div id="pal-readout"></div>
+            <p style="margin-top: 0.7rem; font-size: 0.76rem">
+              亮端不是 <code>--amber</code> 本身，而是它<b>往底色提</b>一档。直接拿强调色当亮端，
+              整颗星只有五十来级亮度差，白底上读成一块均匀的紫 —— 这是 star-gl 那一轮撞过的坑，
+              这一轮没有重犯。
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══════════ 04 定格 ═══════════ -->
+      <section id="hold">
+        <div class="hd">
+          <span class="n">04</span>
+          <h2>定格</h2>
+          <span class="note">
+            触发一次，然后完全静止。<code>brand.ts</code> 是 7 步轮转 + 每步 1 s、走满一圈之后停 3 s；
+            这颗星用的是同一套语法：姿态量化到 12 格，每格 110 ms，最后一格 ×3。
+          </span>
+        </div>
+
+        <div class="grid2">
+          <div>
+            <div class="stage-host" id="tumble-stage">
+              <figure class="cell c320" data-mat="crystal" data-ground="light"></figure>
+            </div>
+            <div class="ctrls" style="margin-top: 0.4rem">
+              <button id="t-flip">翻一次</button>
+              <button id="t-idle">静置 2 秒 · 查帧数</button>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="cap" style="margin-bottom: 0.6rem">零帧取证</div>
+            <div id="t-readout"></div>
+            <p style="margin-top: 0.7rem; font-size: 0.78rem" id="t-verdict">
+              按「翻一次」，等它落下，再按「静置 2 秒」。
+              要紧的不是「帧数很少」，而是<b>排队的 rAF 是 0、排队的 setTimeout 是 0</b> ——
+              定格之后这张画布上没有任何东西会再变。
+            </p>
+          </div>
+        </div>
+
+        <div class="hd-line">
+          <b>静置 vs 微漂移</b>
+          <span class="cap">静止零帧；漂移 ±1.2° / ±0.8°，一格 60 fps 常驻</span>
+        </div>
+        <div class="grid2">
+          <div class="stage-host" id="drift-stage">
+            <div class="g2" style="max-width: 560px">
+              <figure class="cell c240" data-mat="crystal" data-ground="light" data-orbit="off"></figure>
+              <figure class="cell c240" data-mat="crystal" data-ground="light" data-orbit="off"></figure>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="ctrls" style="margin: 0 0 0.7rem">
+              <button id="d-on">开始漂移</button>
+              <button id="d-off">停下</button>
+            </div>
+            <div id="d-readout"></div>
+            <p style="margin-top: 0.7rem; font-size: 0.78rem">
+              右边那颗在漂，左边那颗一格都不动。两边的姿态、材质、光完全一样，
+              差别只有一点点转动 —— 这一点点转动买到的，是棱面上那些亮点在缓慢移动。
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══════════ 05 代价 ═══════════ -->
+      <section id="cost">
+        <div class="hd">
+          <span class="n">05</span>
+          <h2>代价</h2>
+          <span class="note">
+            块计时：一块 40 帧连续画、块末一次 <code>gl.finish()</code>，整块 ÷40，
+            跑 5 块取中位数。逐帧 <code>gl.finish()</code> 在这个尺寸上是纯噪声（会跳几十倍）。
+          </span>
+        </div>
+
+        <div class="ctrls">
+          <button id="c-run">测算（约 10 秒）</button>
+          <span class="cap" id="c-hint">480×480 缓冲 · DPR 1 · 一次一档，测完即销毁画布</span>
+        </div>
+        <div class="panel">
+          <table id="c-table">
+            <thead>
+              <tr>
+                <th>底色</th><th>材质</th>
+                <th class="n">ms/帧</th><th class="n">draw calls</th>
+                <th class="n">三角形</th><th class="n">ms/s @110ms</th>
+              </tr>
+            </thead>
+            <tbody><tr><td colspan="6" class="cap">按「测算」</td></tr></tbody>
+          </table>
+        </div>
+
+        <div class="grid2" style="margin-top: 1.2rem">
+          <div class="panel">
+            <div class="cap" style="margin-bottom: 0.6rem">字节（服务端现算，不经手抄）</div>
+            <div id="bytes-out" class="cap">读取中…</div>
+          </div>
+          <div class="panel">
+            <div class="cap" style="margin-bottom: 0.6rem">定格模式下每秒占用</div>
+            <p style="font-size: 0.78rem">
+              定格不是每帧都画，而是每格画一次。所以「每秒占用」＝单帧合成成本 ÷ 110 ms，
+              约等于 ×9.1。格与格之间是完全静止的 —— 画面没有任何东西在变，也就没有帧。
+              <b>空闲成本这一项这里可以归零</b>，真正要付的是别处：首屏字节与一个 WebGL 上下文。
+            </p>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <script type="importmap">
+      { "imports": { "three": "/three/build/three.module.js" } }
+    </script>
+    <script type="module">
+      import {
+        Stage, mountCells, TumbleClock, TUMBLE, REST, MAT_KEYS, MAT_NOTE, MAT_SUB,
+        tonePalette, accentAt, lightReport, LIGHTS, measureAll, blockTime, realityMix,
+        GROUND,
+      } from './src.js';
+
+      /* ── 醒度：与 reality.ts 的 setTint 逐行同构 ── */
+      const ACCENT_SRC = {
+        '--amber': ['#9a86c4', '#a7b1ba'],
+        '--umber': ['#4f4a66', '#556270'],
+        '--ghost-ink': ['#817ba3', '#8e9aa6'],
+        '--dream': ['#9389ae', '#a39c92'],
+      };
+      const hex = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+      const mixRgb = (a, b, t) =>
+        `rgb(${Math.round(a[0] + (b[0] - a[0]) * t)},${Math.round(a[1] + (b[1] - a[1]) * t)},${Math.round(a[2] + (b[2] - a[2]) * t)})`;
+      const docEl = document.documentElement;
+      function setTint(mix) {
+        const m = Math.round(mix * 1000) / 1000;
+        for (const k in ACCENT_SRC) {
+          const [d, w] = ACCENT_SRC[k];
+          docEl.style.setProperty(k, mixRgb(hex(d), hex(w), m));
+        }
+        docEl.style.setProperty('--reality-mix', m.toFixed(3));
+      }
+
+      /* ── 舞台 ── */
+      const stages = {};
+      const mk = (id, ground) => {
+        const host = document.getElementById(id);
+        if (!host) return null;
+        const st = new Stage(host, { ground });
+        stages[id] = st;
+        return st;
+      };
+
+      const wakeStages = []; // 醒度一变就重算调色板的那些
+
+      const stA = mk('light-a', 'light');
+      mountCells(stA, document.querySelectorAll('#light-a .cell'));
+      wakeStages.push(stA);
+
+      const stB = mk('light-b', 'light');
+      mountCells(stB, document.querySelectorAll('#light-b .cell'));
+
+      const stC = mk('light-c', 'light');
+      const big = mountCells(stC, document.querySelectorAll('#light-c .cell'));
+      wakeStages.push(stC);
+
+      const stD = mk('deep-a', 'deep');
+      mountCells(stD, document.querySelectorAll('#deep-a .cell'));
+
+      const stL = mk('lights', 'light');
+      mountCells(stL, document.querySelectorAll('#lights .cell'));
+
+      const stW = mk('wake-stage', 'light');
+      mountCells(stW, document.querySelectorAll('#wake-stage .cell'));
+      wakeStages.push(stW);
+
+      const stE = mk('endpoints', 'light');
+      mountCells(stE, document.querySelectorAll('#endpoints .cell'));
+
+      const stT = mk('tumble-stage', 'light');
+      mountCells(stT, document.querySelectorAll('#tumble-stage .cell'));
+
+      const stR = mk('drift-stage', 'light');
+      mountCells(stR, document.querySelectorAll('#drift-stage .cell'), { label: false });
+
+      /* 漂移那一格：右半边 */
+      const driftCell = stR.cells[1];
+      driftCell.drift = { yaw: 1.2, pitch: 0.8, w: 0.55 };
+
+      /* ══ 光向的读数 ══ */
+      function renderLightReadout() {
+        const trips = [
+          ['good', '①', LIGHTS.good[0].dir],
+          ['frontLeft', '②', LIGHTS.frontLeft[0].dir],
+          ['screenUp', '③', LIGHTS.screenUp[0].dir],
+          ['inPlane', '④', LIGHTS.inPlane[0].dir],
+        ];
+        const bars = document.getElementById('spine-bars');
+        const ros = document.getElementById('light-readout');
+        const fmt = (v) => (v === null || v === undefined ? '—' : v.toFixed(2));
+        bars.innerHTML = '';
+        ros.innerHTML = '';
+        const reports = {};
+        for (const [key, idx, dir] of trips) {
+          const r = lightReport(dir, REST);
+          reports[key] = r;
+          /* 六支各自的落差摆成六条短条 */
+          const row = document.createElement('div');
+          row.style.cssText = 'margin-bottom:0.55rem';
+          const head = document.createElement('div');
+          head.className = 'cap';
+          head.style.cssText = 'display:flex;justify-content:space-between;margin-bottom:0.25rem';
+          head.innerHTML = `<span>${idx} <code>[${dir.map((v) => (v === 0 ? '0' : v.toFixed(2))).join(', ')}]</code></span>
+            <span style="color:${r.flat ? '#8a5a3c' : 'inherit'}">最小 ${fmt(r.minSpine)}${r.flat ? ' · ' + r.flat + ' 支死平' : ''}</span>`;
+          row.appendChild(head);
+          const inner = document.createElement('div');
+          inner.className = 'bars';
+          r.spine.forEach((v, i) => {
+            const br = document.createElement('div');
+            const isFlat = v !== null && v < 0.06;
+            br.className = 'bar-row' + (isFlat ? ' dim' : '');
+            br.innerHTML = `<span class="lab">支 ${i + 1}</span>
+              <span class="track"><span class="fill" style="width:${v === null ? 0 : Math.min(100, (v / 0.7) * 100).toFixed(1)}%"></span></span>
+              <span class="val">${v === null ? '—' : v.toFixed(2)}</span>`;
+            inner.appendChild(br);
+          });
+          row.appendChild(inner);
+          bars.appendChild(row);
+        }
+        for (const [key, idx, dir] of trips) {
+          const r = reports[key];
+          const d = document.createElement('div');
+          d.className = 'ro' + (r.flat ? ' warn' : '');
+          d.innerHTML = `<span>${idx} <code>${key}</code></span>
+            <b>最小 ${fmt(r.minSpine)} · 死平 ${r.flat} 支 · <span style="color:${r.distinctTones < 4 ? '#8a5a3c' : 'inherit'}">占 ${r.distinctTones}/4 档</span></b>`;
+          ros.appendChild(d);
+        }
+        return reports;
+      }
+      const lightRepo = renderLightReadout();
+
+      /* ══ 醒度 ══ */
+      const wMix = document.getElementById('w-mix');
+      const wLabel = document.getElementById('w-label');
+      function renderPalette() {
+        const pal = tonePalette('light');
+        const ro = document.getElementById('pal-readout');
+        const hexOf = (c) => '#' + c.getHexString();
+        const swatch = (name, c) =>
+          `<span style="display:inline-block;width:0.62rem;height:0.62rem;border-radius:50%;vertical-align:-1px;margin-right:0.35rem;background:${hexOf(c)};border:1px solid var(--line)"></span>`;
+        ro.innerHTML = `
+          <div class="ro"><span>最亮的面 hi</span><b>${swatch('hi', pal.hi)}${hexOf(pal.hi)}</b></div>
+          <div class="ro"><span>中间面 mid</span><b>${swatch('mid', pal.mid)}${hexOf(pal.mid)}</b></div>
+          <div class="ro"><span>最暗的面 lo</span><b>${swatch('lo', pal.lo)}${hexOf(pal.lo)}</b></div>
+          <div class="ro"><span>体色 body</span><b>${swatch('body', pal.body)}${hexOf(pal.body)}</b></div>
+          <div class="ro"><span>醒度 --reality-mix</span><b>${pal.mix.toFixed(3)}</b></div>`;
+        for (const [id, k] of [['sw-amber', '--amber'], ['sw-umber', '--umber'], ['sw-dream', '--dream'], ['sw-wake', '--wake']]) {
+          const el = document.getElementById(id);
+          if (el) el.style.background = getComputedStyle(docEl).getPropertyValue(k).trim();
+        }
+        document.getElementById('t-verdict').dataset.mix = pal.mix.toFixed(3);
+      }
+      function applyMix(v) {
+        setTint(v);
+        wLabel.textContent = '醒度 ' + v.toFixed(2);
+        for (const st of wakeStages) st.repaint();
+        stB.repaint();
+        stD.repaint();
+        stE.repaint();
+        renderPalette();
+      }
+      wMix.addEventListener('input', () => applyMix(+wMix.value));
+      document.getElementById('w-wake').addEventListener('click', () => {
+        wMix.value = '1';
+        applyMix(1);
+      });
+      document.getElementById('w-dream').addEventListener('click', () => {
+        wMix.value = '0';
+        applyMix(0);
+      });
+      /* 起手：按站点默认（无 JS 时恒醒面），再读一次真实值 */
+      setTint(1);
+      wMix.value = String(realityMix());
+      renderPalette();
+      for (const id of ['sw-amber', 'sw-umber', 'sw-dream', 'sw-wake']) {
+        const k = '--' + id.slice(3);
+        const el = document.getElementById(id);
+        el.style.background = getComputedStyle(docEl).getPropertyValue(k).trim();
+      }
+
+      /* ══ 定格 ══ */
+      const tuneCell = stT.cells[0];
+      const clock = new TumbleClock(stT, {
+        cell: tuneCell,
+        onTick: (t) => renderTumble({ ...t, state: clock.state() }),
+      });
+
+      const tOut = document.getElementById('t-readout');
+      let lastRunStart = null;
+      function renderTumble(extra = {}) {
+        const s = clock.state();
+        const rows = [
+          ['累计帧数', s.frames],
+          ['本次翻动画了', lastRunStart === null ? '—' : s.frames - lastRunStart],
+          ['排队的 rAF', s.raf],
+          ['排队的 setTimeout', s.timer + s.live],
+          ['当前姿态', `${s.pose.yaw.toFixed(1)}° / ${s.pose.pitch.toFixed(1)}°`],
+          ['reduced-motion', s.reduce ? '是（只画正位）' : '否'],
+        ];
+        tOut.innerHTML = rows
+          .map(([k, v]) => `<div class="ro${(k === '排队的 rAF' || k === '排队的 setTimeout') && v === 0 ? '' : ''}"><span>${k}</span><b>${v}</b></div>`)
+          .join('');
+        if (extra.proof) {
+          const p = extra.proof;
+          tOut.innerHTML += `<div class="ro${p.delta === 0 ? '' : ' warn'}"><span>静置 ${p.elapsed} ms 后</span><b>Δ ${p.delta} 帧</b></div>`;
+        }
+      }
+      document.getElementById('t-flip').addEventListener('click', () => {
+        lastRunStart = stT.frames;
+        clock.start();
+        renderTumble();
+      });
+      document.getElementById('t-idle').addEventListener('click', async () => {
+        clock.stop();
+        const p = await clock.probeIdle(2000);
+        renderTumble({ proof: p });
+        const v = document.getElementById('t-verdict');
+        v.innerHTML =
+          p.delta === 0
+            ? `<b>静置 ${p.elapsed} ms，画了 0 帧。</b>排队的 rAF ${p.raf}，排队的 setTimeout ${p.timer}，busy=${p.busy}。
+               这不是「帧数很少」——是 <code>cancelAnimationFrame</code> 之后一次都没有再排。`
+            : `静置 ${p.elapsed} ms 画了 ${p.delta} 帧 —— 还有东西在跑。`;
+      });
+      renderTumble();
+
+      /* ══ 漂移 ══ */
+      const dOut = document.getElementById('d-readout');
+      let driftRaf = 0;
+      let driftFrames = 0;
+      let driftT0 = 0;
+      function renderDrift() {
+        const el = document.getElementById('drift-stage');
+        const still = stR.cells[0];
+        dOut.innerHTML = `
+          <div class="ro"><span>左侧（静止）</span><b>${still ? still.pose.yaw.toFixed(2) : '—'}° · 不动</b></div>
+          <div class="ro"><span>右侧（漂移）</span><b>${driftCell.pose.yaw.toFixed(2)}° / ${driftCell.pose.pitch.toFixed(2)}°</b></div>
+          <div class="ro${driftFrames ? ' warn' : ''}"><span>漂移期间画了</span><b>${driftFrames} 帧</b></div>
+          <div class="ro"><span>排队的 rAF</span><b>${driftRaf ? 1 : 0}</b></div>`;
+      }
+      function loopDrift(now) {
+        if (!driftT0) driftT0 = now;
+        stR.draw((now - driftT0) / 1000);
+        driftFrames++;
+        renderDrift();
+        driftRaf = requestAnimationFrame(loopDrift);
+      }
+      document.getElementById('d-on').addEventListener('click', () => {
+        if (driftRaf) return;
+        driftFrames = 0;
+        driftT0 = 0;
+        driftRaf = requestAnimationFrame(loopDrift);
+      });
+      document.getElementById('d-off').addEventListener('click', () => {
+        if (driftRaf) cancelAnimationFrame(driftRaf);
+        driftRaf = 0;
+        renderDrift();
+      });
+      renderDrift();
+
+      /* ══ 代价 ══ */
+      document.getElementById('c-run').addEventListener('click', async () => {
+        const tbody = document.querySelector('#c-table tbody');
+        tbody.innerHTML = '<tr><td colspan="6" class="cap">测算中…</td></tr>';
+        const rows = await measureAll({ size: 480, frames: 40, blocks: 5 });
+        tbody.innerHTML = rows
+          .map(
+            (r) => `<tr>
+              <td>${r.ground === 'light' ? '浅 #f0f3f6' : '深 #2a2b38'}</td>
+              <td>${MAT_NOTE[r.mat]} <span class="cap">${MAT_SUB[r.mat]}</span></td>
+              <td class="n">${r.ms.toFixed(3)}</td>
+              <td class="n">${r.callsPerFrame}</td>
+              <td class="n">${r.trisPerFrame}</td>
+              <td class="n">${r.msPerSec110.toFixed(2)}</td>
+            </tr>`,
+          )
+          .join('');
+        window.__cost = rows;
+        document.getElementById('c-hint').textContent =
+          '测法：预热 4 帧 → 5 块 × 40 帧，块末 gl.finish()，取中位数';
+      });
+
+      fetch('/bytes.json')
+        .then((r) => (r.ok ? r.json() : null))
+        .then((j) => {
+          if (!j) {
+            document.getElementById('bytes-out').textContent = '取不到 bytes.json（要用 serve.cjs）';
+            return;
+          }
+          document.getElementById('bytes-out').innerHTML = j.rows
+            .map(
+              (r) =>
+                `<div class="ro"><span style="font-size:0.7rem">${r.k}</span><b>${(r.gzip / 1024).toFixed(1)} KB
+                 <span style="color:var(--fg-faint)">/ ${(r.raw / 1024).toFixed(0)} KB</span></b></div>`,
+            )
+            .join('');
+        })
+        .catch(() => {
+          document.getElementById('bytes-out').textContent = '取不到 bytes.json';
+        });
+
+      /* ══ 对外自检口 ══ */
+      window.__star = {
+        stages,
+        cellCount: () => Object.values(stages).reduce((a, s) => a + s.cells.length, 0),
+        frames: () => stT.frames,
+        flip: () => {
+          lastRunStart = stT.frames;
+          return clock.start();
+        },
+        probeIdle: (ms) => clock.probeIdle(ms),
+        state: () => clock.state(),
+        pose: () => ({ ...tuneCell.pose }),
+        setPose: (yaw, pitch) => {
+          tuneCell.pose = { yaw, pitch };
+          stT.drawOnce();
+        },
+        setMix: (v) => {
+          wMix.value = String(v);
+          applyMix(v);
+        },
+        lightReport,
+        lightRepo,
+        drift: {
+          on: () => document.getElementById('d-on').click(),
+          off: () => document.getElementById('d-off').click(),
+          frames: () => driftFrames,
+        },
+        measure: (o) => measureAll(o),
+        blockTime,
+        palette: (g, m) => {
+          const p = tonePalette(g || 'light', m);
+          return { hi: '#' + p.hi.getHexString(), mid: '#' + p.mid.getHexString(), lo: '#' + p.lo.getHexString(), body: '#' + p.body.getHexString() };
+        },
+        ground: GROUND,
+        tuumbleCfg: TUMBLE,
+      };
+      window.__ready = true;
+    </script>
+  </body>
+</html>

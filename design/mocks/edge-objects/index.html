@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>屏幕边缘 · 实物边框原型</title>
+<style>
+/* ── 令牌：抄自 src/styles/tokens.css（原型不 import，验收后落地时换真令牌）── */
+:root {
+  --bg: #f0f3f6; --fg: #232830; --fg-soft: #56606d; --fg-faint: #858f9d;
+  --line: rgba(35,40,48,.12);
+  --wake: #a7b1ba; --dream: #9389ae; --umber: #4f4a66; --amber: #9a86c4;
+  --font-display: 'Noto Serif SC','Palatino Linotype',Palatino,Georgia,'Source Han Serif SC',serif;
+  --font-body: system-ui,-apple-system,'PingFang SC','Microsoft YaHei UI',sans-serif;
+  --font-mono: 'IBM Plex Mono',ui-monospace,Consolas,'Microsoft YaHei UI',monospace;
+  --mix: 1; /* 1 醒 0 梦 */
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; overflow: hidden; }
+body {
+  font-family: var(--font-body); color: var(--fg); background: var(--bg);
+  transition: background 1.2s ease;
+}
+body.dream { --bg: #191d2e; --fg: #cfd3e2; --fg-soft: #9298ad; --fg-faint: #5d6378; --line: rgba(207,211,226,.13); --mix: 0; background: var(--bg); }
+
+/* ── 页面内容替身：一段阅读页正文 ── */
+.page { position: absolute; inset: 0; overflow: hidden; }
+.prose { max-width: 34em; margin: 12vh auto 0; padding: 0 24px; font-family: var(--font-display); font-size: 17px; line-height: 2; text-align: justify; color: var(--fg); }
+.prose h1 { font-size: 26px; font-weight: 600; margin-bottom: 10px; }
+.prose .meta { font-family: var(--font-mono); font-size: 11px; letter-spacing: .14em; color: var(--fg-faint); margin-bottom: 28px; }
+.prose p { margin-bottom: 1.4em; color: var(--fg-soft); }
+.prose p:first-of-type { color: var(--fg); }
+
+/* ── 现有仪器替身（占位，看新边框与它们的避让关系）── */
+.brand { position: fixed; top: 26px; left: 34px; font-family: var(--font-display); font-size: 15px; letter-spacing: .32em; color: var(--fg-soft); z-index: 40; }
+.hairline { position: fixed; top: 0; left: 0; right: 0; height: 2px; z-index: 40; background: linear-gradient(90deg, var(--wake), var(--amber)); transform: scaleX(.34); transform-origin: left; }
+.star { position: fixed; left: 26px; bottom: 24px; width: 44px; height: 44px; border-radius: 50%; background: color-mix(in srgb, var(--bg) 70%, white); border: 1px solid var(--line); z-index: 40; display: grid; place-items: center; color: var(--fg-faint); font-size: 18px; }
+.ave { position: fixed; right: 26px; bottom: 40px; width: 240px; padding: 12px 14px; border: 1px solid var(--line); background: color-mix(in srgb, var(--bg) 82%, transparent); backdrop-filter: blur(6px); z-index: 40; font-size: 12px; color: var(--fg-soft); border-radius: 2px; }
+.ave b { display: block; font-family: var(--font-mono); font-size: 9px; letter-spacing: .3em; color: var(--fg-faint); margin-bottom: 6px; }
+.mode { position: fixed; top: 22px; right: 30px; font-family: var(--font-mono); font-size: 10px; letter-spacing: .2em; color: var(--fg-faint); border: 1px solid var(--line); padding: 6px 12px; z-index: 40; }
+
+/* ── 原型控制条 ── */
+.bar { position: fixed; left: 50%; bottom: 10px; transform: translateX(-50%); z-index: 99; display: flex; gap: 6px; background: rgba(20,22,32,.82); padding: 6px 8px; border-radius: 6px; }
+.bar button { font: 11px/1 var(--font-mono); letter-spacing: .08em; color: #cfd3e2; background: none; border: 1px solid rgba(207,211,226,.25); padding: 6px 10px; cursor: pointer; border-radius: 3px; }
+.bar button.on { background: #9a86c4; color: #14161f; border-color: #9a86c4; }
+.tag { position: fixed; top: 8px; left: 50%; transform: translateX(-50%); z-index: 99; font: 10px/1 var(--font-mono); letter-spacing: .2em; color: var(--fg-faint); }
+
+/* ── 边框实物层 ── */
+.edge { position: fixed; inset: 0; pointer-events: none; z-index: 30; }
+.edge svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.edge .v { display: none; }
+.edge[data-v="A"] .vA, .edge[data-v="B"] .vB, .edge[data-v="C"] .vC { display: block; }
+
+/* 醒↔梦的整体气质：醒面锐、亮、静；梦面软、暖、缓慢呼吸 */
+.shard { transition: opacity 1.2s ease, filter 1.2s ease; }
+body.dream .shard { filter: blur(.4px) saturate(1.15); }
+.breathe { animation: breathe 9s ease-in-out infinite; transform-origin: center; }
+@keyframes breathe { 0%,100% { opacity: .82; } 50% { opacity: 1; } }
+body:not(.dream) .breathe { animation: none; }
+.flowline { stroke-dasharray: 220 1400; animation: flow 14s linear infinite; }
+@keyframes flow { to { stroke-dashoffset: -1620; } }
+body:not(.dream) .flowline { animation-duration: 26s; }
+@media (prefers-reduced-motion: reduce) { .breathe, .flowline { animation: none; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="prose">
+    <h1>字面与光景 · 全样式样张</h1>
+    <div class="meta">2026.09.28</div>
+    <p>这一段未作任何两态标记，醒与梦两面读到的是同一组字。大多数日常行文皆依此展开，两态机制只在需要分岔处点落：一个词的换面，或者一整段的另一种可能。</p>
+    <p>行内可以自然容纳站内链接、行内代码、加粗强调与斜体微光。加粗在随笔中带有 600 字重与 30% 梦色下衬；行内代码则不填底色，而是在字身下方压上一条梦色发丝线。</p>
+    <p>水汽漫开是逐字浮起的默认状态；更高的字拥有更明显的起伏档位；慢半拍的字则错开步调缓步上升。若希望在波峰处带出一抹微温，可采用顶点微温。</p>
+    <p>流光则不拆分字符，一道暖色自左向右滑过字面：同一句话里有一线暖光走过。它亦可调节节奏，如窄而快、偏暖的一线，或是带有逐帧定格感的抽帧流光。</p>
+  </div>
+</div>
+
+<div class="hairline"></div>
+<div class="brand">Traveritas</div>
+<div class="mode">漫游 ｜ 检索</div>
+<div class="star">✦</div>
+<div class="ave"><b>AVE</b>好——大的橱窗啊，玻璃后面站着整个黄昏。</div>
+<div class="tag" id="tag">EDGE · A · WAKE</div>
+
+<div class="edge" id="edge" data-v="A">
+<svg viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+<defs>
+  <!-- 磨砂树脂棱面：顶亮底暗，靠明暗差在近白纸上交代自己（star-crystal 笔记第 1 节） -->
+  <linearGradient id="face-a" x1="0" y1="0" x2=".7" y2="1">
+    <stop offset="0" stop-color="#ffffff" stop-opacity=".95"/>
+    <stop offset=".55" stop-color="#dfe4ec" stop-opacity=".8"/>
+    <stop offset="1" stop-color="#aeb6c6" stop-opacity=".72"/>
+  </linearGradient>
+  <linearGradient id="face-b" x1="1" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#f4f2fa" stop-opacity=".9"/>
+    <stop offset=".6" stop-color="#cfc9e0" stop-opacity=".7"/>
+    <stop offset="1" stop-color="#8f89ae" stop-opacity=".62"/>
+  </linearGradient>
+  <linearGradient id="face-c" x1="0" y1="1" x2="1" y2="0">
+    <stop offset="0" stop-color="#6a6486" stop-opacity=".5"/>
+    <stop offset="1" stop-color="#e8e6f2" stop-opacity=".85"/>
+  </linearGradient>
+  <linearGradient id="rim" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#ffffff" stop-opacity=".9"/>
+    <stop offset="1" stop-color="#9a86c4" stop-opacity=".55"/>
+  </linearGradient>
+  <linearGradient id="flowg" x1="0" y1="0" x2="1" y2="0">
+    <stop offset="0" stop-color="#a7b1ba" stop-opacity="0"/>
+    <stop offset=".5" stop-color="#9a86c4" stop-opacity=".8"/>
+    <stop offset="1" stop-color="#9389ae" stop-opacity="0"/>
+  </linearGradient>
+  <filter id="soft" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="1.1"/></filter>
+  <filter id="soft2" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="2.6"/></filter>
+
+  <!-- 一枚碎晶：三棱面 + 棱线。用 <use> 摆放，姿态各异 -->
+  <g id="shard1">
+    <polygon points="0,-46 26,-8 6,34 -18,10" fill="url(#face-a)"/>
+    <polygon points="0,-46 -18,10 -30,-16" fill="url(#face-b)"/>
+    <polygon points="6,34 -18,10 0,-46" fill="url(#face-c)" opacity=".8"/>
+    <polygon points="26,-8 6,34 14,6" fill="#4f4a66" opacity=".34"/>
+    <polyline points="0,-46 6,34" fill="none" stroke="url(#rim)" stroke-width="1"/>
+    <polyline points="0,-46 -18,10" fill="none" stroke="#ffffff" stroke-opacity=".85" stroke-width=".8"/>
+    <polyline points="26,-8 14,6 6,34" fill="none" stroke="#ffffff" stroke-opacity=".5" stroke-width=".5"/>
+    <polygon points="0,-46 26,-8 6,34 -18,10 -30,-16" fill="none" stroke="#3a404e" stroke-opacity=".45" stroke-width=".7"/>
+  </g>
+  <g id="shard2">
+    <polygon points="-34,0 -4,-22 30,-6 12,18 -16,22" fill="url(#face-b)"/>
+    <polygon points="-4,-22 12,18 -16,22" fill="url(#face-a)" opacity=".9"/>
+    <polygon points="-4,-22 30,-6 12,18" fill="url(#face-c)" opacity=".8"/>
+    <polygon points="30,-6 12,18 22,2" fill="#4f4a66" opacity=".3"/>
+    <polyline points="-4,-22 12,18" fill="none" stroke="url(#rim)" stroke-width=".9"/>
+    <polyline points="-34,0 -4,-22" fill="none" stroke="#ffffff" stroke-opacity=".8" stroke-width=".6"/>
+    <polygon points="-34,0 -4,-22 30,-6 12,18 -16,22" fill="none" stroke="#3a404e" stroke-opacity=".42" stroke-width=".7"/>
+  </g>
+</defs>
+
+<!-- ═══ 变体 A · 侵入的碎片 ═══
+     世界本体在屏幕之外，几枚碎晶从边缘探进来。
+     右上为主簇（最大一枚 ~120px），左中一枚小的，底边两枚贴着下沿。
+     全部避开：字标(左上)、模式切换(右上内 30px)、星(左下)、Ave(右下)。 -->
+<g class="v vA">
+  <g class="shard breathe">
+    <use href="#shard1" transform="translate(1424,238) rotate(24) scale(2.5)"/>
+    <use href="#shard2" transform="translate(1372,116) rotate(-14) scale(1.4)" opacity=".85"/>
+    <use href="#shard1" transform="translate(1446,356) rotate(70) scale(1.2)" opacity=".7" filter="url(#soft)"/>
+    <use href="#shard2" transform="translate(1336,184) rotate(56) scale(.5)" opacity=".55" filter="url(#soft)"/>
+  </g>
+  <g class="shard">
+    <use href="#shard2" transform="translate(14,430) rotate(102) scale(1.35)" opacity=".75"/>
+    <use href="#shard1" transform="translate(-16,506) rotate(-30) scale(.9)" opacity=".5" filter="url(#soft)"/>
+  </g>
+  <g class="shard breathe" style="animation-delay:-4s">
+    <use href="#shard2" transform="translate(560,896) rotate(8) scale(1.6)" opacity=".8"/>
+    <use href="#shard1" transform="translate(700,912) rotate(-52) scale(1.0)" opacity=".55" filter="url(#soft)"/>
+  </g>
+</g>
+
+<!-- ═══ 变体 B · 玻璃层缘 ═══
+     屏幕本身是一层玻璃：四边各一条带厚度的磨砂层缘（斜切端面），
+     碎片只生在缘的断口处。缘宽 ~10px，角落 45° 拼缝。 -->
+<g class="v vB">
+  <g class="shard">
+    <!-- 上缘 -->
+    <polygon points="0,0 1440,0 1428,10 12,10" fill="url(#face-a)" opacity=".8"/>
+    <line x1="12" y1="10" x2="1428" y2="10" stroke="url(#rim)" stroke-width=".8"/>
+    <!-- 下缘 -->
+    <polygon points="12,890 1428,890 1440,900 0,900" fill="url(#face-c)" opacity=".6"/>
+    <line x1="12" y1="890" x2="1428" y2="890" stroke="url(#rim)" stroke-width=".8"/>
+    <!-- 左缘 / 右缘 -->
+    <polygon points="0,0 12,10 12,890 0,900" fill="url(#face-b)" opacity=".65"/>
+    <polygon points="1440,0 1428,10 1428,890 1440,900" fill="url(#face-a)" opacity=".7"/>
+    <line x1="12" y1="10" x2="12" y2="890" stroke="#ffffff" stroke-opacity=".6" stroke-width=".7"/>
+    <line x1="1428" y1="10" x2="1428" y2="890" stroke="url(#rim)" stroke-width=".7"/>
+  </g>
+  <!-- 断口：右缘中段崩开一小口，三枚碎晶悬在缺口内外 -->
+  <g class="shard breathe">
+    <polygon points="1428,380 1440,368 1440,452 1428,440" fill="var(--bg,#f0f3f6)"/>
+    <use href="#shard1" transform="translate(1424,410) rotate(40) scale(1.15)"/>
+    <use href="#shard2" transform="translate(1394,376) rotate(-20) scale(.6)" opacity=".7"/>
+    <use href="#shard1" transform="translate(1400,452) rotate(120) scale(.45)" opacity=".5" filter="url(#soft)"/>
+  </g>
+  <g class="shard">
+    <use href="#shard2" transform="translate(300,6) rotate(160) scale(.7)" opacity=".65"/>
+  </g>
+</g>
+
+<!-- ═══ 变体 C · 沿缘光流 ═══
+     一道极细的光沿屏幕内缘环游（14° 缝线的气质延伸），
+     在四角与两处驻点凝出小碎晶；光流经过时晶体被点亮。 -->
+<g class="v vC">
+  <rect x="7" y="7" width="1426" height="886" fill="none" stroke="var(--line)" stroke-width=".6"/>
+  <rect class="flowline" x="7" y="7" width="1426" height="886" fill="none" stroke="url(#flowg)" stroke-width="1.6" filter="url(#soft)"/>
+  <g class="shard breathe">
+    <use href="#shard1" transform="translate(1433,7) rotate(45) scale(.8)"/>
+    <use href="#shard2" transform="translate(7,893) rotate(225) scale(.7)" opacity=".8"/>
+  </g>
+  <g class="shard breathe" style="animation-delay:-5s">
+    <use href="#shard1" transform="translate(720,7) rotate(180) scale(.5)" opacity=".65"/>
+    <use href="#shard2" transform="translate(7,450) rotate(90) scale(.55)" opacity=".6"/>
+    <use href="#shard1" transform="translate(1433,620) rotate(-70) scale(.45)" opacity=".55" filter="url(#soft)"/>
+  </g>
+</g>
+</svg>
+</div>
+
+<div class="bar">
+  <button data-v="A" class="on">A 碎片</button>
+  <button data-v="B">B 层缘</button>
+  <button data-v="C">C 光流</button>
+  <button id="face">醒 ⇄ 梦</button>
+  <button id="hide">隐/显</button>
+</div>
+
+<script>
+const edge = document.getElementById('edge');
+const tag = document.getElementById('tag');
+const upd = () => { tag.textContent = `EDGE · ${edge.dataset.v} · ${document.body.classList.contains('dream') ? 'DREAM' : 'WAKE'}`; };
+document.querySelectorAll('.bar [data-v]').forEach((b) => b.addEventListener('click', () => {
+  edge.dataset.v = b.dataset.v;
+  document.querySelectorAll('.bar [data-v]').forEach((x) => x.classList.toggle('on', x === b));
+  upd();
+}));
+document.getElementById('face').addEventListener('click', () => { document.body.classList.toggle('dream'); upd(); });
+document.getElementById('hide').addEventListener('click', () => { edge.style.display = edge.style.display === 'none' ? '' : 'none'; });
+const q = new URLSearchParams(location.search);
+if (q.get('v')) { edge.dataset.v = q.get('v'); document.querySelectorAll('.bar [data-v]').forEach((x) => x.classList.toggle('on', x.dataset.v === q.get('v'))); }
+if (q.get('face') === 'dream') document.body.classList.add('dream');
+if (q.get('bare')) { document.querySelector('.bar').style.display = 'none'; tag.style.display = 'none'; }
+if (q.get('mobile')) {
+  /* 手机布局：viewBox 换成手机尺寸（否则 slice 裁切把边缘碎片全裁掉），碎片缩小、避开仪器 */
+  document.querySelector('.edge svg').setAttribute('viewBox', '0 0 390 844');
+  const va = document.querySelector('.vA');
+  va.innerHTML = `
+  <g class="shard breathe">
+    <use href="#shard1" transform="translate(396,318) rotate(24) scale(.85)"/>
+    <use href="#shard2" transform="translate(378,258) rotate(-14) scale(.45)" opacity=".8"/>
+    <use href="#shard1" transform="translate(402,372) rotate(70) scale(.4)" opacity=".6" filter="url(#soft)"/>
+  </g>
+  <g class="shard">
+    <use href="#shard2" transform="translate(-4,560) rotate(102) scale(.55)" opacity=".7"/>
+  </g>
+  <g class="shard breathe" style="animation-delay:-4s">
+    <use href="#shard2" transform="translate(150,852) rotate(8) scale(.8)" opacity=".75"/>
+    <use href="#shard1" transform="translate(216,858) rotate(-52) scale(.4)" opacity=".5" filter="url(#soft)"/>
+  </g>`;
+}
+upd();
+</script>
+</body>
+</html>

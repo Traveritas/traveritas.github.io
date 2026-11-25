@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>星 · 粗细</title>
+<link rel="stylesheet" href="/fonts/noto/font.css">
+<link rel="icon" href="data:,">
+<style>
+  /* 令牌取自 src/styles/tokens.css，只抄这颗星用得上的几个 */
+  :root {
+    --bg: #f0f3f6;
+    --bg-sunken: #e5ebf2;
+    --fg: #232830;
+    --fg-soft: #56606d;
+    --fg-faint: #858f9d;
+    --line: rgba(35, 40, 48, 0.12);
+    --umber: #4f4a66;
+    --amber: #9a86c4;
+    --deep: #2a2b38;
+    --deep-ink: #dfe2ec;
+    --font-display: 'Noto Serif SC', 'Palatino Linotype', Palatino, Georgia, 'Source Han Serif SC', serif;
+    --font-body: system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+    /* 与 src/styles/tokens.css 同一串：中文必须排在 monospace 前面，
+       否则无衬线中文字形落空，汉字全成方框 */
+    --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, 'JetBrains Mono',
+      'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans SC', monospace;
+  }
+
+  * { box-sizing: border-box; }
+  html { color-scheme: light; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.72;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 2190px; margin: 0 auto; padding: 64px 42px 150px; }
+
+  .kicker {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--fg-faint);
+    margin: 0 0 16px;
+  }
+  header.head { margin-bottom: 56px; }
+  header.head h1 {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 30px;
+    letter-spacing: 0.1em;
+    margin: 0 0 18px;
+  }
+  header.head p { margin: 0; max-width: 46em; color: var(--fg-soft); font-size: 14px; }
+  header.head p + p { margin-top: 10px; }
+
+  section { margin: 0 0 90px; }
+  section > .hd { display: flex; align-items: baseline; gap: 18px; margin-bottom: 12px; }
+  section > .hd h2 {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 18px;
+    letter-spacing: 0.08em;
+    margin: 0;
+  }
+  section > .hd .n {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    color: var(--fg-faint);
+  }
+  section > .hd .aside {
+    margin-left: auto;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    color: var(--fg-faint);
+    text-transform: uppercase;
+  }
+  section > .lede {
+    margin: 0 0 28px;
+    max-width: 54em;
+    color: var(--fg-soft);
+    font-size: 13.5px;
+    line-height: 1.85;
+  }
+  h3.sub {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 14px;
+    letter-spacing: 0.06em;
+    color: var(--fg-soft);
+    margin: 56px 0 8px;
+  }
+  code {
+    font-family: var(--font-mono);
+    font-size: 0.92em;
+    color: var(--umber);
+  }
+
+  /* ── 底：昼面 / 深底 ── */
+  .ground {
+    border-radius: 4px;
+    margin-bottom: 18px;
+    padding: 32px 28px 24px;
+    border: 1px solid var(--line);
+    background: var(--bg-sunken);
+    overflow-x: auto;
+  }
+  .ground.is-deep { background: var(--deep); border-color: transparent; color: var(--deep-ink); }
+  .ground .row { min-width: max-content; }
+
+  .row { display: flex; gap: 28px; align-items: flex-start; }
+  .row.is-mid { align-items: center; }
+  .row + .row { margin-top: 26px; }
+
+  .cell { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .cell .box { display: grid; place-items: center; }
+  .cell svg { display: block; }
+
+  /* 星取现役那颗的颜色：工具条 .ts-star 的 color 是 var(--fg-soft)，悬停才提到 --fg */
+  .cell .star { color: var(--fg-soft); }
+  .is-deep .cell .star { color: var(--deep-ink); }
+  .cell .cap {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.03em;
+    color: var(--fg-soft);
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+    line-height: 1.6;
+  }
+  .is-deep .cell .cap { color: rgba(223, 226, 236, 0.6); }
+  .cell .cap b { font-weight: 500; color: var(--fg); }
+  .is-deep .cell .cap b { color: var(--deep-ink); }
+  .cell .cap em { font-style: normal; color: var(--fg-faint); }
+  .is-deep .cell .cap em { color: rgba(223, 226, 236, 0.38); }
+  .cell.is-prod .cap b { color: var(--umber); }
+
+  .group-label {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--fg-faint);
+    margin: 0 0 12px;
+  }
+
+  /* ── 中心放大 ── */
+  .pair { display: flex; flex-direction: column; align-items: center; gap: 11px; }
+  .pair .zoom {
+    border-radius: 3px;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    display: grid;
+    place-items: center;
+    background: var(--bg);
+  }
+  .pair .tag {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    letter-spacing: 0.1em;
+    color: var(--fg-faint);
+    text-align: center;
+    line-height: 1.6;
+  }
+  .pair .zoom svg { color: var(--fg-soft); }
+
+  /* ── 读数表 ── */
+  .tblwrap { overflow-x: auto; }
+  table.tbl { border-collapse: collapse; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+  table.tbl th, table.tbl td {
+    text-align: right;
+    padding: 9px 18px 9px 0;
+    border-bottom: 1px solid var(--line);
+    white-space: nowrap;
+  }
+  table.tbl th {
+    font-family: var(--font-mono);
+    font-weight: 400;
+    font-size: 11.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--fg-faint);
+    border-bottom-color: transparent;
+    padding-bottom: 5px;
+  }
+  table.tbl td.v { font-family: var(--font-mono); }
+  table.tbl td.note { text-align: left; color: var(--fg-soft); font-family: var(--font-body); padding-left: 10px; }
+  table.tbl tr.is-prod td { color: var(--umber); }
+  table.tbl tr.is-prod td.note { color: var(--umber); }
+  table.tbl tr.is-win td { background: color-mix(in srgb, var(--amber) 10%, transparent); }
+  table.tbl tr.is-blob td.note { color: var(--fg-faint); }
+
+  .foot { margin-top: 34px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 36px; font-size: 12.5px; line-height: 1.8; color: var(--fg-soft); }
+  .foot b { font-weight: 500; color: var(--fg); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="head">
+    <p class="kicker">星 · 第三条轴</p>
+    <h1>粗细</h1>
+    <p>姿势锁在 yaw 45° / pitch 35.264°，支长 16，支尾越过星心回伸 1.4，深度仍用两档不透明度假扮。只动一个量：每支在原点处的半宽 <code>halfWidth</code>。</p>
+    <p>现役是 1.9，即 0.119·r。下面从 0.08 排到 0.62 —— 一端还只是一束细刺，另一端已糊成一团。</p>
+  </header>
+
+  <section id="sweep">
+    <div class="hd"><span class="n">01</span><h2>粗细梯</h2><span class="aside">200 px · ISO</span></div>
+    <p class="lede">九档并排，昼面底与深底各一遍。看的是剪影：支与支之间那个内角还分不分得开，六支还数不数得清。</p>
+    <div class="ground" id="g-bg"><div class="row" id="sweep-bg"></div></div>
+    <div class="ground is-deep" id="g-deep"><div class="row" id="sweep-deep"></div></div>
+  </section>
+
+  <section id="center">
+    <div class="hd"><span class="n">02</span><h2>中心</h2><span class="aside">400 px · 中心放大</span></div>
+    <p class="lede">左上角那颗星的中心一直没人细看过。左起是现役，后三档是这一轮挑出来的。上排是整颗；下排把中心 7.5 单位见方那块放大 4.3 倍、并去掉中心圆 —— 支尾在哪里交叠、交叠出什么形状，只有下排说得清。</p>
+    <div class="row" id="center-row"></div>
+    <div class="row" id="zoom-row"></div>
+
+    <h3 class="sub">支尾的回伸</h3>
+    <p class="lede">简报假定支尾是「唯一往星心里填东西的一笔」。实测它<b>只改明暗，不改剪影</b>：六张风筝本来就都盖住原点，支尾再往回伸，也仍落在另外五张的里面。下面五档的内角半径完全相同，差的是中心那一片的叠层次序。</p>
+    <div class="row" id="tail-row"></div>
+    <p class="lede" id="tail-note"></p>
+  </section>
+
+  <section id="sizes">
+    <div class="hd"><span class="n">03</span><h2>尺寸</h2><span class="aside">48 / 96 / 200 px</span></div>
+    <p class="lede">变粗之后，小尺寸是变好了还是变糊了。前三个是这一轮的档，后三个是现役 —— 对比着看，工具栏那颗 40px 该往哪边走就清楚了。</p>
+    <p class="group-label" id="sizes-win"></p>
+    <div class="ground"><div class="row is-mid" id="size-row"></div></div>
+    <p class="group-label" id="sizes-prod"></p>
+    <div class="ground"><div class="row is-mid" id="size-row-prod"></div></div>
+  </section>
+
+  <section id="readout">
+    <div class="hd"><span class="n">04</span><h2>读数</h2><span class="aside">内角半径 · 200 px</span></div>
+    <p class="lede">内角半径 = 星心到「相邻两支之间那个内角」的距离。六重对称，只在 0°–60° 里扫并集半径、取最小值。单位是 viewBox 的 40 单位，再按画布尺寸换算成像素。</p>
+    <div class="tblwrap"><table class="tbl" id="tbl"></table></div>
+    <div class="foot" id="foot"></div>
+  </section>
+
+</div>
+
+<script type="module">
+import { RATIOS, R0, PROD, notchRadius, fillRatio, sixFold, px, starSvg, starMarkup } from './src.js';
+
+const W = (k) => +(k * R0).toFixed(3);
+const n2 = (v) => v.toFixed(2);
+const n3 = (v) => v.toFixed(3);
+
+/* 三档待选与最终一档（依据见 notes.md） */
+const BEST = [0.20, 0.26, 0.32];
+const WIN = 0.26;
+const TAILS = [0, 0.7, 1.4, 2.0, 4.0];
+const SIZES = [48, 96, 200];
+
+const notchOf = (k, notch) => notchRadius({ halfWidth: W(k), notch });
+
+/* ── 01 粗细梯（两遍，同一批格子） ── */
+function sweep(host) {
+  host.innerHTML = RATIOS.map((k) => {
+    const n = notchOf(k);
+    const prod = Math.abs(k - PROD.halfWidth / R0) < 1e-9;
+    return `<div class="cell${prod ? ' is-prod' : ''}">
+      ${starSvg(200, { halfWidth: W(k) })}
+      <div class="cap"><b>${n3(k)}</b><br><em>w ${n2(W(k))}</em><br>内角 ${n2(px(n.notch, 200))}px</div>
+    </div>`;
+  }).join('');
+}
+sweep(document.getElementById('sweep-bg'));
+sweep(document.getElementById('sweep-deep'));
+
+/* ── 02 中心：整颗 400px ── */
+const picks = [
+  { k: PROD.halfWidth / R0, label: '现役', win: false },
+  ...BEST.map((k) => ({ k, label: k === WIN ? '这一档' : '待选', win: k === WIN })),
+];
+document.getElementById('center-row').innerHTML = picks.map(({ k, label, win }) => {
+  const n = notchOf(k);
+  return `<div class="cell${win ? ' is-prod' : ''}">
+    ${starSvg(400, { halfWidth: W(k) })}
+    <div class="cap"><b>${n3(k)}</b><br><em>${label}</em> · 内角 ${n2(px(n.notch, 400))}px</div>
+  </div>`;
+}).join('');
+
+/* 中心放大：viewBox 取 7.5 单位见方。整颗 400px 是 10 px/单位，
+   这里 320px 画 7.5 单位 ≈ 42.7 px/单位 ⇒ 放大 4.3 倍，不重采样 */
+const ZU = 7.5;
+const ZS = 320;
+const ZMAG = (ZS / ZU) / (400 / 40);
+const zoom = (k) =>
+  `<svg width="${ZS}" height="${ZS}" viewBox="${-ZU / 2} ${-ZU / 2} ${ZU} ${ZU}" aria-hidden="true">${starMarkup({ halfWidth: W(k) }, { center: false })}</svg>`;
+document.getElementById('zoom-row').innerHTML = picks.map(({ k, label }) => {
+  const n = notchOf(k);
+  return `<div class="pair">
+    <div class="zoom" style="width:${ZS}px;height:${ZS}px">${zoom(k)}</div>
+    <div class="tag">${n3(k)} · ${label}<br>中心 ${ZU} 单位 · ×${n2(ZMAG)} · 无中心圆<br>内角离星心 ${n2(n.notch)} 单位</div>
+  </div>`;
+}).join('');
+
+/* ── 02b 支尾回伸（实测对剪影无效，留着当反例） ── */
+document.getElementById('tail-row').innerHTML = TAILS.map((t) => {
+  const n = notchOf(WIN, t);
+  return `<div class="cell${t === 1.4 ? ' is-prod' : ''}">
+    ${starSvg(400, { halfWidth: W(WIN), notch: t })}
+    <div class="cap"><b>${t.toFixed(1)}</b><br><em>支尾</em> · 内角 ${n2(px(n.notch, 400))}px</div>
+  </div>`;
+}).join('');
+document.getElementById('tail-note').textContent =
+  `五档（0 / 0.7 / 1.4 / 2.0 / 4.0）的内角半径完全相同：${n3(notchOf(WIN, 0).notch)} 单位，剪影一个像素不变。`
+  + ` 变的是中心那块六边形里，六张风筝谁压在谁上面 —— 逐点算合成不透明度，最大差 0.058（约 6%），`
+  + ` 且越偏离 1.4 差得越多：0 与 4.0 两档最明显。所以这一笔是「中心微调」，不是「填中心」。`;
+
+/* ── 03 尺寸 ── */
+/* 三档画布高矮差四倍：每个格子先占一块 200px 高的托盘，星在托盘里居中，
+   于是三格的中轴与下面的字都在同一行上，大小关系一眼看得出 */
+const TRAY = 210;
+const sizeSet = (host, k) => {
+  const n = notchOf(k);
+  host.innerHTML = SIZES.map(
+    (s) => `<div class="cell">
+      <div class="box" style="width:${TRAY}px;height:${TRAY}px">${starSvg(s, { halfWidth: W(k) })}</div>
+      <div class="cap"><b>${s}</b> px<br>内角 ${n2(px(n.notch, s))}px</div>
+    </div>`,
+  ).join('');
+};
+sizeSet(document.getElementById('size-row'), WIN);
+sizeSet(document.getElementById('size-row-prod'), PROD.halfWidth / R0);
+document.getElementById('sizes-win').textContent = `halfWidth/r ${n3(WIN)}（这一档）`;
+document.getElementById('sizes-prod').textContent = `halfWidth/r ${n3(PROD.halfWidth / R0)}（现役 1.9）`;
+document.getElementById('sizes-win').textContent = `halfWidth/r ${n3(WIN)}（这一档）`;
+document.getElementById('sizes-prod').textContent = `halfWidth/r ${n3(PROD.halfWidth / R0)}（现役 1.9）`;
+
+/* ── 04 读数 ── */
+const verdict = [
+  '细刺。六瓣分得最开，但每支只剩一条线',
+  '现役。六根并列，不是一颗',
+  '支开始有面，还是偏瘦',
+  '第一档不再是刺',
+  '这一档。支有厚度，六角仍各是各的',
+  '上沿。内角开始被填，仍读得出六支',
+  '内角快被填平，六支在并拢',
+  '已是六边形带六个小凸',
+  '六边形。六支不再可数',
+];
+
+const rows = RATIOS.map((k) => {
+  const n = notchOf(k);
+  return {
+    k,
+    w: W(k),
+    notch: n.notch,
+    at: n.atDeg,
+    p200: px(n.notch, 200),
+    rel: n.notch / n.tip,
+    fill: fillRatio({ halfWidth: W(k) }),
+    a6: sixFold({ halfWidth: W(k) }),
+  };
+});
+
+document.getElementById('tbl').innerHTML = `
+  <thead><tr>
+    <th>halfWidth / r</th><th>halfWidth</th><th>内角（单位）</th><th>内角 @200px</th>
+    <th>内角 / 支尖</th><th>六重谐波 a6</th><th>剪影填充率</th><th style="text-align:left">读起来</th>
+  </tr></thead>
+  <tbody>${rows
+    .map((r, i) => {
+      const prod = Math.abs(r.k - PROD.halfWidth / R0) < 1e-9;
+      const win = Math.abs(r.k - WIN) < 1e-9;
+      const cls = prod ? 'is-prod' : win ? 'is-win' : r.k >= 0.5 ? 'is-blob' : '';
+      return `<tr class="${cls}">
+        <td class="v">${n3(r.k)}</td>
+        <td class="v">${n3(r.w)}</td>
+        <td class="v">${n3(r.notch)}</td>
+        <td class="v">${n2(r.p200)} px</td>
+        <td class="v">${n3(r.rel)}</td>
+        <td class="v">${n3(r.a6)}</td>
+        <td class="v">${n3(r.fill)}</td>
+        <td class="note">${verdict[i]}</td>
+      </tr>`;
+    })
+    .join('')}</tbody>`;
+
+const P = notchOf(PROD.halfWidth / R0);
+document.getElementById('foot').innerHTML = `
+  <div><b>内角随粗细单调变远，不是变近。</b>支越粗，内角被推得越靠外：0.08 时内角还缩在星心 2.19 处，是一道深 V；到 0.62 已推到 9.12，只剩一道浅坑。所以在这一族几何里，<b>内角越大 = 六支并得越紧</b>，与 star-solid 那份「内角至少 2.8px」的读法方向相反。真正随粗细单调的是 <b>a6</b>：六重谐波幅度，0.67 降到 0.14。</div>
+  <div><b>现役 1.9 的内角是 ${n3(P.notch)} 单位，200px 上 ${n2(px(P.notch, 200))}px。</b>star-solid/notes.md 记的是 2.8135 单位 / 14.07px，差约 7%。我没能复现那组数字（见 notes.md）。</div>
+  <div><b>填充率</b>是剪影面积占「半径 13.064 的正圆」的比例。一条极细的六芒星本来只有 0.16，0.26 档 0.39，0.62 档 0.64 —— 超过一半，六支的边界就再也说不清在哪了。</div>
+`;
+
+/* 给截图脚本核对 */
+window.__star = { rows, prod: P, best: BEST, win: WIN, tails: TAILS, sizes: SIZES, zoomMag: ZMAG };
+</script>
+</body>
+</html>
+

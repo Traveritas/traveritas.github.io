@@ -1,0 +1,848 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>晶体六芒星 · 定格翻动</title>
+<link rel="stylesheet" href="/fonts/noto/font.css">
+<link rel="icon" href="data:,">
+<style>
+  :root {
+    --bg: #f0f3f6;
+    --bg-sunken: #e5ebf2;
+    --fg: #232830;
+    --fg-soft: #56606d;
+    --fg-faint: #858f9d;
+    --line: rgba(35, 40, 48, 0.12);
+    --dream: #9389ae;
+    --amber: #9a86c4;
+    --font-display: 'Noto Serif SC', 'Palatino Linotype', Palatino, Georgia, serif;
+    --font-body: system-ui, 'PingFang SC', 'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+    /* 站点的玻璃卡（照 Toolstar.astro 的 .ts-sheet） */
+    --glass: color-mix(in srgb, var(--bg) 72%, transparent);
+    --glass-edge: rgb(255 255 255 / 0.7);
+    --glass-hi: rgb(255 255 255 / 0.6);
+    --glass-sh: rgb(38 44 51 / 0.22);
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body { margin: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 1060px; margin: 0 auto; padding: 56px 32px 120px; }
+
+  header.head { margin-bottom: 44px; }
+  header.head h1 {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 26px;
+    letter-spacing: 0.04em;
+    margin: 0 0 10px;
+  }
+  header.head p { margin: 0; max-width: 46em; color: var(--fg-soft); font-size: 14px; }
+  .kicker {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--fg-faint);
+    margin: 0 0 14px;
+  }
+
+  section { margin: 0 0 68px; }
+  section > h2 {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 17px;
+    letter-spacing: 0.03em;
+    margin: 0 0 6px;
+  }
+  section > .lede {
+    margin: 0 0 24px;
+    max-width: 44em;
+    color: var(--fg-soft);
+    font-size: 13.5px;
+  }
+  .num {
+    display: inline-block;
+    width: 1.6em;
+    color: var(--fg-faint);
+    font-family: var(--font-mono);
+    font-size: 12px;
+  }
+
+  /* ── 控件条 ── */
+  .bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 22px;
+    align-items: flex-end;
+    padding: 16px 18px;
+    margin-bottom: 26px;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    background: color-mix(in srgb, #ffffff 46%, transparent);
+  }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field > span {
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--fg-faint);
+  }
+  .seg { display: flex; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+  .seg button {
+    appearance: none;
+    border: 0;
+    border-right: 1px solid var(--line);
+    background: transparent;
+    color: var(--fg-soft);
+    font: 12px/1 var(--font-mono);
+    padding: 7px 11px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  .seg button:last-child { border-right: 0; }
+  .seg button[aria-pressed='true'] { background: var(--fg); color: var(--bg); }
+  .seg button:hover:not([aria-pressed='true']) { background: color-mix(in srgb, var(--fg) 6%, transparent); }
+
+  .sub {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 13.5px;
+    letter-spacing: 0.03em;
+    color: var(--fg-soft);
+    margin: 30px 0 0;
+  }
+
+  .note {
+    font-size: 12px;
+    color: var(--fg-faint);
+    margin: 10px 0 0;
+  }
+  .note b { color: var(--fg-soft); font-weight: 600; }
+
+  /* ── 1 底色可读性 ── */
+  .ground {
+    display: flex;
+    gap: 0;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--bg);
+  }
+  .ground figure { margin: 0; flex: 1; position: relative; border-right: 1px solid var(--line); }
+  .ground figure:last-child { border-right: 0; }
+  .ground canvas { display: block; margin: 0 auto; }
+  .ground figcaption {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-align: center;
+    color: var(--fg-faint);
+    padding: 2px 0 14px;
+  }
+  .ground figure > .stagebox { padding: 18px 0 0; }
+
+  /* ── 2 图层关系 ── */
+  .semantics {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 22px;
+  }
+  .sem {
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--bg);
+  }
+  .sem .frame {
+    position: relative;
+    height: 300px;
+    overflow: hidden;
+    background: var(--bg);
+    /* 一点极淡的纸纹，给「卡片在什么之上」一个参照 */
+    background-image:
+      radial-gradient(circle at 18% 26%, rgba(154, 134, 196, 0.07), transparent 42%),
+      radial-gradient(circle at 84% 74%, rgba(167, 177, 186, 0.1), transparent 46%);
+  }
+  .sem .lbl {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 10px;
+    padding: 10px 14px;
+    border-top: 1px solid var(--line);
+    font-size: 12px;
+    color: var(--fg-soft);
+  }
+  .sem .lbl em { font-style: normal; font-family: var(--font-mono); font-size: 10px; color: var(--fg-faint); letter-spacing: 0.08em; }
+
+  /* 立牌：这是测试用的衬底，不是站点上的对话框组件 */
+  .standin {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    translate: -50% -50%;
+    width: 76%;
+    padding: 20px 22px 18px;
+    border-radius: 6px;
+    border: 1px solid var(--glass-edge);
+    background: var(--glass);
+    -webkit-backdrop-filter: blur(18px) saturate(1.08);
+    backdrop-filter: blur(18px) saturate(1.08);
+    box-shadow:
+      inset 0 1px 1px var(--glass-hi),
+      0 18px 42px -18px var(--glass-sh);
+  }
+  .standin h3 {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 14px;
+    letter-spacing: 0.04em;
+    margin: 0 0 8px;
+  }
+  .standin p { margin: 0 0 14px; font-size: 12.5px; line-height: 1.75; color: var(--fg-soft); }
+  .standin .btns { display: flex; gap: 8px; }
+  .standin button {
+    appearance: none;
+    font: 12px var(--font-body);
+    padding: 5px 14px;
+    border-radius: 4px;
+    border: 1px solid var(--line);
+    background: color-mix(in srgb, var(--fg) 5%, transparent);
+    color: var(--fg-soft);
+  }
+  .standin button.primary { border-color: color-mix(in srgb, var(--amber) 55%, transparent); color: var(--amber); }
+
+  .sem .starholder { position: absolute; pointer-events: none; }
+  .sem canvas { display: block; }
+  /* 没有衬底的那一格：给帧留一点极淡的边界，否则读者不知道自己在看什么 */
+  .sem.is-bare .frame { box-shadow: inset 0 0 0 1px var(--line); }
+
+  /* 图层语义：三种叠放 */
+  .sem[data-stack='front'] .starholder { z-index: 3; }
+  .sem[data-stack='behind'] .starholder { z-index: 1; }
+  .sem[data-stack='behind'] .standin { z-index: 2; }
+  .sem[data-stack='clip'] .starholder { z-index: 3; }
+
+  /* 折射档进不了玻璃后面：它自带一块不透明底，会让整块立牌消失 */
+  .sem .starholder[data-blocked]::after {
+    content: '折射档在这里没有位置';
+    position: absolute;
+    inset: auto 0 10px 0;
+    text-align: center;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    color: var(--fg-faint);
+  }
+
+  /* ── 3 静止帧 ── */
+  /* 六格 240px 加起来 1510px，比正文栏宽 —— 这一节破出正文栏，
+     否则静止帧条永远要横向滚动，评审时看不全 */
+  #strip-sec, #grain-sec {
+    margin-left: calc(50% - 50vw);
+    margin-right: calc(50% - 50vw);
+    padding-inline: 32px;
+  }
+  #strip-sec > h2, #strip-sec > .lede,
+  #grain-sec > h2, #grain-sec > .lede {
+    max-width: 1000px;
+  }
+
+  .stripwrap { border: 1px solid var(--line); border-radius: 6px; padding: 22px; background: var(--bg); width: fit-content; }
+  .stripwrap canvas { display: block; }
+  .stripmarks { display: flex; gap: 14px; padding-top: 8px; }
+  .stripmarks span {
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    color: var(--fg-faint);
+    text-align: center;
+    flex: 0 0 240px;
+  }
+
+  /* ── 4 粒度 ── */
+  .matrixwrap { border: 1px solid var(--line); border-radius: 6px; padding: 22px; overflow-x: auto; background: var(--bg); width: fit-content; max-width: 100%; }
+  .matrixwrap canvas { display: block; }
+  .matrixlegend { display: flex; gap: 14px; padding-top: 8px; }
+  .matrixlegend span { font-family: var(--font-mono); font-size: 9.5px; color: var(--fg-faint); text-align: center; }
+  .rowtags { display: grid; gap: 8px; margin-top: 14px; }
+  .rowtags div { font-family: var(--font-mono); font-size: 10.5px; color: var(--fg-soft); letter-spacing: 0.06em; }
+  .rowtags b { color: var(--fg); font-weight: 600; }
+
+  /* ── 5 测算 ── */
+  .measure { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .measure button {
+    appearance: none;
+    padding: 9px 20px;
+    border-radius: 4px;
+    border: 1px solid color-mix(in srgb, var(--amber) 55%, transparent);
+    background: transparent;
+    color: var(--amber);
+    font: 12.5px var(--font-body);
+    cursor: pointer;
+  }
+  .measure button:disabled { opacity: 0.45; cursor: default; }
+  .measure output { font-family: var(--font-mono); font-size: 11px; color: var(--fg-faint); }
+
+  table.perf {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+  }
+  table.perf th, table.perf td {
+    text-align: right;
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--line);
+    white-space: nowrap;
+  }
+  table.perf th { color: var(--fg-faint); font-weight: 400; letter-spacing: 0.06em; font-size: 10px; }
+  table.perf td:first-child, table.perf th:first-child { text-align: left; }
+  table.perf td.v { color: var(--fg); }
+  table.perf tr.bad td { color: var(--fg-soft); }
+
+  .proto {
+    margin-top: 4px;
+    font-size: 11px;
+    color: var(--fg-faint);
+    font-family: var(--font-mono);
+    letter-spacing: 0.04em;
+  }
+
+  @media (max-width: 860px) {
+    .semantics { grid-template-columns: minmax(0, 1fr); }
+    .ground { flex-wrap: wrap; }
+    .ground figure { flex: 1 0 50%; border-bottom: 1px solid var(--line); }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="head">
+    <p class="kicker">prototype · design/mocks/star-crystal</p>
+    <h1>晶体六芒星 · 定格翻动</h1>
+    <p>
+      一颗绕水平轴翻动的六支星，姿态量化并保持，读起来是一格一格地停。
+      下面的立牌只是测试衬底——一块磨砂玻璃，用来问「星在磨砂面上还读得出吗」，
+      它不是站点上的任何对话框组件。真正要判断的是三件事：
+      白底上这几种材质还看不看得见；它和下方那一层算是什么关系；小尺寸下低级数还像不像星。
+    </p>
+  </header>
+
+  <section id="ground-sec">
+    <h2><span class="num">01</span>白底上的可读性</h2>
+    <p class="lede">
+      底就是站点的 <code>--bg #f0f3f6</code>，不加任何衬底、不加投影。
+      同一个几何、同一个姿态时钟、同一套灯，唯一变量是材质本身。
+      下面一排是<b>默认档</b>：折射材质自己把画布变成不透明（原因见下一段）。
+    </p>
+    <div class="ground" id="ground">
+      <figure>
+        <div class="stagebox"><canvas id="tile-cheap"></canvas></div>
+        <figcaption>CHEAP · 虹彩 + 清漆</figcaption>
+      </figure>
+      <figure>
+        <div class="stagebox"><canvas id="tile-refract"></canvas></div>
+        <figcaption>REFRACT · transmission 1</figcaption>
+      </figure>
+      <figure>
+        <div class="stagebox"><canvas id="tile-resin"></canvas></div>
+        <figcaption>RESIN · 磨砂半透明</figcaption>
+      </figure>
+    </div>
+
+    <h3 class="sub">同一档，只把画布换回真透明</h3>
+    <p class="note" style="margin-bottom:14px">
+      这是这一整个原型里最要紧的一组对照。transmission 折射的是<b>同一个场景里</b>的东西，
+      而一张真透明画布的场景里什么也没有 —— 于是它把「空」折射成一片死白，
+      六支的棱面全部消失，只剩一个白色的剪影。右边两档不折射，透明或不透明都照样成立。
+    </p>
+    <div class="ground" id="ground-alpha">
+      <figure>
+        <div class="stagebox"><canvas id="alpha-cheap"></canvas></div>
+        <figcaption>CHEAP · 透明画布</figcaption>
+      </figure>
+      <figure>
+        <div class="stagebox"><canvas id="alpha-refract"></canvas></div>
+        <figcaption>REFRACT · 透明画布（塌成一片白）</figcaption>
+      </figure>
+      <figure>
+        <div class="stagebox"><canvas id="alpha-resin"></canvas></div>
+        <figcaption>RESIN · 透明画布</figcaption>
+      </figure>
+    </div>
+    <p class="note">
+      看的是<b>轮廓与棱线</b>：白底的星如果只剩一团更亮的白，那就是消失了。
+      <b>结论：白底上只有 cheap / resin 能当透明图层用；refract 必须吃掉一块方形底。</b>
+    </p>
+  </section>
+
+  <section id="layer-sec">
+    <h2><span class="num">02</span>它和下面那一层是什么关系</h2>
+    <p class="lede">
+      既然它可以浮在任何东西上面，就需要一条规矩说明它能压在哪、怎么和下面的东西相处。
+      四种叠法，同一位置同一姿态：压在立牌上沿、躲在立牌后面被磨砂糊掉、被裁切只剩一部分、以及干脆退到纯页面底色上。
+    </p>
+
+    <div class="bar" id="stage-bar">
+      <div class="field">
+        <span>材质</span>
+        <div class="seg" data-key="variant">
+          <button data-val="cheap">cheap</button>
+          <button data-val="refract">refract</button>
+          <button data-val="resin">resin</button>
+        </div>
+      </div>
+      <div class="field">
+        <span>步数</span>
+        <div class="seg" data-key="steps">
+          <button data-val="8">8</button>
+          <button data-val="12">12</button>
+          <button data-val="16">16</button>
+          <button data-val="24">24</button>
+        </div>
+      </div>
+      <div class="field">
+        <span>保持</span>
+        <div class="seg" data-key="holdMs">
+          <button data-val="60">60</button>
+          <button data-val="90">90</button>
+          <button data-val="110">110</button>
+          <button data-val="160">160</button>
+        </div>
+      </div>
+      <div class="field">
+        <span>尺寸</span>
+        <div class="seg" data-key="size">
+          <button data-val="120">120</button>
+          <button data-val="180">180</button>
+          <button data-val="240">240</button>
+        </div>
+      </div>
+      <div class="field">
+        <span>翻转轴</span>
+        <div class="seg" data-key="axis">
+          <button data-val="x">绕 x</button>
+          <button data-val="diag">绕对角</button>
+        </div>
+      </div>
+      <div class="field">
+        <span>时钟</span>
+        <div class="seg" data-key="mode">
+          <button data-val="step">定格</button>
+          <button data-val="smooth">连续 · 对照</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="semantics" id="semantics"></div>
+    <p class="note" id="sem-note"></p>
+  </section>
+
+  <section id="strip-sec">
+    <h2><span class="num">03</span>静止帧 · 连续六格</h2>
+    <p class="lede">
+      这是真正要被判断的东西：一圈里连续六次保持各自定格的那一帧，并排成静图。
+      如果六张里有两三张轮廓雷同，步数就浪费了；如果相邻两张毫无关联，翻动就读成闪烁。
+    </p>
+    <div class="stripwrap" id="stripwrap">
+      <canvas id="strip"></canvas>
+      <div class="stripmarks" id="stripmarks"></div>
+    </div>
+  </section>
+
+  <section id="grain-sec">
+    <h2><span class="num">04</span>小尺寸与低步数的极限</h2>
+    <p class="lede">
+      这个图层将来会缩到很小（页角、行间、卡片一角）。同一颗星、同样是定格，
+      在 64 / 48 / 32 像素与 8 / 12 步下的全部姿态都摆在这里。
+      找的是那条线：从哪一格量起，六支的剪影还彼此认得出来。
+    </p>
+    <div class="matrixwrap" id="matrixwrap">
+      <canvas id="matrix"></canvas>
+      <div class="rowtags" id="rowtags"></div>
+    </div>
+  </section>
+
+  <section id="perf-sec">
+    <h2><span class="num">05</span>测算</h2>
+    <p class="lede">
+      三档材质各跑约 0.5 秒纯提交、0.42 秒带 <code>gl.finish()</code> 的合成计时，全程约 3 秒，期间需要标签页可见。
+      定格模式的实际开销是「每帧成本 ÷ 保持时长」，所以最后那张表按保持时长折算成每秒毫秒数。
+    </p>
+    <div class="measure">
+      <button id="m-btn" type="button">开始测算（约 3 秒）</button>
+      <output id="m-out">未运行</output>
+    </div>
+    <table class="perf" id="m-table" hidden>
+      <thead>
+        <tr>
+          <th>材质</th><th>提交 ms/帧</th><th>峰值 ms</th><th>合成 ms/帧</th>
+          <th>draw calls</th><th>三角形</th><th>programs</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <table class="perf" id="m-steps" hidden>
+      <thead>
+        <tr><th>保持时长</th><th>定格 draws/s</th><th>cheap ms/s</th><th>refract ms/s</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <p class="proto">
+    原型文件：src.js · index.html · notes.md ｜ 几何与材质全部程序化生成，无外部资源
+  </p>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "/three/build/three.module.js",
+    "three/addons/": "/three/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import { StarLayer, mountGrid, measureVariants, schedule, VARIANTS } from './src.js';
+
+const q = new URLSearchParams(location.search);
+const num = (k, d) => (q.has(k) ? Number(q.get(k)) : d);
+const str = (k, d) => q.get(k) ?? d;
+
+/* 截图用的确定性入口：?pose=3 把舞台上的星钉在第 3 格 */
+const POSE = q.has('pose') ? num('pose', 0) : null;
+
+const state = {
+  variant: str('variant', 'cheap'),
+  steps: num('steps', 12),
+  holdMs: num('holdMs', 110),
+  size: num('size', 240),
+  axis: str('axis', 'x'),
+  mode: str('mode', 'step'),
+};
+
+document.querySelectorAll('.bar .seg').forEach((seg) => {
+  const key = seg.dataset.key;
+  seg.querySelectorAll('button').forEach((b) => {
+    if (String(state[key]) === b.dataset.val) b.setAttribute('aria-pressed', 'true');
+    else b.setAttribute('aria-pressed', 'false');
+    b.addEventListener('click', () => {
+      state[key] = key === 'steps' || key === 'holdMs' || key === 'size' ? Number(b.dataset.val) : b.dataset.val;
+      seg.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+      sync();
+    });
+  });
+});
+
+/* ── 01 三档材质 ── */
+const tiles = [['cheap', 'tile-cheap'], ['refract', 'tile-refract'], ['resin', 'tile-resin']];
+const tileLayers = tiles.map(([variant, id]) => {
+  const el = document.getElementById(id);
+  const layer = new StarLayer(el, { variant, steps: state.steps, holdMs: state.holdMs, size: 240, mode: 'step' });
+  if (POSE != null) layer.freeze(POSE % state.steps);
+  else layer.start();
+  return { variant, layer };
+});
+
+/* 同一档，画布强制转回真透明 —— 折射档在这里会塌掉，那正是要看的 */
+const alphaLayers = [['cheap', 'alpha-cheap'], ['refract', 'alpha-refract'], ['resin', 'alpha-resin']].map(([variant, id]) => {
+  const el = document.getElementById(id);
+  const layer = new StarLayer(el, {
+    variant, steps: state.steps, holdMs: state.holdMs, size: 240, mode: 'step', canvasMode: 'alpha',
+  });
+  if (POSE != null) layer.freeze(POSE % state.steps);
+  else layer.start();
+  return { variant, layer };
+});
+
+/* ── 02 图层关系 ── */
+const STACKS = [
+  {
+    id: 'front',
+    title: '压在立牌上沿',
+    tag: 'z-index 3 · 完整',
+    note: '星完整地压过玻璃上沿，边界最容易读，但也最容易读成「贴在上面的一枚贴纸」。',
+  },
+  {
+    id: 'behind',
+    title: '躲进磨砂玻璃后面',
+    tag: '被 backdrop-filter 糊掉',
+    note: '星在卡片之下，卡片的 backdrop-filter 把它糊成一片。这是「图层」而不是「贴纸」的关键一步，代价是细节几乎全丢。',
+  },
+  {
+    id: 'clip',
+    title: '被页面边裁掉一截',
+    tag: 'mask 渐隐',
+    note: '只露出一部分，剩下的交给读者的想象。最像「浮在页面里，还有别的深度」。',
+  },
+  {
+    id: 'flat',
+    title: '放在纯页面底色上',
+    tag: '无衬底对照',
+    note: '什么也不压，只和背景相处。这一格回答的是「它自己站不站得住」。',
+  },
+];
+
+const semHost = document.getElementById('semantics');
+const semItems = STACKS.map((s) => {
+  const art = document.createElement('article');
+  art.className = 'sem';
+  art.dataset.stack = s.id;
+  art.innerHTML = `
+    <div class="frame">
+      <div class="standin">
+        <h3>关于这一页</h3>
+        <p>这里放的是随便一段当时写下的字。世界应当始终保留一种感觉：它随时可能消失，又随时可能重新被记起。</p>
+        <div class="btns"><button class="primary" type="button">继续</button><button type="button">先停一下</button></div>
+      </div>
+      <div class="starholder"><canvas></canvas></div>
+    </div>
+    <div class="lbl"><span>${s.title}</span><em>${s.tag}</em></div>`;
+  semHost.append(art);
+  const holder = art.querySelector('.starholder');
+  const canvas = art.querySelector('canvas');
+  const frame = art.querySelector('.frame');
+  const layer = new StarLayer(canvas, {
+    variant: state.variant, steps: state.steps, holdMs: state.holdMs,
+    size: state.size, axis: state.axis, mode: state.mode,
+  });
+  if (POSE != null) layer.freeze(POSE % state.steps);
+  else layer.start();
+  return { ...s, art, holder, frame, layer };
+});
+
+/* 摆放：以立牌实际的盒子为基准，而不是拍脑袋的偏移量。
+   front / behind 都在立牌上沿跨着 —— 一半在卡片外、一半压进卡片的磨砂里，
+   这样两张图能直接对着看「同一位置，前面 vs 后面」。 */
+function layoutSemantics() {
+  const size = state.size;
+  for (const it of semItems) {
+    const f = it.frame.getBoundingClientRect();
+    const card = it.art.querySelector('.standin').getBoundingClientRect();
+    const cardTop = card.top - f.top;
+    const cardLeft = card.left - f.left;
+    it.layer.set({ size });
+
+    if (it.id === 'flat') {
+      /* 无衬底对照：立牌整个撤掉，只有星和页面底色 */
+      it.holder.style.cssText = `left:${(f.width - size) / 2}px;top:${(f.height - size) / 2}px;`;
+    } else if (it.id === 'clip') {
+      /* 下移，让下面一截被面的底边裁掉 */
+      it.holder.style.cssText = `left:${cardLeft + card.width - size * 0.72}px;top:${f.height - size * 0.58}px;`;
+    } else {
+      /* 星心正对卡片上沿，横向偏左，避开卡里那段字 */
+      it.holder.style.cssText = `left:${cardLeft - size * 0.34}px;top:${cardTop - size * 0.5}px;`;
+    }
+  }
+  document.querySelectorAll('.sem[data-stack="flat"] .standin').forEach((el) => (el.style.visibility = 'hidden'));
+  document.querySelectorAll('.sem[data-stack="flat"]').forEach((el) => el.classList.add('is-bare'));
+}
+layoutSemantics();
+
+/* 裁切那格：底部渐隐 */
+semItems.find((i) => i.id === 'clip').holder.style.webkitMaskImage =
+  'linear-gradient(to bottom, #000 0%, #000 52%, transparent 84%)';
+semItems.find((i) => i.id === 'clip').holder.style.maskImage =
+  'linear-gradient(to bottom, #000 0%, #000 52%, transparent 84%)';
+
+document.getElementById('sem-note').innerHTML =
+  '读法：立牌上沿那一格最清楚，也最平；<b>进磨砂后面</b>才第一次出现「这是一个层」的证据——'
+  + '但代价是六支的剪影被糊掉，只剩一块更亮的雾。裁切那格观感最好，也最不占地方。';
+
+/* ── 03 静止帧 ── */
+const stripCanvas = document.getElementById('strip');
+const stripMarks = document.getElementById('stripmarks');
+let strip = null;
+
+/* 只取前六格（连续的六个保持位），不是整圈 —— 整圈会在 24 步时排成一条过长的带 */
+const STRIP_N = 6;
+
+function buildStrip() {
+  if (strip) strip.dispose();
+  const n = Math.min(STRIP_N, state.steps);
+  strip = mountGrid(stripCanvas, {
+    rows: [{ steps: state.steps, size: 240, poses: [...Array(n).keys()] }],
+    variant: state.variant,
+    holdMs: state.holdMs,
+    axis: state.axis,
+    gap: 14,
+  });
+  stripMarks.innerHTML = '';
+  for (let i = 0; i < n; i++) {
+    const s = document.createElement('span');
+    s.textContent = `${i + 1} / ${state.steps} · ${Math.round((i * 360) / state.steps)}°`;
+    stripMarks.append(s);
+  }
+}
+buildStrip();
+
+/* ── 04 粒度矩阵 ── */
+const matrixCanvas = document.getElementById('matrix');
+const rowtags = document.getElementById('rowtags');
+let matrix = null;
+
+const GRAIN_ROWS = [
+  { steps: 8, size: 64, label: '64px · 8 步' },
+  { steps: 12, size: 64, label: '64px · 12 步' },
+  { steps: 8, size: 32, label: '32px · 8 步' },
+  { steps: 12, size: 32, label: '32px · 12 步' },
+  { steps: 8, size: 24, label: '24px · 8 步' },
+];
+
+function buildMatrix() {
+  if (matrix) matrix.dispose();
+  matrix = mountGrid(matrixCanvas, {
+    rows: GRAIN_ROWS.map((r) => ({ steps: r.steps, size: r.size })),
+    variant: state.variant,
+    holdMs: state.holdMs,
+    axis: state.axis,
+    gap: 12,
+  });
+  rowtags.innerHTML = '';
+  for (const r of GRAIN_ROWS) {
+    const d = document.createElement('div');
+    d.innerHTML = `<b>${r.label}</b> — ${r.steps} 个姿态，一格 ${Math.round(360 / r.steps)}°`;
+    rowtags.append(d);
+  }
+}
+/* 矩阵先按 240 的尺寸量一遍布局；格子小，就等主线程空了再建，别抢首帧 */
+buildMatrix();
+
+/* ── 同步控件 ── */
+function sync() {
+  for (const t of tileLayers) {
+    t.layer.set({ steps: state.steps, holdMs: state.holdMs, mode: state.mode });
+    if (POSE != null) t.layer.freeze(POSE % state.steps);
+  }
+  for (const t of alphaLayers) {
+    t.layer.set({ steps: state.steps, holdMs: state.holdMs, mode: state.mode });
+    if (POSE != null) t.layer.freeze(POSE % state.steps);
+  }
+  for (const it of semItems) {
+    it.layer.set({
+      variant: state.variant, steps: state.steps, holdMs: state.holdMs,
+      axis: state.axis, mode: state.mode,
+    });
+    /* 叠在磨砂玻璃后面那一格：折射档自带不透明底，会把玻璃整个挡住，
+       所以这一格强制回真透明 —— 用来说明「它进不到玻璃后面」。 */
+    if (it.id === 'behind' && state.variant === 'refract') {
+      it.layer.opts.canvasMode = 'alpha';
+      it.layer.applyOpaqueness();
+      it.layer.draw(it.layer.elapsed);
+      it.holder.dataset.blocked = '1';
+    } else {
+      it.layer.opts.canvasMode = 'auto';
+      it.layer.applyOpaqueness();
+      it.layer.draw(it.layer.elapsed);
+      delete it.holder.dataset.blocked;
+    }
+    if (POSE != null) it.layer.freeze(POSE % state.steps);
+    else if (!it.layer.running) it.layer.start();
+  }
+  layoutSemantics();
+  buildStrip();
+  buildMatrix();
+}
+
+/* 窗口尺寸变了，星的位置得重摆（尺寸是 CSS px，与 DPR 无关） */
+let rz = 0;
+addEventListener('resize', () => {
+  cancelAnimationFrame(rz);
+  rz = requestAnimationFrame(() => {
+    layoutSemantics();
+    for (const t of tileLayers) t.layer.set({ size: 240 });
+  });
+});
+
+/* ── 05 测算 ── */
+const mBtn = document.getElementById('m-btn');
+const mOut = document.getElementById('m-out');
+const mTable = document.getElementById('m-table');
+const mSteps = document.getElementById('m-steps');
+
+mBtn.addEventListener('click', async () => {
+  mBtn.disabled = true;
+  mOut.textContent = '运行中…';
+  await new Promise((r) => requestAnimationFrame(() => r()));
+  try {
+    const res = await measureVariants({ size: 480 });
+    const body = mTable.querySelector('tbody');
+    body.innerHTML = res.rows.map((r) => `
+      <tr class="${r.variant === 'refract' ? 'bad' : ''}">
+        <td class="v">${r.variant}</td>
+        <td>${r.cpu.toFixed(3)}</td>
+        <td>${r.cpuMax.toFixed(2)}</td>
+        <td>${r.gpu.toFixed(3)}</td>
+        <td>${r.calls}</td>
+        <td>${r.tris}</td>
+        <td>${r.programs}</td>
+      </tr>`).join('');
+    const sbody = mSteps.querySelector('tbody');
+    sbody.innerHTML = res.stepPlan.map((s) => `
+      <tr>
+        <td class="v">${s.holdMs} ms</td>
+        <td>${s.drawsPerSec}</td>
+        <td>${s.cheapPerSec.toFixed(1)}</td>
+        <td>${s.refractPerSec.toFixed(1)}</td>
+      </tr>`).join('');
+    mTable.hidden = false;
+    mSteps.hidden = false;
+    mOut.textContent = `${res.size}px 缓冲区 · DPR ${res.dpr} · ${res.rows[0].samples} 次采样`;
+  } catch (err) {
+    mOut.textContent = `失败：${err.message}`;
+    console.error(err);
+  } finally {
+    mBtn.disabled = false;
+  }
+});
+
+/* ── 自检钩子（截图脚本用） ── */
+window.__star = {
+  state,
+  probe() {
+    return {
+      tiles: tileLayers.map((t) => ({ variant: t.variant, ...t.layer.probe() })),
+      alpha: alphaLayers.map((t) => ({ variant: t.variant, ...t.layer.probe() })),
+      semantics: semItems.map((i) => ({ id: i.id, ...i.layer.probe() })),
+      strip: strip.probe(),
+      matrix: matrix.probe(),
+    };
+  },
+  freeze(k) {
+    for (const t of tileLayers) t.layer.freeze(k % state.steps);
+    for (const t of alphaLayers) t.layer.freeze(k % state.steps);
+    for (const it of semItems) it.layer.freeze(k % state.steps);
+  },
+  measure() {
+    return measureVariants({ size: 480 });
+  },
+  setState(p) {
+    Object.assign(state, p);
+    document.querySelectorAll('.bar .seg').forEach((seg) => {
+      seg.querySelectorAll('button').forEach((b) =>
+        b.setAttribute('aria-pressed', String(String(state[seg.dataset.key]) === b.dataset.val)));
+    });
+    sync();
+  },
+};
+</script>
+</body>
+</html>

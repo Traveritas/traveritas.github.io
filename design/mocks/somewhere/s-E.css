@@ -1,0 +1,75 @@
+/* ─────────────────────────────────────────────────────────────
+  E · 一处室内 —— 场景自己的样式（只有三样东西）
+
+  · #room：房间那层 2D 画布。只有 1/2 分辨率，再用 pixelated 放大 2 倍——
+    像素格跟底下那片流光（5px 一格）是同一个手感，于是「墙」和「光」是同一块料。
+  · #labels / .rm-line：墙上那一行字。字必须在 DOM 里、不能在画布里：
+    画布是放大的，字画进去会糊成一团灰。
+  · .rm-help：怎么走的那一行，过一会儿自己退掉。
+  ───────────────────────────────────────────────────────────── */
+
+#room {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  width: 100vw;
+  height: 100vh;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  pointer-events: none;
+}
+
+#labels {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+}
+
+/* 墙上的那一行字：钉在远墙的一个世界坐标上，跟着透视走，
+   但字号只跟一点点——完全不缩放会像贴在屏幕上（不是墙上的话），
+   完全跟着缩放又会糊。 */
+.rm-line {
+  position: absolute;
+  left: 0;
+  top: 0;
+  margin: 0;
+  white-space: nowrap;
+  font: 500 12.5px/1.9 var(--font-display);
+  letter-spacing: 0.26em;
+  color: rgb(224 219 236 / 0.88);
+  /* 底子是流动的，字后面垫一层极淡的暗，保证任何一帧都读得出来 */
+  text-shadow:
+    0 0 2px rgb(10 9 17 / 0.94),
+    0 0 18px rgb(10 9 17 / 0.88);
+  will-change: transform, opacity;
+}
+
+/* 怎么走的那一行：过一会儿自己退掉，不解释第二遍 */
+.rm-help {
+  position: fixed;
+  left: 50%;
+  bottom: 30px;
+  transform: translateX(-50%);
+  z-index: 30;
+  margin: 0;
+  font: 400 10px/1 var(--font-mono);
+  letter-spacing: 0.28em;
+  padding-left: 0.28em;
+  color: var(--ink-faint);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 1.2s ease;
+}
+
+/* 窄屏：句子会顶到字宽，缩一点；位置由脚本夹在视口内 */
+@media (max-width: 520px) {
+  .rm-line {
+    font-size: 11px;
+    letter-spacing: 0.18em;
+  }
+  .rm-help {
+    font-size: 9.5px;
+    letter-spacing: 0.2em;
+  }
+}

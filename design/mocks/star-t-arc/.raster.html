@@ -1,0 +1,109 @@
+<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="/fonts/noto/font.css"><style>
+body{margin:0;background:#f0f3f6;font:12px ui-monospace,monospace;color:#232830}
+.row{display:flex;gap:0;align-items:flex-start;padding:10px 0 0 10px}
+.cell{padding:0 14px 10px 0;text-align:center}
+.cv{image-rendering:pixelated;display:block;background:#f0f3f6;border:1px solid #d8dde4}
+.lbl{font-size:11px;color:#56606d;margin-top:5px;line-height:1.5}
+.tag{font-size:11px;color:#232830;text-align:left;padding:2px 0 0 10px;letter-spacing:.04em}
+</style><div id="host"></div>
+<script type="module">
+import * as A from './src.js';
+const SET = [["v0","直"],["c2","凹 0.04"],["s3","S 0.020"],["b3","凸 0.06"]];
+const SIZES = [[48,10],[96,5]];
+const host = document.getElementById('host');
+const out = {};
+const SCALE = 12;
+
+function drawStar(ctx, size, edge, ink) {
+  const p = { ...A.BASE, edge };
+  const k = size / A.BASE.box;
+  ctx.save();
+  ctx.translate(size / 2, size / 2);
+  ctx.scale(k, k);
+  const spikes = A.spikes(p);
+  for (const sp of spikes) {
+    const segs = A.spikeSegs(sp, p);
+    ctx.beginPath();
+    ctx.moveTo(segs[0].a[0], segs[0].a[1]);
+    for (const s of segs) {
+      if (s.kind === 'q' && !s.__straight) ctx.quadraticCurveTo(s.c[0], s.c[1], s.b[0], s.b[1]);
+      else ctx.lineTo(s.b[0], s.b[1]);
+    }
+    ctx.closePath();
+    const op = 0.38 + (0.5 * (sp.z + 1)) / 2;
+    ctx.globalAlpha = op;
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = ink;
+    ctx.fill('nonzero');
+  }
+  ctx.globalAlpha = 1;
+  ctx.beginPath();
+  ctx.arc(0, 0, p.hub, 0, Math.PI * 2);
+  ctx.fillStyle = '#9a86c4';
+  ctx.fill();
+  ctx.restore();
+}
+
+/* 凹口：从中心每 3° 打一条射线，量到「墨迹第一次断掉」的距离；取 60° 内的最小值 */
+function notchPx(alpha, size) {
+  const at = (x, y) => {
+    const i = (y * size + x) * 4;
+    return alpha[i + 3];
+  };
+  let best = Infinity;
+  for (let a = 0; a < 60; a += 1) {
+    const rad = (a * Math.PI) / 180;
+    const dx = Math.cos(rad), dy = Math.sin(rad);
+    let far = 0;
+    for (let t = 0.5; t < size / 2; t += 0.2) {
+      const x = Math.round(size / 2 + dx * t);
+      const y = Math.round(size / 2 + dy * t);
+      if (x < 0 || y < 0 || x >= size || y >= size) break;
+      if (at(x, y) > 24) far = t; else break;
+    }
+    best = Math.min(best, far);
+  }
+  return best;
+}
+
+for (const [size, scale] of SIZES) {
+  const row = document.createElement('div');
+  row.className = 'row';
+  const tag = document.createElement('div');
+  tag.className = 'tag';
+  tag.textContent = size + ' px（放大 ' + scale + '×）';
+  const cells = document.createElement('div');
+  cells.className = 'row';
+  cells.style.padding = '0';
+  for (const [id, name] of SET) {
+    const v = A.VARIANTS.find((q) => q.id === id);
+    const off = document.createElement('canvas');
+    off.width = off.height = size;
+    const octx = off.getContext('2d', { willReadFrequently: true });
+    drawStar(octx, size, v.edge, '#2f3540');
+    const px = notchPx(octx.getImageData(0, 0, size, size).data, size);
+
+    const cv = document.createElement('canvas');
+    cv.className = 'cv';
+    cv.width = cv.height = size * scale;
+    const ctx = cv.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(off, 0, 0, size, size, 0, 0, cv.width, cv.height);
+
+    const lbl = document.createElement('div');
+    lbl.className = 'lbl';
+    lbl.textContent = name + ' · 凹口 ' + px.toFixed(1) + ' px';
+    const cell = document.createElement('div');
+    cell.className = 'cell';
+    cell.append(cv, lbl);
+    cells.append(cell);
+    out[size + ':' + id] = { name, notchPx: +px.toFixed(2) };
+  }
+  row.append(tag, cells);
+  row.style.display = 'block';
+  tag.style.padding = '0 0 6px 10px';
+  host.append(row);
+}
+window.__raster = out;
+window.__ready = true;
+</script>

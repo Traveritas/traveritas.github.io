@@ -1,0 +1,72 @@
+/* ─────────────────────────────────────────────────────────────
+  somewhere · C · 一条很长的路 —— 这一份只放这片空间自己的东西。
+
+  路画在 #road 这一层 Canvas2D 上，压在 initWorld 的流光之上：
+  流光还是正式站那支着色器、那个 WebGL 上下文，这里不再建第二个。
+  于是这一层除了「画线的代码」什么都不需要——没有滤镜、没有 DOM 粒子，
+  swiftshader 下也只是一堆 stroke。
+
+  字只有三处：左上是这处地方的称呼，右下是回去的路，左下是手势。
+  手势那行不用 --ink-faint：10px 的字压在暗底上会糊，宁可亮一档，看清楚比好看要紧。
+  ───────────────────────────────────────────────────────────── */
+
+#road {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 3;
+  pointer-events: none;
+}
+
+/* 手势提示：转场没完之前不出现，转完才慢慢浮上来，之后一直很淡。
+   line-height 要单独给：10.5px 的字配 1 的行高，两行会叠在一起（试过，糊成一团）。 */
+.c-keys {
+  left: 26px;
+  bottom: 24px;
+  line-height: 2.1;
+  color: rgb(200 195 214 / 0.66);
+  opacity: 0;
+  transition: opacity 1.8s ease 0.6s;
+}
+html[data-arrived='go'] .c-keys,
+html[data-arrived='done'] .c-keys {
+  opacity: 1;
+}
+/* 桌面说滚轮、触屏说双指：窄屏 / 没有 hover 的设备换一句 */
+.c-keys-t {
+  display: none;
+}
+@media (hover: none) and (pointer: coarse) {
+  .c-keys-d {
+    display: none;
+  }
+  .c-keys-t {
+    display: inline;
+  }
+}
+/* 左下角那行字挪开一点，别和 sw-hint 那条竖线抢位置（hint 居中，不冲突，这里只是留白） */
+@media (max-width: 520px) {
+  .c-keys {
+    left: 20px;
+    bottom: 20px;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+  }
+  .sw-tl {
+    left: 20px;
+    top: 22px;
+  }
+  .sw-br {
+    right: 20px;
+    bottom: 20px;
+  }
+}
+
+/* 关掉动效以后：路还在，只是不再自己往前长（JS 里也把时间轴停住了）。
+   这里只把文字进出那点过渡收掉。 */
+@media (prefers-reduced-motion: reduce) {
+  .c-keys {
+    transition-duration: 0.01ms !important;
+  }
+}

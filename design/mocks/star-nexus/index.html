@@ -1,0 +1,476 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>星 · 晶体</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E" />
+    <link rel="stylesheet" href="/fonts/noto/font.css" />
+    <link rel="stylesheet" href="/fonts/plex/index.css" />
+    <style>
+      /* 令牌照抄 src/styles/tokens.css 里这一页用得到的那几个 */
+      :root {
+        --bg: #f0f3f6;
+        --fg: #232830;
+        --fg-soft: #56606d;
+        --fg-faint: #858f9d;
+        --line: rgba(35, 40, 48, 0.12);
+        --amber: #9a86c4;
+        --umber: #4f4a66;
+        --wake: #a7b1ba;
+        --dream: #9389ae;
+        /* 醒梦总闸（reality.ts 写的就是这一个变量） */
+        --reality-mix: 1;
+        --font-display: 'Noto Serif SC', 'Palatino Linotype', Palatino, Georgia, serif;
+        --font-body: system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei UI', 'Microsoft YaHei', sans-serif;
+        --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        color-scheme: light;
+      }
+      body {
+        margin: 0;
+        padding: 3rem 2.6rem 7rem;
+        background: var(--bg);
+        color: var(--fg);
+        font-family: var(--font-body);
+        -webkit-font-smoothing: antialiased;
+      }
+      .wrap {
+        max-width: 72rem;
+        margin: 0 auto;
+      }
+      h1,
+      h2,
+      h3 {
+        font-family: var(--font-display);
+        font-weight: 500;
+        margin: 0;
+      }
+      h1 {
+        font-size: 1.3rem;
+        letter-spacing: 0.02em;
+      }
+      h2 {
+        font-size: 0.95rem;
+        letter-spacing: 0.04em;
+      }
+      p {
+        margin: 0;
+        font-size: 0.83rem;
+        line-height: 1.95;
+        color: var(--fg-soft);
+      }
+      p + p {
+        margin-top: 0.6rem;
+      }
+      .mono,
+      .num {
+        font-family: var(--font-mono);
+        font-variant-numeric: tabular-nums;
+      }
+      .k {
+        font-family: var(--font-mono);
+        font-size: 0.63rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--fg-faint);
+      }
+      header.top {
+        display: flex;
+        align-items: baseline;
+        gap: 1rem;
+        padding-bottom: 1.5rem;
+      }
+      header.top .k {
+        margin-left: auto;
+      }
+      .lede {
+        max-width: 40rem;
+      }
+      section {
+        padding: 2.4rem 0 0.6rem;
+        border-top: 1px solid var(--line);
+        margin-top: 2rem;
+      }
+      section > .k {
+        display: block;
+        margin-bottom: 0.7rem;
+      }
+      section > .note {
+        max-width: 42rem;
+        margin: 0 0 1.1rem;
+      }
+
+      /* ── 舞台：画布铺满 host，格子自己透明、接指针 ── */
+      .stage {
+        position: relative;
+        width: 100%;
+      }
+      .stage-canvas {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+      }
+      .cell {
+        position: relative;
+        cursor: grab;
+        touch-action: none;
+      }
+      .cell[data-drag] {
+        cursor: grabbing;
+      }
+      .stage[data-gl='off'] .cell {
+        cursor: default;
+      }
+      /* 静帧兜底：没有任何 WebGL2 时，至少还能看到一张图 */
+      .stage[data-gl='off']::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: var(--fallback) center / min(52%, 22rem) no-repeat;
+        opacity: 0.9;
+        pointer-events: none;
+      }
+      .cell-tag {
+        position: absolute;
+        left: 0.1rem;
+        bottom: 0.2rem;
+        font-family: var(--font-mono);
+        font-size: 0.6rem;
+        letter-spacing: 0.06em;
+        color: var(--fg-faint);
+        pointer-events: none;
+        white-space: nowrap;
+      }
+
+      /* ── 主星 ── */
+      .stage[data-main] .cell {
+        height: min(68vh, 34rem);
+        min-height: 20rem;
+      }
+      .bar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.6rem;
+        margin-top: 1rem;
+      }
+      button {
+        font: inherit;
+        font-size: 0.76rem;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.6);
+        color: var(--fg);
+        padding: 0.34rem 0.8rem;
+        border-radius: 2px;
+        cursor: pointer;
+      }
+      button:hover {
+        border-color: rgba(35, 40, 48, 0.28);
+      }
+      button[aria-pressed='true'] {
+        border-color: var(--amber);
+        box-shadow: inset 0 0 0 1px var(--amber);
+      }
+      button:focus-visible {
+        outline: 2px solid var(--amber);
+        outline-offset: 2px;
+      }
+      .readout {
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        color: var(--fg-faint);
+        font-variant-numeric: tabular-nums;
+      }
+
+      /* ── 对照 ── */
+      .pair {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.4rem;
+        align-items: start;
+      }
+      @media (max-width: 760px) {
+        .pair {
+          grid-template-columns: 1fr;
+        }
+      }
+      .pair figure {
+        margin: 0;
+      }
+      .pair .cell {
+        aspect-ratio: 1;
+        width: 100%;
+      }
+      .pair img {
+        display: block;
+        width: 100%;
+        aspect-ratio: 1;
+        object-fit: contain;
+      }
+      .pair figcaption {
+        margin-top: 0.45rem;
+        font-family: var(--font-mono);
+        font-size: 0.63rem;
+        letter-spacing: 0.06em;
+        color: var(--fg-faint);
+      }
+
+      /* ── 形状：一排一排 ── */
+      .rows {
+        display: grid;
+        gap: 1.3rem;
+      }
+      .row {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 0.9rem;
+      }
+      .row.n4 {
+        grid-template-columns: repeat(4, 1fr);
+      }
+      @media (max-width: 760px) {
+        .row,
+        .row.n4 {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+      .row .cell {
+        aspect-ratio: 1;
+      }
+      .row-label {
+        font-family: var(--font-mono);
+        font-size: 0.62rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--fg-faint);
+        margin-bottom: 0.35rem;
+      }
+      .row-note {
+        font-size: 0.74rem;
+        color: var(--fg-soft);
+        margin-top: 0.5rem;
+      }
+
+      /* ── 醒梦 ── */
+      .wakedream {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.4rem;
+      }
+      .wakedream .cell {
+        aspect-ratio: 1;
+      }
+      table.cost {
+        border-collapse: collapse;
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        color: var(--fg-soft);
+        margin-top: 0.9rem;
+      }
+      table.cost th,
+      table.cost td {
+        text-align: left;
+        padding: 0.3rem 1.4rem 0.3rem 0;
+        border-bottom: 1px solid var(--line);
+        font-weight: 400;
+      }
+      table.cost th {
+        color: var(--fg-faint);
+        letter-spacing: 0.08em;
+      }
+      ul.plain {
+        margin: 0.8rem 0 0;
+        padding-left: 1.1rem;
+        font-size: 0.8rem;
+        line-height: 1.9;
+        color: var(--fg-soft);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="top">
+        <h1>星 · 晶体</h1>
+        <span class="k">design / mocks / star-nexus · 4674</span>
+      </header>
+      <p class="lede">
+        一颗六尖的星，材质取自 NEXUS 页那枚晶体。着色器是搬过来的，几何另算 —— 那枚切面永远是凸的，这颗不是。
+      </p>
+
+      <!-- ═══════════════ 晶体 ═══════════════ -->
+      <section id="solid">
+        <span class="k">一 · 晶体</span>
+        <p class="note">
+          拖一下换个角度，滚轮推拉，双击回正位。松手就停在那儿。落定的姿态是体对角视角：六个支尖等距、相邻夹角六十度，剪影是正六芒星。这一页用的是正交投影 —— 透视会把六个支尖拆成近三远三（实测半径差三成），那就不成六芒星了。
+        </p>
+        <div class="stage" data-main>
+          <div class="cell" data-tag="醒面 · 粗细 0.26 · 凹 · 倒角 0.30 · 圆角 0.016"></div>
+        </div>
+        <div class="bar">
+          <button type="button" data-flip>翻一次</button>
+          <button type="button" data-frames>读帧数</button>
+          <button type="button" data-idle>静置取证</button>
+          <button type="button" data-cost>量一次</button>
+          <span class="readout" data-flip-state>等一秒，它自己翻过来</span>
+          <span class="readout" data-idle-out></span>
+        </div>
+      </section>
+
+      <!-- ═══════════════ 对照 NEXUS ═══════════════ -->
+      <section id="versus">
+        <span class="k">二 · 对照 NEXUS</span>
+        <p class="note">
+          左边这一颗与右边那张 <span class="mono">public/nexus-slice/wake.webp</span> 用同一个画框、同一个占位。判的是同一件事：这两块读起来是不是同一种料。右边那张的晶体是丁香色的底、近白的地平亮带、左上一盏柔光箱、两块暗卡 —— 暗卡在左上角那张面上留下一道灰，那是它轮廓的来源。
+        </p>
+        <div class="pair">
+          <figure>
+            <div class="stage">
+              <div class="cell" data-mix="1"></div>
+            </div>
+            <figcaption>星 · 晶体（醒面，着色器移植自 nexus-slice.ts）</figcaption>
+          </figure>
+          <figure>
+            <img src="/nexus-slice/wake.webp" alt="NEXUS 页的晶体，醒面" width="640" height="640" />
+            <figcaption>NEXUS · wake.webp（同一张着色器，凸的切面）</figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <!-- ═══════════════ 形状 ═══════════════ -->
+      <section id="shape">
+        <span class="k">三 · 形状</span>
+        <p class="note">
+          三个旋钮都作用在几何上，材质不动 —— 所以这三排能一起判「这颗星的形对不对」，而不只是「材质好不好」。每一格都能拖。
+        </p>
+        <div class="stage">
+          <div class="rows">
+            <div>
+              <div class="row-label">粗细 · 根部截面的大小</div>
+              <div class="row">
+                <div class="cell" data-tag="0.16" data-w="0.16"></div>
+                <div class="cell" data-tag="0.21" data-w="0.21"></div>
+                <div class="cell" data-tag="0.26" data-w="0.26"></div>
+                <div class="cell" data-tag="0.32" data-w="0.32"></div>
+                <div class="cell" data-tag="0.40" data-w="0.40"></div>
+              </div>
+              <p class="row-note">细下去读成一枚折的镖；粗过 0.32 六支并拢，六个凹口被吃掉。</p>
+            </div>
+            <div>
+              <div class="row-label">弧线 · 沿轴的母线</div>
+              <div class="row n4">
+                <div class="cell" data-tag="直" data-prof="straight"></div>
+                <div class="cell" data-tag="凹" data-prof="waist"></div>
+                <div class="cell" data-tag="深凹" data-prof="waistDeep"></div>
+                <div class="cell" data-tag="凸" data-prof="belly"></div>
+              </div>
+            </div>
+            <div>
+              <div class="row-label">截面 · 菱形四个角倒掉的量</div>
+              <div class="row">
+                <div class="cell" data-tag="0.08" data-bev="0.08"></div>
+                <div class="cell" data-tag="0.18" data-bev="0.18"></div>
+                <div class="cell" data-tag="0.30" data-bev="0.30"></div>
+                <div class="cell" data-tag="0.45" data-bev="0.45"></div>
+                <div class="cell" data-tag="0.70" data-bev="0.70"></div>
+              </div>
+              <p class="row-note">0.08 是近乎菱形（四张面）；越往后倒角面越宽，面越像一卷圆。</p>
+            </div>
+            <div>
+              <div class="row-label">平滑 · 棱上的圆角宽度</div>
+              <div class="row">
+                <div class="cell" data-tag="0" data-round="0"></div>
+                <div class="cell" data-tag="0.008" data-round="0.008"></div>
+                <div class="cell" data-tag="0.016" data-round="0.016"></div>
+                <div class="cell" data-tag="0.032" data-round="0.032"></div>
+                <div class="cell" data-tag="0.070" data-round="0.070"></div>
+              </div>
+              <p class="row-note">0 是硬棱（棱上那道细光最利）；过了 0.032 开始糊开，0.070 时六个尖先糊没。</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══════════════ 醒梦 ═══════════════ -->
+      <section id="wake">
+        <span class="k">四 · 醒梦</span>
+        <p class="note">
+          吸色与天顶跟着站点的醒度走：<span class="mono">--reality-mix</span> 为 1 时是醒面（丁香吸色、近白的一条地平），为 0 时偏粉一点。着色器里的 uDream 就取这个数，与 NEXUS 一样。下面这一对是同一个姿态、写死的两个醒度。
+        </p>
+        <div class="stage">
+          <div class="wakedream">
+            <div class="cell" data-tag="醒 · 1.000" data-mix="1"></div>
+            <div class="cell" data-tag="梦 · 0.000" data-mix="0"></div>
+          </div>
+        </div>
+        <div class="bar">
+          <button type="button" data-set-mix="1" aria-pressed="true">醒面</button>
+          <button type="button" data-set-mix="0" aria-pressed="false">梦面</button>
+          <button type="button" data-set-mix="0.5" aria-pressed="false">一半</button>
+          <span class="readout" data-mix-label>醒面 1.000</span>
+        </div>
+        <p class="row-note" style="max-width: 42rem">
+          这三个按钮写的是页面上的 <span class="mono">--reality-mix</span>，不是这一页自己的开关；上面那颗主星跟的是同一个变量。
+        </p>
+      </section>
+
+      <!-- ═══════════════ 代价 ═══════════════ -->
+      <section id="cost">
+        <span class="k">五 · 代价</span>
+        <p class="note">
+          一张画布摊开同一节里的全部格子（Chrome 每页只给十六个 WebGL2 上下文；这一页 23 格用 4 张画布）。计时用块计时：连着画四十帧、块末同步一次，除以四十，跑五块取中位。同步用的是 <span class="mono">readPixels</span> 而不是 <span class="mono">gl.finish()</span> —— 后者在这一页上给出 0.032 ms 这种不可能的数，它没有待查对象时差不多是空转。
+        </p>
+        <div class="bar">
+          <button type="button" data-cost>量一次主星</button>
+          <span class="readout" data-cost-out>还没量</span>
+          <span class="readout" data-frames-out></span>
+        </div>
+        <table class="cost">
+          <tr>
+            <th>上限</th>
+            <th>值</th>
+            <th>为什么</th>
+          </tr>
+          <tr>
+            <td>单格位图长边</td>
+            <td>820 px</td>
+            <td>NEXUS 是 900；这一页要摊十几格，再高就只是多烧填充</td>
+          </tr>
+          <tr>
+            <td>整张画布长边</td>
+            <td>1500 px</td>
+            <td>让长页面上的格子一起塞进一张画布</td>
+          </tr>
+          <tr>
+            <td>画布数</td>
+            <td>4 张 / 23 格</td>
+            <td>五节各一块 .stage；一格子一个上下文的话，只「形状」那一节就超了十六个</td>
+          </tr>
+          <tr>
+            <td>凸体数 / 每支段数</td>
+            <td>24 / 4</td>
+            <td>六支各分四段凸方台；段越多母线越顺，但每个像素要多轮一遍</td>
+          </tr>
+          <tr>
+            <td>体内段数</td>
+            <td>4</td>
+            <td>入射 + 至多三次全反射，与 nexus-slice.ts 相同</td>
+          </tr>
+        </table>
+        <ul class="plain">
+          <li>拿不到 WebGL2、或 <span class="mono">failIfMajorPerformanceCaveat</span> 拒了、或渲染器名是 SwiftShader / llvmpipe，就停在静帧图上，一个 rAF 都不排。</li>
+          <li>掉了 GPU 上下文不重建，退回静帧。</li>
+          <li>减弱动效（<span class="mono">prefers-reduced-motion</span>）时只画正位一张，不播翻动。</li>
+        </ul>
+      </section>
+    </div>
+
+    <script type="module" src="./src.js"></script>
+  </body>
+</html>

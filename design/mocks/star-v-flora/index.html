@@ -1,0 +1,719 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>六芒 · 花相</title>
+<link rel="stylesheet" href="/fonts/noto/font.css">
+<link rel="icon" href="data:,">
+<style>
+  :root {
+    --bg: #f0f3f6;
+    --bg-sunken: #e5ebf2;
+    --fg: #232830;
+    --fg-soft: #56606d;
+    --fg-faint: #858f9d;
+    --line: rgba(35, 40, 48, 0.12);
+    --umber: #4f4a66;
+    --dream: #9389ae;
+    --amber: #9a86c4;
+    --wake: #a7b1ba;
+    --font-display: 'Noto Serif SC', 'Palatino Linotype', Palatino, Georgia, serif;
+    --font-body: system-ui, 'PingFang SC', 'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.75;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 64px 32px 140px; }
+
+  header.head { margin-bottom: 52px; }
+  header.head h1 {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 27px;
+    letter-spacing: 0.05em;
+    margin: 0 0 12px;
+  }
+  header.head p { margin: 0; max-width: 42em; color: var(--fg-soft); font-size: 14px; }
+  .kicker {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--fg-faint);
+    margin: 0 0 16px;
+  }
+
+  section { margin: 0 0 76px; }
+  section > h2 {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 17px;
+    letter-spacing: 0.04em;
+    margin: 0 0 8px;
+  }
+  section > .lede {
+    margin: 0 0 26px;
+    max-width: 44em;
+    color: var(--fg-soft);
+    font-size: 13.5px;
+  }
+  .num {
+    display: inline-block;
+    width: 1.7em;
+    color: var(--fg-faint);
+    font-family: var(--font-mono);
+    font-size: 12px;
+  }
+  code { font-family: var(--font-mono); font-size: 0.92em; }
+
+  /* ── 形态对照表 ── */
+  .formgrid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 22px 20px;
+  }
+  .cell {
+    border-top: 1px solid var(--line);
+    padding-top: 12px;
+  }
+  .cell .art {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1;
+  }
+  .cell .art canvas { display: block; width: 100%; height: 100%; border-radius: 2px; }
+  .cell h3 {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 14px;
+    margin: 10px 0 2px;
+    letter-spacing: 0.02em;
+  }
+  .cell .note { margin: 0; color: var(--fg-soft); font-size: 12.5px; line-height: 1.65; }
+  .cell .verdict {
+    margin: 6px 0 0;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    color: var(--fg-faint);
+  }
+  .cell.keep .verdict { color: var(--amber); }
+  .cell.cut { opacity: 0.62; }
+
+  .seg {
+    display: inline-flex;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    overflow: hidden;
+    margin: 0 0 22px;
+  }
+  .seg button {
+    font: inherit;
+    font-size: 12.5px;
+    padding: 6px 16px;
+    border: 0;
+    background: transparent;
+    color: var(--fg-soft);
+    cursor: pointer;
+  }
+  .seg button[aria-pressed='true'] { background: var(--bg-sunken); color: var(--fg); }
+
+  /* ── 大格 ── */
+  .bigrow { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start; }
+  .bigcell { border-top: 1px solid var(--line); padding-top: 12px; }
+  .bigcell .art { width: 400px; height: 400px; }
+  .bigcell .art canvas { width: 400px; height: 400px; border-radius: 2px; display: block; }
+  .bigcell .cap {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    color: var(--fg-faint);
+    margin: 8px 0 0;
+  }
+
+  /* ── 帧条 ── */
+  .strip .art { width: 100%; }
+  .strip .art canvas { display: block; width: 100%; height: auto; }
+  .striplabels {
+    display: flex;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    color: var(--fg-faint);
+    margin-top: 6px;
+  }
+  .striplabels span { text-align: center; }
+
+  /* ── 尺寸 ── */
+  .sizerow {
+    display: flex;
+    align-items: flex-end;
+    gap: 30px;
+    flex-wrap: wrap;
+    padding: 20px 0 4px;
+  }
+  .sizebox { text-align: center; }
+  .sizebox canvas { display: block; border-radius: 2px; }
+  .sizebox .cap {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--fg-faint);
+    margin-top: 8px;
+    letter-spacing: 0.08em;
+  }
+
+  /* ── 运动 ── */
+  .motions { display: grid; grid-template-columns: repeat(2, 1fr); gap: 34px 30px; }
+  .motion .art { width: 260px; height: 260px; }
+  .motion .art canvas { width: 260px; height: 260px; display: block; border-radius: 2px; }
+  .motion h3 {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 14px;
+    margin: 0 0 2px;
+  }
+  .motion .meta {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    color: var(--fg-faint);
+    margin: 0 0 10px;
+  }
+  .motion .why { margin: 10px 0 0; color: var(--fg-soft); font-size: 12.5px; max-width: 30em; }
+
+  /* ── 拆解 ── */
+  .anatomy { display: flex; gap: 24px; flex-wrap: wrap; align-items: flex-start; }
+  .anatomy .art { width: 300px; height: 300px; }
+  .anatomy .art canvas { width: 300px; height: 300px; display: block; border-radius: 2px; }
+  .anatomy .txt { flex: 1; min-width: 260px; max-width: 34em; }
+  .anatomy .txt h3 {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 14px;
+    margin: 14px 0 4px;
+  }
+  .anatomy .txt p { margin: 0 0 4px; color: var(--fg-soft); font-size: 13px; }
+
+  /* ── 测算 ── */
+  .measure { display: flex; gap: 16px; align-items: center; margin-bottom: 18px; }
+  .measure button {
+    font: inherit;
+    font-size: 13px;
+    padding: 8px 18px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--fg);
+    cursor: pointer;
+  }
+  .measure output { font-family: var(--font-mono); font-size: 12px; color: var(--fg-soft); }
+  table.perf {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12.5px;
+    margin-bottom: 22px;
+  }
+  table.perf th, table.perf td {
+    text-align: right;
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--line);
+  }
+  table.perf th { font-weight: 500; color: var(--fg-soft); }
+  table.perf th:first-child, table.perf td:first-child { text-align: left; }
+  table.perf td { font-family: var(--font-mono); }
+  table.perf td:first-child { font-family: var(--font-body); }
+
+  .proto {
+    margin: 60px 0 0;
+    padding-top: 18px;
+    border-top: 1px solid var(--line);
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    color: var(--fg-faint);
+  }
+
+  /* 深色底：只用于对照那一张 */
+  .darkground { background: #2a2b38; }
+  .darkground .cell, .darkground .bigcell { border-color: rgba(255,255,255,0.14); }
+  .darkground h3, .darkground .note { color: #dfe3ea; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="head">
+  <p class="kicker">Design mock · 六芒 · 2026-11-10</p>
+  <h1>六芒 · 花相</h1>
+  <p>
+    上一稿的六支针沿 ±x ±y ±z 伸出，在任何角度都是一个含混的多刺球 —— 问题在几何，不在材质。
+    这一稿把前提换掉：六重的形不一定是「六个方向各有一支」，也可以是「一株六次生长的东西」。
+    下面七个候选全部当作植物或冰的生长来建，都有朝向观者的一个面。
+  </p>
+</header>
+
+<section id="forms-sec">
+  <h2><span class="num">01</span>形态对照</h2>
+  <p class="lede">
+    同一姿态、同一材质档，200px，先只看白底。每一格右下角是判断：留，还是砍。
+    深色底那一组在下面 —— 剪影要能脱离材质单独被判断。
+  </p>
+  <div class="seg" data-ground="light">
+    <button data-val="light" aria-pressed="true">白底 #f0f3f6</button>
+    <button data-val="dark" aria-pressed="false">深底 #2a2b38</button>
+  </div>
+  <div class="formgrid" id="grid-light"></div>
+</section>
+
+<section id="forms-dark-anchor">
+  <h2><span class="num">02</span>同一组，深底</h2>
+  <p class="lede">白底上会被磨砂的亮度骗过去的东西，在同尺寸的深底上会露出来：谁的剪影里还有第二个面，谁只是一个星形贴纸。</p>
+  <div class="formgrid" id="grid-dark"></div>
+</section>
+
+<section id="petal-sec">
+  <h2><span class="num">03</span>花瓣与厚度</h2>
+  <p class="lede">
+    六瓣花体是唯一一个需要认真调参数的形：花瓣的壳厚与横截面的龙骨深度，决定了它读成「六片花瓣」还是「六个枕头」。
+    同一套几何，只换这两个数，400px。
+  </p>
+  <div class="bigrow" id="petal-sweep"></div>
+</section>
+
+<section id="anatomy-sec">
+  <h2><span class="num">04</span>拆解</h2>
+  <p class="lede">拆开看它凭什么成立：一片花的瓣是薄的壳，不是实心锥；雪片的每一支是一个独立的面片，靠一层薄板叠出厚度。</p>
+  <div class="anatomy">
+    <div>
+      <div class="art"><canvas id="ana-petal"></canvas></div>
+      <p class="cap">只留一片花瓣</p>
+    </div>
+    <div>
+      <div class="art"><canvas id="ana-core"></canvas></div>
+      <p class="cap">只留小核</p>
+    </div>
+    <div class="txt">
+      <h3>花瓣</h3>
+      <p>每片是一个参数曲面：中线先上扬再外翻，横截面是「中央一条脊 → 两侧落到沟」，顶部与两侧各有一线厚度。</p>
+      <p>厚度不是装饰。薄的壳在掠射角上有一道更暗的边，白底上这道边就是花瓣的轮廓；没有它，六片会糊成一片淡雾。</p>
+      <h3>小核</h3>
+      <p>低面数的六棱球。它比花瓣暗一档，是整朵唯一「实」的地方 —— 六片从这里散开，而不是悬在空中。</p>
+    </div>
+  </div>
+</section>
+
+<section id="strip-sec">
+  <h2><span class="num">05</span>静止帧条</h2>
+  <p class="lede">
+    一圈里连续六次保持的六帧，并排成静图。这是真正要被判断的东西：
+    如果六张里有两三张轮廓雷同，步数就浪费了；如果相邻两张毫无关联，翻动会读成闪烁。
+  </p>
+  <div class="strip">
+    <div class="art"><canvas id="strip"></canvas></div>
+    <div class="striplabels" id="striplabels"></div>
+  </div>
+</section>
+
+<section id="size-sec">
+  <h2><span class="num">06</span>尺寸</h2>
+  <p class="lede">
+    同一姿态下 64 / 96 / 144 / 240px。上一次的实测结论是「3D 在 64px 以下换不到任何东西」，
+    这一组是复验：花瓣的龙骨与雪片的枝在哪个尺寸先糊掉。
+  </p>
+  <div class="sizerow" id="sizes"></div>
+</section>
+
+<section id="motion-sec">
+  <h2><span class="num">07</span>运动</h2>
+  <p class="lede">
+    定格：姿态量化到 360/steps 的格子，每格保持 holdMs 不动，一整轮之后那一格 ×3.2（同 brand.ts 的「7 步轮转 + 3 秒停歇」）。
+    这七个形里，多数并不适合整圈旋转 —— 花与冰晶的「正面」就是它们的全部价值，转起来反而把它丢掉。
+    四种运动各自一格，真实播放。
+  </p>
+  <div class="motions" id="motions"></div>
+</section>
+
+<section id="hero-sec">
+  <h2><span class="num">08</span>落位</h2>
+  <p class="lede">把它放进页面里看一眼：压在一张磨砂卡片的上沿，被页面边裁掉一截，以及躲在玻璃后面。这一格回答的是「它到底是这一页的一部分，还是浮在上面的一枚贴纸」。</p>
+  <div class="herolayout" id="heroes"></div>
+</section>
+
+<section id="perf-sec">
+  <h2><span class="num">09</span>测算</h2>
+  <p class="lede">
+    480×480 缓冲、DPR 1，每形跑 0.42 s 纯提交 + 0.36 s 带 <code>gl.finish()</code> 的合成计时。
+    定格模式下星不是每帧都在画，所以最后一张表按保持时长折算成每秒毫秒数。
+  </p>
+  <div class="measure">
+    <button id="m-btn" type="button">开始测算（约 4 秒）</button>
+    <output id="m-out">未运行</output>
+  </div>
+  <table class="perf" id="m-table" hidden>
+    <thead>
+      <tr><th>形</th><th>提交 ms/帧</th><th>合成 ms/帧</th><th>draw calls</th><th>三角形</th><th>programs</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+  <table class="perf" id="m-mats" hidden>
+    <thead>
+      <tr><th>材质</th><th>合成 ms/帧</th><th>draw calls</th><th>三角形</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</section>
+
+<p class="proto">
+  原型文件：src.js · index.html · notes.md ｜ 几何与材质全部程序化生成，无外部资源 ｜ 端口 4665
+</p>
+</div>
+
+<style>
+  .herolayout { display: flex; gap: 22px; flex-wrap: wrap; align-items: flex-start; }
+  .hb {
+    position: relative;
+    width: 250px;
+    height: 250px;
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    overflow: hidden;
+    background: var(--bg);
+  }
+  .hb .card {
+    position: absolute;
+    left: 26px;
+    right: 26px;
+    bottom: 20px;
+    padding: 12px 14px;
+    background: color-mix(in srgb, var(--bg) 74%, transparent);
+    border: 1px solid rgb(255 255 255 / 0.7);
+    border-radius: 6px;
+    backdrop-filter: blur(7px);
+    font-size: 11px;
+    line-height: 1.6;
+    color: var(--fg-soft);
+  }
+  .hb .card b { display: block; font-family: var(--font-display); font-weight: 500; font-size: 12px; color: var(--fg); margin-bottom: 2px; }
+  .hb canvas { position: absolute; display: block; }
+  .hb .lab {
+    position: absolute; left: 0; bottom: 0; right: 0;
+    font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.08em;
+    color: var(--fg-faint); padding: 5px 8px; z-index: 5;
+  }
+  .hb.flat canvas { left: 25px; top: 14px; }
+  .hb.above canvas { left: 15px; top: 6px; z-index: 2; }
+  .hb.behind canvas { left: 15px; top: 6px; z-index: 0; }
+  .hb.clip canvas { left: 12px; top: 10px; mask-image: linear-gradient(to bottom, #000 62%, transparent 92%); }
+</style>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "/three/build/three.module.js",
+    "three/addons/": "/three/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import {
+  FormView, FORMS, FORM_KEYS, MATERIAL_KEYS, MATERIAL_LABELS,
+  MOTIONS, MOTION_LABELS, MOTION_CFG, poseFor, schedule, measure, paintGrid, PAGE_BG, DARK_BG,
+} from './src.js';
+
+const q = new URLSearchParams(location.search);
+const num = (k, d) => (q.has(k) ? Number(q.get(k)) : d);
+const GROUND_LIGHT = PAGE_BG;
+const GROUND_DARK = DARK_BG;
+
+/* 截图用的确定性入口：?pose=k 把每一格钉在同一格 */
+const POSE = q.has('pose') ? Number(q.get('pose')) : 2;
+
+/* 形态对照用「同一个绝对视角」：每一形都被摆到同一个机位看，
+   而不是各自用 poseFor 转 yaw —— 那样七格其实各在不同角度，没法比。 */
+const ABS_POSE = {
+  rx: num('rx', 24),
+  ry: num('ry', 26),
+  roll: 0,
+  scale: 1,
+  open: 1,
+  grow: 1,
+};
+
+/* 名次与判断。'keep' 会被标成唯一色。 */
+const VERDICT = {
+  flower: ['keep', '留 · 主选'],
+  flakeD: ['keep', '留 · 备选'],
+  growth: ['keep', '留 · 备选'],
+  bud: ['cut', '砍 · 太对称'],
+  flakeS: ['cut', '砍 · 太规整'],
+  torus: ['cut', '砍 · 太规整'],
+  shell: ['cut', '砍 · 读成六瓣圆饼'],
+};
+
+/* ── 01 / 02 形态对照 ── */
+function makeCell(key, ground, size = 200) {
+  const def = FORMS[key];
+  const [verdict, label] = VERDICT[key] || ['', ''];
+  const el = document.createElement('article');
+  el.className = `cell ${verdict}`;
+  el.innerHTML = `
+    <div class="art" style="width:${size}px;height:${size}px"><canvas></canvas></div>
+    <h3>${def.label}</h3>
+    <p class="note">${def.note}</p>
+    <p class="verdict">${label}</p>`;
+  el.querySelector('.art').style.cssText = `width:${size}px;height:${size}px`;
+  return { el, canvas: el.querySelector('canvas') };
+}
+
+function buildFormGrid(hostId, ground) {
+  const host = document.getElementById(hostId);
+  const items = FORM_KEYS.map((k) => {
+    const { el, canvas } = makeCell(k, ground, 200);
+    host.append(el);
+    return { key: k, canvas };
+  });
+  /* 每格一张自己的画布与自己的渲染器：
+     形态对照段一共七格，共用一个画布会让截图裁切和滚动都变麻烦。 */
+  items.forEach((it) => {
+    const view = new FormView(it.canvas, { width: 200, height: 200, ground, dprCap: 2, fill: 0.86 });
+    view.setMaterial('frost');
+    view.show(it.key);
+    view.applyPose(ABS_POSE);
+    view.draw();
+    it.view = view;
+  });
+  return items;
+}
+
+const gridLight = buildFormGrid('grid-light', GROUND_LIGHT);
+const gridDark = buildFormGrid('grid-dark', GROUND_DARK);
+window.__grids = { gridLight, gridDark };
+
+/* ── 03 花瓣厚度 / 龙骨深度扫描 ── */
+const SWEEP = [
+  { thickness: 0.010, bow: 0.30, tag: '壳 0.010 · 龙骨 0.30' },
+  { thickness: 0.024, bow: 0.62, tag: '壳 0.024 · 龙骨 0.62（推荐）' },
+  { thickness: 0.024, bow: 1.10, tag: '壳 0.024 · 龙骨 1.10' },
+  { thickness: 0.050, bow: 0.62, tag: '壳 0.050 · 龙骨 0.62' },
+  { thickness: 0.050, bow: 0.30, tag: '壳 0.050 · 龙骨 0.30' },
+  { thickness: 0.012, bow: 1.00, tag: '壳 0.012 · 龙骨 1.00' },
+];
+{
+  const host = document.getElementById('petal-sweep');
+  SWEEP.forEach((s, i) => {
+    const key = `flower@thickness=${s.thickness},bow=${s.bow}`;
+    const box = document.createElement('div');
+    box.className = 'bigcell';
+    box.innerHTML = `<div class="art"><canvas></canvas></div><p class="cap">${s.tag}</p>`;
+    host.append(box);
+    const canvas = box.querySelector('canvas');
+    const view = new FormView(canvas, { width: 400, height: 400, ground: GROUND_LIGHT, dprCap: 2, fill: 0.86 });
+    view.setMaterial('frost');
+    view.show(key);
+    view.applyPose(poseFor('rev', POSE, 12));
+    view.draw();
+  });
+}
+
+/* ── 04 拆解 ── */
+{
+  const pairs = [
+    ['ana-petal', ['petal']],
+    ['ana-core', ['core']],
+  ];
+  pairs.forEach(([id, only]) => {
+    const canvas = document.getElementById(id);
+    const view = new FormView(canvas, { width: 300, height: 300, ground: GROUND_LIGHT, dprCap: 2, fill: 0.86 });
+    view.setMaterial('frost');
+    const entry = view.show('flower');
+    view.applyPose(poseFor('rev', POSE, 12));
+    entry.group.traverse((o) => {
+      if (o.isMesh) o.visible = only.includes(o.userData.role);
+    });
+    view.draw();
+  });
+}
+
+/* ── 05 帧条：六帧并排（一格一格渲染，再拼到一张 2D canvas） ── */
+{
+  const S = 200;
+  const N = 6;
+  const steps = 12;
+  const ks = [0, 2, 4, 6, 8, 10];
+  const canvas = document.getElementById('strip');
+  const view = new FormView(canvas, { width: S * N, height: S, ground: GROUND_LIGHT, dprCap: 2, fill: 0.86 });
+  view.setMaterial('frost');
+  paintGrid(
+    view,
+    ks.map((k, i) => ({
+      x: i * S,
+      y: 0,
+      size: S,
+      form: 'flower',
+      mat: 'frost',
+      ground: GROUND_LIGHT,
+      pose: poseFor('rev', k, steps),
+    })),
+    { width: S * N, height: S },
+  );
+  const labels = document.getElementById('striplabels');
+  labels.innerHTML = ks
+    .map((k) => `<span style="width:${S}px">第 ${k} 格</span>`)
+    .join('');
+}
+
+/* ── 06 尺寸 ── */
+{
+  const host = document.getElementById('sizes');
+  [64, 96, 144, 240].forEach((s) => {
+    const box = document.createElement('div');
+    box.className = 'sizebox';
+    box.innerHTML = `<canvas></canvas><p class="cap">${s}px</p>`;
+    host.append(box);
+    const canvas = box.querySelector('canvas');
+    const view = new FormView(canvas, { width: s, height: s, ground: GROUND_LIGHT, dprCap: 2, fill: 0.88 });
+    view.setMaterial('frost');
+    view.show('flower');
+    view.applyPose(poseFor('rev', POSE, 12));
+    view.draw();
+  });
+}
+
+/* ── 07 运动：四种，真实播放（定格 setTimeout 链） ── */
+const MOTION_NOTES = {
+  rev: {
+    meta: '12 步 / 118ms · 一圈 1.54s · 末格 ×3.2',
+    why: '整圈转。给定格一个基准。花与冰晶的「正面」在这一种里会有一半时间背过去 —— 这是它的问题。',
+  },
+  breath: {
+    meta: '12 步 / 150ms · 两姿之间',
+    why: '在两个都好看的姿态之间来回，幅度只有 ±17°。形体一直在，只是慢慢偏一点，像深呼吸。',
+  },
+  bloom: {
+    meta: '8 步 / 190ms · 开合 0.85→1.0',
+    why: '花瓣的开角量化到八格，尺度随之 0.985→1.0。这是「生长」最省的一版：不动位置，只动开合。',
+  },
+  grow: {
+    meta: '9 步 / 170ms · 走完即停',
+    why: '一次长成：尺度 0.90→1.0、开角 0.86→1.0，走完九个保持格就完全静止。之后一次都不再提交。',
+  },
+};
+{
+  const host = document.getElementById('motions');
+  MOTIONS.forEach((m) => {
+    const box = document.createElement('div');
+    box.className = 'motion';
+    box.innerHTML = `
+      <h3>${MOTION_LABELS[m]}</h3>
+      <p class="meta">${MOTION_NOTES[m].meta}</p>
+      <div class="art"><canvas></canvas></div>
+      <p class="why">${MOTION_NOTES[m].why}</p>`;
+    host.append(box);
+    const canvas = box.querySelector('canvas');
+    const view = new FormView(canvas, { width: 260, height: 260, ground: GROUND_LIGHT, dprCap: 2, fill: 0.86 });
+    view.setMaterial('frost');
+    view.show('flower');
+    view.start(m);
+    box._view = view;
+  });
+}
+
+/* ── 08 落位 ── */
+{
+  const host = document.getElementById('heroes');
+  const STACKS = [
+    { id: 'flat', label: '纯底色 · 无衬底' },
+    { id: 'above', label: '压过卡片上沿' },
+    { id: 'behind', label: '在磨砂玻璃后面' },
+    { id: 'clip', label: '被容器边裁掉一截' },
+  ];
+  STACKS.forEach((s) => {
+    const el = document.createElement('div');
+    el.className = `hb ${s.id}`;
+    el.innerHTML = `<canvas></canvas><div class="card"><b>关于这一页</b>世界应当始终保留一种感觉：它随时可能消失，又随时可能重新被记起。</div><div class="lab">${s.label}</div>`;
+    host.append(el);
+    const canvas = el.querySelector('canvas');
+    const view = new FormView(canvas, { width: 196, height: 196, ground: GROUND_LIGHT, dprCap: 2, fill: 0.86 });
+    view.setMaterial('frost');
+    view.show(q.get('form') || 'flower');
+    view.applyPose(poseFor('rev', POSE, 12));
+    view.draw();
+    if (s.id === 'behind') canvas.style.opacity = '0.9';
+  });
+}
+
+/* ── 09 测算 ── */
+document.getElementById('m-btn').addEventListener('click', async () => {
+  const out = document.getElementById('m-out');
+  out.textContent = '运行中…';
+  await new Promise((r) => setTimeout(r, 60));
+  const res = await measure();
+  const tb = document.querySelector('#m-table tbody');
+  tb.innerHTML = res.rows
+    .map((r) => `<tr><td>${r.label} <code style="color:var(--fg-faint)">${r.form}</code></td>
+      <td>${r.cpu.toFixed(3)}</td><td>${r.gpu.toFixed(2)}</td><td>${r.calls}</td><td>${r.tris}</td><td>${r.programs}</td></tr>`)
+    .join('');
+  const mb = document.querySelector('#m-mats tbody');
+  mb.innerHTML = res.matRows
+    .map((r) => `<tr><td>${r.label} <code style="color:var(--fg-faint)">${r.mat}</code></td>
+      <td>${r.gpu.toFixed(2)}</td><td>${r.calls}</td><td>${r.tris}</td></tr>`)
+    .join('');
+  document.getElementById('m-table').hidden = false;
+  document.getElementById('m-mats').hidden = false;
+  out.textContent = `完成（${res.rows.length} 形 / ${res.matRows.length} 档）`;
+  window.__measureResult = res;
+});
+
+/* 自检入口 */
+window.__flora = {
+  forms: FORM_KEYS,
+  report() {
+    const grids = [gridLight, gridDark].map((g) =>
+      g.map((it) => {
+        const c = it.view.renderer.getContext();
+        const w = it.view.renderer.domElement.width;
+        const h = it.view.renderer.domElement.height;
+        const px = new Uint8Array(w * h * 4);
+        c.readPixels(0, 0, w, h, c.RGBA, c.UNSIGNED_BYTE, px);
+        let lum = 0;
+        let lit = 0;
+        const bg =
+          it.view.opts.ground === DARK_BG
+            ? [0x2a, 0x2b, 0x38]
+            : [0xf0, 0xf3, 0xf6];
+        for (let i = 0; i < px.length; i += 4) {
+          const d = Math.abs(px[i] - bg[0]) + Math.abs(px[i + 1] - bg[1]) + Math.abs(px[i + 2] - bg[2]);
+          if (d > 10) {
+            lit++;
+            lum += (px[i] + px[i + 1] + px[i + 2]) / 3;
+          }
+        }
+        return {
+          key: it.key,
+          coverage: +(lit / (w * h)).toFixed(3),
+          meanLum: lit ? +(lum / lit).toFixed(1) : 0,
+          calls: it.view.lastCalls,
+        };
+      }),
+    );
+    return { light: grids[0], dark: grids[1] };
+  },
+};
+</script>
+</body>
+</html>
+
+

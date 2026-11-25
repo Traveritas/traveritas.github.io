@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>vary</title>
+    <style>
+      body { margin: 0; padding: 14px; background: #f0f3f6; font-family: system-ui, sans-serif; }
+      .host { position: relative; }
+      canvas { position: absolute; inset: 0; z-index: 0; display: block; }
+      .row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+      .cell { position: relative; z-index: 1; margin: 0; }
+      .lab { position: absolute; left: 0; bottom: -2px; font-size: 10px; font-family: monospace; color: #56606d; z-index: 2; }
+      body.deep { background: #2a2b38; }
+      body.deep .lab { color: #c9cede; }
+    </style>
+  </head>
+  <body>
+    <div class="host" id="host"></div>
+    <script type="importmap">
+      { "imports": { "three": "/three/build/three.module.js" } }
+    </script>
+    <script type="module">
+      import { Stage, buildStar, REST, MAT_KEYS, buildEnvTexture } from './src.js';
+      const q = new URLSearchParams(location.search);
+      const ground = q.get('g') || 'light';
+      if (ground === 'deep') document.body.classList.add('deep');
+      const size = +(q.get('s') || 320);
+      const w = +(q.get('w') || 0.26);
+      const fold = +(q.get('fold') || 0.95);
+      const sides = +(q.get('sides') || 6);
+      const mode = q.get('m') || 'mat';
+      const envFloor = q.get('floor') || null;
+      const gap = +(q.get('gap') || 8);
+
+      const host = document.getElementById('host');
+      const st = new Stage(host, { ground });
+      if (envFloor) {
+        st.env.dispose();
+        st.env = buildEnvTexture({ floor: envFloor });
+      }
+      const mkCell = (label, extra) => {
+        const row = document.createElement('div');
+        row.className = 'row';
+        row.style.gap = gap + 'px';
+        const el = document.createElement('figure');
+        el.className = 'cell';
+        el.style.width = size + 'px';
+        el.style.height = size + 'px';
+        el.innerHTML = `<span class="lab">${label}</span>`;
+        row.appendChild(el);
+        host.appendChild(row);
+        return el;
+      };
+
+      const geoSets = [[0.22, 0.9], [0.26, 0.95], [0.26, 1.2], [0.3, 1.0]];
+      const cells = [];
+      if (mode === 'mat') {
+        for (const k of MAT_KEYS) {
+          const el = mkCell(k);
+          cells.push({ el, mat: k });
+        }
+      } else if (mode === 'geomat') {
+        for (const [ww, ff] of geoSets) {
+          for (const k of ['crystal', 'dusk', 'frosted', 'refract']) {
+            const el = mkCell(`${k} w${ww} f${ff}`);
+            cells.push({ el, mat: k, geo: buildStar({ halfWidth: ww, fold: ff, sides }) });
+          }
+        }
+      } else if (mode === 'one') {
+        const el = mkCell(`${q.get('mat') || 'crystal'} w${w} f${fold} s${sides}`);
+        cells.push({ el, mat: q.get('mat') || 'crystal', geo: buildStar({ halfWidth: w, fold, sides }) });
+      }
+      st.resize();
+      for (const c of cells) {
+        const cell = st.addCell({ materialKey: c.mat, ground, pose: { ...REST }, geo: c.geo });
+        cell.el = c.el;
+        st.wireOrbit(cell, c.el);
+      }
+      st.resize();
+      st.drawOnce();
+      window.__v = { st, cells, ready: true, ground };
+    </script>
+  </body>
+</html>

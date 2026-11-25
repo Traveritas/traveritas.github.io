@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>probe · facets</title>
+    <style>
+      body { margin: 0; padding: 16px 18px; background: #f0f3f6; font: 12px/1.5 system-ui; color: #56606d; }
+      h3 { font: 500 12px system-ui; margin: 14px 0 4px; color: #232830; letter-spacing: 0.02em; }
+      .row { display: flex; gap: 10px; align-items: flex-end; }
+      .cell { text-align: center; }
+      .b { background: #fff; border: 1px solid rgba(35, 40, 48, 0.08); border-radius: 6px; padding: 4px; }
+      .cap { font: 10px/1.3 ui-monospace, monospace; color: #858f9d; margin-top: 3px; white-space: pre; }
+      svg { display: block; overflow: visible; }
+    </style>
+    <link rel="stylesheet" href="/fonts/noto/font.css" />
+    <link rel="icon" href="data:," />
+  </head>
+  <body>
+    <div id="out"></div>
+    <script type="module">
+      import { octaStar, toMarkup, TOOLBAR_PRESET } from './star-solid.js';
+      const SVGNS = 'http://www.w3.org/2000/svg';
+      const out = document.getElementById('out');
+      const q = new URLSearchParams(location.search);
+      const CASES = JSON.parse(q.get('cases') || 'null') || [
+        ['现行 flat（基准）', { variant: 'flat' }],
+        ['ridge 默认', { variant: 'ridge' }],
+        ['pyramid 默认', { variant: 'pyramid', edgeWidth: 0.2 }],
+        ['silhouette 默认', { variant: 'silhouette' }],
+      ];
+      const SIZES = JSON.parse(q.get('sizes') || 'null') || [400, 48];
+
+      for (const [title, opts] of CASES) {
+        const h = document.createElement('h3');
+        h.textContent = title;
+        const row = document.createElement('div');
+        row.className = 'row';
+        for (const size of SIZES) {
+          const cell = document.createElement('div');
+          cell.className = 'cell';
+          const b = document.createElement('div');
+          b.className = 'b';
+          const svg = document.createElementNS(SVGNS, 'svg');
+          svg.setAttribute('viewBox', '-20 -20 40 40');
+          svg.setAttribute('width', size);
+          svg.setAttribute('height', size);
+          svg.innerHTML = toMarkup(octaStar({ ...TOOLBAR_PRESET, ...opts }), {
+            color: '#232830',
+            hub: '#9a86c4',
+            attrs: false,
+          });
+          b.append(svg);
+          const cap = document.createElement('div');
+          cap.className = 'cap';
+          cap.textContent = size + 'px';
+          cell.append(b, cap);
+          row.append(cell);
+        }
+        out.append(h, row);
+      }
+      window.__errs = [];
+      addEventListener('error', (e) => window.__errs.push(String(e.message)));
+      document.title = 'probe ' + CASES.length;
+    </script>
+  </body>
+</html>

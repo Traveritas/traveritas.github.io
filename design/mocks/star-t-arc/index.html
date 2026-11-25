@@ -1,0 +1,539 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>六芒星 · 弧线力度</title>
+<link rel="stylesheet" href="/fonts/noto/font.css">
+<link rel="icon" href="data:,">
+<style>
+  :root {
+    --bg: #f0f3f6;
+    --bg-sunken: #e5ebf2;
+    --fg: #232830;
+    --fg-soft: #56606d;
+    --fg-faint: #858f9d;
+    --line: rgba(35, 40, 48, 0.12);
+    --dream: #9389ae;
+    --umber: #4f4a66;
+    --amber: #9a86c4;
+    --deep: #2a2b38;
+    --deep-fg: #cfd2de;
+    --deep-faint: #7b7f93;
+    --font-display: 'Noto Serif SC', 'Palatino Linotype', Palatino, Georgia, serif;
+    --font-body: system-ui, 'PingFang SC', 'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+    --font-mono: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.72;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 1560px; margin: 0 auto; padding: 64px 48px 160px; }
+
+  header.head { margin-bottom: 56px; max-width: 44em; }
+  header.head h1 {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 27px;
+    letter-spacing: 0.06em;
+    margin: 0 0 14px;
+  }
+  header.head p { margin: 0 0 10px; color: var(--fg-soft); font-size: 14px; }
+  header.head .warn { color: var(--fg-faint); font-size: 13px; }
+  .kicker {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--fg-faint);
+    margin: 0 0 18px;
+  }
+
+  section { margin: 0 0 84px; }
+  section > h2 {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 17.5px;
+    letter-spacing: 0.05em;
+    margin: 0 0 10px;
+  }
+  section > .lede { margin: 0 0 28px; max-width: 46em; color: var(--fg-soft); font-size: 13.5px; }
+  section > .lede em { font-style: normal; color: var(--fg); }
+  .num { display: inline-block; width: 1.8em; color: var(--fg-faint); font-family: var(--font-mono); font-size: 12px; }
+
+  /* ── 梯：一行一族，左边一列族名 ── */
+  .band { display: grid; grid-template-columns: 128px repeat(5, 1fr); align-items: start; }
+  .band > .fname {
+    padding: 26px 14px 0 0;
+    text-align: right;
+    font-size: 12.5px;
+    color: var(--fg-soft);
+    line-height: 1.5;
+  }
+  .band > .fname b { display: block; font-weight: 500; font-size: 14px; color: var(--fg); letter-spacing: 0.04em; }
+  .band > .fname span { display: block; font-family: var(--font-mono); font-size: 10px; color: var(--fg-faint); margin-top: 4px; }
+  .on-deep .band > .fname { color: var(--deep-fg); }
+  .on-deep .band > .fname b { color: var(--deep-fg); }
+  .on-deep .band > .fname span { color: var(--deep-faint); }
+
+  /* ── 格子 ── */
+  .rack { display: flex; flex-wrap: wrap; gap: 0; align-items: flex-start; }
+  .rack.cols-4 > .cell { width: 25%; }
+  .rack.cols-3 > .cell { width: 33.333%; }
+
+  .cell { margin: 0; padding: 14px 10px 34px; display: flex; flex-direction: column; align-items: center; }
+  .cell-star { display: grid; place-items: center; }
+  .cell-star svg { display: block; overflow: visible; }
+  .cell figcaption {
+    margin-top: 12px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--fg-soft);
+    line-height: 1.5;
+  }
+  .cell figcaption .cn { display: block; letter-spacing: 0.02em; }
+  .cell figcaption .sub {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--fg-faint);
+    letter-spacing: 0.04em;
+  }
+  .cell.is-pick figcaption .cn { color: var(--fg); }
+  .cell.is-pick { position: relative; }
+  .cell.is-pick::after {
+    content: '';
+    position: absolute;
+    left: 12%; right: 12%; bottom: 20px;
+    height: 1px;
+    background: var(--amber);
+    opacity: 0.55;
+  }
+
+  /* ── 深底 ── */
+  .on-deep { background: var(--deep); border-radius: 4px; padding: 26px 0 10px; color: var(--deep-fg); }
+  .on-deep .cell figcaption { color: var(--deep-fg); }
+  .on-deep .cell figcaption .sub { color: var(--deep-faint); }
+  .on-deep .cap-row { padding: 0 18px 14px; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--deep-faint); }
+  .cap-row { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--fg-faint); padding: 0 0 12px 2px; }
+
+  /* ── 一行对照 ── */
+  .headline { display: flex; gap: 26px; flex-wrap: wrap; }
+  .headline .frame { border: 1px solid var(--line); border-radius: 4px; padding: 14px; background: color-mix(in srgb, #fff 44%, transparent); }
+
+  /* ── 表 ── */
+  table.rd { border-collapse: collapse; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+  table.rd th, table.rd td { padding: 6px 13px 6px 0; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  table.rd th { font-weight: 400; font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--fg-faint); border-bottom-color: var(--fg-faint); }
+  table.rd td:first-child, table.rd th:first-child { text-align: left; padding-left: 0; }
+  table.rd td.fam { color: var(--fg-faint); }
+  table.rd tr.pick td { color: var(--fg); font-weight: 500; }
+  table.rd tr.pick td:first-child::after { content: ' ←'; color: var(--amber); }
+  table.rd .mono { font-family: var(--font-mono); font-size: 11.5px; }
+  .tbl-wrap { overflow-x: auto; }
+
+  /* ── 读数段落 ── */
+  .notes { max-width: 52em; }
+  .notes p { margin: 0 0 14px; font-size: 13.5px; color: var(--fg-soft); }
+  .notes p b { font-weight: 500; color: var(--fg); }
+  .notes h3 { font-family: var(--font-display); font-size: 14px; font-weight: 500; letter-spacing: 0.04em; margin: 30px 0 10px; color: var(--fg); }
+
+  .legend { display: flex; gap: 22px; flex-wrap: wrap; margin: 0 0 20px; font-size: 12px; color: var(--fg-faint); }
+  .legend span::before { content: '— '; }
+
+  .sz { display: flex; align-items: flex-end; gap: 34px; flex-wrap: wrap; }
+  .sz .unit { text-align: center; }
+  .sz .unit .stars { display: grid; place-items: center; }
+  .sz .unit .lbl { margin-top: 10px; font-family: var(--font-mono); font-size: 10px; color: var(--fg-faint); letter-spacing: 0.06em; }
+  .sz .unit .lbl b { color: var(--fg-soft); font-weight: 400; }
+  .sz-row { margin: 0 0 30px; }
+  .raster img { display: block; max-width: 100%; border: 1px solid var(--line); border-radius: 4px; }
+  .sz-row > .name { font-size: 12.5px; color: var(--fg); margin: 0 0 10px; letter-spacing: 0.02em; }
+  .sz-row > .name span { color: var(--fg-faint); font-family: var(--font-mono); font-size: 10.5px; margin-left: 10px; }
+
+  .centre4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 22px; }
+  .centre4 .cf { min-width: 0; }
+  .centre4 .cf .t { font-size: 12.5px; margin: 0 0 2px; }
+  .centre4 .cf .s { font-family: var(--font-mono); font-size: 10.5px; color: var(--fg-faint); margin: 0 0 8px; min-height: 2.6em; }
+  .centre4 .cf .box {
+    border: 1px solid var(--line); border-radius: 4px;
+    display: grid; place-items: center; overflow: hidden;
+    background: color-mix(in srgb, #fff 40%, transparent);
+  }
+  .centre4 .cf .box > div { width: 100% !important; height: auto !important; aspect-ratio: 1; }
+  .centre4 .cf .box svg { width: 100%; height: 100%; }
+
+  footer { color: var(--fg-faint); font-size: 12px; border-top: 1px solid var(--line); padding-top: 22px; max-width: 52em; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="head">
+  <p class="kicker">醒梦 · 六芒星 · 第七次</p>
+  <h1>弧线力度</h1>
+  <p>结构不动：三轴正交的六支，支长 16，半宽 1.9，支尾越过中心 1.4，姿势锁在 yaw 45° / pitch 35.264°。
+  这一轮只改一件事——每一支那两条边从尖端到内角的那道弯。</p>
+  <p class="warn">判断只看这个姿势，因为只有它投影成一颗正六芒星；其余姿势的六支长短不齐，不在这轮的射程里。</p>
+</header>
+
+<!-- ══════════════════ 一 · 弧线梯 ══════════════════ -->
+<section id="sec-ladder">
+  <h2><span class="num">一</span>弧线梯</h2>
+  <p class="lede">同一组结构，每一行一个走法，每一列一道弯的深浅。弯是边偏离直线多远，单位是体单位（<em>1 u ≈ 星径的 1/13</em>）。
+  第一行是现役那颗——零弯。</p>
+  <div class="cap-row">浅底 #f0f3f6 · 200 px</div>
+  <div id="ladder-light"></div>
+  <div class="on-deep">
+    <div class="cap-row">深底 #2a2b38 · 200 px · 看剪影</div>
+    <div id="ladder-deep"></div>
+  </div>
+</section>
+
+<!-- ══════════════════ 二 · 四种走法 ══════════════════ -->
+<section id="sec-four">
+  <h2><span class="num">二</span>四种走法</h2>
+  <p class="lede">直、凸、凹、S 形并排，各取一族里最该被看见的那一档。<em>凸</em>是边往外鼓——支成一片带腹的叶；
+  <em>凹</em>是边往轴里收——支成一柄收腰的长矛；<em>S 形</em>是近根收、近尖放，两道弯在中间换向。</p>
+  <div class="rack cols-4" id="four"></div>
+  <div class="cap-row" style="margin-top:26px">单支 · 把它拉直放大，看边到底怎么弯（同样四档）</div>
+  <div class="rack cols-4" id="spike"></div>
+  <div class="cap-row" style="margin-top:26px">深底剪影</div>
+  <div class="on-deep">
+    <div class="cap-row">同一组 · #2a2b38</div>
+    <div class="rack cols-4" id="four-deep"></div>
+  </div>
+</section>
+
+<!-- ══════════════════ 三 · 中心 ══════════════════ -->
+<section id="sec-centre">
+  <h2><span class="num">三</span>中心</h2>
+  <p class="lede">400 px，只看中心那一块。六支的支尾都越过中心、互相穿过，所以中心本来就是一叠交错的窄片。
+  这一段的问题是：<em>把边弯起来，中心是变清楚了还是更乱</em>。</p>
+  <div class="centre4" id="centre"></div>
+</section>
+
+<!-- ══════════════════ 四 · 尺寸 ══════════════════ -->
+<section id="sec-size">
+  <h2><span class="num">四</span>尺寸</h2>
+  <p class="lede">三种尺寸下，现役（直）与三种走法的最好那一档并排。看六支之间的凹口还张不张得开。
+  下面标的凹口是几何值；<em>真画到像素格上再数</em>，48 px 上直与凹 0.04 都是 3.9 px、96 px 上都是 7.3 px
+  ——这两档在小尺寸上是同一颗星。S 0.020 才真吃亏（48 px 3.3、96 px 6.3）。</p>
+  <div id="sizes"></div>
+  <div class="cap-row" style="margin-top:20px">真栅格：48 px 与 96 px 的原尺寸画出来，再放大（最近邻，不改一个像素）</div>
+  <div class="raster"><img src=".shots/raster.png" alt="48 px 与 96 px 下的四档星，放大 12 倍"></div>
+</section>
+
+<!-- ══════════════════ 五 · 读数 ══════════════════ -->
+<section id="sec-read">
+  <h2><span class="num">五</span>读数</h2>
+  <p class="lede">凹口半径是相邻两支之间那个内角到星心的距离——判「还读不读得出是六芒星」的尺子。
+  宽度剖面是在离根部 25 / 50 / 75 / 90% 处量两支边之间的宽度（直档是 3.80 → 0 的线性收）。
+  「腰」是比直档同站更窄的最大处，「腹」是更宽的最大处；单段凹只有腰、单段凸只有腹，两段才会有两个。
+  中心三栏量的是 r &lt; 3.2 那一块圆里，被六支盖住零层 / 一层 / 两层以上的面积占比。</p>
+  <div class="tbl-wrap"><table class="rd" id="read-table"></table></div>
+  <div class="notes" id="read-notes" style="margin-top:34px"></div>
+</section>
+
+<footer>
+  <p>弯的参数是「控制点沿弦法向推出的距离 ÷ 弦长」，正号往外（凸）、负号往里（凹）。
+  单段时它就是 <span class="mono">star-flat/star.js</span> 里那个 <span class="mono">pinch</span> 的有符号版；
+  两段时结点靠「两侧切线共线」解出来，所以结点处不起折。</p>
+  <p style="margin-top:8px">这一页不碰 <span class="mono">src/</span>；零弯那一档与 <span class="mono">drawStar()</span> 逐坐标相同（差 0.000000 u）。</p>
+</footer>
+
+</div>
+
+<script type="module">
+import * as A from './src.js';
+
+const SIZES = [48, 96, 200, 400];
+const read = await fetch('./.readings.json').then((r) => r.json());
+const R = new Map(read.rows.map((r) => [r.id, r]));
+const V = A.VARIANTS;
+const pick = (id) => V.find((v) => v.id === id);
+
+/* ── 星：现役那颗的颜色。醒面 --fg，深底用浅一档的冷灰 ── */
+const LIGHT_INK = '#2f3540';
+const DEEP_INK = '#d3d6e2';
+
+function star(edge, size, ink, hub, zoom) {
+  const el = document.createElement('div');
+  el.style.width = el.style.height = size + 'px';
+  el.style.color = ink;
+  A.mountStar(el, zoom ? { edge, zoom, hub } : { edge }, size);
+  const circle = el.querySelector('circle');
+  if (circle) circle.style.fill = hub || 'var(--amber)';
+  return el;
+}
+
+function cell(v, size, ink, hub, sub, extraClass) {
+  const f = document.createElement('figure');
+  f.className = 'cell' + (extraClass ? ' ' + extraClass : '');
+  const box = document.createElement('div');
+  box.className = 'cell-star';
+  box.append(star(v.edge, size, ink, hub));
+  const cap = document.createElement('figcaption');
+  const r = R.get(v.id);
+  cap.innerHTML =
+    `<span class="cn">${v.name}</span>` +
+    `<span class="sub">${sub ?? (r ? `凹口 ${r.notchPx[size] ?? '—'} px` : '')}</span>`;
+  f.append(box, cap);
+  return f;
+}
+
+/* ── 一 · 弧线梯 ── */
+const ladderLight = document.getElementById('ladder-light');
+const ladderDeep = document.getElementById('ladder-deep');
+
+/* 一行一族，五列自左向右加深。行首写族名与这一族在动什么 */
+const LADDER = [
+  { fam: '直', sub: '零弯 · 现役', ids: ['v0', 'v0', 'v0', 'v0', 'v0'] },
+  { fam: '凸', sub: '边往外鼓', ids: ['b1', 'b2', 'b3', 'b4', 'b5'] },
+  { fam: '凹', sub: '边往轴里收', ids: ['c1', 'c2', 'c3', 'c4', 'c5'] },
+  { fam: 'S 形', sub: '近根收 · 近尖放', ids: ['s1', 's2', 's3', 's4', 's5'] },
+  { fam: '尖端', sub: '腰部收 + 尖端外鼓', ids: ['v0', 'd4', 'd1', 'd2', 'd3'] },
+];
+
+const best = ['c2', 's3']; // 见第五节
+
+function band(host, row, ink, hub, deep) {
+  const b = document.createElement('div');
+  b.className = 'band';
+  const name = document.createElement('div');
+  name.className = 'fname';
+  name.innerHTML = `<b>${row.fam}</b><span>${row.sub}</span>`;
+  b.append(name);
+  for (const id of row.ids) {
+    const v = pick(id);
+    const r = R.get(id);
+    /* 副行：弯在哪里、多大。取「腰」与「腹」里更显著的那个；都小于 0.1 u 就是零弯 */
+  const waist = r && r.neck < -0.1 ? r.neck : null;
+  const belly = r && r.belly > 0.1 ? r.belly : null;
+  const sub = !r
+    ? ''
+    : waist !== null && (belly === null || Math.abs(waist) >= belly)
+      ? `腰 ${waist.toFixed(2)} u @ ${Math.round(r.neckAt * 100)}%`
+      : belly !== null
+        ? `腹 +${belly.toFixed(2)} u @ ${Math.round(r.bellyAt * 100)}%`
+        : '零弯';
+    b.append(cell(v, 200, ink, hub, sub, !deep && best.includes(id) ? 'is-pick' : ''));
+  }
+  host.append(b);
+}
+
+for (const row of LADDER) {
+  band(ladderLight, row, LIGHT_INK, 'var(--amber)', false);
+  band(ladderDeep, row, DEEP_INK, '#9a86c4', true);
+}
+
+/* ── 二 · 四种走法 ── */
+const FOUR = ['v0', 'b3', 'c2', 's3'];
+const FOUR_LABEL = { v0: '直 · 现役', b3: '凸 · 0.06', c2: '凹 · 0.04', s3: 'S · 0.020' };
+const four = document.getElementById('four');
+const fourDeep = document.getElementById('four-deep');
+const spikeHost = document.getElementById('spike');
+for (const id of FOUR) {
+  const v = pick(id);
+  const r = R.get(id);
+  four.append(cell(v, 200, LIGHT_INK, 'var(--amber)',
+    `${FOUR_LABEL[id]}　凹口 ${r.notchPx[200]} px`, best.includes(id) ? 'is-pick' : ''));
+  fourDeep.append(cell(v, 200, DEEP_INK, '#9a86c4', FOUR_LABEL[id], ''));
+
+  /* 单支 */
+  const f = document.createElement('figure');
+  f.className = 'cell';
+  const box = document.createElement('div');
+  box.className = 'cell-star';
+  box.style.width = box.style.height = '210px';
+  box.style.color = LIGHT_INK;
+  box.innerHTML = A.singleSpikeMarkup({ edge: v.edge });
+  const svg = box.firstElementChild;
+  svg.setAttribute('width', '210');
+  svg.setAttribute('height', '210');
+  const cap = document.createElement('figcaption');
+  cap.innerHTML = `<span class="cn">${FOUR_LABEL[id]}</span><span class="sub">${
+    r.neck < -0.1 && (r.belly <= 0.1 || -r.neck >= r.belly)
+      ? `腰 ${r.neck.toFixed(2)}`
+      : r.belly > 0.1
+        ? `腹 +${r.belly.toFixed(2)}`
+        : '零弯'
+  } · 尖端 ${r.tipHalfAngle.toFixed(1)}°</span>`;
+  f.append(box, cap);
+  spikeHost.append(f);
+}
+
+/* ── 三 · 中心 ── */
+const centre = document.getElementById('centre');
+const CENTRE_SET = [
+  { id: 'v0', t: '直 · 现役', s: '交叉的窄片全是直的，交角是细尖的楔' },
+  { id: 'b3', t: '凸 · 0.06', s: '根部更宽，楔也跟着变宽' },
+  { id: 'c2', t: '凹 · 0.04', s: '腰部收到半宽的 86%，根旁留出空' },
+  { id: 's3', t: 'S · 0.020', s: '近根收、近尖放，两侧边不同向' },
+];
+for (const it of CENTRE_SET) {
+  const v = pick(it.id);
+  const r = R.get(it.id);
+  const cf = document.createElement('div');
+  cf.className = 'cf';
+  cf.innerHTML = `<p class="t">${it.t}</p><p class="s">${it.s}</p>`;
+  const box = document.createElement('div');
+  box.className = 'box';
+  box.append(star(v.edge, 400, LIGHT_INK, 'var(--amber)'));
+  cf.append(box);
+  /* 放大：把画框收到 (−5, 5) 见方，中心那一圈占满 400px */
+  const zf = document.createElement('div');
+  zf.className = 'cf';
+  zf.innerHTML = `<p class="t" style="font-size:11.5px;color:var(--fg-faint)">同上 · 中心放大约 4 倍</p>
+    <p class="s">露底 ${r.bare}% · 单层 ${r.single}% · 叠层 ${r.layered}%</p>`;
+  const zbox = document.createElement('div');
+  zbox.className = 'box';
+  zbox.append(star(v.edge, 400, LIGHT_INK, 'var(--amber)', [-5, -5, 10]));
+  zf.append(zbox);
+  centre.append(cf, zf);
+}
+
+/* ── 四 · 尺寸 ── */
+const szHost = document.getElementById('sizes');
+const SZ_SET = [
+  { id: 'v0', name: '直 · 现役', cls: false },
+  { id: 'b3', name: '凸 0.06', cls: false },
+  { id: 'c2', name: '凹 0.04', cls: true },
+  { id: 's3', name: 'S 0.020', cls: true },
+];
+for (const s of SZ_SET) {
+  const v = pick(s.id);
+  const row = document.createElement('div');
+  row.className = 'sz-row';
+  const r = R.get(s.id);
+  row.innerHTML = `<p class="name">${s.name}<span>凹口 ${[48, 96, 200].map((k) => r.notchPx[k] + 'px@' + k).join(' · ')}</span></p>`;
+  const flex = document.createElement('div');
+  flex.className = 'sz';
+  for (const k of [48, 96, 200]) {
+    const u = document.createElement('div');
+    u.className = 'unit';
+    const st = document.createElement('div');
+    st.className = 'stars';
+    st.append(star(v.edge, k, LIGHT_INK, 'var(--amber)'));
+    const lbl = document.createElement('div');
+    lbl.className = 'lbl';
+    lbl.innerHTML = `${k} px<br><b>凹口 ${r.notchPx[k]} px</b>`;
+    u.append(st, lbl);
+    flex.append(u);
+  }
+  row.append(flex);
+  szHost.append(row);
+}
+
+/* ── 五 · 读数表 ── */
+const ORDER = [
+  'v0', 'b1', 'b2', 'b3', 'b4', 'b5',
+  'c1', 'c2', 'c3', 'c4', 'c5',
+  's1', 's2', 's3', 's4', 's5',
+  'd1', 'd2', 'd3', 'd4',
+];
+const th = `<thead><tr>
+  <th>档</th><th>族</th><th>宽度剖面 25/50/75/90%</th><th>中点 vs 直</th>
+  <th>腰</th><th>腰在</th><th>腹</th><th>腹在</th><th>尖端半角°</th>
+  <th>凹口 u</th><th>@48</th><th>@96</th><th>@200</th><th>@400</th><th>vs 直</th>
+  <th>中心 露底</th><th>单层</th><th>叠层</th>
+</tr></thead>`;
+let body = '<tbody>';
+for (const id of ORDER) {
+  const r = R.get(id);
+  const v = pick(id);
+  if (!r) continue;
+  const isPick = best.includes(id);
+  const pos = (f) => (f > 0 ? `${Math.round(f * 100)}%` : '根');
+  body += `<tr class="${isPick ? 'pick' : ''}">
+    <td class="mono">${id}</td>
+    <td class="fam">${v.fam}</td>
+    <td class="mono" style="font-size:11px">${r.w25} ${r.w50} ${r.w75} ${r.w90}</td>
+    <td>${r.midVsStraight > 0 ? '+' : ''}${r.midVsStraight}%</td>
+    <td>${r.neck < 0 ? r.neck.toFixed(2) : '—'}</td>
+    <td class="fam">${r.neck < 0 ? pos(r.neckAt) : '—'}</td>
+    <td>${r.belly > 0.05 ? '+' + r.belly.toFixed(2) : '—'}</td>
+    <td class="fam">${r.belly > 0.05 ? pos(r.bellyAt) : '—'}</td>
+    <td>${r.tipHalfAngle.toFixed(1)}</td>
+    <td>${r.notchU.toFixed(3)}</td>
+    <td>${r.notchPx[48]}</td>
+    <td>${r.notchPx[96]}</td>
+    <td>${r.notchPx[200]}</td>
+    <td>${r.notchPx[400]}</td>
+    <td>${r.notchVsStraight > 0 ? '+' : ''}${r.notchVsStraight}%</td>
+    <td>${r.bare}%</td>
+    <td>${r.single}%</td>
+    <td>${r.layered}%</td>
+  </tr>`;
+}
+body += '</tbody>';
+document.getElementById('read-table').innerHTML = th + body;
+
+/* ── 五 · 结论段 ── */
+const g = (id) => R.get(id);
+document.getElementById('read-notes').innerHTML = `
+  <h3>哪一道弯读成晶体</h3>
+  <p><b>凹 0.04：赢的是它。</b>它是这几组里唯一让支「变成一根有棱面的东西」而不是「一根带弧边的针」的。
+  做法很省：只把中段收窄 0.57 u（半宽 1.9 → 1.37，剖面 50% 处 −28%），腰部落在离根 49% 的位置，
+  于是从根到尖有了「宽一两收一放」的节奏。尖端同时被带锐了：半角从 8.3° 降到 5.0°。
+  这三件事一起发生，观感才是「晶体」——它有面、有腰、尖端还是硬的。</p>
+  <p><b>S 0.020 是它的加强版，也更危险。</b>腰在离根 34% 处收到 −0.63 u，腹在 81% 处只鼓 +0.20 u——
+  两段的方向是对的，读起来确实比凹 0.04 更「长出来」。但它在 200px 上已经开始显得苗条得不均匀，
+  而且代价更大：凹口 13.29 px（−12.4%），是这一批里对尺寸最不客气的一个。</p>
+  <p><b>凸全族落选，而且是最先可以排除的一族。</b>它做的事只是把支加肥：凸 0.06 的中点宽度是直档的 142%，
+  凹口涨到 17.41 px（+14.7%），中心叠层从 57.4% 涨到 69.2%。六支本来就细，再加肥只会把六个凹口填平成六段圆弧，
+  往「花」的方向走。凸 0.13 那张已经彻底读成一颗八角风车。</p>
+
+  <h3>弯对中心做了什么</h3>
+  <p><b>几乎没有。</b>这是这一轮最清楚的否定结论。r &lt; 3.2 那一圈的叠层面积，直档 57.4%
+  → 凹 0.04 是 50.3%、S 0.020 是 46.9%，降幅不到 11 个百分点；同时露底从 0.5% 涨到 2.5% / 4.7%。
+  也就是说弯只是把「一层糊住的深色」换成「糊住但中间透几处亮缝」，并没有把那一堆交叉的窄片理开。
+  凸更糟，叠层直接涨到 81.2%。</p>
+  <p>原因不在弧线，在支尾：六支各越过中心 <b>1.4 u</b>，它们必然在半径 1.13–1.30 u 处互相穿过，
+  那个六角形的小结是几何的直接后果。弯只改这个结外围的形状，改不动它本身。
+  要治中心得动支尾 1.4 或半宽 1.9，不是动弧线——这条留给下一轮。</p>
+
+  <h3>小尺寸吃亏多少</h3>
+  <p>几何上算，两个胜出档都吃亏：凹 0.04 的凹口从 15.18 px 降到 13.92 px（−8.3%），48 px 上 3.34 px；
+  S 0.020 降到 13.29 px（−12.4%），48 px 上 3.19 px。<b>但这是按曲线轮廓算的，不是屏幕上真实看到的。</b></p>
+  <p>把星真画到 48 px 的像素格上再数（<span class="mono">.raster.mjs</span>，DPR 1，从中心每 1° 打一条射线量到墨迹中断处，取 60° 内的最小值）：</p>
+  <table class="rd" style="font-size:12px;margin:6px 0 16px">
+    <thead><tr><th>档</th><th>48 px 实测</th><th>48 px 几何</th><th>96 px 实测</th><th>96 px 几何</th></tr></thead>
+    <tbody>
+      <tr><td>直</td><td>3.9</td><td>3.64</td><td>7.3</td><td>7.28</td></tr>
+      <tr><td>凹 0.04</td><td>3.9</td><td>3.34</td><td>7.3</td><td>6.68</td></tr>
+      <tr><td>S 0.020</td><td>3.3</td><td>3.19</td><td>6.3</td><td>6.38</td></tr>
+      <tr><td>凸 0.06</td><td>3.9</td><td>4.18</td><td>8.7</td><td>8.36</td></tr>
+    </tbody>
+  </table>
+  <p><b>这是本轮最该记的一条：48 px 上凹 0.04 并不比直档差。</b>两者都落在 3.9 px —— 几何上差 0.30 px，
+  但那个差小于一个像素格里能分辨的量，栅格化时被抹平了。96 px 上也一样是 7.3 对 7.3。
+  所以「曲率伤小尺寸」这个预期，对凹 0.04 <b>不成立</b>：它的亏损只在纸面上。</p>
+  <p>真正在像素上吃亏的是 <b>S 0.020</b>：48 px 少 0.6 px（3.3 对 3.9）、96 px 少 1.0 px（6.3 对 7.3）——
+  它的收腰又深又靠根（离根 34% 处 −0.63 u），已经跨过了能分辨的那一档。</p>
+  <p>凸 0.06 在 48 px 上也是 3.9，但 96 px 上 8.7 px 已经明显比直档张得开——这是它唯一的便宜，也就是「把凹口填宽」。</p>
+
+  <h3>尖端那一条：露珠不成立</h3>
+  <p>「露珠」在单支上非常好看——单支放大看，露珠 0.04 的尖端像一滴正在离开水面的水。
+  但六支并置时它立刻垮掉：尖端半角从 8.3° 抬到 44.1°，六个尖同时变成六片圆头的瓣，整颗星读成一朵六瓣花。
+  露珠 0.06（半角 54.8°）更是彻底。所以尖端必须保持硬收；能动的只有腰部与腹。</p>
+  <p>对照的「硬尖」（腰 −0.84、尖端更利、半角 8.2°）单支看很利，但六支一起会显得干——它把支削瘦了却没给出节奏，
+  所以也不选。</p>
+
+  <h3>一句话</h3>
+  <p>要的是<b>凹 0.04</b>：腰部只收 0.57 u，位置在离根一半处，尖端保持硬收。
+  它把「一根等宽的针」变成「一根有腰的棱柱」，而在 48 px 上它与今天那颗量到的凹口一样是 <b>3.9 px</b>——
+  换形不换可读性。S 0.020 更「长出来」一些，但那是这一批里唯一在像素上真吃亏的一档（48 px 3.3 px）。</p>
+`;
+</script>
+</body>
+</html>

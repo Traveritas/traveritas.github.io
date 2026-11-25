@@ -1,0 +1,651 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>星 · 晶体 —— 几何对照</title>
+<link rel="stylesheet" href="/fonts/noto/font.css">
+<link rel="icon" href="data:,">
+<style>
+  :root {
+    --bg: #f0f3f6;
+    --bg-sunken: #e5ebf2;
+    --fg: #232830;
+    --fg-soft: #56606d;
+    --fg-faint: #858f9d;
+    --line: rgba(35, 40, 48, 0.12);
+    --dream: #9389ae;
+    --umber: #4f4a66;
+    --amber: #9a86c4;
+    --deep: #2a2b38;
+    --font-display: 'Noto Serif SC', 'Palatino Linotype', Palatino, Georgia, serif;
+    --font-body: system-ui, 'PingFang SC', 'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.72;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 1560px; margin: 0 auto; padding: 64px 44px 140px; }
+
+  header.head { margin-bottom: 52px; }
+  header.head h1 {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 26px;
+    letter-spacing: 0.05em;
+    margin: 0 0 12px;
+  }
+  header.head p { margin: 0; max-width: 44em; color: var(--fg-soft); font-size: 14px; }
+  .kicker {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--fg-faint);
+    margin: 0 0 16px;
+  }
+
+  section { margin: 0 0 76px; }
+  section > h2 {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 17px;
+    letter-spacing: 0.04em;
+    margin: 0 0 8px;
+  }
+  section > .lede {
+    margin: 0 0 28px;
+    max-width: 42em;
+    color: var(--fg-soft);
+    font-size: 13.5px;
+  }
+  .num {
+    display: inline-block;
+    width: 1.7em;
+    color: var(--fg-faint);
+    font-family: var(--font-mono);
+    font-size: 12px;
+  }
+
+  /* ── 控件条 ── */
+  .bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px;
+    align-items: flex-end;
+    padding: 16px 18px;
+    margin-bottom: 30px;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    background: color-mix(in srgb, #ffffff 48%, transparent);
+  }
+  .field { display: flex; flex-direction: column; gap: 7px; }
+  .field > span {
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--fg-faint);
+  }
+  .seg { display: flex; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+  .seg button {
+    appearance: none;
+    border: 0;
+    border-right: 1px solid var(--line);
+    background: transparent;
+    color: var(--fg-soft);
+    font: 12px/1 var(--font-mono);
+    padding: 8px 12px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  .seg button:last-child { border-right: 0; }
+  .seg button[aria-pressed='true'] { background: var(--fg); color: var(--bg); }
+  .seg button:hover:not([aria-pressed='true']) { background: color-mix(in srgb, var(--fg) 6%, transparent); }
+
+  /* ── 1 几何对照 ── */
+  .grid-host { border-radius: 6px; overflow: hidden; border: 1px solid var(--line); }
+  .grid-host canvas { display: block; }
+  .grid-names { display: flex; gap: 16px; margin-top: 10px; }
+  .grid-names > div {
+    width: 190px;
+    text-align: center;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    line-height: 1.4;
+    color: var(--fg);
+  }
+  .grid-names > div span { display: block; font-size: 9px; color: var(--fg-faint); letter-spacing: 0.02em; }
+
+  /* ── 2 单几何拆解 ── */
+  .detail { border-radius: 6px; border: 1px solid var(--line); overflow: hidden; background: var(--bg); }
+  .detail-wrap { display: flex; }
+  .detail-canvas-col { position: relative; flex: none; }
+  .detail-canvas-col canvas { display: block; }
+  /* 视角名压在每一行画布顶端 */
+  .detail-canvas-col .vh {
+    position: absolute; top: 8px; text-align: center; pointer-events: none;
+    font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em; color: var(--fg-faint);
+  }
+  /* 说明列：每块正好一行高，垂直居中 */
+  .detail-notes { flex: none; width: 210px; display: flex; flex-direction: column; padding: 0 22px 0 22px; }
+  .detail-notes > div { display: flex; flex-direction: column; justify-content: center; }
+  .detail-notes b { font-family: var(--font-display); font-weight: 500; font-size: 14px;
+    letter-spacing: 0.04em; color: var(--fg); margin-bottom: 7px; }
+  .detail-notes span { font-size: 12px; line-height: 1.75; color: var(--fg-soft); }
+
+  /* ── 3 静止帧条 ── */
+  .strip-host { position: relative; border-radius: 6px; overflow: hidden; border: 1px solid var(--line); }
+  .strip-host canvas { display: block; }
+  .strip-labels { position: absolute; inset: 0; pointer-events: none; }
+  .strip-labels > div {
+    position: absolute;
+    text-align: center;
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    letter-spacing: 0.1em;
+    color: var(--fg-faint);
+  }
+
+  /* ── 4 尺寸 ── */
+  .sizes { padding: 26px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); }
+  .sizes .stagewrap { position: relative; display: inline-block; }
+  .sizes canvas { display: block; }
+  .size-labels { position: absolute; inset: 0; pointer-events: none; }
+  .size-labels > div {
+    position: absolute; text-align: center;
+    font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.1em; color: var(--fg-faint);
+  }
+
+  /* ── 5 对照 ── */
+  .ab { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .ab figure { margin: 0; }
+  .ab .stage { border: 1px solid var(--line); border-radius: 6px; background: var(--bg);
+    display: flex; align-items: center; justify-content: center; padding: 18px 0; position: relative; }
+  .ab figcaption { margin-top: 10px; font-size: 12px; color: var(--fg-soft); }
+  .ab figcaption b { color: var(--fg); font-weight: 600; }
+  .badge {
+    position: absolute; top: 10px; left: 12px;
+    font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--fg-faint);
+  }
+
+  /* ── 表 ── */
+  table.cost { border-collapse: collapse; width: 100%; font-size: 12.5px; margin-top: 4px; }
+  table.cost th, table.cost td {
+    text-align: right; padding: 8px 10px; border-bottom: 1px solid var(--line);
+    font-variant-numeric: tabular-nums;
+  }
+  table.cost th { font-family: var(--font-mono); font-weight: 500; font-size: 10px;
+    letter-spacing: 0.1em; text-transform: uppercase; color: var(--fg-faint); }
+  table.cost td:first-child, table.cost th:first-child { text-align: left; font-variant-numeric: normal; }
+  table.cost td.lbl { font-family: var(--font-display); }
+  table.cost tr.best td { background: color-mix(in srgb, var(--amber) 10%, transparent); }
+  table.cost tr.best td.lbl { color: var(--umber); font-weight: 600; }
+  .mono { font-family: var(--font-mono); font-size: 11.5px; }
+
+  .note {
+    font-size: 12px; color: var(--fg-faint); margin: 14px 0 0; max-width: 46em;
+  }
+  .note b { color: var(--fg-soft); font-weight: 600; }
+  .note code { font-family: var(--font-mono); font-size: 11.5px; }
+
+  .verdict {
+    margin: 0 0 28px; padding: 18px 22px; border-left: 2px solid var(--amber);
+    background: color-mix(in srgb, #ffffff 52%, transparent); border-radius: 0 6px 6px 0;
+    font-size: 13.5px; color: var(--fg-soft); max-width: 46em;
+  }
+  .verdict b { color: var(--fg); }
+
+  @media (max-width: 900px) {
+    .detail { grid-template-columns: 1fr 1fr; }
+    .ab { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="head">
+    <p class="kicker">星 · 晶体 · 第三版</p>
+    <h1>有棱面的结晶，剪影仍读成六芒星</h1>
+    <p>
+      上一版是六支细四棱锥从同一点伸出，怎么看都像一枚带刺的球。这一版换从实体多面体出发：
+      七个几何，各自配四档材质，同一姿态、两种底色并排看。下面每一格都是真的 WebGL 画出来的，
+      不是示意图。
+    </p>
+  </header>
+
+  <section id="geo-sec">
+    <h2><span class="num">01</span>几何对照</h2>
+    <p class="lede">
+      同一格姿态，200px：上排落在页面底色 <span class="mono">#f0f3f6</span>，下排落在深底
+      <span class="mono">#2a2b38</span>。默认用「各自正面」——每颗晶体先给它自己最好看的那一格；
+      想看统一的正等轴视角，切一下姿态。深底那一排只用来判断剪影，材质在那上面不作数。
+      <b>凸多面体的正交剪影恒为凸形</b>，所以前四个候选无论怎么转都只可能是六边形 ——
+      这一节把两族并排放，让观感自己说话。
+    </p>
+
+    <div class="bar">
+      <div class="field">
+        <span>材质</span>
+        <div class="seg" id="mat-seg">
+          <button data-mat="crystal" aria-pressed="true">近白晶面</button>
+          <button data-mat="resin" aria-pressed="false">磨砂薄紫树脂</button>
+          <button data-mat="edge" aria-pressed="false">淡彩体 + 棱线</button>
+          <button data-mat="refract" aria-pressed="false">折射</button>
+        </div>
+      </div>
+      <div class="field">
+        <span>姿态</span>
+        <div class="seg" id="base-seg">
+          <button data-base="iso" aria-pressed="false">正等轴（统一）</button>
+          <button data-base="own" aria-pressed="true">各自正面（最好看）</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid-host" id="geo-host">
+      <canvas id="geo-canvas"></canvas>
+    </div>
+    <div class="grid-names" id="geo-labels"></div>
+    <p class="note" id="geo-note"></p>
+  </section>
+
+  <section id="detail-sec">
+    <h2><span class="num">02</span>单几何拆解</h2>
+    <p class="lede">
+      留下的三个，400px，两种底色各一面。正面看棱面怎么分光，侧面看它有没有体量。
+    </p>
+    <div class="detail" id="detail"></div>
+  </section>
+
+  <section id="strip-sec">
+    <h2><span class="num">03</span>静止帧条</h2>
+    <p class="lede">
+      一圈 12 格里的六格，每格持有 110 ms，最后一格持有 110×3.2 ms（照 brand.ts 的七步轮转加三秒呼吸）。
+      每一格都是静止的 —— 动的是「它在翻面」，不是它本人在飘。
+    </p>
+    <div class="bar">
+      <div class="field">
+        <span>几何</span>
+        <div class="seg" id="strip-geo">
+          <button data-geo="starBi" aria-pressed="true">星芒双锥</button>
+          <button data-geo="octa" aria-pressed="false">正八面体</button>
+          <button data-geo="bud" aria-pressed="false">六棱双锥</button>
+          <button data-geo="blunt" aria-pressed="false">截角六尖体</button>
+        </div>
+      </div>
+      <div class="field">
+        <span>怎么转</span>
+        <div class="seg" id="strip-motion">
+          <button data-motion="rock" aria-pressed="true">摆 ±38°（不经过侧面）</button>
+          <button data-motion="flip" aria-pressed="false">整圈翻</button>
+        </div>
+      </div>
+    </div>
+    <div class="strip-host" id="strip-host">
+      <canvas id="strip-canvas"></canvas>
+      <div class="strip-labels" id="strip-labels"></div>
+    </div>
+  </section>
+
+  <section id="size-sec">
+    <h2><span class="num">04</span>尺寸</h2>
+    <p class="lede">
+      64 / 96 / 144 / 240px，同一格姿态。64px 是本做法还能读出「有棱面」的下限，
+      再小就退回 2D 剪影。
+    </p>
+    <div class="sizes" id="sizes">
+      <div class="stagewrap" id="sizes-wrap"></div>
+    </div>
+    <p class="note" id="size-note"></p>
+  </section>
+
+  <section id="ab-sec">
+    <h2><span class="num">05</span>定格与连续</h2>
+    <p class="lede">
+      左边是定格（每格持有 110 ms），右边是连续旋转。同一几何、同一材质、同一尺寸。
+      这一对只用来回答一件事：停留感到底来自哪里。
+    </p>
+    <div class="ab">
+      <figure>
+        <div class="stage"><span class="badge">定格 12 步 / 110 ms</span><canvas id="live-step"></canvas></div>
+        <figcaption><b>定格</b>姿态离散，格与格之间完全静止。</figcaption>
+      </figure>
+      <figure>
+        <div class="stage"><span class="badge">连续</span><canvas id="live-smooth"></canvas></div>
+        <figcaption><b>连续</b>同一路径补间，一直在动。</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section id="perf-sec">
+    <h2><span class="num">06</span>测算</h2>
+    <p class="lede">
+      480×480 缓冲、DPR 1，逐个「几何 × 材质」各跑 0.4 s 纯提交 + 0.3 s 含 <span class="mono">gl.finish()</span> 的合成。
+      「每秒占用」＝ 合成耗时 ÷ 保持时长，定格模式下总占用是这个数，不是每帧数。
+    </p>
+    <p>
+      <button id="m-btn" style="appearance:none;border:1px solid var(--line);border-radius:4px;background:transparent;
+        color:var(--fg-soft);font:12px/1 var(--font-mono);padding:9px 14px;cursor:pointer;">开始测算</button>
+      <span id="m-out" style="font-family:var(--font-mono);font-size:11.5px;color:var(--fg-faint);margin-left:12px;"></span>
+    </p>
+    <div id="m-table-host" hidden><table class="cost" id="m-table"></table></div>
+  </section>
+
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "/three/build/three.module.js",
+    "three/addons/": "/three/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import {
+  mountGrid, GemLayer, measure, GEOMETRIES, GEO_ORDER, MAT_ORDER,
+  schedule, PAGE,
+} from './src.js';
+
+const q = new URLSearchParams(location.search);
+const num = (k, d) => (q.has(k) ? Number(q.get(k)) : d);
+const str = (k, d) => q.get(k) ?? d;
+
+const MAT_SHORT = { crystal: '近白晶面', resin: '磨砂树脂', edge: '淡彩棱线', refract: '折射' };
+
+let mat = str('mat', 'crystal');
+let base = str('base', 'own');
+let poseK = num('pose', 0);
+const SIZE = 200;
+const GAP = 18;
+const COLS = 7;
+
+const grids = [];
+
+/* ── 01 几何对照：一行七个，两行底色 ─────────────────────── */
+const geoHost = document.getElementById('geo-host');
+const geoCanvas = document.getElementById('geo-canvas');
+const geoLabels = document.getElementById('geo-labels');
+let geoGrid = null;
+
+const geoRows = () => ['light', 'deep'].map((bg) => ({
+  cells: GEO_ORDER.map((geo) => ({ geo, mat, bg, size: SIZE, k: poseK, steps: 12, mat, base })),
+}));
+
+function labelGeo() {
+  geoLabels.innerHTML = '';
+  const seen = new Set();
+  for (const c of GEO_ORDER) {
+    if (seen.has(c)) continue;
+    seen.add(c);
+    const d = document.createElement('div');
+    d.style.width = `${SIZE}px`;
+    d.innerHTML = `${GEOMETRIES[c].label}<span>${GEOMETRIES[c].note}</span>`;
+    geoLabels.appendChild(d);
+  }
+}
+
+function buildGeoGrid() {
+  if (!geoGrid) geoGrid = mountGrid(geoCanvas, { rows: geoRows(), gap: GAP, pad: 0 });
+  else geoGrid.update(geoRows());
+  labelGeo();
+}
+
+buildGeoGrid();
+document.getElementById('geo-note').innerHTML =
+  `七个候选，同一格姿态（第 ${poseK} 格）。上排 ${PAGE.light}，下排 ${PAGE.deep}。`;
+
+/* 从查询串进来的 mat / base / strip / motion 要和按钮的按下态对上，
+   否则截图里会出现「渲染是正等轴、按钮却指着各自正面」的假象。 */
+function syncSeg(id, attr, value) {
+  for (const o of document.querySelectorAll(`#${id} button`)) {
+    o.setAttribute('aria-pressed', String(o.dataset[attr] === value));
+  }
+}
+syncSeg('mat-seg', 'mat', mat);
+syncSeg('base-seg', 'base', base);
+
+for (const b of document.querySelectorAll('#mat-seg button')) {
+  b.addEventListener('click', () => {
+    mat = b.dataset.mat;
+    for (const o of document.querySelectorAll('#mat-seg button')) o.setAttribute('aria-pressed', String(o === b));
+    buildGeoGrid();
+  });
+}
+for (const b of document.querySelectorAll('#base-seg button')) {
+  b.addEventListener('click', () => {
+    base = b.dataset.base;
+    for (const o of document.querySelectorAll('#base-seg button')) o.setAttribute('aria-pressed', String(o === b));
+    buildGeoGrid();
+  });
+}
+
+/* ── 02 单几何拆解：400px，每行一个几何、三个视角 ───────────
+   左列一张画布（一个 WebGL 上下文，三行各三格），右列是说明。
+   说明列每块的高度＝本行画布高（400）＋行距（18），与画布逐行对齐。 */
+const DETAIL = [
+  { geo: 'starBi', cap: '星芒双锥', line: '六芒星截面 + 前后双尖。正对时剪影就是六芒星本身，转过去是一枚厚透镜。' },
+  { geo: 'octa', cap: '正八面体', line: '六个顶点在 ±x±y±z，六个朝向清楚，但凸体的剪影恒为凸六边形。' },
+  { geo: 'bud', cap: '六棱双锥', line: 'favicon 那一族。认得出是自己人，认不出是六芒。' },
+];
+const VIEWS = [
+  { tag: '正对', euler: [13, 9, 0], bg: 'light' },
+  { tag: '转 40°', euler: [26, 40, 0], bg: 'light' },
+  { tag: '侧 70°', euler: [20, 70, 0], bg: 'deep' },
+];
+const DETAIL_SIZE = 400;
+const DETAIL_GAP = 18;
+
+const detailHost = document.getElementById('detail');
+const detailWrap = document.createElement('div');
+detailWrap.className = 'detail-wrap';
+const detailCol = document.createElement('div');
+detailCol.className = 'detail-canvas-col';
+const detailCanvas = document.createElement('canvas');
+detailCol.appendChild(detailCanvas);
+const detailNotes = document.createElement('div');
+detailNotes.className = 'detail-notes';
+detailWrap.append(detailCol, detailNotes);
+detailHost.appendChild(detailWrap);
+
+const detailRows = () => DETAIL.map((d) => ({
+  cells: VIEWS.map((v) => ({ geo: d.geo, mat, bg: v.bg, size: DETAIL_SIZE, euler: v.euler })),
+}));
+let detailGrid = null;
+function buildDetail() {
+  const rows = detailRows();
+  if (!detailGrid) detailGrid = mountGrid(detailCanvas, { rows, gap: DETAIL_GAP, pad: 0 });
+  else detailGrid.update(rows);
+
+  detailCol.querySelectorAll('.vh').forEach((n) => n.remove());
+  VIEWS.forEach((v, i) => {
+    const d = document.createElement('div');
+    d.className = 'vh';
+    d.style.left = `${i * (DETAIL_SIZE + DETAIL_GAP)}px`;
+    d.style.width = `${DETAIL_SIZE}px`;
+    d.textContent = v.tag;
+    detailCol.appendChild(d);
+  });
+  detailNotes.innerHTML = DETAIL.map(
+    (d) => `<div style="height:${DETAIL_SIZE + DETAIL_GAP}px"><b>${d.cap}</b><span>${d.line}</span></div>`,
+  ).join('');
+}
+buildDetail();
+
+/* ── 03 静止帧条 ─────────────────────────────────────────── */
+let stripGeo = str('strip', 'starBi');
+let stripMotion = str('motion', 'rock');
+const stripCanvas = document.getElementById('strip-canvas');
+const stripLabels = document.getElementById('strip-labels');
+let stripGrid = null;
+
+const STRIP_K = [0, 2, 4, 6, 8, 10];
+const stripRows = () => ([{
+  cells: STRIP_K.map((k) => ({
+    geo: stripGeo, mat: 'crystal', bg: 'light', size: 200, k, steps: 12, base: 'own', motion: stripMotion,
+  })),
+}]);
+
+function buildStrip() {
+  const rows = stripRows();
+  if (!stripGrid) stripGrid = mountGrid(stripCanvas, { rows, gap: 18, pad: 0 });
+  else stripGrid.update(rows);
+  stripLabels.innerHTML = '';
+  for (const c of stripGrid.layout) {
+    const d = document.createElement('div');
+    d.style.left = `${c.left}px`;
+    d.style.top = `${c.top + c.size + 6}px`;
+    d.style.width = `${c.size}px`;
+    d.textContent = `第 ${c.k} 格`;
+    stripLabels.appendChild(d);
+  }
+}
+buildStrip();
+for (const b of document.querySelectorAll('#strip-geo button')) {
+  b.addEventListener('click', () => {
+    stripGeo = b.dataset.geo;
+    for (const o of document.querySelectorAll('#strip-geo button')) o.setAttribute('aria-pressed', String(o === b));
+    buildStrip();
+  });
+}
+for (const b of document.querySelectorAll('#strip-motion button')) {
+  b.addEventListener('click', () => {
+    stripMotion = b.dataset.motion;
+    for (const o of document.querySelectorAll('#strip-motion button')) o.setAttribute('aria-pressed', String(o === b));
+    buildStrip();
+  });
+}
+syncSeg('strip-geo', 'geo', stripGeo);
+syncSeg('strip-motion', 'motion', stripMotion);
+
+/* ── 04 尺寸 ─────────────────────────────────────────────── */
+const sizesHost = document.getElementById('sizes-wrap');
+const sizeCanvas = document.createElement('canvas');
+const sizeLabels = document.createElement('div');
+sizeLabels.className = 'size-labels';
+sizesHost.append(sizeCanvas, sizeLabels);
+const SIZES = [64, 96, 144, 240];
+let sizeGrid = null;
+function buildSizes() {
+  const rows = [{ cells: SIZES.map((px) => ({ geo: 'starBi', mat: 'crystal', bg: 'light', size: px, k: 0, steps: 12, base: 'own' })) }];
+  if (!sizeGrid) sizeGrid = mountGrid(sizeCanvas, { rows, gap: 36, pad: 26 });
+  else sizeGrid.update(rows);
+  /* 标注按 layout 的绝对位置摆。但 grid 的行高用的是最大格，
+     小格在行内是垂直居中的 —— 标注要贴在每格自己的底边，所以把 offsetY 算进去。 */
+  sizeLabels.innerHTML = '';
+  for (const c of sizeGrid.layout) {
+    const d = document.createElement('div');
+    d.style.left = `${c.left}px`;
+    d.style.top = `${c.top + c.offsetY + c.size + 10}px`;
+    d.style.width = `${c.size}px`;
+    d.textContent = `${c.size} px`;
+    sizeLabels.appendChild(d);
+  }
+}
+buildSizes();
+document.getElementById('size-note').innerHTML =
+  '<b>64px 是下限。</b>再往下棱面的明暗全部并成一块灰，读成一个带毛边的点 —— 那个尺寸该退回 toolstar.ts 的 2D 剪影。';
+
+/* ── 05 定格 vs 连续 ─────────────────────────────────────── */
+const liveStep = new GemLayer(document.getElementById('live-step'), {
+  geo: 'starBi', mat: 'crystal', bg: 'light', size: 200, steps: 12, holdMs: 110, base: 'own', motion: 'rock', mode: 'step',
+});
+const liveSmooth = new GemLayer(document.getElementById('live-smooth'), {
+  geo: 'starBi', mat: 'crystal', bg: 'light', size: 200, steps: 12, holdMs: 110, base: 'own', motion: 'rock', mode: 'smooth',
+});
+grids.push(liveStep, liveSmooth);
+
+const startLive = () => { liveStep.start(); liveSmooth.start(); };
+const stopLive = () => { liveStep.stop(); liveSmooth.stop(); };
+startLive();
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) stopLive();
+  else startLive();
+});
+
+/* ── 06 测算 ─────────────────────────────────────────────── */
+document.getElementById('m-btn').addEventListener('click', async () => {
+  const out = document.getElementById('m-out');
+  const host = document.getElementById('m-table-host');
+  const table = document.getElementById('m-table');
+  out.textContent = '跑着……';
+  /* 先把两张活动画布停掉：它们各自在 rAF / setTimeout 上跑，
+     和测算抢同一个 GPU，读数会被拉成噪声（实测同一组能差 100 倍）。 */
+  stopLive();
+  const res = await measure({ size: 480 });
+  startLive();
+  const byGeo = {};
+  for (const r of res.rows) (byGeo[r.geo] ||= []).push(r);
+
+  const best = {};
+  for (const geo of GEO_ORDER) {
+    const sorted = [...byGeo[geo]].sort((a, b) => a.gpu - b.gpu);
+    best[geo] = sorted[0].mat;
+  }
+
+  let html = '<thead><tr><th>几何</th><th>材质</th><th>提交 ms/帧</th><th>合成 ms/帧</th>' +
+    '<th>draw calls</th><th>三角形</th><th>110 ms 档 ms/s</th></tr></thead><tbody>';
+  for (const geo of GEO_ORDER) {
+    for (const r of byGeo[geo]) {
+      const perSec = +(r.gpu * 1000 / 110).toFixed(1);
+      const isBest = best[geo] === r.mat;
+      html += `<tr${isBest ? ' class="best"' : ''}>` +
+        `<td class="lbl">${isBest ? GEOMETRIES[geo].label : ''}</td>` +
+        `<td class="mono">${MAT_SHORT[r.mat]}</td>` +
+        `<td>${r.cpu}</td><td>${r.gpu}</td><td>${r.calls}</td><td>${r.tris}</td><td>${perSec}</td></tr>`;
+    }
+  }
+  html += '</tbody>';
+  table.innerHTML = html;
+  host.hidden = false;
+  out.textContent = `${res.rows.length} 组，480×480 / DPR 1`;
+});
+
+/* ── 自检口 ─────────────────────────────────────────────── */
+window.__gem = {
+  probe() {
+    return { geo: geoGrid.probe(), strip: stripGrid.probe() };
+  },
+  freeze(k) {
+    poseK = k;
+    buildGeoGrid();
+    buildStrip();
+    buildSizes();
+  },
+  setMat(m) {
+    mat = m;
+    for (const o of document.querySelectorAll('#mat-seg button')) o.setAttribute('aria-pressed', String(o.dataset.mat === m));
+    buildGeoGrid();
+  },
+  setBase(b) {
+    base = b;
+    for (const o of document.querySelectorAll('#base-seg button')) o.setAttribute('aria-pressed', String(o.dataset.base === b));
+    buildGeoGrid();
+  },
+  setStrip(g) {
+    stripGeo = g;
+    for (const o of document.querySelectorAll('#strip-geo button')) o.setAttribute('aria-pressed', String(o.dataset.geo === g));
+    buildStrip();
+  },
+  measure: (o) => measure(o || { size: 480 }),
+  stopLive,
+  startLive,
+  GEOMETRIES,
+};
+</script>
+</body>
+</html>

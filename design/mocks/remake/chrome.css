@@ -1,0 +1,1253 @@
+/* 生成物：chrome/build-chrome.mjs，别手改。原站的令牌与工具栏 / Ave 样式，原样 */
+/* ─────────────────────────────────────────────────────────────
+   醒梦之界 · 一夜 —— 设计令牌
+   一条 14° 的发丝线贯穿整站。醒侧冷灰、梦侧薄暮，
+   强调色是全站唯一的异质色。主页夜间由 night.ts 按三段平台
+   覆盖 --bg / --fg / --fg-soft / --line（见 src/data/night.ts）。
+
+   这一族令牌的名字（--amber / --umber / --dream「暖沙」/ --seal「朱砂」）是初版那套暖色的旧名，
+   颜色后来换过（今为薄暮紫），名字没跟着改——它们是标识，不是色号。再换色怎么推值：
+   design/accent-contrast.cjs。
+   ───────────────────────────────────────────────────────────── */
+
+:root {
+  color-scheme: light;
+
+  /* 昼面（默认） */
+  --bg: #f0f3f6;
+  --bg-sunken: #e5ebf2;
+  --fg: #232830;
+  --fg-soft: #56606d;
+  --fg-faint: #858f9d;
+  --line: rgba(35, 40, 48, 0.12);
+
+  /* 醒梦缝 */
+  --wake: #a7b1ba; /* 醒 · 冷灰 */
+  --dream: #9389ae; /* 梦 · 薄暮 */
+  --umber: #4f4a66;
+  --amber: #9a86c4; /* 全站唯一异质色：锚点 / 进度 / 焦点（名字是旧的；值怎么推出来的见 design/accent-contrast.cjs） */
+  --seal: #a3452f; /* 朱砂，仅关于页的「醒」章 */
+  --seam-angle: 14deg;
+
+  /* 统一晶体外壳令牌（Toolstar / Return / Gauge / Ave 共用同一套磨砂树脂质感） */
+  --chrome-bg: rgba(247, 249, 253, 0.76);
+  --chrome-bg-strong: rgba(247, 249, 253, 0.9);
+  --chrome-edge: rgba(255, 255, 255, 0.84);
+  --chrome-edge-lo: rgba(35, 40, 48, 0.13);
+  --chrome-hi: rgba(255, 255, 255, 0.74);
+  --chrome-sh: rgba(35, 40, 48, 0.16);
+  --chrome-radius: 3px;
+
+  /* 醒梦双态总闸：reality.ts 逐帧覆写 --reality-mix（0=梦，1=醒），
+     无 JS / RM 恒醒面（与「HTML 原文＝醒面真值」一致）。
+     --still 动效倍率：梦 1（浮动）→ 醒 0（静止），漂移类 keyframes 消费。
+     （大表面洗染那层的两个端点色写死在 global.css 的 .wash-backdrop 里，没有对应令牌——
+     原来那枚 --wash 全站零引用，2026-11-04 删掉。） */
+  --reality-mix: 1;
+  --still: calc(1 - var(--reality-mix));
+
+  /* 字体 */
+  --font-display: 'Noto Serif SC', 'Palatino Linotype', 'Iowan Old Style', Palatino,
+    Georgia, 'Source Han Serif SC', 'Source Han Serif CN', 'Songti SC', SimSun,
+    serif;
+  --font-body: system-ui, -apple-system, 'PingFang SC', 'Hiragino Sans GB',
+    'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+  /* 中文不走等宽：Plex Mono 没有中文字形，generic monospace 在 Windows 上落到新宋体，
+     所以在 monospace 之前垫一层系统黑体；西文与数字仍命中 Plex Mono */
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas,
+    'JetBrains Mono', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei UI',
+    'Microsoft YaHei', 'Noto Sans SC', monospace;
+  --font-pixel: 'Silkscreen', ui-monospace, Consolas, monospace;
+
+  /* 度量 */
+  --measure: 34em;
+  --gap-v: clamp(3.5rem, 9vh, 6.5rem);
+
+  /* 叠影残影的分离量（0 合拢 → 1 峰值）。目前没有脚本写它，恒为 0；样式预览页给了一支滑杆 */
+  --echo: 0;
+  --ghost-ink: #817ba3;
+}
+
+/* ── src/components/chrome/Toolstar.astro ── */
+
+  .ts {
+    --ts-glass: var(--chrome-bg);
+    --ts-edge: var(--chrome-edge);
+    --ts-hi: var(--chrome-hi);
+    --ts-sh: var(--chrome-sh);
+    font-family: var(--font-body);
+  }
+
+  /* ── 星 ── */
+  .ts-star {
+    position: fixed;
+    left: 22px;
+    bottom: 22px;
+    z-index: 61;
+    width: 48px;
+    height: 48px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 50%;
+    /* 收着时垫一小片玻璃：压在任何一种夜色上都看得见 */
+    background: var(--ts-glass);
+    border-color: var(--ts-edge);
+    -webkit-backdrop-filter: blur(12px) saturate(1.08);
+    backdrop-filter: blur(12px) saturate(1.08);
+    box-shadow: 0 6px 18px -8px var(--ts-sh);
+    display: grid;
+    place-items: center;
+    color: var(--fg-soft);
+    cursor: pointer;
+    transition:
+      color 0.3s,
+      background-color 0.3s,
+      border-color 0.3s,
+      box-shadow 0.3s;
+  }
+  /* 开着时星落在圆盘上，自己那片玻璃退掉 */
+  .ts-star[aria-expanded='true'] {
+    background-color: transparent;
+    border-color: transparent;
+    box-shadow: none;
+  }
+  .ts-star:hover,
+  .ts-star[aria-expanded='true'] {
+    color: var(--fg);
+  }
+  .ts-star svg {
+    width: 40px;
+    height: 40px;
+    overflow: visible;
+    /* 星每帧重画：点在某一支上时，按下与松开落在两个不同的节点上，click 就不成立 */
+    pointer-events: none;
+  }
+  .ts-star .ts-hub {
+    fill: var(--amber);
+  }
+  .ts-star:focus-visible,
+  .ts-item:focus-visible,
+  .ts-seg button:focus-visible {
+    outline: 1.5px solid var(--amber);
+    outline-offset: 3px;
+  }
+
+  /* ── 轨道层 ── */
+  .ts-orbit {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    pointer-events: none;
+  }
+  /* 以星为圆心的一块磨砂玻璃圆盘，使用 GPU transform: scale() 缩扩避免布局重排 */
+  .ts-orbit::before {
+    content: '';
+    position: absolute;
+    left: var(--ts-cx, 46px);
+    top: var(--ts-cy, 100vh);
+    width: 760px;
+    height: 760px;
+    margin-left: -380px;
+    margin-top: -380px;
+    border-radius: 50%;
+    background: var(--ts-glass);
+    border: 1px solid var(--ts-edge);
+    -webkit-backdrop-filter: blur(18px) saturate(1.08);
+    backdrop-filter: blur(18px) saturate(1.08);
+    box-shadow:
+      inset 0 1px 1px var(--ts-hi),
+      0 18px 42px -18px var(--ts-sh);
+    opacity: 0;
+    transform: scale(var(--ts-scale, 0.063));
+    transition:
+      opacity 0.35s,
+      transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+    will-change: transform, opacity;
+  }
+  .ts-orbit.is-veiled::before {
+    opacity: 1;
+  }
+  .ts-caption {
+    position: fixed;
+    left: 22px;
+    bottom: calc(46px + var(--ts-sr, 138px) + 10px);
+    margin: 0;
+    padding: 3px 9px;
+    border-radius: var(--chrome-radius);
+    background: var(--ts-glass);
+    border: 1px solid var(--ts-edge);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+    font-size: 11px;
+    line-height: 1.4;
+    letter-spacing: 0.1em;
+    white-space: nowrap;
+    color: var(--fg);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition:
+      opacity 0.22s ease,
+      visibility 0.22s ease,
+      bottom 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .ts-orbit.is-veiled .ts-caption.is-on {
+    opacity: 0.96;
+    visibility: visible;
+  }
+  .ts-tracks {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+  .ts-tracks .ts-trk {
+    fill: none;
+    stroke: var(--fg);
+    stroke-opacity: 0.1;
+    stroke-width: 1;
+  }
+  .ts-tracks .ts-trk.is-dash {
+    stroke-dasharray: 1 5;
+    stroke-opacity: 0.22;
+  }
+  .ts-tracks .ts-band {
+    fill: none;
+    stroke: transparent;
+    stroke-width: 46;
+    pointer-events: stroke;
+    cursor: grab;
+  }
+  .ts-ring[hidden] {
+    display: none;
+  }
+  .ts-item {
+    position: absolute;
+    left: 0;
+    top: 0;
+    pointer-events: auto;
+    touch-action: none;
+    will-change: transform, opacity;
+    opacity: 0;
+    visibility: hidden;
+  }
+
+  /* 工具 */
+  .ts-tool {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    display: grid;
+    place-items: center;
+    color: var(--fg-soft);
+    cursor: pointer;
+    transition: color 0.2s, background-color 0.2s;
+  }
+  .ts-tool:hover {
+    color: var(--fg);
+    background: color-mix(in srgb, var(--fg) 6%, transparent);
+  }
+  .ts-tool[aria-expanded='true'] {
+    color: var(--amber);
+  }
+  .ts-ico {
+    width: 22px;
+    height: 22px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.25;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    overflow: visible;
+  }
+  .ts-ico .ts-fill {
+    fill: currentColor;
+    fill-opacity: 0.2;
+    stroke: none;
+  }
+  .ts-ico .ts-fill--face {
+    fill-opacity: 0.32;
+  }
+  /* 会往外展开的工具：外侧一道小刻，指向它要展开去的那一圈（--ts-a 是它在轨道上的角度，逐帧写） */
+  .ts-tool--opens::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 5px;
+    height: 1.25px;
+    margin-top: -0.625px;
+    background: currentColor;
+    opacity: 0.5;
+    transform-origin: 0 50%;
+    transform: rotate(calc(var(--ts-a, 0) * -1deg)) translateX(17px);
+  }
+  .ts-ico .ts-knob {
+    fill: var(--bg);
+  }
+  /* 换面：醒面那一组停在 0°，梦面转到 180°（亮的一半换到另一边）。
+     点下去就开始转（.is-turning，toolstar.ts 加、换面落定时摘），和塌缩圈一起走完；长按换面时落定那一下也转过去。
+     悬停时线先偏一点，梦面里亮的那一半慢慢呼吸 */
+  .ts-ico-face .ts-cut {
+    transform-box: view-box;
+    transform-origin: 12px 12px;
+    transition:
+      transform 1.1s cubic-bezier(0.65, 0, 0.35, 1),
+      rotate 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  body[data-reality='dream'] .ts-ico-face .ts-cut,
+  .ts-tool.is-turning .ts-ico-face .ts-cut {
+    transform: rotate(180deg);
+  }
+  body[data-reality='dream'] .ts-tool.is-turning .ts-ico-face .ts-cut {
+    transform: rotate(0deg);
+  }
+  .ts-tool[data-t='face']:hover .ts-cut {
+    rotate: -16deg;
+  }
+  body[data-reality='dream'] .ts-ico-face .ts-fill--face {
+    animation: ts-breathe 4.2s ease-in-out infinite alternate;
+  }
+  @keyframes ts-breathe {
+    from {
+      fill-opacity: 0.2;
+    }
+    to {
+      fill-opacity: 0.46;
+    }
+  }
+  .ts-ico .ts-dot {
+    fill: currentColor;
+    stroke: none;
+  }
+  /* 声音：有一路在响时，三道弧由内往外轮流亮一下 */
+  .ts-ico-sound path {
+    stroke-opacity: 0.9;
+  }
+  html[data-sound='on'] .ts-ico-sound path {
+    animation: ts-echo 2.4s ease-in-out infinite;
+  }
+  @keyframes ts-echo {
+    0%,
+    100% {
+      stroke-opacity: 0.9;
+    }
+    20% {
+      stroke-opacity: 0.35;
+    }
+  }
+
+  /* ── 三圈音量（显隐的转与淡由 toolstar.ts 逐帧写，与别的圈同一套） ── */
+  .ts-vols {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0;
+    transform-origin: var(--ts-cx, 46px) var(--ts-cy, 100vh);
+  }
+  .ts-vols[hidden] {
+    display: none;
+  }
+  .ts-vol-arcs {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+  .ts-vol {
+    outline: none;
+    cursor: pointer;
+    touch-action: none;
+  }
+  .ts-vol path {
+    fill: none;
+    stroke-linecap: round;
+  }
+  .ts-vol-track {
+    stroke: var(--fg);
+    stroke-opacity: 0.16;
+    stroke-width: 1.25;
+  }
+  .ts-vol-fill {
+    stroke: var(--amber);
+    stroke-width: 1.5;
+    stroke-dasharray: 0 1;
+  }
+  .ts-vol-thumb {
+    fill: var(--amber);
+    stroke: none;
+    transition: r 0.2s;
+  }
+  /* 关着：滑块缩成起点上的一个空心点 */
+  .ts-vol[aria-valuenow='0'] .ts-vol-thumb {
+    fill: var(--bg);
+    stroke: var(--fg-faint);
+    stroke-width: 1.25;
+    r: 2.5;
+  }
+  .ts-vol:hover .ts-vol-track,
+  .ts-vol.is-drag .ts-vol-track {
+    stroke-opacity: 0.3;
+  }
+  .ts-vol:hover .ts-vol-thumb,
+  .ts-vol.is-drag .ts-vol-thumb {
+    r: 5;
+  }
+  .ts-vol:focus-visible .ts-vol-track {
+    stroke: var(--amber);
+    stroke-opacity: 0.6;
+  }
+  .ts-vol-hit {
+    stroke: transparent;
+    stroke-width: 30;
+    pointer-events: stroke;
+  }
+  /* 记着音量、还没等到浏览器的播放许可：亮着但淡一档 */
+  .ts-vol.is-waiting .ts-vol-fill,
+  .ts-vol.is-waiting .ts-vol-thumb {
+    opacity: 0.5;
+  }
+
+  .ts-vch {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 36px;
+    height: 36px;
+    margin: -18px 0 0 -18px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    display: grid;
+    place-items: center;
+    color: var(--fg-faint);
+    cursor: pointer;
+    pointer-events: auto;
+    transition: color 0.2s, background-color 0.2s;
+  }
+  .ts-vch[aria-pressed='true'] {
+    color: var(--fg-soft);
+  }
+  /* 三态：关着（音量 0）＝压平、最暗；开着＝形状展开；第三态（起伏 / 呼吸）＝更亮。
+     第三态由「这一路开着」驱动（aria-pressed），不是「此刻真的有样本在流」——
+     图标说的是这一路的状态，不是电平表：曲子还在缓冲时它照样起伏，Ave 没开口时
+     亮面也照常呼吸。颜色深浅与动画都由 aria-pressed 一处决定，三路标准一致。 */
+  .ts-vch[aria-pressed='true'].is-live {
+    color: var(--fg);
+  }
+  .ts-vch:hover {
+    background: color-mix(in srgb, var(--fg) 6%, transparent);
+  }
+  .ts-vch:focus-visible {
+    outline: 1.5px solid var(--amber);
+    outline-offset: 2px;
+  }
+  /* 名字落在图标正下方（右边是外一圈的图标） */
+  .ts-vch .ts-lab {
+    --ts-a: -90;
+  }
+  .ts-vch:hover .ts-lab,
+  .ts-vch:focus-visible .ts-lab,
+  .ts-vch.is-drag .ts-lab {
+    opacity: 1;
+  }
+
+  /* 环境声：关着三根弦平卧成点，开着起伏（与原先的微章同一个意思） */
+  .ts-ico-bgm line {
+    transform-box: fill-box;
+    transform-origin: center;
+    transform: scaleY(0.12);
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .ts-vch[aria-pressed='true'] .ts-ico-bgm line {
+    transform: scaleY(0.6);
+  }
+  .ts-vch[aria-pressed='true'].is-live .ts-ico-bgm line {
+    animation: ts-str 1.7s ease-in-out infinite alternate;
+  }
+  .ts-vch[aria-pressed='true'].is-live .ts-ico-bgm line:nth-child(2) {
+    animation-duration: 1.3s;
+  }
+  .ts-vch[aria-pressed='true'].is-live .ts-ico-bgm line:nth-child(3) {
+    animation-duration: 2.3s;
+  }
+  /* Ave：关着菱形压成一道横线，开着亮面慢慢呼吸 */
+  .ts-ico-voice .ts-dia {
+    transform-box: fill-box;
+    transform-origin: center;
+    transform: scaleY(0.08);
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .ts-vch[aria-pressed='true'] .ts-ico-voice .ts-dia {
+    transform: none;
+  }
+  .ts-vch[aria-pressed='true'].is-live .ts-ico-voice .ts-fill {
+    animation: ts-breathe 2.6s ease-in-out infinite alternate;
+  }
+  /* 音效：关着四道光收进中心那一点，开着四道光一轮轮往外散 */
+  .ts-ico-fx .ts-rays {
+    transform-box: view-box;
+    transform-origin: 12px 12px;
+    transform: scale(0.35);
+    opacity: 0.4;
+    transition:
+      transform 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+      opacity 0.4s;
+  }
+  .ts-vch[aria-pressed='true'] .ts-ico-fx .ts-rays {
+    transform: none;
+    opacity: 1;
+  }
+  .ts-vch[aria-pressed='true'].is-live .ts-ico-fx .ts-rays {
+    animation: ts-rays 2.1s ease-in-out infinite alternate;
+  }
+  @keyframes ts-str {
+    from {
+      transform: scaleY(0.35);
+    }
+    to {
+      transform: scaleY(1);
+    }
+  }
+  /* 音效：四道光从中心一点点往外撑开，再收回来 */
+  @keyframes ts-rays {
+    from {
+      transform: scale(0.82);
+      opacity: 0.55;
+    }
+    to {
+      transform: scale(1.08);
+      opacity: 1;
+    }
+  }
+  /* 名字沿半径往外浮出，字保持横排，垫一片玻璃：不压在相邻的图标上，外圈展开着时也读得清。
+     先沿半径推出 24px，再按角度挪锚点——0° 时贴着左侧中点，90° 时贴着底边中点 */
+  .ts-lab {
+    --c: cos(calc(var(--ts-a, 0) * 1deg));
+    --s: sin(calc(var(--ts-a, 0) * 1deg));
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    z-index: 1;
+    /* 横向锚点不往左过 -20%：星贴着屏幕左缘，近 90° 那几件居中摆会被左边裁掉 */
+    transform: translate(calc(var(--c) * 24px), calc(var(--s) * -24px))
+      translate(calc(-50% + max(var(--c), 0.6) * 50%), calc(-50% - var(--s) * 50%));
+    padding: 3px 9px;
+    border-radius: var(--chrome-radius);
+    background: var(--ts-glass);
+    border: 1px solid var(--ts-edge);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    white-space: nowrap;
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    color: var(--fg-soft);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+  }
+  .ts-lab small {
+    font: 11px var(--font-mono);
+    letter-spacing: 0.1em;
+    color: var(--fg-faint);
+    margin-left: 0.5em;
+  }
+
+  /* 放射排开的条目：从轨道上的那一点沿半径往外读 */
+  .ts-ray {
+    transform-origin: 0 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 4px 6px 0;
+    border: 0;
+    background: none;
+    white-space: nowrap;
+    font: 15px/1.2 var(--font-display);
+    color: var(--fg-soft);
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .ts-ray::before {
+    content: '';
+    flex: none;
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: 0.5;
+  }
+  .ts-ray:hover {
+    color: var(--fg);
+  }
+  .ts-ray[aria-current='page'],
+  .ts-ray[data-word][aria-pressed='true'],
+  .ts-ray[data-set-cat][aria-pressed='true'] {
+    color: var(--amber);
+  }
+  .ts-ray[aria-current='page']::before,
+  .ts-ray[data-word][aria-pressed='true']::before,
+  .ts-ray[data-set-cat][aria-pressed='true']::before {
+    opacity: 1;
+    width: 5px;
+    height: 5px;
+  }
+  .ts-ray--sm {
+    font: 12px/1.2 var(--font-mono);
+  }
+  .ts-ray small {
+    font: 11px var(--font-mono);
+    color: var(--fg-faint);
+  }
+  .ts-opt b {
+    font-weight: 400;
+    color: var(--amber);
+  }
+  .ts-opt[aria-pressed='true'] .ts-v-off,
+  .ts-opt[aria-pressed='false'] .ts-v-on {
+    display: none;
+  }
+  /* Ave 不说话时，依附于说话的那几项变淡（仍可调）。透明度归帧循环管，这里只改颜色 */
+  html[data-ave='off'] .ts-ave-dep,
+  html[data-ave='off'] .ts-ave-dep b {
+    color: var(--fg-faint);
+  }
+
+  /* ── 平直薄片 ── */
+  .ts-sheet {
+    position: fixed;
+    left: 20px;
+    z-index: 61;
+    width: min(18rem, calc(100vw - 40px));
+    max-height: min(60vh, 30rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: none;
+    padding: 1.05rem 1.2rem 1.15rem;
+    border-radius: var(--chrome-radius);
+    background: var(--ts-glass);
+    border: 1px solid var(--ts-edge);
+    -webkit-backdrop-filter: blur(18px) saturate(1.08);
+    backdrop-filter: blur(18px) saturate(1.08);
+    box-shadow:
+      inset 0 1px 1px var(--ts-hi),
+      0 18px 42px -18px var(--ts-sh);
+    color: var(--fg);
+    opacity: 0;
+    translate: 0 10px;
+    transition:
+      opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+      translate 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .ts-sheet.is-on {
+    opacity: 1;
+    translate: 0 0;
+  }
+  .ts-sheet--bar {
+    width: min(20rem, calc(100vw - 40px));
+    padding: 0.65rem 1rem 0.55rem;
+  }
+  .ts-field {
+    width: 100%;
+    padding: 0.4rem 0;
+    border: 0;
+    border-bottom: 1px solid var(--line);
+    border-radius: 0;
+    background: transparent;
+    font: 15px var(--font-display);
+    color: var(--fg);
+    outline: none;
+  }
+  .ts-field:focus {
+    border-bottom-color: var(--amber);
+  }
+  .ts-count {
+    margin: 0.45rem 0 0;
+    min-height: 1.2em;
+    font-size: 11px;
+    color: var(--fg-faint);
+  }
+  .ts-h {
+    margin: 0 0 0.6rem;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    color: var(--fg-faint);
+  }
+  .ts-toc {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .ts-toc a {
+    display: block;
+    padding: 0.32rem 0;
+    font: 0.92rem/1.45 var(--font-display);
+    color: var(--fg-soft);
+    text-decoration: none;
+  }
+  .ts-toc a.is-sub {
+    padding-left: 1em;
+    font-size: 0.85rem;
+  }
+  .ts-toc a:hover,
+  .ts-toc a.is-current {
+    color: var(--fg);
+  }
+  .ts-toc a.is-current::before {
+    content: '—';
+    color: var(--amber);
+    margin-right: 0.4em;
+  }
+  .ts-sec {
+    margin-top: 0.9rem;
+    padding-top: 0.8rem;
+    border-top: 1px solid var(--line);
+  }
+  .ts-set {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.3rem 0;
+    font-size: 13px;
+    color: var(--fg-soft);
+  }
+  .ts-seg {
+    display: flex;
+    gap: 4px;
+  }
+  .ts-seg button {
+    padding: 2px 9px;
+    border: 1px solid var(--line);
+    border-radius: var(--chrome-radius);
+    background: none;
+    font-size: 12px;
+    color: var(--fg-soft);
+    cursor: pointer;
+  }
+  .ts-seg button[aria-pressed='true'] {
+    color: var(--amber);
+    border-color: color-mix(in srgb, var(--amber) 60%, transparent);
+  }
+
+  .ts-dock {
+    display: none;
+  }
+
+  @media (max-width: 767px) {
+    #ts[data-reading] .ts-star {
+      display: none;
+    }
+    #ts[data-reading] .ts-dock {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 61;
+      height: calc(54px + env(safe-area-inset-bottom));
+      padding: 0 0.85rem env(safe-area-inset-bottom);
+      display: grid;
+      grid-template-columns: 1fr auto auto auto;
+      align-items: center;
+      gap: 0.4rem;
+      background: var(--ts-glass);
+      border-top: 1px solid var(--ts-edge);
+      box-shadow:
+        inset 0 1px 0 var(--ts-hi),
+        0 -10px 26px -14px var(--ts-sh);
+      -webkit-backdrop-filter: blur(16px) saturate(1.1);
+      backdrop-filter: blur(16px) saturate(1.1);
+    }
+    .ts-dock-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.35rem;
+      min-height: 36px;
+      padding: 0 0.68rem;
+      border-radius: var(--chrome-radius);
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--fg-soft);
+      text-decoration: none;
+      font-family: var(--font-display);
+      font-size: 0.78rem;
+      letter-spacing: 0.06em;
+      white-space: nowrap;
+      cursor: pointer;
+      transition:
+        color 0.2s ease,
+        border-color 0.2s ease;
+    }
+    .ts-dock-back {
+      justify-content: flex-start;
+      color: var(--fg);
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .ts-dock-face .ts-ico {
+      width: 15px;
+      height: 15px;
+    }
+    .ts-dock-btn:hover,
+    .ts-dock-btn:focus-visible,
+    .ts-dock-btn[aria-expanded='true'] {
+      color: var(--fg);
+      border-color: color-mix(in srgb, var(--amber) 45%, var(--ts-edge));
+      outline: none;
+    }
+    .ts-dock-btn[aria-pressed='true'] .ts-cut {
+      transform: rotate(180deg);
+    }
+    #ts[data-reading] .ts-caption {
+      bottom: calc(76px + var(--ts-sr, 138px) + 10px);
+    }
+    #ts[data-reading].is-dock-page .ts-sheet[data-sheet='page'] {
+      left: 14px;
+      right: 14px;
+      width: auto;
+      bottom: calc(66px + env(safe-area-inset-bottom)) !important;
+      max-height: calc(100svh - 96px - env(safe-area-inset-bottom)) !important;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ts-ico-bgm line,
+    .ts-ico-sound path,
+    .ts-ico-voice .ts-fill,
+    .ts-ico-fx .ts-rays,
+    .ts-ico-face .ts-fill--face {
+      animation: none !important;
+    }
+    .ts-ico-face .ts-cut {
+      transition: none;
+    }
+    .ts-sheet,
+    .ts-caption,
+    .ts-orbit::before {
+      transition: none;
+    }
+  }
+
+/* ── src/components/chrome/Ave.astro ── */
+
+  /* 她的色调（与头像 src/scripts/ave-flow.ts 的两套调色板同源）：醒面雾蓝、梦面薄暮紫。
+     注册成颜色，换面时才能整块平滑地过渡过去，不是一下跳 */
+  @property --ave-tint {
+    syntax: '<color>';
+    inherits: true;
+    initial-value: #a1b8cf;
+  }
+  @property --ave-hue {
+    syntax: '<color>';
+    inherits: true;
+    initial-value: #6f8bab;
+  }
+  @property --ave-deep {
+    syntax: '<color>';
+    inherits: true;
+    initial-value: #415369;
+  }
+  .ave {
+    /* 灰面（整块玻璃染的那层）/ 线头与饰件 / 名牌的深片 */
+    --ave-tint: #a1b8cf;
+    --ave-hue: #6f8bab;
+    --ave-deep: #415369;
+    transition:
+      --ave-tint 1.2s ease,
+      --ave-hue 1.2s ease,
+      --ave-deep 1.2s ease;
+    /* 材质：平时与工具栏薄片同一种玻璃；主页 / 漫游时跟场景（--w-*，见 wander.css），
+       深色场景就是深色玻璃 + 浅字 */
+    --ave-fg: var(--w-fg, var(--fg));
+    --ave-faint: var(--w-faint, var(--fg-faint));
+    --ave-panel: var(--chrome-bg);
+    --ave-rim: var(--chrome-edge);
+    --ave-sheen: var(--chrome-hi);
+    --ave-sh: var(--chrome-sh);
+    /* 线的墨色：比正文淡，像铅笔量出来的 */
+    --ave-ink: color-mix(in srgb, var(--ave-fg) 46%, transparent);
+    --ave-line: 1px;
+    /* 线在字身底下多远（inline 的 padding-bottom，不占排版） */
+    --ave-drop: 3px;
+    /* 整块玻璃上的那层她的颜色；边环也微微偏同一个色 */
+    --ave-wash: color-mix(in srgb, var(--ave-tint) 9%, transparent);
+    --ave-edge: color-mix(in srgb, var(--ave-rim) 76%, var(--ave-tint));
+    /* 下沿那道暗线（卡片的「上亮下暗」） */
+    --ave-lo: var(--chrome-edge-lo);
+    /* 头像边长（与背景同一个 5px 像素格，取 5 的倍数） */
+    --ave-size: 45px;
+    /* 星：边长与中心（相对框的左上角） */
+    --ave-star: 230px;
+    --ave-star-x: 22px;
+    --ave-star-y: 8px;
+    /* 框进场从右边滑进来多远 */
+    --ave-slide: 24px;
+    /* 星另一套：比框远得多、也久得多（框 24px / 0.5s）。
+       两块不必同位移——ave-star.ts 每帧按两块的实到位置重算遮罩，错开也对得上 */
+    --ave-star-slide: 72px;
+    --ave-star-exit: 104px;
+    --ave-star-in: 1.2s;
+    /* 星比框晚出场多久（框 0.18s 后浮起）——先看见框，星再慢慢从右边转进来 */
+    --ave-star-in-delay: 0.7s;
+    /* 星的退场：CSS 位移与 WebGL 的转走缩没共用这一个数（ms，ave.ts 也读它） */
+    --ave-star-out: 950;
+    /* 星比框晚退场多久（框 0.3s 后开始收）——框先走，星最后才散 */
+    --ave-star-out-delay: 0.62s;
+    /* 星淡下去要多久：比滑走短一点，末尾留下一段「只剩个影子在滑」 */
+    --ave-star-fade: 0.8s;
+    /* 收起整个窗口要多久（ms，ave.ts 读它）：要盖住星那一段（延迟 0.62s + 0.95s = 1.57s） */
+    --ave-out: 1700;
+    /* 缓动：进场快起慢收；收起反过来，由慢到快。
+       收起那条刻意让末尾收一收（y2 = 0.5 而不是 0.25）：纯 ease-in 是先慢后猛地冲到底，
+       抬手不动、最后一百毫秒里跳掉一半，读起来还是「咔」一下没了 */
+    --ave-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --ave-ease-in: cubic-bezier(0.55, 0.06, 0.68, 0.5);
+    position: fixed;
+    right: 22px;
+    /* 让开页脚那一行链接 */
+    bottom: 58px;
+    z-index: 59; /* 工具栏（60/61）展开时压在它上面 */
+    /* 头像一栏占掉一截宽度，字栏要留够一行十几个字 */
+    max-width: min(24rem, calc(100vw - 112px));
+    pointer-events: none;
+  }
+  body[data-reality='dream'] .ave {
+    --ave-tint: #a399c7;
+    --ave-hue: #8a7cb8;
+    --ave-deep: #4f4a66;
+  }
+  html[data-wscene] .ave {
+    --ave-panel: rgb(var(--w-glass) / calc(var(--w-glass-a) + 0.2));
+    --ave-rim: rgb(var(--w-edge) / calc(var(--w-edge-a) + 0.08));
+    --ave-sheen: rgb(var(--w-sheen) / var(--w-sheen-a));
+  }
+  /* 贴元素：left/top（必要时还有 max-width）由 ave.ts 写 */
+  .ave.is-anchored {
+    right: auto;
+    bottom: auto;
+    max-width: min(24rem, calc(100vw - 32px));
+  }
+  .ave[hidden] {
+    display: none;
+  }
+
+  /* ── 星：叠在框上面（不接指针）；落在框里的那一块由 ave-star.ts 画成线框 ── */
+  .ave-star {
+    position: absolute;
+    left: calc(var(--ave-star-x) - var(--ave-star) / 2);
+    top: calc(var(--ave-star-y) - var(--ave-star) / 2);
+    z-index: 2;
+    width: var(--ave-star);
+    height: var(--ave-star);
+    /* 比框大一圈是本意：别让全局的 canvas { max-width: 100% } 把它压回框宽 */
+    max-width: none;
+    pointer-events: none;
+    /* 星自己的一套：更远（--ave-star-slide）、更久（--ave-star-in）。
+       与框的位移不同步——它是一颗悬在后面的星，比框多滑一段才落下，收起时也后走。
+       遮罩对得上是因为 ave-star.ts 画的时候现量两块的实到位置，不靠两者位移相等 */
+    /* 透明度：进场与框一起淡上来，收起时整颗暗下去（只有位移和缩没的话，星像是被挪走而不是消散） */
+    opacity: 0;
+    translate: var(--ave-star-slide) 0;
+    transition: translate calc(var(--ave-star-out) * 1ms) var(--ave-ease-out);
+  }
+
+  /* ── 框：与卡片同门 ── */
+  .ave-card {
+    position: relative;
+    z-index: 1;
+    padding: 9px 16px 13px;
+    border: 1px solid var(--ave-edge);
+    border-radius: var(--chrome-radius);
+    color: var(--ave-fg);
+    background:
+      /* 她的颜色：薄薄一层铺在玻璃上 */
+      linear-gradient(var(--ave-wash), var(--ave-wash)),
+      var(--ave-panel);
+    -webkit-backdrop-filter: blur(16px) saturate(1.06);
+    backdrop-filter: blur(16px) saturate(1.06);
+    box-shadow:
+      inset 0 1px 0 var(--ave-sheen),
+      0 1px 0 var(--ave-lo);
+    opacity: 0;
+    /* 起点在右侧一点：进场从右边淡着滑进来，收起时原路滑出去 */
+    translate: var(--ave-slide) 0;
+    transition:
+      opacity 0.45s var(--ave-ease-out),
+      translate 0.5s var(--ave-ease-out);
+  }
+  /* 星先转进来，框晚一拍浮起；星自己滑得比框远、也比框久（1.2s），所以先落地的是框 */
+  .ave.is-on .ave-card {
+    opacity: 1;
+    translate: 0 0;
+    pointer-events: auto;
+    transition-delay: 0.18s;
+  }
+  .ave.is-on .ave-star {
+    opacity: 1;
+    translate: 0 0;
+    transition:
+      opacity 0.4s var(--ave-ease-out),
+      translate var(--ave-star-in) var(--ave-ease-out);
+    transition-delay: var(--ave-star-in-delay);
+  }
+  /* 收起：曲线换成由慢到快（--ave-ease-in），时长也比进场长一截——
+     0.45s 的淡出配上 ease-in 只剩末尾一百毫秒在掉，看着还是掐断的 */
+  .ave.is-leaving .ave-card {
+    transition:
+      opacity 0.7s var(--ave-ease-in),
+      translate 0.8s var(--ave-ease-in);
+    transition-delay: 0.3s;
+  }
+  /* 收起：框先淡出滑走，星后走、走得比进场更远（--ave-star-exit），
+     而且整颗一起暗下去——只有位移和缩没的话，星像是被挪走而不是消散 */
+  .ave.is-leaving .ave-star {
+    opacity: 0;
+    translate: var(--ave-star-exit) 0;
+    transition:
+      opacity var(--ave-star-fade) var(--ave-ease-in),
+      translate calc(var(--ave-star-out) * 1ms) var(--ave-ease-in);
+    transition-delay: var(--ave-star-out-delay);
+  }
+
+  /* 连说中途换位置：整段只有 QUICK_OUT + THEN_GAP（约 310ms），星等不起 0.7s 的出场延迟，
+     这一句里把它压成 0（.is-swap 由 ave.ts 在换位置那一句上临时挂、1.4s 后摘掉） */
+  .ave.is-swap {
+    --ave-star-in-delay: 0s;
+  }
+
+  /* 抬头行：○ AVE（× 在右上角） */
+  .ave-hd {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    padding-right: 22px;
+    font-size: 11px;
+    line-height: 20px;
+    letter-spacing: 0.12em;
+    color: var(--ave-faint);
+  }
+  .ave-o {
+    width: 7px;
+    height: 7px;
+    border: 1px solid currentColor;
+    border-radius: 50%;
+  }
+  .ave-who {
+    color: var(--ave-fg);
+    opacity: 0.8;
+  }
+  .ave-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    margin-top: 6px;
+  }
+
+  /* ── 头像 ── */
+  .ave-portrait {
+    position: relative;
+    flex: none;
+    width: var(--ave-size);
+    height: var(--ave-size);
+    margin-top: 6px;
+    overflow: hidden;
+    /* 底色只在流光的缝里露出来：她自己的紫 / 蓝各自压暗一档，浅色页上也不会与卡片连成一片 */
+    background: linear-gradient(
+      165deg,
+      color-mix(in srgb, var(--dream) 42%, var(--bg)) 0%,
+      color-mix(in srgb, var(--umber) 52%, var(--bg)) 100%
+    );
+    box-shadow: 0 0 0 1px var(--ave-edge);
+    isolation: isolate;
+  }
+  .ave-face {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  /* 占位：背景流光的一小块，5px 一格 */
+  .ave-flow {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+  }
+
+  /* ── 字栏 ── */
+  .ave-body {
+    flex: 1;
+    min-width: 0;
+  }
+  .ave-text {
+    margin: 0;
+    font: 500 15px/2 var(--font-display);
+    overflow-wrap: anywhere;
+  }
+  /* 字：还没念到的先占着位置（框不跟着字一点点长），只是看不见。
+     每个字底下自己的一小段线，念到了才长出来；相邻的字连成一条 */
+  .ave-text .c {
+    position: relative;
+    padding-bottom: var(--ave-drop);
+    background: linear-gradient(var(--ave-ink), var(--ave-ink)) 0 100% / 0 var(--ave-line) no-repeat;
+    transition:
+      background-size 0.22s cubic-bezier(0.3, 0.7, 0.2, 1),
+      color 0.3s;
+  }
+  .ave-text .c:not(.on) {
+    color: transparent;
+  }
+  .ave-text .c.on {
+    background-size: 100% var(--ave-line);
+  }
+  /* 线头：最后念到的两个字底下换成她的颜色，加一点厚度——念完就停在句尾当句读 */
+  .ave-text .c.head {
+    background-image: linear-gradient(var(--ave-hue), var(--ave-hue));
+    background-size: 100% 2px;
+  }
+  /* 收起：线从句首往句尾一字一字退掉，再整片淡出 */
+  .ave.is-leaving .ave-text .c {
+    background-size: 0 var(--ave-line);
+    background-position: 100% 100%;
+    transition-delay: calc(var(--i) * 14ms);
+  }
+  /* 句尾的三截碎屑：线说完了在这里碎掉（和最后一个字包在 .ave-end 里，不单独折行） */
+  .ave-end {
+    white-space: nowrap;
+  }
+  .ave-tail {
+    display: inline-flex;
+    align-items: flex-end;
+    gap: 3px;
+    height: 1em;
+    margin-left: 5px;
+    vertical-align: calc(-1 * var(--ave-drop) - 0.18em);
+  }
+  .ave-tail i {
+    width: var(--ave-line);
+    background: var(--ave-ink);
+    opacity: 0;
+    translate: 0 -4px;
+    transition:
+      opacity 0.35s,
+      translate 0.5s cubic-bezier(0.3, 0.7, 0.2, 1);
+  }
+  .ave-tail i:nth-child(1) {
+    height: 7px;
+  }
+  .ave-tail i:nth-child(2) {
+    height: 4px;
+    transition-delay: 0.12s;
+  }
+  .ave-tail i:nth-child(3) {
+    height: 2px;
+    transition-delay: 0.24s;
+  }
+  .ave.is-done .ave-tail i {
+    opacity: 1;
+    translate: 0 0;
+  }
+  .ave.is-leaving .ave-tail i {
+    opacity: 0;
+    translate: 0 4px;
+    transition-delay: 0s;
+  }
+  .ave-sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* ── 收起 × ── */
+  .ave-x {
+    position: absolute;
+    top: 5px;
+    right: 7px;
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    color: var(--ave-faint);
+    cursor: pointer;
+    opacity: 0.55;
+    transition:
+      opacity 0.25s,
+      color 0.25s;
+  }
+  .ave-card:hover .ave-x,
+  .ave-x:focus-visible {
+    opacity: 1;
+  }
+  .ave-x:hover {
+    color: var(--ave-fg);
+  }
+
+  /* 连说中途换位置时的快收（ave.ts 的 QUICK_OUT = 250ms）：整片 0.2s 淡掉、滑回去 */
+  .ave.is-quick .ave-card,
+  .ave.is-quick .ave-star {
+    transition:
+      opacity 0.2s ease,
+      translate 0.2s ease;
+    transition-delay: 0s;
+  }
+  .ave.is-quick .ave-text .c,
+  .ave.is-quick .ave-tail i {
+    transition: none;
+  }
+
+  @media (max-width: 560px) {
+    .ave {
+      --ave-size: 40px;
+      right: 12px;
+      /* 让开底部那条阅读工具条 */
+      bottom: 64px;
+      /* 左边让出工具栏的星（left 22 + 48） */
+      max-width: calc(100vw - 94px);
+      --ave-star: 180px;
+    }
+    .ave-card {
+      padding: 8px 12px 11px;
+    }
+    .ave-row {
+      gap: 11px;
+    }
+    .ave-text {
+      font-size: 14px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    /* 星在收起时另有一条 translate（--ave-star-exit），这里一并压平 */
+    .ave-card,
+    .ave-star,
+    .ave.is-on .ave-star,
+    .ave.is-leaving .ave-star,
+    .ave.is-quick .ave-star {
+      translate: none;
+      transition: opacity 0.3s;
+      transition-delay: 0s;
+    }
+    .ave-text .c,
+    .ave-tail i {
+      transition: none;
+    }
+  }

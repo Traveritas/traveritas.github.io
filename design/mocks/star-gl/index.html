@@ -1,0 +1,805 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>星 · 深度</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E" />
+    <link rel="stylesheet" href="/fonts/noto/font.css" />
+    <link rel="stylesheet" href="/fonts/plex/index.css" />
+    <style>
+      /* 令牌取自 src/styles/tokens.css，只抄这一页要用的 —— 留一份自足的原型。
+         --amber / --umber / --wake / --dream / --reality-mix 五个由 reality.ts 在换面时覆写，
+         所以这一页**不做**自己的插值，只读。 */
+      :root {
+        --bg: #f0f3f6;
+        --fg: #232830;
+        --fg-soft: #56606d;
+        --fg-faint: #858f9d;
+        --line: rgba(35, 40, 48, 0.12);
+        --amber: #9a86c4;
+        --umber: #4f4a66;
+        --wake: #a7b1ba;
+        --dream: #9389ae;
+        --reality-mix: 1;
+        --glass: rgba(255, 255, 255, 0.5);
+        --edge: rgba(255, 255, 255, 0.72);
+        --sh: rgba(38, 44, 51, 0.14);
+        --deep: #2a2b38;
+        --font-display: 'Noto Serif SC', 'Palatino Linotype', Palatino, Georgia, serif;
+        --font-body: system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei UI', 'Microsoft YaHei', sans-serif;
+        --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+      }
+      * { box-sizing: border-box; }
+      html { color-scheme: light; }
+      body {
+        margin: 0;
+        padding: 3rem 2.6rem 6rem;
+        background: var(--bg);
+        color: var(--fg);
+        font-family: var(--font-body);
+        -webkit-font-smoothing: antialiased;
+      }
+      .wrap { max-width: 70rem; margin: 0 auto; }
+      h1, h2, h3 { font-family: var(--font-display); font-weight: 500; margin: 0; }
+      h1 { font-size: 1.38rem; letter-spacing: 0.02em; }
+      h2 { font-size: 0.98rem; letter-spacing: 0.04em; }
+      h3 { font-size: 0.84rem; color: var(--fg-soft); letter-spacing: 0.03em; }
+      p { margin: 0; font-size: 0.84rem; line-height: 1.88; color: var(--fg-soft); }
+      .mono, .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+      .k {
+        font-family: var(--font-mono);
+        font-size: 0.66rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--fg-faint);
+      }
+      .lede { max-width: 42rem; }
+      .lede p + p { margin-top: 0.7rem; }
+
+      header.top { display: flex; align-items: baseline; gap: 1rem; padding-bottom: 1.5rem; }
+      header.top .tag { margin-left: auto; }
+
+      section { padding: 2.2rem 0 0.3rem; }
+      section > .hd {
+        display: flex;
+        align-items: baseline;
+        gap: 1rem;
+        padding: 1rem 0 1rem;
+        border-top: 1px solid var(--line);
+        flex-wrap: wrap;
+      }
+      section > .hd .n { font-family: var(--font-mono); font-size: 0.66rem; color: var(--fg-faint); letter-spacing: 0.16em; }
+      section > .hd .note { margin-left: auto; max-width: 32rem; text-align: right; font-size: 0.78rem; }
+
+      .panel {
+        position: relative;
+        border-radius: 8px;
+        border: 1px solid var(--edge);
+        background: var(--glass);
+        -webkit-backdrop-filter: blur(14px) saturate(1.06);
+        backdrop-filter: blur(14px) saturate(1.06);
+        box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.5), 0 14px 34px -22px var(--sh);
+        padding: 1.2rem 1.3rem;
+      }
+      .panel + .panel { margin-top: 0.85rem; }
+      .cap { font-family: var(--font-mono); font-size: 0.64rem; letter-spacing: 0.06em; color: var(--fg-faint); }
+
+      /* 对照表 */
+      .cmp { display: grid; grid-template-columns: 3.4rem repeat(4, 1fr); gap: 0.1rem 1rem; align-items: start; position: relative; }
+      .cmp .rh { font-family: var(--font-mono); font-size: 0.62rem; color: var(--fg-faint); letter-spacing: 0.04em; padding-top: 0.7rem; line-height: 1.4; }
+      .cmp .ch { font-size: 0.72rem; color: var(--fg-soft); padding-bottom: 0.3rem; }
+      .cmp .ch b { font-weight: 500; color: var(--fg); }
+      .cell { text-align: center; }
+      .cell .slot { display: grid; place-items: center; }
+      .cell .slot svg { display: block; }
+      .cell .lab { margin-top: 0.3rem; font-size: 0.68rem; color: var(--fg-soft); line-height: 1.4; }
+      .cell .lab .sub { display: block; color: var(--fg-faint); font-family: var(--font-mono); font-size: 0.58rem; letter-spacing: 0.04em; }
+      .ground-deep { background: var(--deep); border-radius: 8px; padding: 1rem 1.1rem; margin-top: 0.5rem; }
+      .ground-deep .cell .lab { color: rgba(207, 210, 226, 0.66); }
+      .ground-deep .cell .lab .sub { color: rgba(207, 210, 226, 0.44); }
+      .ground-deep .cap, .ground-deep .ch, .ground-deep .cmp .rh { color: rgba(207, 210, 226, 0.5); }
+      .ground-deep .cmp .ch b { color: #e6e8f2; }
+
+      /* 中心 */
+      .centres { display: flex; gap: 1.4rem; align-items: flex-start; flex-wrap: wrap; }
+      .centres figure { margin: 0; display: grid; gap: 0.45rem; }
+      .sweep { display: grid; grid-template-columns: 4.2rem repeat(3, 1fr); gap: 0.6rem 0.8rem; align-items: start; position: relative; }
+      .sweep .rh { font-family: var(--font-mono); font-size: 0.62rem; color: var(--fg-faint); padding-top: 0.5rem; }
+      .sweep .cell .lab { font-size: 0.6rem; }
+      .readouts { display: grid; grid-template-columns: 1fr 1fr; gap: 0.1rem 1.4rem; margin-top: 0.5rem; }
+      .ro { display: flex; justify-content: space-between; gap: 0.6rem; font-size: 0.72rem; color: var(--fg-soft); border-bottom: 1px solid var(--line); padding: 0.2rem 0; }
+      .ro b { font-family: var(--font-mono); font-weight: 400; color: var(--fg); }
+
+      /* 运动 */
+      .motion { display: grid; grid-template-columns: 300px 1fr; gap: 1.6rem; align-items: start; }
+      .plotbox { background: rgba(255, 255, 255, 0.42); border-radius: 6px; padding: 0.5rem 0.4rem 0.2rem; }
+      .plot { width: 100%; display: block; }
+      .strip { display: flex; gap: 0.45rem; margin-top: 0.7rem; flex-wrap: wrap; position: relative; }
+      .strip .cell .lab { font-size: 0.6rem; }
+      .legend { display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 0.4rem; }
+      .legend span { font-family: var(--font-mono); font-size: 0.62rem; color: var(--fg-faint); display: flex; align-items: center; gap: 0.32rem; }
+      .legend i { width: 13px; height: 2px; border-radius: 1px; display: block; }
+
+      .btn {
+        font-family: var(--font-display);
+        font-size: 0.86rem;
+        letter-spacing: 0.08em;
+        color: var(--fg);
+        padding: 0.6rem 1.4rem;
+        border-radius: 999px;
+        border: 1px solid var(--edge);
+        background: rgba(255, 255, 255, 0.62);
+        -webkit-backdrop-filter: blur(12px) saturate(1.08);
+        backdrop-filter: blur(12px) saturate(1.08);
+        box-shadow: 0 6px 18px -10px var(--sh);
+        cursor: pointer;
+        transition: color 0.25s, background-color 0.25s, transform 0.25s;
+      }
+      .btn:hover { background: rgba(255, 255, 255, 0.86); }
+      .btn:active { transform: translateY(1px); }
+      .btn:focus-visible { outline: 1.5px solid var(--amber); outline-offset: 3px; }
+      .btn[disabled] { color: var(--fg-faint); cursor: default; }
+      .state { font-family: var(--font-mono); font-size: 0.7rem; color: var(--fg-faint); letter-spacing: 0.05em; }
+      .state b { color: var(--amber); font-weight: 400; }
+
+      /* 表 */
+      table { width: 100%; border-collapse: collapse; font-size: 0.74rem; }
+      th, td { text-align: left; padding: 0.32rem 0.45rem; border-bottom: 1px solid var(--line); }
+      th { font-family: var(--font-mono); font-size: 0.6rem; letter-spacing: 0.08em; font-weight: 400; color: var(--fg-faint); text-transform: uppercase; }
+      td.n { font-family: var(--font-mono); font-variant-numeric: tabular-nums; text-align: right; }
+      td.b { color: var(--fg); }
+      .two { display: grid; grid-template-columns: 1fr 1fr; gap: 1.6rem; align-items: start; }
+      .swatch { display: flex; gap: 0.45rem; align-items: center; flex-wrap: wrap; }
+      .swatch i { width: 20px; height: 20px; border-radius: 4px; display: block; border: 1px solid rgba(0, 0, 0, 0.08); }
+      .pulse { display: grid; grid-template-columns: 240px 1fr; gap: 1.4rem; align-items: center; }
+      .centre-pair { display: grid; grid-template-columns: 400px 400px; gap: 1.4rem; }
+      [hidden] { display: none !important; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="top">
+        <h1>星 · 深度</h1>
+        <span class="k tag">design/mocks/star-gl</span>
+      </header>
+
+      <div class="lede">
+        <p>
+          上一轮那颗星输在一件很具体的事上：六支半宽 4.16 的料都穿过原点，
+          <span class="mono">半径 4 以内 100% 被三层以上的料盖住</span>。截面是薄片时六片共面，画序怎么排都对；
+          一旦有了厚度，六块的 z 区间互相包住 —— 那是真的三维互插，任何按片排序都排不出来。
+          当时的退路是把根部削到零厚度，中心那一段因此没有脊。
+        </p>
+        <p>
+          这一页把那层退让拆掉：<b>不收坡，六支照原样互插，全部交给深度缓冲。</b>
+          要判的只有一件事 —— 真的深度缓冲会不会让中心自己读成一颗晶体。
+        </p>
+      </div>
+
+      <!-- 01 对照 -->
+      <section id="cmp">
+        <div class="hd">
+          <span class="n">01</span>
+          <h2>对照</h2>
+          <span class="note">左列是站上现役的 <span class="mono">drawStar()</span>：六张平风筝、两档深度透明度、一个紫圆心。右列是这一颗。同一个 40 单位画框、同一个 CSS 尺寸。</span>
+        </div>
+
+        <div class="panel">
+          <div class="cap" style="margin-bottom: 0.5rem">浅底 <span class="mono">#f0f3f6</span></div>
+          <div class="cmp" id="cmp-light"></div>
+        </div>
+
+        <div class="ground-deep">
+          <div class="cap" style="margin-bottom: 0.5rem">深底 <span class="mono">#2a2b38</span></div>
+          <div class="cmp" id="cmp-deep"></div>
+        </div>
+
+        <div class="panel">
+          <div class="cap" style="margin-bottom: 0.5rem">两边到底差在哪（几何与构图上可数的部分）</div>
+          <table id="t-cmp">
+            <thead><tr><th>　</th><th>现役 drawStar()</th><th>这一颗 · WebGL</th></tr></thead>
+            <tbody></tbody>
+          </table>
+          <div class="cap" style="margin-top: 0.6rem" id="t-cmp-note"></div>
+        </div>
+      </section>
+
+      <!-- 02 中心 -->
+      <section id="centre">
+        <div class="hd">
+          <span class="n">02</span>
+          <h2>中心</h2>
+          <span class="note">400px 画布、取景收到 12.5 单位见方 —— 等于把中心放大 3.2 倍。六支在原点附近真的互相穿过，没有一层给它让路。</span>
+        </div>
+
+        <div class="centre-pair">
+          <figure>
+            <canvas id="c-big" style="width: 400px; height: 400px"></canvas>
+            <figcaption class="cap">深度缓冲 · 半宽 0.26 · 脊 1.0</figcaption>
+          </figure>
+          <figure>
+            <canvas id="c-painter" style="width: 400px; height: 400px"></canvas>
+            <figcaption class="cap">关掉深度、逐片按 z 排序（画家算法本体）</figcaption>
+          </figure>
+        </div>
+
+        <div class="panel" style="margin-top: 0.9rem">
+          <div class="cap" style="margin-bottom: 0.4rem">同一块中心的可数读数（半径 2.5 单位以内）</div>
+          <div class="readouts" id="c-readout"></div>
+        </div>
+
+        <div class="panel">
+          <div class="cap" style="margin-bottom: 0.6rem">半宽 × 脊：九格。都开着深度缓冲，都只看中心（12.5 单位见方，每格 200px）。</div>
+          <div class="sweep" id="c-sweep"></div>
+          <table id="t-sweep" style="margin-top: 0.8rem">
+            <thead><tr><th>半宽</th><th>脊</th><th>最前面的片数</th><th>最大一片</th><th>薄片数</th><th>用了四档里的几档</th><th>调子跨度</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 03 运动 -->
+      <section id="motion">
+        <div class="hd">
+          <span class="n">03</span>
+          <h2>运动</h2>
+          <span class="note">一次触发的三轴翻动：x −90°、y −90°、z +90°，起止错开 12% / 0% / 5%，弹簧 k 7 / w 5，1550 ms。落定在体对角线那一格。</span>
+        </div>
+
+        <div class="panel">
+          <div class="motion">
+            <div>
+              <canvas id="m-live" style="width: 300px; height: 300px"></canvas>
+              <div style="display: flex; align-items: center; gap: 0.9rem; margin-top: 0.7rem">
+                <button class="btn" id="m-btn" type="button">翻一次</button>
+                <span class="state" id="m-state">定 · 零帧</span>
+              </div>
+            </div>
+            <div>
+              <div class="plotbox"><canvas class="plot" id="m-plot" height="180"></canvas></div>
+              <div class="legend">
+                <span><i style="background: #a3452f"></i>难看 &lt; 55</span>
+                <span><i style="background: #c9a34a"></i>能过 55–70</span>
+                <span><i style="background: #4f4a66"></i>好 ≥ 70</span>
+              </div>
+              <div class="strip" id="m-strip"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="readouts" id="m-readout"></div>
+        </div>
+      </section>
+
+      <!-- 04 代价 -->
+      <section id="cost">
+        <div class="hd">
+          <span class="n">04</span>
+          <h2>代价</h2>
+          <span class="note">块计时：一块 40 帧连续画、块末 <span class="mono">gl.finish()</span>，整块计时 ÷ 40，跑 5 块取中位数。逐帧 <span class="mono">gl.finish()</span> 在这个尺寸上是纯噪声。</span>
+        </div>
+        <div class="panel">
+          <table id="t-cost">
+            <thead><tr><th>画布</th><th>ms/帧</th><th>五块</th><th>calls</th><th>三角形</th><th>programs</th><th>ms/s@9.1</th></tr></thead>
+            <tbody></tbody>
+          </table>
+          <div class="cap" style="margin-top: 0.6rem" id="t-cost-note"></div>
+        </div>
+        <div class="panel">
+          <div class="two">
+            <div>
+              <div class="cap" style="margin-bottom: 0.4rem">字节</div>
+              <table id="t-bytes"><thead><tr><th>什么</th><th>原始</th><th>gzip</th></tr></thead><tbody></tbody></table>
+              <div class="cap" style="margin-top: 0.5rem">这一页的 JS 与 three 由服务端现算，不用手抄。</div>
+            </div>
+            <div>
+              <div class="cap" style="margin-bottom: 0.4rem">启动（这一页自己走到 __ready 的分段耗时）</div>
+              <table id="t-boot"><thead><tr><th>阶段</th><th>ms</th></tr></thead><tbody></tbody></table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 05 纪律 -->
+      <section id="discipline">
+        <div class="hd">
+          <span class="n">05</span>
+          <h2>纪律</h2>
+          <span class="note">「触发式，动完就停」。所以这一节要给的不是「帧数很少」，是「帧数是零」。</span>
+        </div>
+
+        <div class="panel">
+          <div class="pulse">
+            <div><canvas id="d-live" style="width: 240px; height: 240px"></canvas></div>
+            <div>
+              <p>
+                下面这个计数只统计<b>真正画出来的帧</b>。翻动时它涨，落定之后无论等多久都不再动 ——
+                因为它不是在「很少帧」地跑，而是 <span class="mono">cancelAnimationFrame</span> 之后<b>一次都没有再排</b>。
+              </p>
+              <div class="readouts" id="d-readout" style="margin-top: 0.7rem"></div>
+              <div style="display: flex; gap: 0.7rem; margin-top: 0.9rem; flex-wrap: wrap">
+                <button class="btn" id="d-btn" type="button">翻一次</button>
+                <button class="btn" id="d-idle" type="button">静置 2 秒，看计数</button>
+              </div>
+              <div class="state" id="d-state" style="margin-top: 0.7rem">定 · 零帧</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="two">
+            <div>
+              <div class="cap" style="margin-bottom: 0.4rem">颜色跟着醒度走</div>
+              <p style="font-size: 0.76rem">
+                晶体只有两个端点色：最暗的面取 <span class="mono">--umber</span> 一侧，最亮的面取 <span class="mono">--amber</span> 一侧；
+                深底上再往 <span class="mono">--wake</span> 提一档。这三个变量由 <span class="mono">reality.ts</span> 在换面时覆写，
+                这页只读不算 —— 点下面这一下，晶体跟着换色，与站上换面时同一个时钟。
+              </p>
+              <div class="swatch" id="d-swatch" style="margin-top: 0.7rem"></div>
+              <button class="btn" id="d-flipface" type="button" style="margin-top: 0.8rem">在这页上换一次面</button>
+            </div>
+            <div>
+              <div class="cap" style="margin-bottom: 0.4rem">prefers-reduced-motion</div>
+              <p style="font-size: 0.76rem">
+                系统偏好 <span class="mono">reduce</span> 时，翻动整段跳过：按钮只画一次正位，一个
+                <span class="mono">requestAnimationFrame</span> 都不排。当前：<b id="d-rm">—</b>
+              </p>
+              <div class="readouts" id="d-rm-readout" style="margin-top: 0.5rem"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section style="padding-top: 2.4rem">
+        <p class="cap" style="max-width: 40rem">
+          读数由页面自己算出并挂到 <span class="mono">window.__gl</span>；<span class="mono">window.__star.flip()</span> 是对外唯一入口，
+          <span class="mono">window.__star.probeIdle(ms)</span> 是「静置期间真的画了 0 帧」的取证。
+        </p>
+      </section>
+    </div>
+
+    <script type="importmap">
+      { "imports": { "three": "/three/build/three.module.js" } }
+    </script>
+    <script type="module">
+      import {
+        MAIN, cfgOf, Star, Gallery, readPalette, centreFacets, offPalette, prodSVG, rgbCss, notchRadius,
+        measureCost, measurePose, poseAt, scoreSamples, calibrate, tonePalette,
+        TUMBLE, axisAngles, SCORE_SIZE,
+      } from './src.js';
+
+      const $ = (s) => document.querySelector(s);
+      const mk = (tag, cls, html) => {
+        const n = document.createElement(tag);
+        if (cls) n.className = cls;
+        if (html != null) n.innerHTML = html;
+        return n;
+      };
+      const BOOT = { t0: performance.now(), steps: [] };
+      const mark = (k) => BOOT.steps.push({ k, ms: +(performance.now() - BOOT.t0).toFixed(1) });
+      const ready = () => new Promise((r) => (document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve()).then(() => requestAnimationFrame(() => r())));
+
+      const cal = calibrate(MAIN);
+      mark('几何与标定');
+      let pal = readPalette();
+      const OUT = { calibrate: cal, scoreSize: SCORE_SIZE, palette: () => pal };
+      const stars = {};
+
+      /* ── 01 对照 ─────────────────────────────────────────── */
+      const SIZES = [40, 96, 200, 400];
+      const cmpRefs = {};
+      const buildCmp = (host, ground) => {
+        host.innerHTML = '';
+        host.append(mk('div', 'ch', '<b>尺寸</b>'));
+        for (const s of SIZES) host.append(mk('div', 'ch', `<b>${s}px</b>`));
+        const refs = { prod: [], gl: [] };
+        for (const key of ['prod', 'gl']) {
+          host.append(mk('div', 'rh', key === 'prod' ? '现役<br>drawStar()' : '这一颗<br>WebGL'));
+          for (const s of SIZES) {
+            const cell = mk('div', 'cell');
+            const slot = mk('div', 'slot');
+            slot.style.height = s + 'px';
+            slot.style.minWidth = s + 'px';
+            if (key === 'prod') slot.innerHTML = prodSVG(s, ground, pal);
+            cell.append(slot);
+            cell.append(mk('div', 'lab', `${s}px<span class="sub">${s === 40 ? '工具栏那颗' : s === 200 ? '正文主视觉' : s === 400 ? '看细节' : '列表'}</span>`));
+            host.append(cell);
+            refs[key].push({ s, slot, cell });
+          }
+        }
+        return refs;
+      };
+
+      /* ── 主流程 ─────────────────────────────────────────── */
+      (async () => {
+        await ready();
+        mark('字体就绪');
+
+        const cmpLight = buildCmp($('#cmp-light'), 'light');
+        const cmpDeep = buildCmp($('#cmp-deep'), 'deep');
+
+        /* 对照里的 WebGL 格：每个底一张画布，绝对定位铺在表上（八格共用一张上下文） */
+        const cmpStats = { light: [], deep: [] };
+        for (const [refs, ground] of [[cmpLight, 'light'], [cmpDeep, 'deep']]) {
+          const host = refs.gl[0].cell.parentElement;
+          const hr = host.getBoundingClientRect();
+          const canvas = document.createElement('canvas');
+          canvas.style.cssText = `position:absolute;left:0;top:0;width:${Math.round(hr.width)}px;height:${Math.round(hr.height)}px;pointer-events:none;background:transparent`;
+          host.append(canvas);
+          const g = new Gallery(canvas, { dpr: 1 });
+          for (const r of refs.gl) {
+            const sr = r.slot.getBoundingClientRect();
+            const rect = {
+              x: Math.round(sr.left - hr.left + (sr.width - r.s) / 2),
+              y: Math.round(sr.top - hr.top + (sr.height - r.s) / 2),
+              w: r.s,
+              h: r.s,
+            };
+            g.add(rect, { cfg: MAIN, ground, box: 40 });
+          }
+          /* 立刻画一次并把结果**留在画面上**。这张画布之后不再重画 ——
+             preserveDrawingBuffer 默认是 false，重画过一张之后 drawImage 就读不到了，
+             所以「读回像素」这件事只在中心那两格里做（那两格画完立刻读）。
+             对照这一节的结论按眼睛判，数字不在这里报 —— 报一份读不到的数比不报更糟。 */
+          g.render();
+        }
+        /* 两边差在哪：这些是几何与渲染方式上真的数得出的差别，不靠读像素 */
+        {
+          const g = cfgOf(MAIN);
+          const nr = notchRadius(g);
+          $('#t-cmp tbody').innerHTML = [
+            ['每支的截面', '一张平风筝（2 个顶点宽）', '八边截面，脊高 = 半宽 × 0.53'],
+            ['半宽（单位）', '1.90（= 0.119·r）', `${g.halfWidth.toFixed(2)}（= 0.26·r）`],
+            ['内角半径 · 200px', '15.18 px', `${((nr / 40) * 200).toFixed(2)} px`],
+            ['内角半径 · 40px', '3.04 px', `${((nr / 40) * 40).toFixed(2)} px`],
+            ['明暗的来源', '深度（越远的支越淡）', '面的朝向（法线 · 光向）'],
+            ['调子档', '连续不透明度 0.38–0.88', '四档，0.10–0.92'],
+            ['遮挡怎么解', '六片共面，画序即可', '真深度缓冲，六支照原样互插'],
+            ['中心', '一张 r 1.7 的 --amber 圆', '六支真的在这里交会，没有覆盖物'],
+            ['三角形', '—（7 条 path）', '1200'],
+          ]
+            .map(([k, a, b]) => `<tr><td>${k}</td><td class="b">${a}</td><td class="b">${b}</td></tr>`)
+            .join('');
+          $('#t-cmp-note').textContent =
+            '这一栏刻意**没有**「星内亮度标准差」这类从截图像素里反推的数：' +
+            '这张对照的画布是 preserveDrawingBuffer: false 的，画过之后 drawImage 就读不到内容，' +
+            '报出来的会是一份读不到的数。哪一边更好看，由这一节的图自己判，读数只报两边构造上确实不同的地方。';
+        }
+        mark('对照');
+
+        /* ── 02 中心 ─────────────────────────────────────── */
+        const gBig = new Gallery($('#c-big'), { dpr: 2 });
+        const bigCell = gBig.add({ x: 0, y: 0, w: gBig.W, h: gBig.H }, { cfg: MAIN, ground: 'light', box: 12.5 });
+        gBig.render();
+        const gP = new Gallery($('#c-painter'), { dpr: 2 });
+        const pCell = gP.add({ x: 0, y: 0, w: gP.W, h: gP.H }, { cfg: MAIN, ground: 'light', box: 12.5, mode: 'painter' });
+        gP.render();
+        const centre = {
+          /* 结构读数走离线口径（真 z-buffer，逐片归属），画面读数走像素口径 —— 两把尺子分开放 */
+          depth: centreFacets(MAIN, { size: 400, box: 12.5, discR: 2.5 }),
+          painter: offPalette(gP, pCell),
+          depthPx: offPalette(gBig, bigCell),
+        };
+        OUT.centre = centre;
+        $('#c-readout').innerHTML = [
+          ['露在最前面的片数', `${centre.depth.faces} 片`],
+          ['最大一片占中心', `${(centre.depth.topShare * 100).toFixed(1)}%`],
+          ['薄片数（&lt;0.5%）', `${centre.depth.slivers} 片`],
+          ['调子跨度（raw）', `${centre.depth.rawMin}–${centre.depth.rawMax}`],
+          ['四档量化后用了几档', `${centre.depth.tonesUsed} 档`],
+          ['不属于任何一档的像素', `深度 ${(centre.depthPx.offShare * 100).toFixed(2)}% ／ 画家 ${(centre.painter.offShare * 100).toFixed(2)}%`],
+          ['调子边界 / 千像素', `深度 ${centre.depthPx.toneEdgesPerK} ／ 画家 ${centre.painter.toneEdgesPerK}`],
+          ['每档占比', centre.depth.bucket.map((v) => (v * 100).toFixed(0) + '%').join(' / ')],
+        ].map(([k, v]) => `<div class="ro"><span>${k}</span><b>${v}</b></div>`).join('');
+        /* 中心那一圈里，画家序把「露在最前面的片」排错了多少 —— 离线算，见 .centre.mjs。
+           报的是 star-final 实际采用的那一档（逐片、全局按 z），以及更粗的按支序，两个都给。 */
+        try {
+          const cj = await (await fetch('/centre.json')).json();
+          const hit = cj.rows.find((r) => Math.abs(r.hw - 0.26) < 1e-6 && Math.abs(r.fold - 1) < 1e-6);
+          if (hit) {
+            OUT.painterWrong = hit;
+            $('#c-readout').insertAdjacentHTML(
+              'beforeend',
+              `<div class="ro"><span>画家序排错的像素（逐片按 z）</span><b>${(hit.painterWrongByFace * 100).toFixed(1)}%</b></div>` +
+                `<div class="ro"><span>画家序排错的像素（先按支）</span><b>${(hit.painterWrongShare * 100).toFixed(1)}%</b></div>` +
+                `<div class="ro"><span>深度缓冲排错的像素</span><b>0%</b></div>`,
+            );
+          }
+        } catch {
+          /* 没有那份 json 就只显示像素口径的读数 */
+        }
+        mark('中心');
+
+        /* 九格扫描 */
+        const HW = [0.2, 0.26, 0.32];
+        const FD = [0.75, 1.0, 1.5];
+        const swHost = $('#c-sweep');
+        swHost.innerHTML = '';
+        swHost.append(mk('div', 'rh', ''));
+        for (const hw of HW) swHost.append(mk('div', 'rh', `半宽 ${hw.toFixed(2)}`));
+        const slots = [];
+        for (const fold of FD) {
+          swHost.append(mk('div', 'rh', `脊 ${fold.toFixed(2)}`));
+          for (const hw of HW) {
+            const cell = mk('div', 'cell');
+            const box = mk('div', 'slot');
+            box.style.width = '200px';
+            box.style.height = '200px';
+            cell.append(box);
+            cell.append(mk('div', 'lab', `半宽 ${hw.toFixed(2)} · 脊 ${fold.toFixed(2)}`));
+            swHost.append(cell);
+            slots.push({ hw, fold, box });
+          }
+        }
+        {
+          const shr = swHost.getBoundingClientRect();
+          const canvas = document.createElement('canvas');
+          canvas.style.cssText = `position:absolute;left:0;top:0;width:${Math.round(shr.width)}px;height:${Math.round(shr.height)}px;pointer-events:none;background:transparent`;
+          swHost.append(canvas);
+          const gS = new Gallery(canvas, { dpr: 1 });
+          const cells = slots.map((s) => {
+            const r = s.box.getBoundingClientRect();
+            const rect = { x: Math.round(r.left - shr.left), y: Math.round(r.top - shr.top), w: Math.round(r.width), h: Math.round(r.height) };
+            const cfg = cfgOf({ halfWidth: s.hw * 16, fold: s.fold });
+            return { ...s, cell: gS.add(rect, { cfg, ground: 'light', box: 12.5 }) };
+          });
+          gS.render();
+          OUT.sweep = slots.map((s) => {
+            const cfg = cfgOf({ halfWidth: s.hw * 16, fold: s.fold });
+            const fr = centreFacets(cfg, { size: 200, box: 12.5, discR: 2.5 });
+            return { hw: s.hw, fold: s.fold, ...fr };
+          });
+          $('#t-sweep tbody').innerHTML = OUT.sweep
+            .map((s) => `<tr><td class="b">${s.hw.toFixed(2)}</td><td class="n">${s.fold.toFixed(2)}</td><td class="n">${s.faces}</td><td class="n">${(s.topShare * 100).toFixed(0)}%</td><td class="n">${s.slivers}</td><td class="n">${s.tonesUsed}</td><td class="n">${s.spread}</td></tr>`)
+            .join('');
+        }
+        mark('九格');
+
+        /* ── 03 运动 ─────────────────────────────────────── */
+        stars.live = new Star($('#m-live'), { ground: 'light' });
+        stars.disc = new Star($('#d-live'), { ground: 'light' });
+
+        const STRIP = [0, 0.1, 0.25, 0.45, 0.7, 1];
+        const stripHost = $('#m-strip');
+        stripHost.innerHTML = '';
+        const stripSlots = [];
+        for (const u of STRIP) {
+          const cell = mk('div', 'cell');
+          const box = mk('div', 'slot');
+          box.style.width = '60px';
+          box.style.height = '60px';
+          cell.append(box);
+          cell.append(mk('div', 'lab', `${Math.round(u * TUMBLE.duration)}ms`));
+          stripHost.append(cell);
+          stripSlots.push({ u, box });
+        }
+        {
+          const sr = stripHost.getBoundingClientRect();
+          const canvas = document.createElement('canvas');
+          canvas.style.cssText = `position:absolute;left:0;top:0;width:${Math.round(sr.width)}px;height:${Math.round(sr.height)}px;pointer-events:none;background:transparent`;
+          stripHost.append(canvas);
+          const gStrip = new Gallery(canvas, { dpr: 2 });
+          for (const s of stripSlots) {
+            const r = s.box.getBoundingClientRect();
+            gStrip.add(
+              { x: Math.round(r.left - sr.left), y: Math.round(r.top - sr.top), w: Math.round(r.width), h: Math.round(r.height) },
+              { cfg: MAIN, ground: 'light', box: 40, pose: poseAt(s.u) },
+            );
+          }
+          gStrip.render();
+        }
+        const samp = scoreSamples({ n: 160 });
+        OUT.motion = { ugly: samp.ugly, pass: samp.pass, good: samp.good, min: samp.min, minT: samp.minT, uglyMs: samp.uglyMs, duration: TUMBLE.duration };
+        drawPlot($('#m-plot'), samp);
+        $('#m-readout').innerHTML = [
+          ['难看（&lt;55）', `${samp.ugly}% · ${samp.uglyMs} ms`],
+          ['能过（55–70）', `${samp.pass}%`],
+          ['好（≥70）', `${samp.good}%`],
+          ['最低分', `${samp.min} @ ${(samp.minT * TUMBLE.duration).toFixed(0)} ms`],
+          ['时长', `${TUMBLE.duration} ms`],
+          ['落定的三轴', axisAngles(1).map((v) => `${v.toFixed(0)}°`).join(' / ')],
+          ['落定后的分数', String(measurePose(MAIN, poseAt(1), SCORE_SIZE).score)],
+          ['落定姿态', 'yaw 45° / pitch 35.264°'],
+        ].map(([k, v]) => `<div class="ro"><span>${k}</span><b>${v}</b></div>`).join('');
+        mark('运动');
+
+        /* ── 04 代价 ─────────────────────────────────────── */
+        const costLive = measureCost(stars.live, { frames: 40, blocks: 5 });
+        const cost400 = await (async () => {
+          const c = document.createElement('canvas');
+          c.style.cssText = 'position:fixed;left:-9999px;top:0;width:400px;height:400px';
+          document.body.append(c);
+          const g = new Gallery(c, { dpr: 1 });
+          g.add({ x: 0, y: 0, w: 400, h: 400 }, { cfg: MAIN, ground: 'light', box: 40 });
+          const r = measureCost({ gallery: g }, { frames: 30, blocks: 5 });
+          c.remove();
+          return r;
+        })();
+        OUT.cost = { live300: costLive, off400: cost400 };
+        $('#t-cost tbody').innerHTML = [
+          ['300px（页面上动的这颗）', costLive],
+          ['400px（主视觉的尺寸）', cost400],
+        ].map(([name, r]) => `<tr><td class="b">${name}</td><td class="n">${r.msFrame.toFixed(3)}</td><td class="n">${r.blocks.join(' · ')}</td><td class="n">${r.calls}</td><td class="n">${r.tris}</td><td class="n">${r.programs ?? '—'}</td><td class="n">${(r.msFrame * 9.1).toFixed(2)}</td></tr>`).join('');
+        $('#t-cost-note').textContent =
+          'ms/s@9.1 = 每帧成本 × 9.1，即「每秒真画 9 帧」这个频率下一秒钟占用多少毫秒。这一页静置时是 0 帧，所以那个数只在翻动的 1.55 秒里成立。';
+        mark('代价');
+
+        /* 字节：去问服务端现算 */
+        try {
+          const b = await (await fetch('/bytes.json')).json();
+          OUT.bytes = b;
+          $('#t-bytes tbody').innerHTML = b.rows
+            .map((r) => `<tr><td class="b">${r.k}</td><td class="n">${(r.raw / 1024).toFixed(1)} KB</td><td class="n">${(r.gzip / 1024).toFixed(1)} KB</td></tr>`)
+            .join('');
+        } catch {
+          $('#t-bytes tbody').innerHTML = '<tr><td colspan="3" class="cap">取不到 /bytes.json（服务端没有这个路由）</td></tr>';
+        }
+        OUT.boot = BOOT.steps.slice();
+        $('#t-boot tbody').innerHTML = BOOT.steps.map((s, i) => `<tr><td class="b">${s.k}</td><td class="n">${i ? s.ms : s.ms}</td></tr>`).join('');
+
+        /* ── 05 纪律 ─────────────────────────────────────── */
+        const dState = $('#d-state');
+        const dRead = $('#d-readout');
+        const paintState = () => {
+          const s = stars.disc.state();
+          dState.innerHTML = s.busy ? '翻 · <b>在动</b>' : s.reduced ? '定 · 已按 reduced-motion 跳过翻动' : '定 · 零帧';
+          dRead.innerHTML = [
+            ['已画帧数', String(s.frames)],
+            ['排队的 rAF', String(s.raf)],
+            ['这一翻的采样帧', String(s.samples)],
+            ['最低分', s.min == null ? '—' : String(s.min)],
+            ['单帧中位耗时', s.msMedian == null ? '—' : s.msMedian.toFixed(2) + ' ms'],
+            ['首帧（含着色器编译）', stars.disc.firstFrameMs + ' ms'],
+            ['reduced-motion', s.reduced ? '是' : '否'],
+          ].map(([k, v]) => `<div class="ro"><span>${k}</span><b>${v}</b></div>`).join('');
+        };
+        paintState();
+
+        const flipBoth = () => {
+          if (stars.disc.busy) return false;
+          stars.live.flip();
+          stars.disc.flip();
+          $('#m-state').textContent = '翻 · 在动';
+          paintState();
+          const done = () => {
+            if (stars.live.busy || stars.disc.busy) return setTimeout(done, 50);
+            $('#m-state').textContent = '定 · 零帧';
+            paintState();
+          };
+          setTimeout(done, TUMBLE.duration + 100);
+          return true;
+        };
+        $('#m-btn').addEventListener('click', flipBoth);
+        $('#d-btn').addEventListener('click', flipBoth);
+        $('#d-idle').addEventListener('click', async () => {
+          const r = await stars.disc.probeIdle(2000);
+          OUT.idleProof = r;
+          dState.innerHTML = `静置 ${r.elapsed} ms：帧数 ${r.before} → <b>${r.after}</b>（差 ${r.delta}）· 排队的 rAF ${r.raf}`;
+        });
+
+        /* 颜色 */
+        const paintSwatch = () => {
+          pal = readPalette();
+          const tp = tonePalette(pal, 'light');
+          $('#d-swatch').innerHTML =
+            `<span class="cap">--amber</span><i style="background:${rgbCss(pal.amber)}"></i>` +
+            `<span class="cap">--umber</span><i style="background:${rgbCss(pal.umber)}"></i>` +
+            `<span class="cap">最亮的面</span><i style="background:${rgbCss(tp.lite)}"></i>` +
+            `<span class="cap">最暗的面</span><i style="background:${rgbCss(tp.deep)}"></i>` +
+            `<span class="cap">--reality-mix</span><b class="mono" style="font-size:.72rem">${pal.mix}</b>`;
+          for (const s of Object.values(stars)) if (s) {
+            s.gallery.setPalette(pal);
+            s.gallery.render();
+          }
+        };
+        paintSwatch();
+        let face = 'wake';
+        $('#d-flipface').addEventListener('click', () => {
+          face = face === 'wake' ? 'dream' : 'wake';
+          const c = face === 'wake' ? 1 : 0;
+          const A = {
+            '--amber': [[0x9a, 0x86, 0xc4], [0xa7, 0xb1, 0xba]],
+            '--umber': [[0x4f, 0x4a, 0x66], [0x55, 0x62, 0x70]],
+            '--wake': [[0xa7, 0xb1, 0xba], [0xa7, 0xb1, 0xba]],
+            '--dream': [[0x93, 0x89, 0xae], [0xa3, 0x9c, 0x92]],
+          };
+          document.documentElement.style.setProperty('--reality-mix', String(c));
+          for (const k in A) {
+            const [d, w] = A[k];
+            document.documentElement.style.setProperty(k, `rgb(${d.map((x, i) => Math.round(x + (w[i] - x) * c)).join(',')})`);
+          }
+          paintSwatch();
+        });
+
+        /* reduced-motion */
+        const rmq = matchMedia('(prefers-reduced-motion: reduce)');
+        const paintRm = () => {
+          $('#d-rm').textContent = rmq.matches ? 'reduce（翻动整段跳过）' : 'no-preference（正常翻）';
+          $('#d-rm-readout').innerHTML = [
+            ['按下去时', rmq.matches ? '只画一次正位' : '排 rAF，逐帧重算'],
+            ['实测排出的 rAF', OUT.rmRun ? String(OUT.rmRun.raf) : rmq.matches ? '0' : '—'],
+            ['实测画出的帧', OUT.rmRun ? `${OUT.rmRun.before} → ${OUT.rmRun.after}` : '—'],
+          ].map(([k, v]) => `<div class="ro"><span>${k}</span><b>${v}</b></div>`).join('');
+        };
+        if (rmq.matches) {
+          const before = stars.disc.frames;
+          stars.disc.flip();
+          OUT.rmRun = { before, after: stars.disc.frames, raf: stars.disc.raf, reduced: stars.disc.reduced };
+        }
+        paintRm();
+        rmq.addEventListener('change', paintRm);
+        paintState();
+
+        /* 对外 */
+        window.__star = {
+          flip: flipBoth,
+          reset: () => {
+            stars.live.reset();
+            stars.disc.reset();
+            paintState();
+          },
+          state: () => ({ live: stars.live.state(), disc: stars.disc.state() }),
+          probeIdle: (ms) => stars.disc.probeIdle(ms),
+          frames: () => stars.disc.frames,
+          raf: () => stars.disc.raf,
+        };
+        window.__gl = OUT;
+        mark('就绪');
+        window.__ready = true;
+      })();
+
+      function drawPlot(canvas, samp) {
+        const dpr = Math.min(2, devicePixelRatio || 1);
+        const W = canvas.clientWidth || 620;
+        const H = 180;
+        canvas.width = Math.round(W * dpr);
+        canvas.height = Math.round(H * dpr);
+        canvas.style.height = H + 'px';
+        const g = canvas.getContext('2d');
+        g.setTransform(dpr, 0, 0, dpr, 0, 0);
+        g.clearRect(0, 0, W, H);
+        const pad = { l: 30, r: 10, t: 10, b: 20 };
+        const iw = W - pad.l - pad.r;
+        const ih = H - pad.t - pad.b;
+        const y = (s) => pad.t + ih * (1 - (s - 20) / 85);
+        const band = (a, b, c) => {
+          g.fillStyle = c;
+          g.fillRect(pad.l, y(b), iw, Math.max(1, y(a) - y(b)));
+        };
+        band(20, 55, 'rgba(163,69,47,0.10)');
+        band(55, 70, 'rgba(201,163,74,0.12)');
+        band(70, 105, 'rgba(79,74,102,0.05)');
+        g.strokeStyle = 'rgba(35,40,48,0.18)';
+        g.lineWidth = 1;
+        for (const s of [55, 70]) {
+          g.beginPath();
+          g.moveTo(pad.l, y(s) + 0.5);
+          g.lineTo(pad.l + iw, y(s) + 0.5);
+          g.stroke();
+        }
+        g.fillStyle = 'rgba(133,143,157,1)';
+        g.font = '9px "IBM Plex Mono", ui-monospace, monospace';
+        g.fillText('55', 4, y(55) + 3);
+        g.fillText('70', 4, y(70) + 3);
+        g.fillText('100', 0, y(100) + 3);
+        g.strokeStyle = '#4f4a66';
+        g.lineWidth = 1.6;
+        g.beginPath();
+        samp.rows.forEach((r, i) => {
+          const x = pad.l + iw * r.t;
+          i ? g.lineTo(x, y(r.score)) : g.moveTo(x, y(r.score));
+        });
+        g.stroke();
+        g.fillStyle = '#a3452f';
+        for (const r of samp.rows) if (r.score < 55) g.fillRect(pad.l + iw * r.t - 1, y(r.score) - 1, 2, 2);
+        g.fillStyle = 'rgba(133,143,157,1)';
+        for (const ms of [0, 400, 800, 1200, 1550]) {
+          const x = pad.l + iw * (ms / TUMBLE.duration);
+          g.fillText(String(ms), Math.max(pad.l, Math.min(W - 20, x)), H - 5);
+        }
+      }
+    </script>
+  </body>
+</html>

@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>probe</title>
+<style>
+  body { margin:0; background:#f0f3f6; font-family: system-ui; }
+  canvas { display:block; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script type="importmap">
+{ "imports": { "three": "/three/build/three.module.js", "three/addons/": "/three/examples/jsm/" } }
+</script>
+<script type="module">
+import { FormView, paintGrid, FORM_KEYS, MATERIAL_KEYS } from './src.js';
+
+const q = new URLSearchParams(location.search);
+const KEY = q.get('form') || 'flower';
+const MAT = q.get('mat') || 'frost';
+const GROUND = q.get('ground') === 'dark' ? 0x2a2b38 : 0xf0f3f6;
+const SIZE = Number(q.get('size') || 220);
+const MODE = q.get('mode') || 'angles';
+
+const canvas = document.getElementById('c');
+const view = new FormView(canvas, { ground: GROUND });
+view.setMaterial(MAT);
+view.show(KEY);
+
+const cells = [];
+let W, H;
+
+if (MODE === 'mats') {
+  /* 三档材质 × 三种视角：看的是「哪一档在白底上有体量」 */
+  const mats = q.get('mats') ? q.get('mats').split(',') : MATERIAL_KEYS;
+  const angs = q.get('angs')
+    ? q.get('angs').split(',').map((s) => s.split(':').map(Number))
+    : [[24, 0], [56, 18], [84, 0]];
+  const S = Number(q.get('size') || 320);
+  angs.forEach(([rx, ry], r) => {
+    mats.forEach((m, c) => {
+      cells.push({
+        x: c * S, y: r * S, size: S, form: KEY, mat: m, ground: GROUND,
+        pose: { rx, ry, roll: 0, scale: 1, open: 1, grow: 1 },
+      });
+    });
+  });
+  W = mats.length * S;
+  H = angs.length * S;
+} else if (MODE === 'one') {
+  const S = Number(q.get('size') || 640);
+  const rx = Number(q.get('rx') || 56);
+  const ry = Number(q.get('ry') || 18);
+  cells.push({
+    x: 0, y: 0, size: S, form: KEY, mat: MAT, ground: GROUND,
+    pose: { rx, ry, roll: 0, scale: 1, open: 1, grow: 1 },
+  });
+  W = S; H = S;
+} else {
+  const COLS = 6;
+  const ROWS = (q.get('rows') || '24,56,84').split(',').map(Number);
+  ROWS.forEach((rx, r) => {
+    for (let c = 0; c < COLS; c++) {
+      cells.push({
+        x: c * SIZE, y: r * SIZE, size: SIZE, form: KEY, mat: MAT, ground: GROUND,
+        pose: { rx, ry: c * 60, roll: 0, scale: 1, open: 1, grow: 1 },
+      });
+    }
+  });
+  W = COLS * SIZE;
+  H = ROWS.length * SIZE;
+}
+
+view.setSize(W, H);
+paintGrid(view, cells, { width: W, height: H });
+window.__ok = { forms: FORM_KEYS, key: KEY, mat: MAT, mode: MODE, W, H };
+</script>
+</body>
+</html>

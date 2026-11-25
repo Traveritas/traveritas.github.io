@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="zh-CN" data-arrived="no" data-view="1" data-look="level">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>一处室内 · r-B · 沉没</title>
+    <link rel="stylesheet" href="./r.css" />
+    <link rel="stylesheet" href="./r-B.css" />
+  </head>
+  <body>
+    <canvas id="light"></canvas>
+
+    <a class="rx-corner rx-tl" href="./index.html">SOMEWHERE · 室内 · 沉没</a>
+    <div class="rx-corner rx-br" id="stat"></div>
+    <p class="rx-hint"><span>向下</span><i></i></p>
+
+    <p class="rx-roomtext" id="roomtext">
+      水面正好齐着眼睛。<br />
+      下半间屋子还在，只是隔着水看。
+    </p>
+
+    <script type="module">
+      import { initFlow, options } from './shell2.js';
+      import { createRoom } from './room.js';
+      import { createApproach } from './approach.js';
+      import { attachRoom } from './r-B.js';
+
+      const opt = options();
+
+      /* 一套色：比底子更冷一点的一层夜。四个槽填同一份，分区在这里不存在。 */
+      const theme = [
+        [0.04, 0.046, 0.078],
+        [0.082, 0.098, 0.142],
+        [0.185, 0.225, 0.296],
+        [0.6, 0.68, 0.76],
+      ];
+
+      const flow = initFlow({
+        canvas: document.getElementById('light'),
+        theme,
+        grain: [0.85, 0.3, 28],
+        face: opt.face,
+        px: opt.px,
+        autoArrive: opt.autoArrive,
+        dur: 3000,
+      });
+
+      const room = createRoom({ autoArrive: opt.autoArrive, dur: 3000 });
+
+      /* 先把画法挂上（room.onPaint 是有序的，晚挂的会盖在早挂的上面） */
+      attachRoom(room, opt);
+
+      const approach = createApproach(document.body);
+      const stat = document.getElementById('stat');
+
+      flow.onFrame((s) => {
+        approach.update(s.sink, s.vw);
+        stat.textContent = `1.00 · 视角 ${document.documentElement.dataset.view} · ${Math.round(s.vw)}×${Math.round(s.vh)}`;
+      });
+
+      flow.start();
+      room.start();
+    </script>
+  </body>
+</html>

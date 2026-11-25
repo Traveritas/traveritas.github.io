@@ -1,0 +1,636 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>屏幕边缘 · 计算特效原型（WebGL2）</title>
+<style>
+:root {
+  --bg: #f0f3f6; --fg: #232830; --fg-soft: #56606d; --fg-faint: #858f9d;
+  --line: rgba(35,40,48,.12);
+  --wake: #a7b1ba; --dream: #9389ae; --amber: #9a86c4;
+  --font-display: 'Noto Serif SC','Palatino Linotype',Palatino,Georgia,'Source Han Serif SC',serif;
+  --font-body: system-ui,-apple-system,'PingFang SC','Microsoft YaHei UI',sans-serif;
+  --font-mono: 'IBM Plex Mono',ui-monospace,Consolas,'Microsoft YaHei UI',monospace;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; overflow: hidden; }
+body { font-family: var(--font-body); color: var(--fg); background: var(--bg); }
+body.dream { --bg: #191d2e; --fg: #cfd3e2; --fg-soft: #9298ad; --fg-faint: #5d6378; --line: rgba(207,211,226,.13); background: var(--bg); }
+.page { position: absolute; inset: 0; overflow: hidden; }
+.prose { max-width: 34em; margin: 12vh auto 0; padding: 0 24px; font-family: var(--font-display); font-size: 17px; line-height: 2; text-align: justify; }
+.prose h1 { font-size: 26px; font-weight: 600; margin-bottom: 10px; }
+.prose .meta { font-family: var(--font-mono); font-size: 11px; letter-spacing: .14em; color: var(--fg-faint); margin-bottom: 28px; }
+.prose p { margin-bottom: 1.4em; color: var(--fg-soft); }
+.prose p:first-of-type { color: var(--fg); }
+.brand { position: fixed; top: 26px; left: 34px; font-family: var(--font-display); font-size: 15px; letter-spacing: .32em; color: var(--fg-soft); z-index: 40; }
+.hairline { position: fixed; top: 0; left: 0; right: 0; height: 2px; z-index: 40; background: linear-gradient(90deg, var(--wake), var(--amber)); transform: scaleX(.34); transform-origin: left; }
+.star { position: fixed; left: 26px; bottom: 24px; width: 44px; height: 44px; border-radius: 50%; background: color-mix(in srgb, var(--bg) 70%, white); border: 1px solid var(--line); z-index: 40; display: grid; place-items: center; color: var(--fg-faint); font-size: 18px; }
+.ave { position: fixed; right: 26px; bottom: 40px; width: 240px; padding: 12px 14px; border: 1px solid var(--line); background: color-mix(in srgb, var(--bg) 82%, transparent); backdrop-filter: blur(6px); z-index: 40; font-size: 12px; color: var(--fg-soft); border-radius: 2px; }
+.ave b { display: block; font-family: var(--font-mono); font-size: 9px; letter-spacing: .3em; color: var(--fg-faint); margin-bottom: 6px; }
+.mode { position: fixed; top: 22px; right: 30px; font-family: var(--font-mono); font-size: 10px; letter-spacing: .2em; color: var(--fg-faint); border: 1px solid var(--line); padding: 6px 12px; z-index: 40; }
+#fx { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 30; pointer-events: none; }
+.bar { position: fixed; left: 50%; bottom: 10px; transform: translateX(-50%); z-index: 99; display: flex; gap: 6px; background: rgba(20,22,32,.82); padding: 6px 8px; border-radius: 6px; }
+.bar button { font: 11px/1 var(--font-mono); letter-spacing: .08em; color: #cfd3e2; background: none; border: 1px solid rgba(207,211,226,.25); padding: 6px 10px; cursor: pointer; border-radius: 3px; }
+.bar button.on { background: #9a86c4; color: #14161f; border-color: #9a86c4; }
+.tag { position: fixed; top: 8px; left: 50%; transform: translateX(-50%); z-index: 99; font: 10px/1 var(--font-mono); letter-spacing: .2em; color: var(--fg-faint); }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="prose">
+    <h1>字面与光景 · 全样式样张</h1>
+    <div class="meta">2026.09.28</div>
+    <p>这一段未作任何两态标记，醒与梦两面读到的是同一组字。大多数日常行文皆依此展开，两态机制只在需要分岔处点落：一个词的换面，或者一整段的另一种可能。</p>
+    <p>行内可以自然容纳站内链接、行内代码、加粗强调与斜体微光。加粗在随笔中带有 600 字重与 30% 梦色下衬；行内代码则不填底色，而是在字身下方压上一条梦色发丝线。</p>
+    <p>水汽漫开是逐字浮起的默认状态；更高的字拥有更明显的起伏档位；慢半拍的字则错开步调缓步上升。若希望在波峰处带出一抹微温，可采用顶点微温。</p>
+    <p>流光则不拆分字符，一道暖色自左向右滑过字面：同一句话里有一线暖光走过。它亦可调节节奏，如窄而快、偏暖的一线，或是带有逐帧定格感的抽帧流光。</p>
+  </div>
+</div>
+<div class="hairline"></div>
+<div class="brand">Traveritas</div>
+<div class="mode">漫游 ｜ 检索</div>
+<div class="star">✦</div>
+<div class="ave"><b>AVE</b>好——大的橱窗啊，玻璃后面站着整个黄昏。</div>
+<div class="tag" id="tag">FX</div>
+<canvas id="fx" aria-hidden="true"></canvas>
+<div class="bar">
+  <button data-v="0" class="on">G 虹彩花</button>
+  <button data-v="1">H 边缘极光</button>
+  <button data-v="2">I 焦散水光</button>
+  <button data-v="3">J 真水晶</button>
+  <button data-v="4">K 流光</button>
+  <button data-v="5">L 磨砂碎片</button>
+  <button id="face">醒 ⇄ 梦</button>
+  <button id="hide">隐/显</button>
+</div>
+
+<script>
+/* ─────────────────────────────────────────────────────────────
+   边缘实物 · 全程序化 WebGL2 片元场（无 SVG、无贴图）
+   G：SDF 百合花——花心在屏外，瓣是解析距离场，缘上走薄膜虹彩（与 ave-star film() 同族），
+      瓣体近乎无（透明画布），梦面呼吸开合 + 离瓣漂移。
+   H：边缘极光——沿四缘的 fbm 帘幕，色沿缘缓移。
+   I：焦散水光——经典 caustics 迭代限制在边缘带内，像水面折光爬在玻璃缘上。
+   透明画布叠在页面上；醒/梦由 uDream 驱动；中央恒为 0（不碰正文）。
+   ───────────────────────────────────────────────────────────── */
+const canvas = document.getElementById('fx');
+const gl = canvas.getContext('webgl2', { alpha: true, premultipliedAlpha: true, antialias: false });
+const tag = document.getElementById('tag');
+const q = new URLSearchParams(location.search);
+let variant = +(q.get('v') || 0);
+let dream = q.get('face') === 'dream' ? 1 : 0;
+if (dream) document.body.classList.add('dream');
+
+const VS = `#version 300 es
+layout(location=0) in vec2 p;
+void main(){ gl_Position = vec4(p,0.,1.); }`;
+
+const FS = `#version 300 es
+precision highp float;
+uniform vec2 uRes; uniform float uTime, uDream, uVar;
+out vec4 o;
+
+/* ── 公共 ── */
+vec3 film(float x){ return .5+.5*cos(6.2832*(x*1.7+vec3(0.,.33,.67))); }
+float hash(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
+float noise(vec2 p){ vec2 i=floor(p),f=fract(p); f=f*f*(3.-2.*f);
+  return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x),f.y); }
+float fbm(vec2 p){ float v=0.,a=.5; for(int i=0;i<4;i++){ v+=a*noise(p); p=p*2.03+vec2(19.7,7.3); a*=.5; } return v; }
+float bayer4(vec2 p){ ivec2 i=ivec2(mod(p,4.));
+  const int m[16]=int[16](0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5);
+  return (float(m[i.y*4+i.x])+.5)/16.; }
+
+/* ── G · SDF 花瓣：从原点朝 +y 的尖椭圆（弯月形），带主脉 ── */
+float petal(vec2 p, float L, float W, float bend){
+  float t = clamp(p.y/L, 0., 1.);
+  p.x -= bend * L * t * t;
+  float w = W * pow(sin(3.14159 * pow(t,.72)), .85) + .0015;
+  float dx = abs(p.x) - w;
+  float dy = max(-p.y, p.y - L);
+  return max(dx, dy);
+}
+float vein(vec2 p, float L, float bend){
+  float t = clamp(p.y/L,0.,1.);
+  float cx = bend * L * t * t;
+  return abs(p.x - cx);
+}
+
+/* 一朵花：逐瓣累加（半透明膜彼此叠透，不取 min——min 会在瓣交处切出锯齿缺口） */
+vec4 lily(vec2 p, vec2 c, float dir, float spread, float L, int n, float seed, float open, float px, float t, float dream){
+  vec2 q = p - c;
+  if(length(q) > L*1.35) return vec4(0.);
+  vec3 acc = vec3(0.); float alpha = 0.;
+  for(int i=0;i<7;i++){
+    if(i>=n) break;
+    float fi = float(i);
+    float tt = n==1 ? 0. : fi/float(n-1) - .5;
+    float jit = hash(vec2(seed,fi));
+    float ang = dir + tt*spread + (jit-.5)*.20;
+    float len = L * (1.-.30*abs(tt)*2.) * (.82+jit*.36) * open;
+    float W = len*(.15+jit*.06);
+    float bend = (hash(vec2(seed+7.,fi))-.5)*.22;
+    float ca=cos(ang), sa=sin(ang);
+    vec2 r = vec2(sa*q.x - ca*q.y, ca*q.x + sa*q.y);
+    float d = petal(r, len, W, bend);
+    if(d > .025) continue;
+    float vv = vein(r, len, bend);
+    /* 虹彩相位：瓣序号 + 角向 + 极慢时移；站点淡彩系，不出霓虹 */
+    float phase = fract(fi*.17 + ang*.11 + t*.016);
+    vec3 raw = film(phase);
+    vec3 irid = mix(vec3(.93,.94,.97), raw, .30+.18*dream);
+    irid = mix(vec3(dot(irid,vec3(.333)))*vec3(.96,.97,1.02), irid, .5+.3*dream);
+    float rim = exp(-abs(d)/(px*1.6));
+    float body = smoothstep(px, -px*2., d) * .045;
+    float vline = exp(-vv/(px*1.1)) * smoothstep(px*2.,0.,d) * .22;
+    float glow = exp(-max(d,0.)/.014) * (.07+.10*dream);
+    float a = rim*(.42+.28*dream) + body + vline + glow;
+    vec3 col = irid*(rim+glow) + vec3(.97,.97,1.)*body + vec3(1.)*vline;
+    col *= .85+.3*dream;
+    acc += col*a*(1.-alpha);
+    alpha += a*(1.-alpha);
+  }
+  return vec4(acc, alpha);
+}
+
+vec4 variantG(vec2 frag){
+  vec2 p = frag / uRes.y;
+  float H = 1.0, W = uRes.x/uRes.y;
+  float t = uTime;
+  float px = 1.4/uRes.y;
+  float breathe = 1. + .035*sin(t*.62) * uDream;
+  /* 花的尺度跟屏宽走（窄屏收小），探入深度也收——正文永不被压 */
+  float k = clamp(W/1.6, .42, 1.);
+  vec3 acc = vec3(0.); float alpha = 0.;
+
+  /* 三处花心都在屏外：右缘主花 / 左缘小苞 / 下缘半朵 */
+  vec4 f1 = lily(p, vec2(W+.045*k,.62*H), 3.14159+.12, 1.95, .30*k, 6, 11., breathe, px, t, uDream);
+  vec4 f2 = lily(p, vec2(-.035*k,.42*H), -.12, .95, .16*k, 3, 23., 1.+.02*sin(t*.5+2.)*uDream, px, t, uDream);
+  vec4 f3 = lily(p, vec2(.44*W,-.055*k*H), 1.5708, 1.7, .19*k, 4, 37., 1.+.03*sin(t*.44+4.)*uDream, px, t, uDream);
+
+  /* 离枝单瓣：缓慢漂移 + 自转 */
+  vec2 lp1 = vec2(.62*W + .012*sin(t*.21), .10*H + .014*cos(t*.17));
+  vec2 lp2 = vec2(.20*W + .010*cos(t*.15+3.), .06*H + .010*sin(t*.19+1.));
+  float la1 = .8 + .10*sin(t*.13)*uDream;
+  float la2 = -1.2 + .12*cos(t*.11)*uDream;
+  vec2 r1 = p-lp1; float c=cos(la1),s=sin(la1); r1=vec2(c*r1.x+s*r1.y,-s*r1.x+c*r1.y);
+  vec2 r2 = p-lp2; c=cos(la2);s=sin(la2); r2=vec2(c*r2.x+s*r2.y,-s*r2.x+c*r2.y);
+  float ds[2]; ds[0]=petal(r1,.085*k,.017*k,.15); ds[1]=petal(r2,.062*k,.013*k,-.18);
+  for(int k=0;k<2;k++){
+    float d = ds[k];
+    if(d > .025) continue;
+    float phase = fract(float(k)*.43 + .2 + t*.016);
+    vec3 raw = film(phase);
+    vec3 irid = mix(vec3(.93,.94,.97), raw, .30+.18*uDream);
+    irid = mix(vec3(dot(irid,vec3(.333)))*vec3(.96,.97,1.02), irid, .5+.3*uDream);
+    float rim = exp(-abs(d)/(px*1.6));
+    float body = smoothstep(px,-px*2.,d)*.04;
+    float glow = exp(-max(d,0.)/.012)*(.06+.09*uDream);
+    float a = rim*(.38+.24*uDream)+body+glow;
+    vec3 col = (irid*(rim+glow)+vec3(.97,.97,1.)*body)*(.85+.3*uDream);
+    acc += col*a*(1.-alpha);
+    alpha += a*(1.-alpha);
+  }
+
+  /* 花与离瓣合成 */
+  vec4 fs[3]; fs[0]=f1; fs[1]=f2; fs[2]=f3;
+  for(int k=0;k<3;k++){
+    acc = fs[k].rgb + acc*(1.-fs[k].a);
+    alpha = fs[k].a + alpha*(1.-fs[k].a);
+  }
+  return vec4(acc, clamp(alpha,0.,1.));
+}
+
+/* ── J · 真水晶：光线追踪凸多面体（照 nexus-slice 的物理口径）──
+   入射折射 → 体内全反射（至多3次）→ 出射三通道色散；丁香吸收、光核积分、
+   菲涅耳反射 × 程序化影棚环境、圆角棱高光。晶簇从右缘/下缘探入，缓慢自转。 */
+#define JN 18
+vec3 jEnv(vec3 d, float dream){
+  /* 影棚：淡丁香天顶、近白地平亮带、压暗的地面 + 柔光箱与暗卡（白底上棱面靠它交代） */
+  float y = d.y;
+  vec3 top = mix(vec3(.90,.895,.97), vec3(.94,.90,.95), dream);
+  vec3 hor = vec3(1.,.975,.965);
+  vec3 low = mix(vec3(.42,.44,.52), vec3(.40,.36,.48), dream);
+  vec3 c = y>0. ? mix(hor,top,smoothstep(0.,.65,y)) : mix(hor,low,smoothstep(0.,.5,-y));
+  c += vec3(.12,.10,.09)*exp(-pow(y/.06,2.));
+  float key = smoothstep(.90,.975,dot(d,normalize(vec3(-.5,.7,.5))));
+  c += vec3(1.,.99,.97)*.85*key;
+  c += vec3(1.,.94,.96)*.30*smoothstep(.93,.99,dot(d,normalize(vec3(.75,.25,-.6))));
+  c *= 1.-.30*smoothstep(.80,.97,dot(d,normalize(vec3(-.95,.05,-.3))));
+  c *= 1.-.18*smoothstep(.75,.97,dot(d,normalize(vec3(.85,-.25,.45))));
+  return c;
+}
+mat3 jRot(float a, float b){
+  float ca=cos(a),sa=sin(a),cb=cos(b),sb=sin(b);
+  return mat3(ca,0.,-sa, 0.,1.,0., sa,0.,ca) * mat3(1.,0.,0., 0.,cb,sb, 0.,-sb,cb);
+}
+mat3 jT(mat3 m){ return mat3(m[0][0],m[1][0],m[2][0], m[0][1],m[1][1],m[2][1], m[0][2],m[1][2],m[2][2]); }
+/* 一枚晶体的半空间集合：六方柱 + 两端锥尖（水晶真形，12 面） */
+void jPlanes(out vec4 pl[JN], out int np){
+  np = 0;
+  /* 六棱柱侧面 */
+  for(int i=0;i<6;i++){
+    float a = float(i)*1.0472; /* 60° */
+    pl[np++] = vec4(cos(a), 0., sin(a), .30);
+  }
+  /* 上锥尖收向 (0,.95,0)，下锥尖收向 (0,-.95,0)；柱身 ±.45，共 18 面 */
+  for(int i=0;i<6;i++){
+    float a = float(i)*1.0472 + .5236;
+    vec3 n = normalize(vec3(cos(a)*.82, .55, sin(a)*.82));
+    pl[np++] = vec4(n, dot(n, vec3(0.,.95,0.)));
+    vec3 m = normalize(vec3(cos(a)*.82, -.55, sin(a)*.82));
+    pl[np++] = vec4(m, dot(m, vec3(0.,-.95,0.)));
+  }
+}
+float jExit(vec3 P, vec3 T, vec4 pl[JN], int np, out vec3 Ne){
+  float tm = 1e9; Ne = vec3(0.,1.,0.);
+  for(int i=0;i<JN;i++){
+    if(i>=np) break;
+    float dn = dot(pl[i].xyz, T);
+    if(dn > 1e-5){
+      float t = (pl[i].w - dot(pl[i].xyz,P))/dn;
+      if(t<tm){ tm=t; Ne=pl[i].xyz; }
+    }
+  }
+  return tm;
+}
+/* 单枚晶体：ro 相机原点 rd 方向，c 中心 s 尺度 R 姿态；返回预乘色+alpha */
+vec4 jCrystal(vec3 ro, vec3 rd, vec3 c, float s, mat3 R, float dream, float t){
+  /* 变换到晶体局部系（R 的转置 = 世界→局部） */
+  mat3 Ri = jT(R);
+  vec3 roL = Ri * ((ro - c)/s); vec3 rdL = normalize(Ri * rd);
+  vec4 pl[JN]; int np; jPlanes(pl, np);
+  /* 入射：找最近正面 */
+  float tIn = -1e9; vec3 N = vec3(0.);
+  bool hit = false;
+  for(int i=0;i<JN;i++){
+    if(i>=np) break;
+    float dn = dot(pl[i].xyz, rdL);
+    if(dn < -1e-5){
+      float tt = (pl[i].w - dot(pl[i].xyz,roL))/dn;
+      if(tt > tIn){ tIn = tt; N = pl[i].xyz; hit = true; }
+    }
+  }
+  if(!hit || tIn < 0.) return vec4(0.);
+  vec3 P = roL + rdL*tIn;
+  /* 凸体入射点必须落在所有半空间内，否则这条射线其实没打中 */
+  for(int i=0;i<JN;i++){
+    if(i>=np) break;
+    if(dot(pl[i].xyz, P) > pl[i].w + 1e-3) return vec4(0.);
+  }
+  vec3 V = -rdL;
+  float ndv = clamp(dot(N,V),0.,1.);
+  float F = .04 + .96*pow(1.-ndv,5.);
+  vec3 refl = jEnv(R*reflect(rdL,N), dream);
+  /* 透射：体内全反射至多3次，出射色散 */
+  float ior = 1.52;
+  vec3 T = refract(rdL, N, 1./ior);
+  vec3 Q = P; float L = 0.;
+  vec3 trans = vec3(0.); bool done = false;
+  float disp = mix(.006,.016,dream);
+  for(int b=0;b<4;b++){
+    vec3 Ne; float tt = jExit(Q, T, pl, np, Ne);
+    vec3 X = Q + T*tt; L += tt;
+    vec3 Tg = refract(T, -Ne, ior);
+    if(dot(Tg,Tg) > 0.){
+      vec3 Tr = refract(T,-Ne,ior-disp);
+      vec3 Tb = refract(T,-Ne,ior+disp);
+      if(dot(Tr,Tr)==0.) Tr=Tg;
+      if(dot(Tb,Tb)==0.) Tb=Tg;
+      float Fe = .04+.96*pow(1.-clamp(dot(Ne,Tg),0.,1.),5.);
+      trans = vec3(jEnv(R*Tr,dream).r, jEnv(R*Tg,dream).g, jEnv(R*Tb,dream).b)*(1.-Fe);
+      done = true; break;
+    }
+    T = reflect(T,-Ne); Q = X + T*1e-4;
+  }
+  if(!done) trans = jEnv(R*T,dream)*.85;
+  /* 丁香吸收：光程越长越深 */
+  vec3 k = mix(vec3(.060,.064,.012), vec3(.030,.058,.030), dream);
+  trans *= exp(-k*L*2.2)*1.03;
+  /* 光核：晶体中心一团近白微温，按光程离核距离近似 */
+  float g = exp(-dot(P+T*L*.5, P+T*L*.5)/.18);
+  vec3 glow = mix(vec3(1.,.975,.955), vec3(1.,.955,.965), dream);
+  trans = mix(trans, glow*1.05, (1.-exp(-g*1.4))*.5);
+  /* 薄膜虹彩只上在反射里，且很淡（16%，与 nexus-slice 同参） */
+  vec3 film = .5+.5*cos(6.2832*(vec3(0.,.33,.67)+1.8*(1.-ndv)));
+  refl *= mix(vec3(1.), film, .16);
+  vec3 col = mix(trans, refl, F);
+  vec3 Lk = normalize(vec3(-.5,.7,.5));
+  float spec = pow(max(dot(N, normalize(Lk+V)),0.),260.);
+  col += vec3(1.)*spec*.9;
+  return vec4(col, 1.);
+}
+vec4 variantJ(vec2 frag){
+  vec2 p = (frag - .5*uRes)/uRes.y;   /* 居中，y 向上 */
+  float W = uRes.x/uRes.y;
+  float t = uTime;
+  vec3 ro = vec3(0.,0.,3.2);
+  vec3 rd = normalize(vec3(p, -1.9));
+  vec3 acc = vec3(0.); float alpha = 0.;
+  float k = clamp(W/1.6, .5, 1.);
+  /* 三枚晶体：右缘主晶（大，半枚在屏外）、其下一枚小晶、左缘下斜晶。
+     相机 fov：rd=vec3(p,-1.9)，z=0 处半宽=W/2*3.2/1.9≈.84W——中心要放到 .84W 之外才算屏外 */
+  float spin = t*.10;
+  float ex = W*.5*3.2/1.9;
+  vec3 cs[3]; float ss[3]; mat3 rs[3];
+  cs[0] = vec3(ex-.04*k, .26, 0.);    ss[0] = .52*k;
+  cs[1] = vec3(ex-.05*k, -.36, -.2);  ss[1] = .17*k;
+  cs[2] = vec3(-ex+.02*k, -.42, -.1); ss[2] = .24*k;
+  rs[0] = jRot(spin*.7+.4, .35+.12*sin(t*.07));
+  rs[1] = jRot(-spin*.9+1.2, -.5);
+  rs[2] = jRot(spin*.5+2.1, 1.25+.1*sin(t*.06));
+  for(int i=0;i<3;i++){
+    vec4 r = jCrystal(ro, rd, cs[i], ss[i], rs[i], uDream, t);
+    acc = r.rgb*r.a + acc*(1.-r.a);
+    alpha = r.a + alpha*(1.-r.a);
+  }
+  return vec4(acc, alpha);
+}
+
+/* ── K · 流光：一道光沿屏幕内缘环游──
+   光有彗尾（头亮尾长）、经过处边缘被短暂点亮；四角与驻点凝着极小的霜晶，
+   光头经过时被点亮再慢慢熄灭。单色：醒=冷灰银，梦=薄暮里一线月白。 */
+vec4 variantK(vec2 frag){
+  vec2 p = (frag - .5*uRes)/uRes.y;
+  float W = uRes.x/uRes.y;
+  vec2 hf = vec2(W*.5, .5) - vec2(.012);   /* 内缘矩形（离屏边 12px 当量） */
+  float t = uTime;
+  /* 到边框的带符号距离 */
+  vec2 d = abs(p) - hf;
+  float dist = abs(length(max(d,0.)) + min(max(d.x,d.y),0.));
+  /* 周长参数必须在「边框上最近的点」处取，不能拿原始像素分段——
+     否则屏幕内部的点全落进同一分支，光头下方会亮出一整道垂直光柱 */
+  vec2 q = clamp(p, -hf, hf);
+  if(d.x < 0. && d.y < 0.){
+    /* 内部点：推到最近的那条缘上 */
+    if(d.x > d.y) q.x = sign(p.x)*hf.x;
+    else q.y = sign(p.y)*hf.y;
+  }
+  float hy = hf.y, hx = hf.x;
+  float s;
+  if(q.x >= hx - .001) s = hy - q.y;                          /* 右缘 ↓ */
+  else if(q.y <= -hy + .001) s = 2.*hy + (hx - q.x);          /* 底缘 ← */
+  else if(q.x <= -hx + .001) s = 2.*hy + 2.*hx + (q.y + hy);  /* 左缘 ↑ */
+  else s = 4.*hy + 2.*hx + (q.x + hx);                        /* 顶缘 → */
+  float per = 4.*hy + 4.*hx;
+  float u = s/per;
+  /* 光头位置：醒面慢（40s/圈），梦面快一点（24s/圈） */
+  float speed = mix(.025, .042, uDream);
+  float head = fract(t*speed);
+  float du = fract(u - head + 1.);        /* 头后方 0..1 */
+  float tail = exp(-du*22.);              /* 彗尾 */
+  float headGlow = exp(-du*260.);         /* 光头 */
+  /* 驻点霜晶：四角 + 两缘中点，被光头经过时点亮（余辉慢熄） */
+  float nodes = 0.;
+  for(int i=0;i<6;i++){
+    float nu = float(i)/6. + .083;
+    float passed = fract(head - nu + 1.);
+    float lit = exp(-passed*7.);
+    /* 节点位置 */
+    vec2 np;
+    float ns = nu*per;
+    if(ns < 2.*hy) np = vec2(hx, hy - ns);
+    else if(ns < 2.*hy+2.*hx) np = vec2(hx - (ns-2.*hy), -hy);
+    else if(ns < 4.*hy+2.*hx) np = vec2(-hx, -hy + (ns-2.*hy-2.*hx));
+    else np = vec2(-hx + (ns-4.*hy-2.*hx), hy);
+    float nd = length(p - np);
+    /* 霜晶：六角星形微光（不是贴片，是距离场） */
+    float ang = atan(p.y-np.y, p.x-np.x);
+    float star = .006*(1. + .5*cos(ang*6. + float(i)));
+    float spark = exp(-pow(nd/star,2.)) + exp(-nd/.02)*.25;
+    nodes += spark * (.12 + .88*lit);
+  }
+  /* 缘线本体：极细的常驻底线 + 流光滑过。
+     流光/光晕只活在贴缘窄带里——内部像素即使投影相位与光头一致，
+     衰减尾巴也不许漏进去（否则光头下方会显出一道竖直接缝） */
+  float near = 1. - smoothstep(.03, .06, dist);
+  float line = exp(-dist/.0016)*.10;
+  float flow = exp(-dist/.004)*(tail*.8 + headGlow*1.6) * near;
+  float halo = exp(-dist/.022)*(tail*.18 + headGlow*.3) * near;
+  /* 霜晶是点状物：每颗自己的高斯已限死范围，亮度绝不再乘缘距宽衰减——
+     否则「某颗亮着」会被涂满整条缘的纵深，光头下方显出竖直接缝 */
+  float a = line + flow + halo + nodes;
+  a *= .5 + .5*uDream;
+  a = clamp(a, 0., 1.);
+  vec3 wakeC = vec3(.62,.67,.75);
+  vec3 dreamC = vec3(.80,.77,.88);
+  vec3 col = mix(wakeC, dreamC, uDream);
+  col = mix(col, vec3(.96,.95,.99), headGlow*.7 + nodes*.3);
+  return vec4(col*a, a);
+}
+vec4 variantH(vec2 frag){
+  vec2 uv = frag/uRes;
+  float t = uTime*.05;
+  float dEdge = min(min(uv.x,1.-uv.x)*uRes.x/uRes.y, min(uv.y,1.-uv.y));
+  float band = exp(-dEdge/.075);
+  if(band < .004) return vec4(0.);
+  float around = (uv.x + uv.y*1.7);
+  float n = fbm(vec2(around*3.2, dEdge*6. - t*2.2));
+  float n2 = fbm(vec2(around*6.1+9., dEdge*10. - t*3.1));
+  float curtain = smoothstep(.32,.75,n) * (.5+.5*n2);
+  /* 单色基调，只在帘幕亮芯允许一点点色温偏移（灰蓝→薄暮紫→芯里一丝暖） */
+  vec3 wakeC = vec3(.62,.67,.74);            /* --wake 冷灰 */
+  vec3 dreamC = vec3(.58,.54,.68);           /* --dream 薄暮 */
+  vec3 base = mix(wakeC, dreamC, uDream);
+  vec3 warm = mix(vec3(.78,.80,.85), vec3(.72,.62,.70), uDream);
+  vec3 col = mix(base, warm, curtain*.35);
+  col *= .75 + .55*curtain + .25*uDream;
+  float a = band * curtain * (.20+.34*uDream);
+  return vec4(col*a, a);
+}
+
+/* ── I · 焦散水光：迭代折光限制在边缘带。单色：光的明暗造形，色只是水的体温 ── */
+vec4 variantI(vec2 frag){
+  vec2 uv = frag/uRes;
+  float dEdge = min(min(uv.x,1.-uv.x)*uRes.x/uRes.y, min(uv.y,1.-uv.y));
+  float band = exp(-dEdge/.06);
+  if(band < .004) return vec4(0.);
+  vec2 p = mod(frag/uRes.y*6.2832, 6.2832) - 250.;
+  vec2 i = p;
+  float c = 1.; float inten = .005;
+  float t = uTime*.16 + 23.;
+  for(int n=0;n<4;n++){
+    float tt = t*(1.-(3.5/float(n+1)));
+    i = p + vec2(cos(tt-i.x)+sin(tt+i.y), sin(tt-i.y)+cos(tt+i.x));
+    c += 1./length(vec2(p.x/(sin(i.x+tt)/inten), p.y/(cos(i.y+tt)/inten)));
+  }
+  c /= 4.; c = 1.17-pow(c,1.4);
+  float v = pow(abs(c), 8.);
+  v = clamp(v,0.,1.);
+  /* 醒=纸上水痕（冷灰），梦=夜水微光（薄暮里透一点月色的暖白） */
+  vec3 wakeC = vec3(.60,.66,.74);
+  vec3 dreamC = vec3(.74,.70,.82);
+  vec3 tint = mix(wakeC, dreamC, uDream);
+  tint = mix(tint, vec3(.92,.90,.94), v*.3*uDream); /* 亮芯偏月白，不偏彩 */
+  float a = band * v * (.26+.42*uDream);
+  return vec4(tint*a, a);
+}
+
+/* ── L · 磨砂层缘：屏幕是一层有厚度的玻璃──
+   四边是磨砂玻璃的斜切端面（外亮内暗的厚度渐变 + 内缘一线提亮），
+   右缘中段一处断口：层缘在那里崩开，两三枚磨砂碎片悬在缺口内外。
+   单色：醒=冷灰玻璃，梦=薄暮里透一层极淡的流动微光。装裱感是目标，不是风险。 */
+float lSDFrag(vec2 p, vec2 c, float ang, float L){
+  /* 碎片：不规则五边形（玻璃崩出来的形，不是晶体） */
+  float ca=cos(ang), sa=sin(ang);
+  vec2 q = vec2(ca*(p.x-c.x)+sa*(p.y-c.y), -sa*(p.x-c.x)+ca*(p.y-c.y));
+  q /= L;
+  float d = -1e3;
+  d = max(d, dot(q, normalize(vec2( .9, .35))) - .52);
+  d = max(d, dot(q, normalize(vec2( .2, .95))) - .40);
+  d = max(d, dot(q, normalize(vec2(-.8, .5 ))) - .46);
+  d = max(d, dot(q, normalize(vec2(-.6,-.7 ))) - .42);
+  d = max(d, dot(q, normalize(vec2( .5,-.85))) - .50);
+  return d * L;
+}
+vec4 variantL(vec2 frag){
+  vec2 p = frag/uRes.y;
+  float W = uRes.x/uRes.y, H = 1.;
+  float t = uTime;
+  vec3 acc = vec3(0.); float alpha = 0.;
+  vec3 wakeC = vec3(.66,.70,.77);
+  vec3 dreamC = vec3(.62,.58,.72);
+  vec3 base = mix(wakeC, dreamC, uDream);
+  vec3 lite = mix(vec3(.98,.99,1.), vec3(.90,.87,.96), uDream);
+
+  /* ── 层缘：到屏边的距离 e，缘宽 bw ── */
+  float e = min(min(p.x, W-p.x), min(p.y, H-p.y));
+  float bw = .014;
+  float inBand = 1. - smoothstep(bw, bw+.0015, e);
+  if(inBand > 0.){
+    float th = clamp(e/bw, 0., 1.);
+    float face = mix(1.12, .78, smoothstep(0.,1.,th));
+    float frost = .96 + .08*noise(p*260.);
+    float rim = exp(-abs(e-bw)/.0012)*.5;
+    float around = p.x + p.y*1.7;
+    float inner = fbm(vec2(around*2.6, e*40. - t*.10));
+    float glow = smoothstep(.45,.8,inner) * uDream * .30;
+    vec3 col = base*face*frost + lite*(rim + glow);
+    float a = inBand * (.42 + .30*uDream + rim*.3);
+    acc += col*a*(1.-alpha); alpha += a*(1.-alpha);
+  }
+
+  /* ── 断口：右缘中段，层缘在那里崩开 ── */
+  vec2 brk = vec2(W, .52*H);
+  float brkD = length((p-brk)*vec2(1.,1.4));
+  float notch = 1. - smoothstep(.030, .052, brkD);
+  if(notch > 0. && e < bw+.002){
+    float crack = exp(-abs(brkD-.040)/.003)*.6;
+    acc = mix(acc, lite*crack, notch*.8);
+    alpha *= 1. - notch*.9;
+    alpha += crack*notch*.5;
+  }
+
+  /* ── 碎片：三枚磨砂玻璃片悬在断口内外，梦面缓慢漂移 ── */
+  float drift = uDream;
+  vec2 cs[3]; float an[3]; float ls[3];
+  cs[0] = vec2(W-.012 + .004*sin(t*.13)*drift, .52*H + .005*cos(t*.11)*drift); an[0] = .5 + .06*sin(t*.09)*drift;  ls[0] = .052;
+  cs[1] = vec2(W-.040 + .003*cos(t*.10+2.)*drift, .575*H);                        an[1] = -.9 + .05*cos(t*.08)*drift; ls[1] = .026;
+  cs[2] = vec2(W+.006, .465*H + .003*sin(t*.12+1.)*drift);                        an[2] = 2.2;                        ls[2] = .034;
+  for(int i=0;i<3;i++){
+    float d = lSDFrag(p, cs[i], an[i], ls[i]);
+    if(d > .006) continue;
+    float px = 1.4/uRes.y;
+    float rim = exp(-abs(d)/(px*1.8));
+    float body = smoothstep(px,-px*2.,d);
+    float inner = fbm(p*90. + float(i)*7. + vec2(t*.02,0.));
+    vec3 col = mix(base*.9, lite, .35 + .3*inner);
+    col = mix(col, lite, rim*.8);
+    float a = body*(.16+.14*uDream) + rim*(.40+.25*uDream);
+    acc += col*a*(1.-alpha); alpha += a*(1.-alpha);
+  }
+
+  /* ── 左缘与下缘：各一枚小碎片凝在层缘上 ── */
+  vec2 cs2[2]; float an2[2]; float ls2[2];
+  cs2[0] = vec2(.010, .40*H); an2[0] = 1.8; ls2[0] = .020;
+  cs2[1] = vec2(.42*W, .008); an2[1] = .3;  ls2[1] = .017;
+  for(int i=0;i<2;i++){
+    float d = lSDFrag(p, cs2[i], an2[i], ls2[i]);
+    if(d > .005) continue;
+    float px = 1.4/uRes.y;
+    float rim = exp(-abs(d)/(px*1.6));
+    float body = smoothstep(px,-px*2.,d);
+    vec3 col = mix(base*.9, lite, .4);
+    col = mix(col, lite, rim*.8);
+    float a = body*(.12+.10*uDream) + rim*(.32+.20*uDream);
+    acc += col*a*(1.-alpha); alpha += a*(1.-alpha);
+  }
+  return vec4(acc, clamp(alpha,0.,1.));
+}
+
+void main(){
+  vec4 r;
+  if(uVar < .5) r = variantG(gl_FragCoord.xy);
+  else if(uVar < 1.5) r = variantH(gl_FragCoord.xy);
+  else if(uVar < 2.5) r = variantI(gl_FragCoord.xy);
+  else if(uVar < 3.5) r = variantJ(gl_FragCoord.xy);
+  else if(uVar < 4.5) r = variantK(gl_FragCoord.xy);
+  else r = variantL(gl_FragCoord.xy);
+  /* 中央保护：离最近边缘超过 0.22 屏高的地方一律归零（正文永不被碰） */
+  vec2 uv = gl_FragCoord.xy/uRes;
+  float dEdge = min(min(uv.x,1.-uv.x)*uRes.x/uRes.y, min(uv.y,1.-uv.y));
+  r *= uVar > 3.5 ? 1. : smoothstep(.24,.16,dEdge);
+  /* Bayer 抖动去色带（与 mist 同款） */
+  r.rgb += (bayer4(gl_FragCoord.xy)-.5)/255.;
+  o = vec4(clamp(r.rgb,0.,1.), clamp(r.a,0.,1.));
+}`;
+
+function compile(type, src) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src); gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) { console.error(gl.getShaderInfoLog(s)); return null; }
+  return s;
+}
+const prog = gl.createProgram();
+gl.attachShader(prog, compile(gl.VERTEX_SHADER, VS));
+gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, FS));
+gl.linkProgram(prog);
+if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) console.error(gl.getProgramInfoLog(prog));
+gl.useProgram(prog);
+const buf = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,3,-1,-1,3]), gl.STATIC_DRAW);
+gl.enableVertexAttribArray(0);
+gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+gl.enable(gl.BLEND);
+gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+const U = {};
+for (const n of ['uRes','uTime','uDream','uVar']) U[n] = gl.getUniformLocation(prog, n);
+
+const DPR = Math.min(devicePixelRatio || 1, 1.5);
+function resize() {
+  canvas.width = Math.round(innerWidth * DPR);
+  canvas.height = Math.round(innerHeight * DPR);
+  gl.viewport(0, 0, canvas.width, canvas.height);
+}
+resize();
+addEventListener('resize', resize);
+
+const names = ['G 虹彩花', 'H 边缘极光', 'I 焦散水光', 'J 真水晶', 'K 流光', 'L 磨砂层缘'];
+function upd() { tag.textContent = `${names[variant]} · ${dream ? 'DREAM' : 'WAKE'}`; }
+let mix = dream, t0 = performance.now();
+function frame(now) {
+  mix += (dream - mix) * .06;
+  gl.uniform2f(U.uRes, canvas.width, canvas.height);
+  gl.uniform1f(U.uTime, (now - t0) / 1000 + 40);
+  gl.uniform1f(U.uDream, mix);
+  gl.uniform1f(U.uVar, variant);
+  gl.clearColor(0,0,0,0);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+document.querySelectorAll('.bar [data-v]').forEach((b) => b.addEventListener('click', () => {
+  variant = +b.dataset.v;
+  document.querySelectorAll('.bar [data-v]').forEach((x) => x.classList.toggle('on', x === b));
+  upd();
+}));
+document.getElementById('face').addEventListener('click', () => { dream = dream ? 0 : 1; document.body.classList.toggle('dream', !!dream); upd(); });
+document.getElementById('hide').addEventListener('click', () => { canvas.style.display = canvas.style.display === 'none' ? '' : 'none'; });
+if (q.get('bare')) { document.querySelector('.bar').style.display = 'none'; tag.style.display = 'none'; }
+upd();
+</script>
+</body>
+</html>

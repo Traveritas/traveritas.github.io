@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8" />
+<title>star-nexus-bake · 离线晶体</title>
+<style>
+  html, body { margin: 0; background: #101216; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script type="module">
+/* ─────────────────────────────────────────────────────────────
+   离线晶体渲染的一页（bake.mjs 的 GPU 段）
+   ─────────────────────────────────────────────────────────────
+   一张全屏片元着色器：逐像素把视线射进「若干凸块的并集」，再按 NEXUS 的
+   那套光学走一遍 —— 入射折射 → 体内至多三次全反射 → 出射折射（三色色散）。
+   材料那一段（env / 吸收 / 光核 / 圆角棱 / 薄膜 / 高光）逐行照搬
+   `src/scripts/nexus-slice.ts` 的 FS，只把几何从「凸体」换成「并集」。
+
+   几何：六支沿 ±x ±y ±z，每支是一个或两个**同轴凸块**（见 bake.mjs 的 profile）。
+   每块都是一组半空间（xyz·p ≤ w）的交，因此「射线与它相交」是闭式的：
+   对每个面算 (w−n·P)/(n·d)，入口取最大、出口取最小 —— 没有二次式、没有开方，
+   也没有 SDF 步进。并集不凸，所以「还在体内吗」用包含判定逐段合并：
+   跨过一个界面后若仍在并集里，那是两块的交叠面（没有真的界面），不折射、不记棱。
+
+   交出的是**带 alpha 的彩色像素**，不是掩码：晶体的每个像素是渐变，
+   一个 alpha 乘一个色相还原不出来 —— 见 notes.md §3 的量。
+   ───────────────────────────────────────────────────────────── */
+
+const MAXP = 6;   // 最多六块（直的一支一块；带腰的一支两块）
+const MAXF = 12;  // 每块最多十二面
+
+const VS = `#version 300 es
+void main(){
+  vec2 p = vec2(float((gl_VertexID << 1) & 2), float(gl_VertexID & 2)) * 2.0 - 1.0;
+  gl_Position = vec4(p, 0.0, 1.0);
+}`;
+
+const FS = `#version 300 es
+precision highp float;
+#define MAXP ${MAXP}
+#define MAXF ${MAXF}
+out vec4 o;
+
+uniform vec2  uRes;
+uniform vec3  uCam;
+uniform float uTanFov;
+uniform mat3  uM;        // 体 → 视（行主序，JS 侧转成列主序上传）
+
+uniform vec4  uPl[MAXP * MAXF];
+uniform int   uOff[MAXP];
+uniform int   uCnt[MAXP];
+uniform int   uNP;
+
+uniform float uDream;
+uniform float uCore;
+uniform vec3  uCoreC;
+uniform float uRough;
+uniform float uEdgeW;
+uniform float uIor;
+uniform float uCard;   // 两张暗卡的强度（1 = NEXUS 原值；这颗星在体对角视角下看到的卡少）
+uniform float uIrid;    // 薄膜虹彩强度（NEXUS 0.16）
+uniform vec3  uBgCol;
+uniform float uBg;
+uniform int   uSS;
+uniform float uDbg;
+uniform vec3  uCamB;     // 体空间里的相机位置
+
+/* ── 环境：照搬 nexus-slice.ts 的 env() ──────────────────────────────
+   淡丁香天顶、近白地平亮带、偏紫的下半球；左上柔光箱与左侧暗卡给轮廓，
+   右后一盏很淡的粉白小灯。r 越大带越糊：表面反射用 0，体内透射用较大值。 */
+vec3 env(vec3 d, float r){
+  float w = 1.0 + 3.0 * r;
+  float y = d.y;
+  float cg = uCard;
+  vec3 top = vec3(0.90, 0.895, 0.97), hor = vec3(1.0, 0.975, 0.965), low = vec3(0.78, 0.745, 0.80);
+  top = mix(top, vec3(0.94, 0.90, 0.95), uDream);
+  vec3 c = y > 0.0 ? mix(hor, top, smoothstep(0.0, 0.65 * w, y)) : mix(hor, low, smoothstep(0.0, 0.5 * w, -y));
+  c += vec3(0.12, 0.10, 0.09) * exp(-pow(y / (0.06 * w), 2.0));
+  c *= mix(1.0, 0.92, smoothstep(0.15, 0.95, d.z));
+  float k = 1.0 - r * 0.6;
+  /* 两张暗卡乘一个增益：这颗星是**凹**的，六支互相遮挡，同一张卡在它身上露出的面积
+     比 NEXUS 那颗凸晶体上小得多 —— 不补，整颗星会偏灰、缺对比（见 notes §2 的量）。 */
+  c *= 1.0 - 0.30 * cg * k * smoothstep(1.0 - 0.20 * w, 0.97, dot(d, normalize(vec3(-0.95, 0.05, -0.30))));
+  c *= 1.0 - 0.15 * cg * k * smoothstep(1.0 - 0.25 * w, 0.97, dot(d, normalize(vec3(0.85, -0.25, 0.45))));
+  float key = smoothstep(1.0 - 0.10 * w, 0.975, dot(d, normalize(vec3(-0.50, 0.70, 0.50))));
+  c += vec3(1.0, 0.99, 0.97) * 0.75 * k * key;
+  c += vec3(1.0, 0.94, 0.96) * 0.30 * k * smoothstep(1.0 - 0.07 * w, 0.99, dot(d, normalize(vec3(0.75, 0.25, -0.60))));
+  return c;
+}
+vec3 toView(vec3 d){ return uM * d; }
+
+bool inPiece(vec3 p, int k){
+  int off = uOff[k], cnt = uCnt[k];
+  for (int i = 0; i < MAXF; i++){
+    if (i >= cnt) break;
+    vec4 pl = uPl[off + i];
+    if (dot(pl.xyz, p) > pl.w + 1e-5) return false;
+  }
+  return true;
+}
+bool inAny(vec3 p){
+  for (int k = 0; k < MAXP; k++){
+    if (k >= uNP) break;
+    if (inPiece(p, k)) return true;
+  }
+  return false;
+}
+
+/* 入口：对每块做半空间裁剪得 [t0,t1]，取所有块里最早的 t0。
+   nIn = 入口那面的外法向，kIn = 是哪一块。 */
+float entryT(vec3 ro, vec3 rd, out vec3 nIn, out int kIn){
+  float best = 1e9; nIn = vec3(0.0, 0.0, 1.0); kIn = -1;
+  for (int k = 0; k < MAXP; k++){
+    if (k >= uNP) break;
+    int off = uOff[k], cnt = uCnt[k];
+    float t0 = -1e9, t1 = 1e9; vec3 n0 = vec3(0.0, 0.0, 1.0);
+    for (int i = 0; i < MAXF; i++){
+      if (i >= cnt) break;
+      vec4 pl = uPl[off + i];
+      float dn = dot(pl.xyz, rd);
+      float num = pl.w - dot(pl.xyz, ro);
+      /* dn > 0 表示 n·p 沿射线增大 —— 从「内」穿到「外」，是出射；dn < 0 才是进入。
+         （nexus-slice 的 exitT 用的是同一个符号口径。） */
+      if (dn > 1e-7){ float t = num / dn; if (t < t1) t1 = t; }
+      else if (dn < -1e-7){ float t = num / dn; if (t > t0){ t0 = t; n0 = pl.xyz; } }
+    }
+    if (t0 > t1 || t1 <= 1e-6) continue;
+    if (t0 < best){ best = t0; nIn = n0; kIn = k; }
+  }
+  return best;
+}
+
+/* 面上一点到这一块最近的棱的距离（沿面量），nb = 那条棱另一侧的面法向 */
+float edgeDist(vec3 p, vec3 n, int k, out vec3 nb){
+  float best = 1e9; nb = n;
+  int off = uOff[k], cnt = uCnt[k];
+  for (int i = 0; i < MAXF; i++){
+    if (i >= cnt) break;
+    vec4 pl = uPl[off + i];
+    float c = dot(pl.xyz, n);
+    if (c > 0.9995) continue;
+    float e = (pl.w - dot(pl.xyz, p)) / sqrt(max(1e-4, 1.0 - c * c));
+    if (e < best){ best = e; nb = pl.xyz; }
+  }
+  return best;
+}
+
+/* 圆角棱：靠近棱时法线朝邻面弯过去（NEXUS 是 0.028 的定宽，这里按体单位可调） */
+vec3 roundN(vec3 p, vec3 n, int k){
+  vec3 nb; float e = edgeDist(p, n, k, nb);
+  float tb = 1.0 - smoothstep(0.0, uEdgeW, e);
+  return normalize(mix(n, normalize(n + nb), tb * tb));
+}
+
+/* 光核：一条线段对一团高斯的贡献 × 线段长 */
+float glowSeg(vec3 A, vec3 B){
+  vec3 ab = B - A;
+  float t = clamp(dot(uCoreC - A, ab) / max(dot(ab, ab), 1e-6), 0.0, 1.0);
+  vec3 q = A + ab * t - uCoreC;
+  return exp(-dot(q, q) / 0.12) * length(ab);
+}
+
+/* 体内沿 T 从 p 出发最近的那张界面；pid 用来算棱距（是哪一块的面） */
+float nextExit(vec3 p, vec3 T, out vec3 Ne, out int pid){
+  float tm = 1e9; pid = -1; Ne = vec3(0.0, 0.0, 1.0);
+  for (int k = 0; k < MAXP; k++){
+    if (k >= uNP) break;
+    if (!inPiece(p, k)) continue;
+    int off = uOff[k], cnt = uCnt[k];
+    for (int i = 0; i < MAXF; i++){
+      if (i >= cnt) break;
+      vec4 pl = uPl[off + i];
+      float dn = dot(pl.xyz, T);
+      if (dn > 1e-6){
+        float t = (pl.w - dot(pl.xyz, p)) / dn;
+        if (t < tm){ tm = t; Ne = pl.xyz; pid = k; }
+      }
+    }
+  }
+  return max(tm, 0.0);
+}
+
+/* 一道视线穿过这颗星的颜色。hit = 0 表示没打中。 */
+vec3 shade(vec3 ro, vec3 rd, out float hit){
+  hit = 0.0;
+  vec3 nIn; int kIn;
+  float t0 = entryT(ro, rd, nIn, kIn);
+  if (kIn < 0 || t0 > 1e8) return vec3(0.0);
+  hit = 1.0;
+
+  vec3 I = rd, V = -rd;
+  vec3 P = ro + rd * max(t0, 1e-5);
+
+  vec3 Nb = roundN(P, nIn, kIn);
+  float ndv = clamp(dot(Nb, V), 0.0, 1.0);
+  float F = 0.04 + 0.96 * pow(1.0 - ndv, 5.0);
+  vec3 refl = env(toView(reflect(I, Nb)), 0.0);
+
+  float ior = uIor;
+  vec3 T = refract(I, Nb, 1.0 / ior);
+  if (dot(T, T) < 1e-8) T = reflect(I, Nb);
+
+  float L = 0.0, g = 0.0, inner = 0.0;
+  vec3 trans = vec3(0.0);
+  bool done = false;
+  float disp = mix(0.006, 0.018, uDream);
+  vec3 Pp = P;
+
+  for (int b = 0; b < 4; b++){
+    vec3 Ne; int pid;
+    float dt = nextExit(Pp, T, Ne, pid);
+    if (pid < 0) break;
+    vec3 Q = Pp + T * dt;
+    L += dt;
+    g += glowSeg(Pp, Q);
+    if (b == 0){
+      vec3 dummy;
+      inner = exp(-pow(edgeDist(Q, Ne, pid, dummy) / 0.010, 2.0));
+    }
+    vec3 Qs = Q + T * 1e-4;
+    if (inAny(Qs)){ Pp = Qs; continue; }   // 交叠面：仍在体内，不折射
+
+    vec3 Tg = refract(T, -Ne, ior);
+    if (dot(Tg, Tg) > 0.0){
+      vec3 Tr = refract(T, -Ne, ior - disp);
+      vec3 Tb = refract(T, -Ne, ior + disp);
+      if (dot(Tr, Tr) == 0.0) Tr = Tg;
+      if (dot(Tb, Tb) == 0.0) Tb = Tg;
+      float Fe = 0.04 + 0.96 * pow(1.0 - clamp(dot(Ne, Tg), 0.0, 1.0), 5.0);
+      trans = vec3(env(toView(Tr), uRough).r, env(toView(Tg), uRough).g, env(toView(Tb), uRough).b) * (1.0 - Fe);
+      done = true;
+      break;
+    }
+    T = reflect(T, -Ne);
+    Pp = Qs;
+  }
+  if (!done) trans = env(toView(T), uRough) * 0.85;
+
+  vec3 kabs = mix(vec3(0.060, 0.064, 0.012), vec3(0.030, 0.058, 0.030), uDream);
+  trans *= exp(-kabs * L) * 1.03;
+  trans *= 1.0 - inner * 0.16;
+  float gc = 1.0 - exp(-g * uCore);
+  vec3 glow = mix(vec3(1.0, 0.975, 0.955), vec3(1.0, 0.955, 0.965), uDream);
+  trans = mix(trans, glow * 1.05, gc * 0.55);
+
+  vec3 film = 0.5 + 0.5 * cos(6.2832 * (vec3(0.0, 0.33, 0.67) + 1.8 * (1.0 - ndv)));
+  refl *= mix(vec3(1.0), film, uIrid);
+  vec3 col = mix(trans, refl, F);
+
+  vec3 Lk = normalize(vec3(-0.50, 0.70, 0.50));
+  float spec = pow(max(dot(toView(Nb), normalize(Lk + V)), 0.0), 260.0);
+  col += vec3(1.0) * spec * 0.9;
+  return col;
+}
+
+void main(){
+  int ss = uSS < 1 ? 1 : uSS;
+  vec3 acc = vec3(0.0);
+  float cov = 0.0;
+  for (int j = 0; j < 2; j++){
+    if (j >= ss) break;
+    for (int i = 0; i < 2; i++){
+      if (i >= ss) break;
+      vec2 off = (vec2(float(i), float(j)) + 0.5) / float(ss) - 0.5;
+      vec2 ndc = (gl_FragCoord.xy + off) / uRes * 2.0 - 1.0;
+      /* 视空间搭射线（相机在 +z 看向 −z），再用 uM 的转置送回体空间 */
+      vec3 rd = normalize(transpose(uM) * vec3(ndc.x * uTanFov, ndc.y * uTanFov, -1.0));
+      float hit;
+      vec3 c = shade(uCamB, rd, hit);
+      if (hit > 0.5){ acc += c; cov += 1.0; }
+    }
+  }
+  float n = 1.0;
+  for (int i = 0; i < 2; i++) if (i < ss) n *= float(ss);
+  vec3 col = cov > 0.0 ? acc / cov : vec3(0.0);
+  float a = cov / n;
+  if (uDbg > 0.5) { o = vec4(a, cov, 0.0, 1.0); return; }
+  /* 交出去的 PNG 用**直 alpha**（canvas 也是 premultipliedAlpha:false）：
+     RGB 是晶体自己的颜色，alpha 是覆盖率。边缘半透明的像素才不会被多乘一次 alpha
+     而在浅底上显出黑边。 */
+  if (uBg > 0.5) o = vec4(mix(uBgCol, col, a), 1.0);
+  else o = vec4(col, a);
+}`;
+
+const cvs = document.getElementById('c');
+const gl = cvs.getContext('webgl2', {
+  alpha: true,
+  premultipliedAlpha: false,
+  preserveDrawingBuffer: true,
+  antialias: false,
+  powerPreference: 'high-performance',
+});
+if (!gl) throw new Error('没有 WebGL2');
+
+function compile(type, src) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src);
+  gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error('shader: ' + gl.getShaderInfoLog(s));
+  return s;
+}
+const prog = gl.createProgram();
+gl.attachShader(prog, compile(gl.VERTEX_SHADER, VS));
+gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, FS));
+gl.linkProgram(prog);
+if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error('link: ' + gl.getProgramInfoLog(prog));
+gl.useProgram(prog);
+gl.bindVertexArray(gl.createVertexArray());
+
+const U = {};
+for (const n of ['uRes', 'uCamB', 'uTanFov', 'uM', 'uPl', 'uOff', 'uCnt', 'uNP', 'uDream', 'uCore', 'uCoreC', 'uRough', 'uEdgeW', 'uIor', 'uCard', 'uIrid', 'uBgCol', 'uBg', 'uSS', 'uDbg'])
+  U[n] = gl.getUniformLocation(prog, n);
+
+/** 行主序 3×3 → 列主序 */
+const colMajor = (m) => new Float32Array([m[0], m[3], m[6], m[1], m[4], m[7], m[2], m[5], m[8]]);
+
+const plBuf = new Float32Array(MAXP * MAXF * 4);
+const offBuf = new Int32Array(MAXP);
+const cntBuf = new Int32Array(MAXP);
+
+/**
+ * o = { px, M(行主序 体→视), pieces: [[[nx,ny,nz,w], …], …], camDist, tanFov,
+ *       dream, core, coreC, rough, edgeW, ior, ss, bg（null = 透明）, bgCol }
+ */
+function render(o) {
+  const px = Math.max(16, o.px | 0);
+  if (cvs.width !== px) { cvs.width = px; cvs.height = px; }
+  gl.viewport(0, 0, px, px);
+
+  let k = 0;
+  o.pieces.forEach((faces, pi) => {
+    /* uPl 是 vec4 数组：偏移以 vec4 为单位（= 面的序号），不是 float 下标 */
+    offBuf[pi] = k;
+    for (const f of faces) { plBuf.set(f, k * 4); k++; }
+    cntBuf[pi] = faces.length;
+  });
+  for (let i = o.pieces.length; i < MAXP; i++) { offBuf[i] = 0; cntBuf[i] = 0; }
+
+  gl.uniform2f(U.uRes, px, px);
+  /* 相机与射线都必须在**体空间**里一致：屏幕中心那条视线 = 体空间的 −(体→视)·ẑ 反向，
+     即 transpose(M)·(0,0,−1)；相机位置同理 transpose(M)·(0,0,camDist)。 */
+  const Mb = o.M;
+  const t = [Mb[0], Mb[3], Mb[6], Mb[1], Mb[4], Mb[7], Mb[2], Mb[5], Mb[8]]; // 转置
+  const cam = [
+    t[0] * 0 + t[1] * 0 + t[2] * o.camDist,
+    t[3] * 0 + t[4] * 0 + t[5] * o.camDist,
+    t[6] * 0 + t[7] * 0 + t[8] * o.camDist,
+  ];
+  gl.uniform3f(U.uCamB, cam[0], cam[1], cam[2]);
+  gl.uniform1f(U.uTanFov, o.tanFov);
+  gl.uniformMatrix3fv(U.uM, false, colMajor(o.M));
+  gl.uniform4fv(U.uPl, plBuf);
+  gl.uniform1iv(U.uOff, offBuf);
+  gl.uniform1iv(U.uCnt, cntBuf);
+  gl.uniform1i(U.uNP, o.pieces.length);
+  gl.uniform1f(U.uDream, o.dream ?? 0);
+  gl.uniform1f(U.uCore, o.core ?? 0.62);
+  gl.uniform3fv(U.uCoreC, new Float32Array(o.coreC || [0, 0.05, 0]));
+  gl.uniform1f(U.uRough, o.rough ?? 0.30);
+  gl.uniform1f(U.uEdgeW, o.edgeW ?? 0.030);
+  gl.uniform1f(U.uIor, o.ior ?? 1.52);
+  gl.uniform1f(U.uCard, o.cardGain ?? 1.0);
+  gl.uniform1f(U.uIrid, o.filmAmt ?? 0.16);
+  gl.uniform1f(U.uBg, o.bg === null || o.bg === undefined ? 0 : 1);
+  gl.uniform3fv(U.uBgCol, new Float32Array(o.bgCol || [0.941, 0.953, 0.965]));
+  gl.uniform1i(U.uSS, o.ss || 1);
+  gl.uniform1f(U.uDbg, o.dbg ? 1 : 0);
+
+  gl.clearColor(0, 0, 0, 0);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  gl.finish();
+  return cvs.toDataURL('image/png');
+}
+
+window.__crystal = {
+  render,
+  info: () => {
+    const d = gl.getExtension('WEBGL_debug_renderer_info');
+    return {
+      version: gl.getParameter(gl.VERSION),
+      renderer: d ? gl.getParameter(d.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER),
+      maxSamples: gl.getParameter(gl.MAX_SAMPLES),
+    };
+  },
+};
+window.__ready = true;
+</script>
+</body>
+</html>

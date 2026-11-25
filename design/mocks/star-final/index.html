@@ -1,0 +1,699 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>星 · 合成</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- 空 favicon：只为免掉一条 404（原型不配图标） -->
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E" />
+    <link rel="stylesheet" href="/fonts/noto/font.css" />
+    <link rel="stylesheet" href="/fonts/plex/index.css" />
+    <style>
+      /* 令牌取自 src/styles/tokens.css，只抄这一页要用的几个 —— 留一份自足的原型 */
+      :root {
+        --bg: #f0f3f6;
+        --bg-sunken: #e5ebf2;
+        --fg: #232830;
+        --fg-soft: #56606d;
+        --fg-faint: #858f9d;
+        --line: rgba(35, 40, 48, 0.12);
+        --amber: #9a86c4;
+        --umber: #4f4a66;
+        --glass: rgba(255, 255, 255, 0.5);
+        --edge: rgba(255, 255, 255, 0.72);
+        --sh: rgba(38, 44, 51, 0.14);
+        --deep: #2a2b38;
+        --font-display: 'Noto Serif SC', 'Palatino Linotype', Palatino, Georgia, serif;
+        --font-body: system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei UI', 'Microsoft YaHei', sans-serif;
+        --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+      }
+      * { box-sizing: border-box; }
+      html { color-scheme: light; }
+      body {
+        margin: 0;
+        padding: 3.2rem 3rem 7rem;
+        background: var(--bg);
+        color: var(--fg);
+        font-family: var(--font-body);
+        -webkit-font-smoothing: antialiased;
+      }
+      .wrap { max-width: 76rem; margin: 0 auto; }
+      h1, h2, h3 { font-family: var(--font-display); font-weight: 500; margin: 0; }
+      h1 { font-size: 1.42rem; letter-spacing: 0.02em; }
+      h2 { font-size: 1.02rem; letter-spacing: 0.04em; }
+      h3 { font-size: 0.88rem; color: var(--fg-soft); letter-spacing: 0.03em; }
+      p { margin: 0; font-size: 0.86rem; line-height: 1.9; color: var(--fg-soft); }
+      .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+      .k {
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--fg-faint);
+      }
+      .lede { max-width: 44rem; }
+      hr.rule { height: 1px; border: 0; background: var(--line); margin: 0; }
+
+      header.top { display: flex; align-items: baseline; gap: 1.2rem; padding-bottom: 1.2rem; }
+      header.top .tag { margin-left: auto; }
+
+      section { padding: 2.6rem 0 0.4rem; }
+      section > .hd {
+        display: flex;
+        align-items: baseline;
+        gap: 1rem;
+        padding-bottom: 1.1rem;
+        flex-wrap: wrap;
+        border-top: 1px solid var(--line);
+        padding-top: 1.1rem;
+      }
+      section > .hd .n { font-family: var(--font-mono); font-size: 0.68rem; color: var(--fg-faint); letter-spacing: 0.16em; }
+      section > .hd .note { margin-left: auto; max-width: 34rem; text-align: right; font-size: 0.8rem; }
+
+      .panel {
+        position: relative;
+        border-radius: 8px;
+        border: 1px solid var(--edge);
+        background: var(--glass);
+        -webkit-backdrop-filter: blur(14px) saturate(1.06);
+        backdrop-filter: blur(14px) saturate(1.06);
+        box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.5), 0 14px 34px -22px var(--sh);
+        padding: 1.25rem 1.35rem;
+      }
+      .panel + .panel { margin-top: 0.9rem; }
+      .cap { font-family: var(--font-mono); font-size: 0.66rem; letter-spacing: 0.06em; color: var(--fg-faint); }
+
+      /* 星与格子 */
+      .cell { text-align: center; }
+      .cell .box { display: grid; place-items: center; }
+      .cell .lab { margin-top: 0.4rem; font-size: 0.74rem; color: var(--fg-soft); line-height: 1.5; }
+      .cell .lab b { font-weight: 500; color: var(--fg); }
+      .cell .lab .sub { display: block; color: var(--fg-faint); font-family: var(--font-mono); font-size: 0.64rem; letter-spacing: 0.04em; }
+      .s svg { display: block; }
+
+      /* 对照：一张表，行 = 尺寸，列 = 现役 / 合成，两组底色 */
+      .cmp { display: grid; grid-template-columns: 3.6rem 1fr 1fr; gap: 0 1.4rem; align-items: end; }
+      .cmp .rh { font-family: var(--font-mono); font-size: 0.68rem; color: var(--fg-faint); padding-bottom: 1.4rem; letter-spacing: 0.06em; }
+      .cmp .ch { font-size: 0.76rem; color: var(--fg-soft); padding-bottom: 0.5rem; }
+      .cmp .ch b { font-weight: 500; color: var(--fg); }
+      .row { display: flex; align-items: flex-end; gap: 1.6rem; padding: 0.5rem 0 1.1rem; }
+      .ground-deep { background: var(--deep); border-radius: 8px; padding: 1.1rem 1.2rem; margin-top: 0.6rem; }
+      .ground-deep .cell .lab { color: rgba(207, 210, 226, 0.66); }
+      .ground-deep .cell .lab b { color: #e6e8f2; }
+      .ground-deep .cell .lab .sub { color: rgba(207, 210, 226, 0.44); }
+      .ground-deep .cap { color: rgba(207, 210, 226, 0.5); }
+
+      /* 拆解 */
+      .break { display: grid; grid-template-columns: 420px 1fr; gap: 2rem; align-items: start; }
+      .break .side { display: grid; gap: 1.1rem; }
+      .kv { display: grid; grid-template-columns: 7.2rem 1fr; gap: 0.3rem 0.8rem; font-size: 0.8rem; }
+      .kv dt { color: var(--fg-faint); font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.05em; padding-top: 0.16rem; }
+      .kv dd { margin: 0; color: var(--fg-soft); line-height: 1.7; }
+      .kv dd b { font-weight: 500; color: var(--fg); }
+      .zooms { display: grid; grid-template-columns: repeat(3, max-content); gap: 1.1rem; align-items: start; }
+
+      /* 运动 */
+      .motion { display: grid; grid-template-columns: 340px 1fr; gap: 1.8rem; align-items: start; }
+      .plot { width: 100%; display: block; border-radius: 6px; background: rgba(255, 255, 255, 0.42); }
+      .strip { display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.5rem; margin-top: 0.9rem; }
+      .strip .cell .lab { font-size: 0.66rem; }
+      .legend { display: flex; gap: 1.1rem; flex-wrap: wrap; margin-top: 0.7rem; }
+      .legend span { font-family: var(--font-mono); font-size: 0.66rem; color: var(--fg-faint); display: flex; align-items: center; gap: 0.35rem; }
+      .legend i { width: 14px; height: 2px; border-radius: 1px; display: block; }
+
+      /* 互动 */
+      .stage { display: grid; grid-template-columns: 380px 1fr; gap: 2rem; align-items: center; }
+      .btn {
+        font-family: var(--font-display);
+        font-size: 0.9rem;
+        letter-spacing: 0.08em;
+        color: var(--fg);
+        padding: 0.66rem 1.5rem;
+        border-radius: 999px;
+        border: 1px solid var(--edge);
+        background: rgba(255, 255, 255, 0.62);
+        -webkit-backdrop-filter: blur(12px) saturate(1.08);
+        backdrop-filter: blur(12px) saturate(1.08);
+        box-shadow: 0 6px 18px -10px var(--sh);
+        cursor: pointer;
+        transition: color 0.25s, background-color 0.25s, transform 0.25s;
+      }
+      .btn:hover { background: rgba(255, 255, 255, 0.86); }
+      .btn:active { transform: translateY(1px); }
+      .btn:focus-visible { outline: 1.5px solid var(--amber); outline-offset: 3px; }
+      .btn[disabled] { color: var(--fg-faint); cursor: default; }
+      .live { display: grid; gap: 0.7rem; }
+      .live .ln { display: flex; align-items: baseline; gap: 0.7rem; font-size: 0.8rem; color: var(--fg-soft); }
+      .live .ln .v { font-family: var(--font-mono); color: var(--fg); font-size: 0.82rem; }
+      .live .ln .k { min-width: 7.6rem; }
+      .state { font-family: var(--font-mono); font-size: 0.72rem; color: var(--fg-faint); letter-spacing: 0.05em; }
+      .state b { color: var(--amber); font-weight: 400; }
+
+      /* 读数 */
+      table { width: 100%; border-collapse: collapse; font-size: 0.79rem; }
+      th, td { text-align: left; padding: 0.44rem 0.5rem; border-bottom: 1px solid var(--line); vertical-align: baseline; }
+      th {
+        font-weight: 500;
+        color: var(--fg-faint);
+        font-family: var(--font-mono);
+        font-size: 0.66rem;
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
+      }
+      td.n { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+      td.hi { color: var(--fg); }
+      td.lo { color: var(--fg-faint); }
+      .tbl + .tbl { margin-top: 1.2rem; }
+      .verdict2 { margin-top: 1.2rem; padding-top: 1rem; border-top: 1px solid var(--line); display: grid; grid-template-columns: 1fr 1fr; gap: 1rem 1.6rem; }
+      .verdict2 p { font-size: 0.82rem; line-height: 1.78; }
+      .yes { color: var(--fg); }
+      .no { color: var(--fg-faint); }
+      footer { padding-top: 3rem; }
+      .foot { display: flex; gap: 1rem; flex-wrap: wrap; font-family: var(--font-mono); font-size: 0.68rem; color: var(--fg-faint); letter-spacing: 0.05em; }
+      .foot span + span::before { content: '·'; margin-right: 1rem; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="top">
+        <h1>星 · 合成</h1>
+        <span class="k">halfWidth 0.26 · 凹 0.04 · 脊 1.0 · 四档 · 劈开</span>
+        <span class="tag k" id="tag-build">—</span>
+      </header>
+
+      <!-- ── 对照 ───────────────────────────────────────────── -->
+      <section id="cmp">
+        <div class="hd">
+          <span class="n">01</span>
+          <h2>对照</h2>
+          <p class="note">左：站上此刻那一颗（七条 path，两档明暗，平风筝）。右：这一轮合成的。同一个画框、同一个尺度。</p>
+        </div>
+
+        <div class="panel">
+          <div class="cap" style="margin-bottom: 0.8rem">浅底 #f0f3f6</div>
+          <div class="cmp" id="cmp-light">
+            <div></div>
+            <div class="ch" id="ch-prod"><b>现役</b> · 七条 path · 两档 · 支内无落差</div>
+            <div class="ch" id="ch-sync"><b>合成</b> · 四档 · 支内有脊</div>
+          </div>
+          <div id="rows-light"></div>
+
+          <div class="ground-deep">
+            <div class="cap" style="margin-bottom: 0.8rem">深底 #2a2b38</div>
+            <div id="rows-deep"></div>
+          </div>
+
+          <p class="cap" style="margin-top: 1rem">
+            每个尺寸都按 CSS 像素画（48 / 96 / 200 / 400），不是缩放同一张图 —— 48 上那几颗就是屏幕上的四个像素宽。
+          </p>
+        </div>
+
+        <div class="panel" id="cmp-verdict-panel">
+          <h3 style="margin-bottom: 0.6rem">一眼看过去的话</h3>
+          <div class="verdict2" id="cmp-verdict"></div>
+        </div>
+      </section>
+
+      <!-- ── 拆解 ───────────────────────────────────────────── -->
+      <section id="breakdown">
+        <div class="hd">
+          <span class="n">02</span>
+          <h2>拆解</h2>
+          <p class="note">400px。四个旋钮各自做的事，分开看比合起来看容易。</p>
+        </div>
+        <div class="panel">
+          <div class="break">
+            <div class="cell">
+              <div class="box" id="bd-full"></div>
+              <div class="lab"><b>整颗</b><span class="sub" id="bd-fullsub">400px</span></div>
+            </div>
+            <div class="side">
+              <div class="zooms">
+                <div class="cell">
+                  <div class="box" id="bd-core"></div>
+                  <div class="lab"><b>中心</b><span class="sub">11.2 单位 · 放大约 3.6 倍</span></div>
+                </div>
+                <div class="cell">
+                  <div class="box" id="bd-tip"></div>
+                  <div class="lab"><b>尖端</b><span class="sub">9 单位 · 放大约 4.4 倍</span></div>
+                </div>
+                <div class="cell">
+                  <div class="box" id="bd-prod"></div>
+                  <div class="lab"><b>现役 · 同一处</b><span class="sub">对照</span></div>
+                </div>
+              </div>
+              <dl class="kv" id="bd-kv"></dl>
+              <p id="bd-say"></p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── 运动 ───────────────────────────────────────────── -->
+      <section id="motion">
+        <div class="hd">
+          <span class="n">03</span>
+          <h2>运动</h2>
+          <p class="note">一次触发的翻动：三个轴同时动，1.55 秒后落回正位，然后完全静止。曲线是逐帧真算的分数。</p>
+        </div>
+        <div class="panel">
+          <div class="motion">
+            <div>
+              <div class="cell">
+                <div class="box" id="mo-live"></div>
+                <div class="lab"><b>翻动之后</b><span class="sub" id="mo-state">静置</span></div>
+              </div>
+            </div>
+            <div>
+              <canvas id="plot" class="plot" width="1120" height="330"></canvas>
+              <div class="legend">
+                <span><i style="background: #8d97a6"></i>70 分以上：这一格可以停住</span>
+                <span><i style="background: #c2b18a"></i>55–70：能过</span>
+                <span><i style="background: #b98f8f"></i>55 以下：不该被看见</span>
+                <span><i style="background: var(--umber)"></i>本条路径</span>
+              </div>
+              <p style="margin-top: 0.8rem" id="mo-say"></p>
+            </div>
+          </div>
+          <div class="strip" id="mo-strip"></div>
+        </div>
+      </section>
+
+      <!-- ── 互动 ───────────────────────────────────────────── -->
+      <section id="play">
+        <div class="hd">
+          <span class="n">04</span>
+          <h2>互动</h2>
+          <p class="note">按一下，它翻一次然后停下。`window.__star.flip()` 是同一件事 —— 以后接任意事件都用它。</p>
+        </div>
+        <div class="panel">
+          <div class="stage">
+            <div class="cell">
+              <div class="box" id="pl-star"></div>
+              <div class="lab"><b>合成</b><span class="sub">320px</span></div>
+            </div>
+            <div class="live">
+              <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap">
+                <button class="btn" id="pl-btn" type="button">翻一次</button>
+                <span class="state" id="pl-state">定 · 零帧</span>
+              </div>
+              <div class="ln"><span class="k">本帧数</span><span class="v" id="pl-frames">0</span></div>
+              <div class="ln"><span class="k">本次最低分</span><span class="v" id="pl-min">—</span></div>
+              <div class="ln"><span class="k">单帧重画</span><span class="v" id="pl-ms">—</span></div>
+              <div class="ln"><span class="k">回落姿态</span><span class="v">yaw 45° / pitch 35.264°</span></div>
+              <p class="cap" style="margin-top: 0.4rem" id="pl-note"></p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── 读数 ───────────────────────────────────────────── -->
+      <section id="readout">
+        <div class="hd">
+          <span class="n">05</span>
+          <h2>读数</h2>
+          <p class="note">都是这一页自己算的，没有查表。</p>
+        </div>
+        <div class="panel">
+          <table class="tbl" id="tbl-main"></table>
+          <table class="tbl" id="tbl-move"></table>
+          <p style="margin-top: 1.2rem" id="rd-say"></p>
+        </div>
+      </section>
+
+      <footer>
+        <div class="foot">
+          <span>design/mocks/star-final</span>
+          <span>4669</span>
+          <span id="foot-cost">—</span>
+        </div>
+      </footer>
+    </div>
+
+    <script type="module">
+      import {
+        svg,
+        build,
+        syncOpts,
+        prodOpts,
+        SYNC,
+        PROD,
+        Flip,
+        scoreSamples,
+        mAxis,
+        mMul,
+        M_REST,
+        poseAt,
+        measurePose,
+        TUMBLE,
+        stationAt,
+        GOOD,
+        PASS,
+      } from './src.js';
+
+      const $ = (s) => document.querySelector(s);
+      const SIZES = [48, 96, 200, 400];
+      const readout = {};
+
+      /* ── 01 对照 ── */
+      const mkCell = (cfg, size, ground, label, sub) => {
+        const box = document.createElement('div');
+        box.className = 'cell';
+        const inner = document.createElement('div');
+        inner.className = 'box s';
+        inner.style.width = size + 'px';
+        inner.style.height = size + 'px';
+        inner.innerHTML = svg(cfg, { size, ground });
+        box.append(inner);
+        if (label) {
+          const lab = document.createElement('div');
+          lab.className = 'lab';
+          lab.innerHTML = `<b>${label}</b>${sub ? `<span class="sub">${sub}</span>` : ''}`;
+          box.append(lab);
+        }
+        return box;
+      };
+
+      const fillRows = (host, ground) => {
+        const list = [];
+        for (const size of SIZES) {
+          const rh = document.createElement('div');
+          rh.className = 'rh';
+          rh.textContent = size + 'px';
+          const left = document.createElement('div');
+          left.className = 'row';
+          left.append(mkCell(prodOpts({}), size, ground));
+          const right = document.createElement('div');
+          right.className = 'row';
+          right.append(mkCell(syncOpts({}), size, ground));
+          list.push(rh, left, right);
+        }
+        const grid = document.createElement('div');
+        grid.className = 'cmp';
+        for (const el of list) grid.append(el);
+        host.append(grid);
+      };
+      fillRows($('#rows-light'), 'light');
+      fillRows($('#rows-deep'), 'dark');
+
+      /* 对照的判语：以这一页自己算的两个量为准 —— 内角的像素、支内落差 */
+      const stTmp = build(syncOpts({})).stats;
+      const stProdTmp = build(prodOpts({})).stats;
+      const n48 = (stTmp.notch / 40) * 48;
+      const n48p = (stProdTmp.notch / 40) * 48;
+      $('#ch-sync').innerHTML = `<b>合成</b> · ${stTmp.paths} 条 path · ${stTmp.tones.length} 档 · 支内有脊`;
+      $('#cmp-verdict').innerHTML = `
+        <p class="yes"><b id="v-coarse">400 / 200px：</b>合成的六支是一支支有面的棱柱，每支自己折过；现役的六片仍是六张平贴的三角。这一档的差别不并排也看得出。</p>
+        <p class="yes"><b id="v-mid">96px：</b>合成开始显出六边形的内心，支与支的分界靠脊的明暗而不是靠空隙；现役在这个尺寸上还站得住，但已经读成六张叠片。</p>
+        <p class="no"><b id="v-small">48px：</b>内角 ${n48p.toFixed(2)}px → ${n48.toFixed(2)}px。合成在这个尺寸上更宽、更实，但<b>现役那张反而更干净</b> —— 它只有两档明暗，缩小之后不会糊成一片灰。这一档合成没有赢。</p>
+      `;
+
+      /* ── 02 拆解 ── */
+      const syncCfg = syncOpts({});
+      $('#bd-full').innerHTML = svg(syncCfg, { size: 400 });
+      $('#bd-core').innerHTML = svg(syncCfg, { size: 260, view: 'core' });
+      $('#bd-tip').innerHTML = svg(syncCfg, { size: 260, view: 'tip' });
+      $('#bd-prod').innerHTML = svg(prodOpts({}), { size: 260, view: 'core' });
+
+      const st = build(syncCfg).stats;
+      const stP = build(prodOpts({})).stats;
+      const W0 = stationAt(0, syncCfg).W;
+      const Wm = stationAt(0.5, syncCfg).W;
+      const Ws = stationAt(0.5, syncOpts({ curve: 0 })).W;
+      const foldRef = (1.0 * Wm) / 1.9;
+      const kvRows = [
+        ['halfWidth', `<b>${W0.toFixed(2)}</b> 单位 = 0.26·r（现役 ${PROD.halfWidth}）`],
+        ['内角', `<b>${st.notch.toFixed(2)}</b> 单位 · 48px 上 ${((st.notch / 40) * 48).toFixed(2)}px（现役 ${((stP.notch / 40) * 48).toFixed(2)}px）`],
+        ['腰', `剖面一半处 <b>${Wm.toFixed(2)}</b> 单位，比直边窄 ${((Wm / Ws - 1) * 100).toFixed(1)}%`],
+        ['脊', `脊高 = 半宽 × ${(foldRef / Wm).toFixed(2)}，脊棱半张角 <b>${((Math.atan2(foldRef, Wm) * 180) / Math.PI).toFixed(1)}°</b>`],
+        ['明暗', `${st.tones.length} 档 <b>${st.tones.map((t) => t.toFixed(2)).join(' / ')}</b>`],
+        ['支内落差', `最差的一支 <b>${st.spineRawMin.toFixed(2)}</b>（现役 ${stP.spineRawMin.toFixed(2)}）`],
+        ['中心', `沿光的垂向劈成两半，半径 ${syncCfg.hub.radius}`],
+      ];
+      $('#bd-kv').innerHTML = kvRows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
+
+      /* ── 03 运动 ── */
+      const samples = scoreSamples({ n: 240, size: 128 });
+      const flipPlot = { samples };
+      const plot = $('#plot');
+      const drawPlot = (series, { replay = null } = {}) => {
+        const ctx = plot.getContext('2d');
+        const W = plot.width;
+        const H = plot.height;
+        const padL = 42;
+        const padR = 16;
+        const padT = 18;
+        const padB = 30;
+        ctx.clearRect(0, 0, W, H);
+        const x = (t) => padL + t * (W - padL - padR);
+        const y = (v) => padT + (1 - v / 100) * (H - padT - padB);
+        /* 三条带 */
+        const bands = [
+          [GOOD, 100, 'rgba(141,151,166,0.10)'],
+          [PASS, GOOD, 'rgba(194,177,138,0.14)'],
+          [0, PASS, 'rgba(185,143,143,0.14)'],
+        ];
+        for (const [a, b, c] of bands) {
+          ctx.fillStyle = c;
+          ctx.fillRect(padL, y(b), W - padL - padR, y(a) - y(b));
+        }
+        /* 网格与刻度 */
+        ctx.font = '15px "IBM Plex Mono", monospace';
+        ctx.fillStyle = '#858f9d';
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'middle';
+        for (const v of [0, 25, 50, 55, 70, 100]) {
+          const yy = y(v);
+          ctx.strokeStyle = v === PASS || v === GOOD ? 'rgba(35,40,48,0.20)' : 'rgba(35,40,48,0.06)';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(padL, yy);
+          ctx.lineTo(W - padR, yy);
+          ctx.stroke();
+          ctx.fillText(String(v), padL - 8, yy);
+        }
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        for (const t of [0, 0.25, 0.5, 0.75, 1]) {
+          ctx.fillStyle = '#858f9d';
+          ctx.fillText((t * TUMBLE.duration).toFixed(0) + 'ms', x(t), H - padB + 8);
+        }
+        /* 读数曲线 */
+        const line = (rows, color, w) => {
+          ctx.strokeStyle = color;
+          ctx.lineWidth = w;
+          ctx.lineJoin = 'round';
+          ctx.beginPath();
+          rows.forEach((r, i) => {
+            const xx = x(r.t);
+            const yy = y(r.score);
+            i ? ctx.lineTo(xx, yy) : ctx.moveTo(xx, yy);
+          });
+          ctx.stroke();
+        };
+        /* 难看段涂实：低于 55 的那几段 */
+        ctx.fillStyle = 'rgba(185,143,143,0.36)';
+        let open = null;
+        for (const r of series) {
+          if (r.score < PASS) {
+            if (open === null) open = r.t;
+          } else if (open !== null) {
+            ctx.fillRect(x(open), padT, x(r.t) - x(open), H - padT - padB);
+            open = null;
+          }
+        }
+        if (open !== null) ctx.fillRect(x(open), padT, x(1) - x(open), H - padT - padB);
+        line(series, '#4f4a66', 2.2);
+        if (replay) line(replay, 'rgba(154,134,196,0.85)', 1.4);
+      };
+      drawPlot(samples);
+
+      const strip = $('#mo-strip');
+      const stripAt = [0, 0.2, 0.4, 0.6, 0.8, 1];
+      for (const u of stripAt) {
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+        const box = document.createElement('div');
+        box.className = 'box s';
+        box.innerHTML = svg(syncOpts({ m: poseAt(u) }), { size: 108 });
+        const sc = samples[Math.round(u * 240)].score;
+        const lab = document.createElement('div');
+        lab.className = 'lab';
+        lab.innerHTML = `<b>${Math.round(u * TUMBLE.duration)}ms</b><span class="sub">${sc} 分</span>`;
+        cell.append(box, lab);
+        strip.append(cell);
+      }
+
+      /* ── 04 互动 ── */
+      const flip = new Flip($('#pl-star'), syncOpts({}), { size: 300, ground: 'light', sampleSize: 96 });
+      const btn = $('#pl-btn');
+      const plState = $('#pl-state');
+      const plFrames = $('#pl-frames');
+      const plMin = $('#pl-min');
+      const plMs = $('#pl-ms');
+      const plNote = $('#pl-note');
+
+      const refresh = () => {
+        const s = flip.state();
+        plFrames.textContent = String(s.frames);
+        plMin.textContent = s.scoreMin === null ? '—' : String(s.scoreMin) + ' 分';
+        plMs.textContent = s.msMedian === null ? '—' : s.msMedian.toFixed(2) + ' ms';
+        if (s.busy) plState.innerHTML = '<b>起</b> · 正在翻';
+        else if (flip.reduced) plState.innerHTML = '<b>定</b> · 已按 reduced-motion 跳过翻动';
+        else plState.innerHTML = '<b>定</b> · 零帧';
+      };
+      const watch = () => {
+        refresh();
+        if (flip.busy) requestAnimationFrame(watch);
+        else {
+          /* 翻完之后再刷一次读数；这条链在 busy 为 false 时立刻停，不留帧 */
+          refresh();
+          plMin.textContent = String(Math.min(...flip.log.map((l) => l.score))) + ' 分';
+          drawPlot(samples, {
+            replay: flip.log.map((l) => ({ t: l.t, score: l.score })),
+          });
+          btn.disabled = false;
+        }
+      };
+      btn.addEventListener('click', () => {
+        if (flip.busy) return;
+        btn.disabled = true;
+        flip.flip();
+        requestAnimationFrame(watch);
+      });
+      plNote.textContent = flip.reduced
+        ? '这台机器要求减少动态：翻动不会播放，直接就是落定之后的样子。'
+        : '翻动期间有帧，停下来之后一条都不剩 —— 状态栏那个「零帧」是真的指零。';
+      refresh();
+
+      /* ── 05 读数 ── */
+      const pct = (v) => (v < 0 ? '−' : '') + Math.abs(v).toFixed(1) + '%';
+      const mainRows = [
+        ['path 数', `${st.paths}`, `${stP.paths}`, `${(st.paths / stP.paths).toFixed(1)}×`],
+        ['片数（未被合并）', `${st.cells}`, `${stP.cells}`, '—'],
+        ['明暗档数', `${st.tones.length}`, `${stP.tones.length}`, '四档是最少的「立得住」档数'],
+        ['支内落差（最差的一支）', st.spineRawMin.toFixed(2), stP.spineRawMin.toFixed(2), '脊的直接读数'],
+        ['内角 · 48px', ((st.notch / 40) * 48).toFixed(2) + 'px', ((stP.notch / 40) * 48).toFixed(2) + 'px', '≥2.8px 才读得出六支'],
+        ['内角 · 200px', ((st.notch / 40) * 200).toFixed(1) + 'px', ((stP.notch / 40) * 200).toFixed(1) + 'px', ''],
+        ['path 字符串字节', `${JSON.stringify(build(syncCfg).paths.map((p) => p.d)).length}`, `${JSON.stringify(build(prodOpts({})).paths.map((p) => p.d)).length}`, '每帧重画要过手的东西'],
+      ];
+      $('#tbl-main').innerHTML =
+        `<thead><tr><th>量</th><th>合成</th><th>现役</th><th>说明</th></tr></thead><tbody>` +
+        mainRows
+          .map(
+            ([a, b, c, d]) =>
+              `<tr><td>${a}</td><td class="n hi">${b}</td><td class="n lo">${c}</td><td class="lo">${d}</td></tr>`,
+          )
+          .join('') +
+        '</tbody>';
+
+      const N = 300;
+      const springU = (p) => (1 - Math.exp(-7 * p) * Math.cos(5 * p)) / (1 - Math.exp(-7) * Math.cos(5));
+      /** 一条候选路径的分数序列（与 poseAt 同一个矩阵构造，只是参数可换） */
+      const seriesOf = (sign, span, spring = { k: 7, w: 5 }) => {
+        const ease = (p) =>
+          (1 - Math.exp(-spring.k * p) * Math.cos(spring.w * p)) /
+          (1 - Math.exp(-spring.k) * Math.cos(spring.w));
+        const out = [];
+        for (let i = 0; i <= N; i++) {
+          const u = i / N;
+          const a = [0, 1, 2].map((j) => {
+            const [s0, s1] = span[j];
+            const p = Math.min(1, Math.max(0, (u - s0) / (s1 - s0)));
+            return 90 * sign[j] * ease(p);
+          });
+          const R = mMul(mAxis([0, 0, 1], a[2]), mMul(mAxis([0, 1, 0], a[1]), mAxis([1, 0, 0], a[0])));
+          out.push(measurePose(syncCfg, mMul(M_REST, R), 96).score);
+        }
+        return out;
+      };
+      const stat = (arr) => ({
+        ugly: +((arr.filter((v) => v < PASS).length / arr.length) * 100).toFixed(1),
+        mid: +((arr.filter((v) => v >= PASS && v < GOOD).length / arr.length) * 100).toFixed(1),
+        min: Math.min(...arr),
+      });
+      const mine = samples.map((s) => s.score);
+      const mineS = stat(mine);
+      /* 对照：三轴同起同止（最直白的写法） */
+      const naiveS = stat(seriesOf([1, -1, 1], [[0, 1], [0, 1], [0, 1]], { k: 5, w: 6 }));
+
+      $('#tbl-move').innerHTML =
+        `<thead><tr><th>翻动</th><th>本页</th><th>对照：三轴同起同止</th><th>说明</th></tr></thead><tbody>` +
+        [
+          ['时长', TUMBLE.duration + ' ms', TUMBLE.duration + ' ms', '任务给的范围 1.2–2.0 s'],
+          ['三轴', 'x −90° / y −90° / z +90°', 'x +90° / y −90° / z +90°', '每个轴都动，终点都是立方群的一个元素'],
+          ['起止', '错开 12% / 0% / 5%', '三轴对齐', '错开是这一轮唯一改动路径的地方'],
+          [
+            '难看（<55 分）',
+            mineS.ugly.toFixed(1) + '%',
+            naiveS.ugly.toFixed(1) + '%',
+            `≈ ${((mineS.ugly / 100) * TUMBLE.duration).toFixed(0)} ms vs ${((naiveS.ugly / 100) * TUMBLE.duration).toFixed(0)} ms`,
+          ],
+          ['能过（55–70）', mineS.mid.toFixed(1) + '%', naiveS.mid.toFixed(1) + '%', ''],
+          ['最低分', mineS.min + ' 分', naiveS.min + ' 分', '落在起手那一小段'],
+          ['落定之后', '零帧', '零帧', 'cancelAnimationFrame 之后一条 rAF 都不再排'],
+        ]
+          .map(([a, b, c, d]) => `<tr><td>${a}</td><td class="n hi">${b}</td><td class="n lo">${c}</td><td class="lo">${d}</td></tr>`)
+          .join('') +
+        '</tbody>';
+
+      /* ── 文案（用真读数写，不写死） ── */
+      const notch48 = (st.notch / 40) * 48;
+      const notch48p = (stP.notch / 40) * 48;
+      const minAt = mine.indexOf(mineS.min);
+      $('#mo-say').textContent =
+        `分数在起手那一小段压得最低（${mineS.min} 分，约 ${((minAt / mine.length) * TUMBLE.duration).toFixed(0)} ms 处），` +
+        `之后一路回到 100。整段落在 55 分以下的时间是 ${mineS.ugly.toFixed(1)}%，也就是 ${((mineS.ugly / 100) * TUMBLE.duration).toFixed(0)} 毫秒 —— ` +
+        `不到一帧半。把三轴改成同起同止，同一把尺子量出来是 ${naiveS.ugly.toFixed(1)}%。`;
+
+      $('#bd-say').textContent =
+        `六支的每一支都被脊折成两片，两片之间的调子差是 ${st.spineRawMin.toFixed(2)} —— 那是「一块料」的来源。` +
+        `中心那一块沿光的垂向劈成两半，一半接亮的那几支、一半接暗的，于是中心不再是一个洞。` +
+        `支根一段的截面按坡收到零（否则六块有厚度的料在中心真的互插，画序排不开）。`;
+
+      $('#rd-say').textContent =
+        `合起来最要紧的一句：${st.paths} 条 path、${st.tones.length} 档明暗、支内落差 ${st.spineRawMin.toFixed(2)}。` +
+        `现役是 ${stP.paths} 条、${stP.tones.length} 档、落差 ${stP.spineRawMin.toFixed(2)}。` +
+        `48px 上内角从 ${notch48p.toFixed(2)}px 变成 ${notch48.toFixed(2)}px —— 这一项在小尺寸上最直接。` +
+        `但这是 ${(st.paths / stP.paths).toFixed(1)} 倍 path、${(JSON.stringify(build(syncCfg).paths.map((p) => p.d)).length / JSON.stringify(build(prodOpts({})).paths.map((p) => p.d)).length).toFixed(1)} 倍字节。`;
+
+      $('#foot-cost').textContent = `难看 ${mineS.ugly.toFixed(1)}%`;
+
+      window.__readout = {
+        sizes: SIZES,
+        prod: stP,
+        sync: st,
+        notch48,
+        notch48p,
+        scores: { ...mineS, naive: naiveS, count: mine.length },
+        tumble: TUMBLE,
+        reduced: flip.reduced,
+        verdict: {
+          coarse: $('#v-coarse')?.textContent || '',
+          mid: $('#v-mid')?.textContent || '',
+          small: $('#v-small')?.textContent || '',
+        },
+      };
+
+      /* 对外的唯一入口。以后接任意事件都用它 —— 它不依赖按钮，也不依赖这一页 */
+      window.__star = {
+        flip: () => {
+          if (flip.busy) return false;
+          btn.disabled = true;
+          flip.flip();
+          requestAnimationFrame(watch);
+          return true;
+        },
+        busy: () => flip.busy,
+        state: () => flip.state(),
+        /** 回到静置（调试用） */
+        reset: () => flip.reset(),
+        /** 只画一帧某个朝向，返回这片 path 数 —— 量代价用 */
+        at: (u) => build(syncOpts({ m: poseAt(u) })).paths.length,
+        scores: () => samples.map((s) => s.score),
+      };
+      window.__ready = true;
+      $('#tag-build').textContent = `${st.paths} path · ${TUMBLE.duration}ms`;
+    </script>
+  </body>
+</html>

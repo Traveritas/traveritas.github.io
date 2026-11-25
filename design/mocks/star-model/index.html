@@ -1,0 +1,763 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>星 · 模型</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E" />
+    <link rel="stylesheet" href="/fonts/noto/font.css" />
+    <link rel="stylesheet" href="/fonts/plex/index.css" />
+    <style>
+      /* 令牌照抄 src/styles/tokens.css 里这一页要用的那几个 */
+      :root {
+        --bg: #f0f3f6;
+        --fg: #232830;
+        --fg-soft: #56606d;
+        --fg-faint: #858f9d;
+        --line: rgba(35, 40, 48, 0.12);
+        --amber: #9a86c4;
+        --umber: #4f4a66;
+        --wake: #a7b1ba;
+        --dream: #9389ae;
+        --glass: rgba(255, 255, 255, 0.42);
+        --edge: rgba(255, 255, 255, 0.72);
+        --sh: rgba(38, 44, 51, 0.13);
+        --deep: #2a2b38;
+        --font-display: 'Noto Serif SC', 'Palatino Linotype', Palatino, Georgia, serif;
+        --font-body: system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei UI', 'Microsoft YaHei', sans-serif;
+        --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+      }
+      * { box-sizing: border-box; }
+      html { color-scheme: light; }
+      body {
+        margin: 0;
+        padding: 3rem 2.6rem 7rem;
+        background: var(--bg);
+        color: var(--fg);
+        font-family: var(--font-body);
+        -webkit-font-smoothing: antialiased;
+      }
+      .wrap { max-width: 76rem; margin: 0 auto; }
+      h1, h2, h3 { font-family: var(--font-display); font-weight: 500; margin: 0; }
+      h1 { font-size: 1.34rem; letter-spacing: 0.02em; }
+      h2 { font-size: 0.96rem; letter-spacing: 0.04em; }
+      h3 { font-size: 0.82rem; color: var(--fg-soft); letter-spacing: 0.03em; }
+      p { margin: 0; font-size: 0.83rem; line-height: 1.9; color: var(--fg-soft); }
+      p + p { margin-top: 0.65rem; }
+      .mono, .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+      .k {
+        font-family: var(--font-mono);
+        font-size: 0.64rem;
+        letter-spacing: 0.15em;
+        text-transform: uppercase;
+        color: var(--fg-faint);
+      }
+      .lede { max-width: 40rem; }
+
+      header.top { display: flex; align-items: baseline; gap: 1rem; padding-bottom: 1.6rem; }
+      header.top .k { margin-left: auto; }
+
+      section { padding: 2rem 0 0.4rem; }
+      section > .hd {
+        display: flex;
+        align-items: baseline;
+        gap: 1rem;
+        padding: 0.95rem 0;
+        border-top: 1px solid var(--line);
+        flex-wrap: wrap;
+      }
+      section > .hd .n { font-family: var(--font-mono); font-size: 0.64rem; color: var(--fg-faint); letter-spacing: 0.16em; }
+      section > .hd .note { margin-left: auto; max-width: 30rem; text-align: right; font-size: 0.76rem; color: var(--fg-soft); }
+
+      /* ── 一格星：占位 div 只负责接指针与尺寸；底色、星星都由下面那层固定画布画。
+            占位 div 底色必须透明 —— 它 z-index 比画布高，涂上色就把星盖掉了。 ── */
+      .stage {
+        display: grid;
+        place-items: center;
+        position: relative;
+        cursor: grab;
+        touch-action: none;
+        border-radius: 10px;
+        background: transparent;
+        box-shadow: inset 0 0 0 1px rgba(120, 128, 142, 0.1);
+      }
+      .stage.is-drag { cursor: grabbing; }
+      .stage.on-dark { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05); }
+      .stage .hint {
+        position: absolute;
+        left: 0;
+        bottom: 4px;
+        width: 100%;
+        text-align: center;
+        font-family: var(--font-mono);
+        font-size: 0.58rem;
+        letter-spacing: 0.05em;
+        color: var(--fg-faint);
+        opacity: 0.75;
+        pointer-events: none;
+      }
+      .stage.on-dark .hint { color: rgba(207, 210, 226, 0.45); }
+
+      /* ── 主视口 ── */
+      .hero { display: grid; grid-template-columns: 1fr 15rem; gap: 1.4rem; align-items: start; }
+      .hero .stage { width: 100%; height: 26rem; }
+      .panel {
+        border: 1px solid var(--edge);
+        background: var(--glass);
+        -webkit-backdrop-filter: blur(14px) saturate(1.06);
+        backdrop-filter: blur(14px) saturate(1.06);
+        border-radius: 8px;
+        padding: 1rem 1.05rem;
+        box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.5), 0 14px 34px -24px var(--sh);
+      }
+      .panel + .panel { margin-top: 0.7rem; }
+      .ro { display: flex; justify-content: space-between; gap: 0.6rem; font-size: 0.72rem; color: var(--fg-soft); padding: 0.24rem 0; border-bottom: 1px solid var(--line); }
+      .ro:last-child { border-bottom: 0; }
+      .ro b { font-family: var(--font-mono); font-weight: 400; color: var(--fg); }
+      .btns { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.7rem; }
+      button {
+        font: inherit;
+        font-family: var(--font-mono);
+        font-size: 0.66rem;
+        letter-spacing: 0.04em;
+        padding: 0.3rem 0.6rem;
+        border-radius: 5px;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.6);
+        color: var(--fg-soft);
+        cursor: pointer;
+      }
+      button:hover { color: var(--fg); border-color: rgba(35, 40, 48, 0.24); }
+      button[aria-pressed='true'] { background: rgba(154, 134, 196, 0.16); border-color: rgba(154, 134, 196, 0.5); color: var(--umber); }
+
+      /* ── 一排变体 ── */
+      .row {
+        display: grid;
+        gap: 0.8rem;
+        align-items: start;
+      }
+      .row.c5 { grid-template-columns: repeat(5, 1fr); }
+      .row.c4 { grid-template-columns: repeat(4, 1fr); }
+      .cell { display: grid; gap: 0.4rem; }
+      .cell .stage { width: 100%; aspect-ratio: 1 / 1; }
+      .cell .cap { font-size: 0.72rem; color: var(--fg); letter-spacing: 0.01em; }
+      .cell .sub { font-family: var(--font-mono); font-size: 0.6rem; color: var(--fg-faint); line-height: 1.6; letter-spacing: 0.02em; }
+
+      /* ── 尺寸与底色 ── */
+      .poses { display: flex; gap: 0.8rem; flex-wrap: wrap; align-items: flex-start; }
+      .grounds { display: grid; gap: 0.9rem; margin-top: 0.9rem; }
+      /* 两块各占一行：400 的主图在左，三格 200 在右（放不下就折行，不缩） */
+      .gblock { border-radius: 10px; padding: 0.9rem 1rem 1rem; position: relative; }
+      .gblock.g-light { box-shadow: inset 0 0 0 1px var(--line); }
+      .gblock.g-dark { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08); }
+      .gblock.g-dark .glab { color: rgba(207, 210, 226, 0.56); }
+      .glab { font-family: var(--font-mono); font-size: 0.6rem; letter-spacing: 0.08em; color: var(--fg-faint); margin-bottom: 0.55rem; }
+      .gblock .g-hero { display: flex; flex-wrap: wrap; gap: 1.2rem; align-items: flex-start; }
+      /* 三格 200 排成一列，挨着 400 的主图 */
+      .gblock .row { display: grid; gap: 0.7rem; grid-template-columns: repeat(3, auto); align-items: start; }
+      .gblock .cell { display: grid; gap: 0.4rem; justify-items: center; }
+      .gblock .cell .stage { flex: none; }
+      .gblock .cell .sub { color: var(--fg-faint); }
+      .gblock.g-dark .cell .cap { color: rgba(214, 217, 230, 0.82); }
+      .gblock.g-dark .cell .sub { color: rgba(207, 210, 226, 0.44); }
+
+      /* ── 导出 ── */
+      .exports { display: grid; grid-template-columns: 15rem 1fr; gap: 1.4rem; align-items: start; }
+      .exports .stage { width: 15rem; height: 15rem; }
+      .code {
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        line-height: 1.75;
+        color: var(--fg-soft);
+        background: rgba(255, 255, 255, 0.55);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 0.7rem 0.85rem;
+        overflow-x: auto;
+        white-space: pre;
+      }
+
+      /* ── 读数表 ── */
+      .tbl { width: 100%; border-collapse: collapse; font-size: 0.7rem; }
+      .tbl th {
+        text-align: right;
+        font-weight: 400;
+        font-family: var(--font-mono);
+        font-size: 0.6rem;
+        letter-spacing: 0.06em;
+        color: var(--fg-faint);
+        padding: 0.42rem 0.5rem;
+        border-bottom: 1px solid var(--line);
+        white-space: nowrap;
+      }
+      .tbl th:first-child, .tbl td:first-child { text-align: left; }
+      .tbl td {
+        text-align: right;
+        font-family: var(--font-mono);
+        font-variant-numeric: tabular-nums;
+        color: var(--fg-soft);
+        padding: 0.36rem 0.5rem;
+        border-bottom: 1px solid rgba(35, 40, 48, 0.06);
+        white-space: nowrap;
+      }
+      .tbl td:first-child { font-family: var(--font-body); color: var(--fg); }
+      .tbl tr.grp td:first-child { color: var(--fg); font-weight: 500; }
+      .tbl .hi { color: var(--umber); }
+      .tblwrap { overflow-x: auto; margin-top: 0.5rem; }
+
+      /* ── 对比现役 ── */
+      .cmp { display: grid; grid-template-columns: auto 1fr 1fr; gap: 0.1rem 1.2rem; align-items: center; margin-top: 0.6rem; }
+      .cmp .h { font-family: var(--font-mono); font-size: 0.6rem; letter-spacing: 0.06em; color: var(--fg-faint); padding-bottom: 0.3rem; }
+      .cmp .l { font-size: 0.72rem; color: var(--fg-soft); }
+      .cmp .v { font-family: var(--font-mono); font-size: 0.72rem; color: var(--fg); }
+      .cmp .v.dim { color: var(--fg-faint); }
+      .prod { display: flex; align-items: center; gap: 0.9rem; margin-top: 0.7rem; }
+      .prod svg { display: block; }
+
+      footer { padding-top: 2.6rem; font-family: var(--font-mono); font-size: 0.6rem; color: var(--fg-faint); letter-spacing: 0.05em; line-height: 1.9; }
+
+      @media (max-width: 900px) {
+        body { padding: 2rem 1.2rem 5rem; }
+        .hero { grid-template-columns: 1fr; }
+        .row.c5, .row.c4 { grid-template-columns: repeat(2, 1fr); }
+        .exports { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="stage-canvas" aria-hidden="true" style="position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1"></canvas>
+    <div class="wrap" style="position: relative; z-index: 2">
+      <header class="top">
+        <h1>星 · 模型</h1>
+        <span class="k">star-model · 真三维</span>
+      </header>
+      <div class="lede">
+        <p>
+          六支沿 ±x ±y ±z 的实体，各自是一根变截面的管加一根内切球圆头，六个闭合实体在星心互插，交给深度缓冲去解。
+          页面上的星都能拖——左右上下转，滚轮远近，双击回正位。
+        </p>
+        <p>三节各扫一个旋钮，全部作用在几何上；读数从三维几何里直接量，不经过任何投影。</p>
+      </div>
+
+      <!-- ── 模型 ── -->
+      <section id="model">
+        <div class="hd">
+          <span class="n">01</span>
+          <h2>模型</h2>
+          <span class="note">体对角正位起步。拖动转它，滚轮推近拉远。</span>
+        </div>
+        <div class="hero">
+          <div class="stage on-light" id="hero" data-cell="hero"><span class="hint">拖动旋转 · 滚轮远近 · 双击回正位</span></div>
+          <div>
+            <div class="panel" id="hero-read"></div>
+            <div class="panel">
+              <div class="k" style="margin-bottom: 0.45rem">姿态</div>
+              <div class="btns">
+                <button data-pose="iso">体对角 45° / 35.3°</button>
+                <button data-pose="front">正面 0° / 0°</button>
+                <button data-pose="side">侧面 90° / 0°</button>
+                <button data-pose="top">俯视 0° / 89°</button>
+                <button data-pose="near">近体对角 30° / 25°</button>
+              </div>
+              <div class="btns">
+                <button id="btn-spin">绕竖轴转 60°</button>
+                <button id="btn-home">回正位</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── 粗细 ── -->
+      <section id="thick">
+        <div class="hd">
+          <span class="n">02</span>
+          <h2>粗细</h2>
+          <span class="note">截面大小。面积按标准菱形归一，所以这一列只改粗细，不改别的。</span>
+        </div>
+        <div class="row c5" id="row-thick"></div>
+        <p style="margin-top: 0.9rem; max-width: 44rem">
+          量的是<b>三维里</b>的两个数：从星心沿两支之间的分角线 ⟨1,1,0⟩ 射出去，第一次穿出表面的距离（内凹有多深）；
+          以及整颗星占的体积与「被两支以上同时占着」的比例（星心那一团互插有多厚）。
+          内角在屏幕上有多宽，是这两个数的结果，不是它的来源。
+        </p>
+      </section>
+
+      <!-- ── 平滑 ── -->
+      <section id="smooth">
+        <div class="hd">
+          <span class="n">03</span>
+          <h2>平滑</h2>
+          <span class="note">截面四条棱上的圆角 + 支尖的内切球 + 法线怎么算。三者一起动。</span>
+        </div>
+        <div class="row c4" id="row-smooth"></div>
+        <p style="margin-top: 0.9rem; max-width: 44rem">
+          圆角按面积归一，所以「柔」那一档的截面几乎是圆，但根部半宽还是 0.26。
+          支尖的球是<b>内切</b>的：它切在支身上，接缝处没有折线；代价是支尖沿轴后退
+          （<span class="mono">尖端填充</span> 那一栏），整支因此被等比放大一点，代码里再把它抵掉。
+        </p>
+      </section>
+
+      <!-- ── 弧线 ── -->
+      <section id="arc">
+        <div class="hd">
+          <span class="n">04</span>
+          <h2>弧线</h2>
+          <span class="note">每支沿轴的母线。根部半宽固定，只有中段收放与转折在变。</span>
+        </div>
+        <div class="row c5" id="row-arc"></div>
+        <p style="margin-top: 0.9rem; max-width: 44rem">
+          <span class="mono">腰</span> 那一栏是半宽在 u=0.5 处相对标准锥的比值，&lt;1 是收进去了；
+          <span class="mono">腰位</span> 是最细处在轴上的位置；<span class="mono">尖半角</span> 是母线在 u=0.5 处偏离轴的倾角。
+        </p>
+      </section>
+
+      <!-- ── 导出 ── -->
+      <section id="export">
+        <div class="hd">
+          <span class="n">05</span>
+          <h2>导出</h2>
+          <span class="note">采用参数写成一份 glTF 二进制，落在这个目录里；下面这一格是把那个文件读回来重放的。</span>
+        </div>
+        <div class="exports">
+          <div class="cell">
+            <div class="stage on-light" id="hero-glb" data-cell="glb"><span class="hint">读回来的 star.glb</span></div>
+            <div class="sub" id="glb-cap">—</div>
+          </div>
+          <div>
+            <div class="panel" id="glb-read">—</div>
+            <div class="code" id="glb-code">…</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── 尺寸与底色 ── -->
+      <section id="grounds">
+        <div class="hd">
+          <span class="n">06</span>
+          <h2>尺寸与底色</h2>
+          <span class="note">同一个模型，400 与 200，浅底与深底。都能拖。</span>
+        </div>
+        <div class="grounds" id="grounds-host"></div>
+      </section>
+
+      <!-- ── 与现役对照 ── -->
+      <section id="versus">
+        <div class="hd">
+          <span class="n">07</span>
+          <h2>与现役对照</h2>
+          <span class="note">左侧是 <span class="mono">drawStar()</span> 逐字重画的那一张，40px。</span>
+        </div>
+        <div class="prod">
+          <svg id="prod40" width="40" height="40" viewBox="-20 -20 40 40" style="color: #56606d"></svg>
+          <svg id="prod96" width="96" height="96" viewBox="-20 -20 40 40" style="color: #56606d"></svg>
+          <p style="max-width: 26rem">现役那颗是六张扁风筝：每支只有宽度，没有厚度；中心的紫圆盖住了六支真正交会的地方。</p>
+        </div>
+        <div class="cmp" id="cmp"></div>
+      </section>
+
+      <!-- ── 读数 ── -->
+      <section id="readout">
+        <div class="hd">
+          <span class="n">08</span>
+          <h2>读数</h2>
+          <span class="note">全部由 <span class="mono">.probe.mjs</span> 离线算，页面只读。</span>
+        </div>
+        <div class="tblwrap">
+          <table class="tbl" id="tbl">
+            <thead>
+              <tr>
+                <th>一档</th>
+                <th>半宽</th>
+                <th>三维内凹</th>
+                <th>体积</th>
+                <th>重叠率</th>
+                <th>腰</th>
+                <th>腰位</th>
+                <th>尖半角</th>
+                <th>圆角半径</th>
+                <th>尖端填充</th>
+                <th>三角形</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <footer id="foot">…</footer>
+    </div>
+
+    <script type="importmap">
+      { "imports": { "three": "/three/build/three.module.js", "three/addons/": "/three/examples/jsm/" } }
+    </script>
+    <script type="module">
+      import {
+        Stage, buildStar, readouts, SWEEPS, WIN, BASE, ISO, GROUNDS, makeMaterial, PROFILE_KEYS,
+      } from './src.js';
+      import * as THREE from 'three';
+      import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+      const $ = (s) => document.querySelector(s);
+      const DEG = Math.PI / 180;
+      const mk = (t, c, h) => {
+        const n = document.createElement(t);
+        if (c) n.className = c;
+        if (h != null) n.innerHTML = h;
+        return n;
+      };
+      const T0 = performance.now();
+      const dp = (v, n = 3) => (v == null || Number.isNaN(v) ? '—' : Number(v).toFixed(n));
+
+      /* 主视口与所有小格共用一个 WebGL 上下文 */
+      const stage = new Stage($('#stage-canvas'));
+      window.__stage = stage;
+
+      /* 一格星说明的读数缓存：必须在任何格用它之前就建好（第一版放在后面，
+         于是三次扫星时抛 ReferenceError，整页脚本死在那里、只剩静态骨架）。 */
+      const RD = new Map();
+      const rdOf = (cfg) => {
+        const k = JSON.stringify([cfg.w, cfg.prof, cfg.fillet, cfg.tipR, cfg.shade, cfg.nBody, cfg.nCap]);
+        if (!RD.has(k)) RD.set(k, readouts(cfg, { mc: 0 }));
+        return RD.get(k);
+      };
+
+      /* 离线账（.probe.mjs）到手之后按参数回找那一行：体积这类只有离线才算得动的数从这里取。
+         比对用 wEff（归一化之后的根部半宽，恒等于输入的 w），不要用 w ——
+         .probe 里那一栏是解 fixW 之前的**内部** w（例如 0.26 那一档记的是 0.2301）。 */
+      let PROBE = null;
+      const probeRow = (group, cfg) => {
+        if (!PROBE) return null;
+        const hit = PROBE.rows.filter((r) => r.group === group);
+        return (
+          hit.find(
+            (r) =>
+              Math.abs(r.wEff - cfg.w) < 2e-3 &&
+              r.prof === cfg.prof &&
+              Math.abs(r.fillet - cfg.fillet) < 1e-6 &&
+              Math.abs(r.tipR - cfg.tipR) < 1e-6,
+          ) || null
+        );
+      };
+
+      /* ── 一格星 + 说明 ── */
+      function cell(host, { cfg, label, sub, ground = 'light', pose = ISO, dist = null, name }) {
+        const wrap = mk('div', 'cell');
+        const st = mk('div', `stage on-${ground}`);
+        st.dataset.cell = name || label;
+        wrap.append(st);
+        if (label) wrap.append(mk('div', 'cap', label));
+        if (sub) wrap.append(mk('div', 'sub', sub));
+        host.append(wrap);
+        const c = stage.add(st, { cfg, ground, pose, dist });
+        st.addEventListener('dblclick', () => stage.home(c));
+        return { wrap, st, c };
+      }
+
+      /* ── 01 主视口 ── */
+      const heroCfg = { ...WIN };
+      const heroStar = buildStar(heroCfg);
+      const heroC = stage.add($('#hero'), { cfg: heroCfg, fov: 26, pose: ISO });
+      const heroRo = () => {
+        const o = heroC.orb;
+        /* 姿态每帧都变，读数不变 —— 几何量预算一次就够（否则每一帧都要重造网格） */
+        $('#hero-read').innerHTML = [
+          ['方位 / 仰角', `${(((Math.round(o.az) % 360) + 360) % 360)}° / ${Math.round(o.el)}°`],
+          ['相机距离', `${o.dist.toFixed(2)}`],
+          ['半宽 w', dp(heroCfg.w)],
+          ['母线', PROFILE_LABEL(heroCfg.prof)],
+          ['圆角 / 尖端球', `${dp(heroCfg.fillet, 2)} / ${dp(heroCfg.tipR, 2)}`],
+          ['三角形', String(heroStar.stats.tris)],
+        ]
+          .map(([k, v]) => `<div class="ro"><span>${k}</span><b>${v}</b></div>`)
+          .join('');
+      };
+      const PROFILE_LABEL = (k) => ({ straight: '直', waist: '凹', waistDeep: '深凹', belly: '凸', sform: 'S' })[k] || k;
+      let poseRaf = 0;
+      heroC.onPose = () => {
+        if (poseRaf) return;
+        poseRaf = requestAnimationFrame(() => {
+          poseRaf = 0;
+          heroRo();
+        });
+      };
+      heroRo();
+
+      const POSES = {
+        iso: [ISO.az, ISO.el],
+        front: [0, 0],
+        side: [90, 0],
+        top: [0, 89],
+        near: [30, 25],
+      };
+      for (const b of document.querySelectorAll('[data-pose]')) {
+        b.addEventListener('click', () => {
+          const p = POSES[b.dataset.pose];
+          /* 走近路：把目标角折到当前位置旁边的一个等价角（360° 周期） */
+          const az = p[0] + Math.round((heroC.orb.az - p[0]) / 360) * 360;
+          stage.setPose(heroC, az, p[1]);
+          for (const x of document.querySelectorAll('[data-pose]')) x.setAttribute('aria-pressed', String(x === b));
+        });
+      }
+      $('#btn-spin').addEventListener('click', () => stage.spin(heroC, 60));
+      $('#btn-home').addEventListener('click', () => stage.home(heroC));
+
+      /* ── 02–04 三组扫：要等离线账到手才建，否则说明里的体积一栏是空的 ── */
+      function buildSweeps() {
+        for (const v of SWEEPS.thick) {
+          const r = probeRow('thick', v.cfg);
+          cell($('#row-thick'), {
+            cfg: v.cfg,
+            label: `${v.w.toFixed(2)}`,
+            sub: `三维内凹 ${dp(rdOf(v.cfg).notch3D)}<br>体积 ${r && r.vol != null ? dp(r.vol) : '—'} · ${rdOf(v.cfg).tris} 三角形`,
+            name: `t-${v.w}`,
+          });
+        }
+        for (const v of SWEEPS.smooth) {
+          const r = probeRow('smooth', v.cfg);
+          cell($('#row-smooth'), {
+            cfg: v.cfg,
+            label: v.label,
+            sub: `${v.note}<br>圆角 ${dp(rdOf(v.cfg).filletR)} · 尖端填充 ${r ? dp(r.fill) : dp(1 - rdOf(v.cfg).cut)} · ${rdOf(v.cfg).tris} 三角形`,
+            name: `s-${v.key}`,
+          });
+        }
+        for (const v of SWEEPS.arc) {
+          const r = probeRow('arc', v.cfg);
+          cell($('#row-arc'), {
+            cfg: v.cfg,
+            label: v.label,
+            sub: `腰 ${dp(rdOf(v.cfg).waistRatio, 2)} @ ${dp(rdOf(v.cfg).waistAt, 2)}<br>尖半角 ${dp(rdOf(v.cfg).angMid, 1)}° · 体积 ${r && r.vol != null ? dp(r.vol) : '—'}`,
+            name: `a-${v.key}`,
+          });
+        }
+      }
+
+      /* ── 06 尺寸与底色：真的 400 与 200 ── */
+      const POSES_SHOWN = [
+        ['iso', '正位', ISO, 400],
+        ['yaw30', '竖转 30°', { az: 75, el: ISO.el }, 200],
+        ['el20', '俯仰 +20°', { az: ISO.az, el: ISO.el + 20 }, 200],
+        ['yaw45', '竖转 45° / 仰 10°', { az: 90, el: 10 }, 200],
+      ];
+      for (const [g, cls] of [
+        ['light', 'g-light'],
+        ['dark', 'g-dark'],
+      ]) {
+        const block = mk('div', `gblock ${cls}`);
+        block.id = `gblock-${g}`;
+        block.append(mk('div', 'glab', GROUNDS[g].label));
+        /* 400 的主图与三格 200 并排在同一行里：左边 400、右边三格 200 一列 */
+        const heroRow = mk('div', 'g-hero');
+        const row = mk('div', 'row');
+        for (const [k, lab, pose, size] of POSES_SHOWN) {
+          const c2 = mk('div', 'cell');
+          const st = mk('div', `stage on-${g}`);
+          st.dataset.cell = `${g}-${k}`;
+          /* 尺寸写死：这一节要判的正是「同一个模型在 400 与 200 上还读不读得出来」 */
+          st.style.width = `${size}px`;
+          st.style.height = `${size}px`;
+          c2.append(st, mk('div', 'cap', lab), mk('div', 'sub', `${size} px`));
+          (size >= 400 ? heroRow : row).append(c2);
+          stage.add(st, { cfg: WIN, ground: g, pose });
+        }
+        heroRow.append(row);
+        block.append(heroRow);
+        $('#grounds-host').append(block);
+      }
+      /* 两块底色也用画布铺（bare 格）：页面上的 div 有底色就会盖住星 */
+      for (const g of ['light', 'dark']) {
+        const el = document.getElementById(`gblock-${g}`);
+        stage.add(el, { bare: true, ground: g });
+        /* 底色格只当一块底，不抢指针；里面那几格自己接事件 */
+        el.style.pointerEvents = 'none';
+        el.querySelectorAll('.stage').forEach((s) => (s.style.pointerEvents = 'auto'));
+      }
+      /* 画序必须跟文档序一致：底色块包着它里面的星，只有先铺底再画星才对。
+         （Stage 内部按 cells 数组顺序画，所以这里按 DOM 序重排一次就够，不必每帧排。） */
+      stage.cells.sort((a, b) => {
+        if (a.el === b.el) return 0;
+        return a.el.compareDocumentPosition(b.el) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
+      });
+
+      /* ── 07 现役：逐字照抄 drawStar() 的那一支，挂一个 40 与一个 96 ── */
+      function prodSVG(svg, size) {
+        const yaw = 45 * DEG;
+        const pit = (Math.asin(1 / Math.sqrt(3)) * 180) / Math.PI * DEG;
+        const cy = Math.cos(yaw), sy = Math.sin(yaw), cp = Math.cos(pit), sp = Math.sin(pit);
+        const pts = [];
+        for (const [ax, ay, az] of [[1, 0, 0], [0, 1, 0], [0, 0, 1]]) {
+          for (const s of [1, -1]) {
+            const x0 = ax * s, y0 = ay * s, z0 = az * s;
+            const x1 = x0 * cy + z0 * sy;
+            const z1 = -x0 * sy + z0 * cy;
+            const y2 = y0 * cp - z1 * sp;
+            const z2 = y0 * sp + z1 * cp;
+            pts.push({ x: x1 * 16, y: -y2 * 16, z: z2 });
+          }
+        }
+        pts.sort((a, b) => a.z - b.z);
+        let out = '';
+        for (const p of pts) {
+          const L = Math.hypot(p.x, p.y);
+          if (L < 0.6) continue;
+          const ux = p.x / L, uy = p.y / L;
+          const w = 1.9;
+          const op = (0.38 + (0.5 * (p.z + 1)) / 2).toFixed(3);
+          out += `<path d="M${(-uy * w).toFixed(2)} ${(ux * w).toFixed(2)}L${p.x.toFixed(2)} ${p.y.toFixed(2)}L${(uy * w).toFixed(2)} ${(-ux * w).toFixed(2)}L${(-ux * 1.4).toFixed(2)} ${(-uy * 1.4).toFixed(2)}Z" fill="currentColor" fill-opacity="${op}"/>`;
+        }
+        out += '<circle r="1.7" fill="#9a86c4"/>';
+        svg.innerHTML = out;
+      }
+      prodSVG($('#prod40'), 40);
+      prodSVG($('#prod96'), 96);
+
+      /* ── 08 读数表 ── */
+      /* 服务端现算的离线账（体积/重叠/对称/剪影），拿不到就自己算体积 */
+      /* 服务端现算的离线账（体积/重叠/对称/剪影），拿不到就留空 */
+      async function loadProbe() {
+        try {
+          const r = await fetch('/probe.json', { cache: 'no-store' });
+          if (r.status === 204) return null;
+          const j = await r.json();
+          return j && !j.missing ? j : null;
+        } catch {
+          return null;
+        }
+      }
+
+      function table() {
+        const groups = [
+          ['粗细', SWEEPS.thick.map((v) => [String(v.w), v.cfg])],
+          ['平滑', SWEEPS.smooth.map((v) => [v.label, v.cfg])],
+          ['弧线', SWEEPS.arc.map((v) => [v.label, v.cfg])],
+        ];
+        const rowsOf = (g) => (PROBE ? PROBE.rows.filter((r) => r.group === g) : []);
+        const tb = $('#tbl tbody');
+        tb.innerHTML = '';
+        for (const [g, items] of groups) {
+          const gk = { 粗细: 'thick', 平滑: 'smooth', 弧线: 'arc' }[g];
+          const fromProbe = rowsOf(gk);
+          const tr0 = mk('tr', 'grp');
+          tr0.append(mk('td', null, g));
+          for (let i = 1; i < 11; i++) tr0.append(mk('td', null, ''));
+          if (fromProbe[0] && fromProbe[0].ms != null) tr0.lastChild.textContent = '';
+          tb.append(tr0);
+          items.forEach(([lab, cfg], i) => {
+            const r = fromProbe[i] || null;
+            const me = r || { ...rdOf(cfg), wEff: rdOf(cfg).wEff, notch3D: rdOf(cfg).notch3D };
+            const vol = r ? r.vol : null;
+            const ov = r ? r.overlapShare : null;
+            const tr = mk('tr');
+            const cells = [
+              lab,
+              dp(me.wEff, 3),
+              dp(me.notch3D, 3),
+              vol == null ? '—' : dp(vol, 3),
+              ov == null ? '—' : `${(ov * 100).toFixed(0)}%`,
+              dp(me.waistRatio, 2),
+              dp(me.waistAt, 2),
+              `${dp(me.angMid, 1)}°`,
+              dp(me.filletR, 3),
+              dp(1 - me.cut, 3),
+              String(me.tris),
+            ];
+            cells.forEach((v, j) => {
+              const td = mk('td', null, v);
+              if ((gk === 'thick' && i === 2) || (gk === 'smooth' && i === 3) || (gk === 'arc' && i === 2)) td.classList.add('hi');
+              tr.append(td);
+            });
+            tb.append(tr);
+          });
+        }
+      }
+
+      /* ── 与现役对照表 ── */
+      function versus() {
+        const r = rdOf(WIN);
+        const rows = [
+          ['每支是什么', '一张扁风筝（只有宽度）', '变截面的管 + 内切球头'],
+          ['有没有厚度', '没有，靠 fill-opacity 暗示', `有，截面半宽 ${dp(r.wEff, 3)}`],
+          ['中心怎么解', '画序；再盖一个紫圆', '六支真互插，深度缓冲'],
+          ['明暗从哪来', '深度 → 不透明度', '面法线 → 光'],
+          ['投影内角 / 尖', '0.227（w=0.119，实测）', `${dp(r.projNotchRel, 3)}`],
+          ['三角形 / path', '7 条 path', `${r.tris} 个三角形`],
+          ['能不能转', '只能按它自己定死的 45° 画', '任意角度，拖就是'],
+        ];
+        const host = $('#cmp');
+        host.innerHTML = '';
+        for (const h of ['', 'drawStar() 现役', '这一颗']) host.append(mk('div', `h ${h ? '' : ''}`, h));
+        for (const [a, b, c] of rows) {
+          host.append(mk('div', 'l', a), mk('div', 'v dim', b), mk('div', 'v', c));
+        }
+      }
+
+      /* ── 05 导出：读回 star.glb ── */
+      let GLB = null;
+      async function loadGlb() {
+        const info = await fetch('/glb.json', { cache: 'no-store' })
+          .then((r) => r.json())
+          .catch(() => ({ missing: true }));
+        GLB = info;
+        const cap = $('#glb-cap');
+        if (info.missing) {
+          cap.textContent = '还没有 star.glb —— 先跑 node design/mocks/star-model/.export.mjs';
+          $('#glb-read').innerHTML = '<div class="ro"><span>star.glb</span><b>缺</b></div>';
+          return;
+        }
+        cap.textContent = `${(info.bytes / 1024).toFixed(1)} KB · ${Math.round(info.bytes / 1024 / 1024 * 10) / 10} MB 以内`;
+        $('#glb-read').innerHTML = [
+          ['文件', 'star.glb'],
+          ['大小', `${(info.bytes / 1024).toFixed(1)} KB`],
+          ['gzip', `${(info.gzip / 1024).toFixed(1)} KB`],
+          ['sha256 前 16', info.sha256],
+          ['读取', 'GLTFLoader 读回，重放于左'],
+        ]
+          .map(([k, v]) => `<div class="ro"><span>${k}</span><b>${v}</b></div>`)
+          .join('');
+        $('#glb-code').textContent = `node design/mocks/star-model/.export.mjs\n\n`
+          + `// or in the browser\n`
+          + `new GLTFLoader().load('./star.glb', (g) => scene.add(g.scene));`;
+        try {
+          const gltf = await new GLTFLoader().loadAsync('./star.glb');
+          const mesh = gltf.scene.getObjectByProperty('type', 'Mesh') || gltf.scene;
+          let tris = 0;
+          gltf.scene.traverse((o) => {
+            if (o.isMesh) {
+              const g = o.geometry;
+              tris += (g.index ? g.index.count : g.attributes.position.count) / 3;
+            }
+          });
+          const m = new THREE.Mesh((mesh.geometry || mesh).clone ? (mesh.geometry || mesh).clone() : null);
+          /* 直接用读回来的网格与材质：这一格要证明的是文件本身能开 */
+          const mat = makeMaterial('light');
+          if (mesh.material) mat.color.copy(mesh.material.color || mat.color);
+          const obj = new THREE.Mesh(mesh.geometry.clone(), mat);
+          const c = stage.add($('#hero-glb'), { obj, ground: 'light', pose: ISO });
+          c.el.dataset.cell = 'glb';
+          $('#glb-read').insertAdjacentHTML('beforeend', `<div class="ro"><span>读回三角形</span><b>${tris}</b></div>`);
+          $('#glb-cap').textContent = `${(info.bytes / 1024).toFixed(1)} KB · ${tris} 个三角形 · 已读回`;
+        } catch (e) {
+          $('#glb-cap').textContent = `读回失败：${e.message}`;
+        }
+      }
+
+      /* ── 启动 ── */
+      (async () => {
+        PROBE = await loadProbe();
+        buildSweeps();
+        table();
+        versus();
+        await loadGlb();
+        if (document.fonts && document.fonts.ready) await document.fonts.ready;
+        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+        stage.kick();
+        const ms = Math.round(performance.now() - T0);
+        $('#foot').innerHTML =
+          `star-model · 端口 4672 · 建模 ${heroStar.stats.tris} 个三角形 · 就绪 ${ms} ms<br>`
+          + `三节里的星都能拖着转；滚轮推近拉远；双击回正位。`;
+        window.__ready = true;
+      })();
+    </script>
+  </body>
+</html>

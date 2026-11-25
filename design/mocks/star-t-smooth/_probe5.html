@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>probe5</title>
+    <style>
+      body { margin: 0; background: #f0f3f6; font: 12px system-ui, sans-serif; }
+      .row { display: flex; gap: 6px; padding: 6px 8px; flex-wrap: wrap; align-items: flex-end; }
+      .c { text-align: center; }
+      .c span { display: block; font-size: 10px; color: #56606d; }
+      .lead { padding: 8px 10px 0; font-weight: 600; color: #232830; }
+      .d { background: #2a2b38; }
+      svg { display: block; }
+    </style>
+  </head>
+  <body>
+    <div id="wrap"></div>
+    <script type="module">
+      import { svg, star } from './src.js';
+      const nrm = (v) => { const l = Math.hypot(...v); return v.map((x) => x / l); };
+      const dirOf = (az, el) => nrm([Math.cos(el * Math.PI / 180) * Math.cos(az * Math.PI / 180), Math.sin(el * Math.PI / 180), Math.cos(el * Math.PI / 180) * Math.sin(az * Math.PI / 180)]);
+      const rows = [];
+      const add = (title, list) => {
+        rows.push(`<div class="lead">${title}</div><div class="row">`);
+        for (const [o, lab, size, view, ground] of list)
+          rows.push(`<div class="c${ground === 'dark' ? ' d' : ''}">${svg(o, { size, view, ground: ground || 'light' })}<span>${lab}</span></div>`);
+        rows.push('</div>');
+      };
+      const cands = [[90, 0], [90, 15], [70, -10], [70, 15], [30, 20], [110, -10], [150, 25], [90, -25]];
+      for (const sides of [4, 6, 8]) {
+        add(`光向 · ${sides} 边`, cands.map(([az, el]) => {
+          const o = { fold: 1.2, sides, rim: sides > 4 ? 0.16 : 0, light: dirOf(az, el) };
+          const st = star(o).stats;
+          return [o, `az${az} el${el}\nsp${Math.min(...st.spine).toFixed(2)} nt${Math.min(...st.notch).toFixed(2)} ${st.tones.length}档`, 190, 'full'];
+        }));
+      }
+      add('光向 · 8边 深底', cands.slice(0, 5).map(([az, el]) => {
+        const o = { fold: 1.2, sides: 8, rim: 0.16, light: dirOf(az, el) };
+        return [o, `az${az} el${el}`, 190, 'full', 'dark'];
+      }));
+      document.getElementById('wrap').innerHTML = rows.join('');
+    </script>
+  </body>
+</html>

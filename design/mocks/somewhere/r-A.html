@@ -1,0 +1,728 @@
+<!doctype html>
+<html lang="zh-CN" data-arrived="no" data-view="1" data-look="level">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <title>蚀刻 · somewhere</title>
+    <link rel="stylesheet" href="./r.css" />
+    <link rel="stylesheet" href="./r-A.css" />
+  </head>
+  <body>
+    <!-- 只有这一张 WebGL：shell2.js 的流光。房间是 room.js 给的那张 2D 画布。 -->
+    <canvas id="light"></canvas>
+
+    <a class="rx-corner rx-tl" href="./index.html">SOMEWHERE · 蚀刻</a>
+    <div class="rx-corner rx-br" id="stat"></div>
+    <p class="rx-roomtext">窗开到一半。<br />再往上是光。</p>
+    <p class="rx-hint"><span>向下</span><i></i></p>
+
+    <script type="module">
+      import { initFlow, options } from './shell2.js';
+      import { createRoom } from './room.js';
+      import { createApproach } from './approach.js';
+
+      const opt = options();
+      const DEG = Math.PI / 180;
+
+      /* 关掉动效的人不该被镜头按着往下拉三秒。
+         这里的画法本身没有一个自走的动画——所有线都只随视角变——所以
+         需要处理的只有「落进屋子」这一段：把它压短成一个干脆的到位，
+         屋子仍然是一处地方，只是不再请你在半空里待着。
+         （背景那支流光由 shell2.js 管，不归这份文件。） */
+      const STILL = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const DUR = STILL ? 380 : 3000;
+
+      /* 一套色：靛夜偏冷。四个槽填同一份——分区这件事在这里不存在。 */
+      const theme = [
+        [0.045, 0.048, 0.074],
+        [0.096, 0.1, 0.148],
+        [0.225, 0.218, 0.31],
+        [0.64, 0.61, 0.76],
+      ];
+
+      const flow = initFlow({
+        canvas: document.getElementById('light'),
+        theme,
+        grain: [0.85, 0.3, 28],
+        face: opt.face,
+        px: opt.px,
+        autoArrive: opt.autoArrive,
+        dur: DUR,
+      });
+
+      /* 梦线略高于眼高（1.44 米对 1.34 米）。于是那条线在画面里是微微上翘的一道，
+         人是从剖切面「下面」仰头看它——浸入感在这儿，不在线本身。 */
+      const room = createRoom({ autoArrive: opt.autoArrive, dur: DUR, dream: 0.48 });
+      const approach = createApproach(document.body);
+      const stat = document.getElementById('stat');
+
+      /* ══════════════════════════════════════════════════════════
+         一、相机
+
+         room.js 只给屏幕多边形，不给相机。可这一份画的是**真的三向线**——
+         窗洞的纵深、踢脚的连续、梁的间距，都得由世界坐标自己投出来，
+         不然「准」无从谈起。
+
+         所以这里从 room.js 给的那几块面反解出这一帧的 yaw 与 pitch：
+         每块面的四个角在世界里是已知的（W / H / D 都在 ctx 里），
+         它们投到屏幕上又摆在眼前，两边一配就是一组对应点。
+         未知数只有两个，取上一帧的解当起点，几步细扫就收住了。
+
+         （拿面心去剔面是不行的——左右墙的面心就压在相机那个平面上。
+         这里只读几何，不碰可见性；可见性仍然只交给 room.js 的近平面裁剪。）
+         ══════════════════════════════════════════════════════════ */
+
+      const STEP = Math.PI / 2;
+      const PHASE = Math.PI / 4;
+      const EYE = 1.34;
+      const PITCH_UP = 52 * DEG;
+      const NEAR = 0.06;
+
+      /* 盒子在下沉中的位置，与 room.js 里 setSink 同一条式子 */
+      const boxOf = (sink) => ({ s: 0.46 + 0.54 * sink, oz: -6.2 * (1 - sink), oy: -0.9 * (1 - sink) });
+
+      /* 焦距，与 room.js 里 rebuild 同一条式子（hfov 49，纵向上限 100 度） */
+      const focal = (vw, vh) => Math.max(vw / 2 / Math.tan(49 * DEG), vh / 2 / Math.tan(50 * DEG));
+
+      /* 世界点 → 相机空间（右手系，-z 是深度） */
+      function makeCam(yaw, pitch, env) {
+        const { box } = env;
+        const cy = Math.cos(-yaw);
+        const sy = Math.sin(-yaw);
+        const cp = Math.cos(-pitch);
+        const sp = Math.sin(-pitch);
+        return (p) => {
+          const z0 = p[2] * box.s + box.oz;
+          const x0 = p[0] * box.s;
+          const y0 = p[1] * box.s + box.oy - EYE;
+          const x1 = x0 * cy - z0 * sy;
+          const z1 = x0 * sy + z0 * cy;
+          return { x: x1, y: y0 * cp - z1 * sp, z: y0 * sp + z1 * cp };
+        };
+      }
+
+      const scr = (c, env) => ({ x: env.vw / 2 + (c.x * env.F) / -c.z, y: env.vh / 2 - (c.y * env.F) / -c.z });
+
+      /* 近平面裁剪（相机空间）：留着 z < -NEAR 的那一段 */
+      function clipNear(pts) {
+        const out = [];
+        for (let i = 0; i < pts.length; i++) {
+          const a = pts[i];
+          const b = pts[(i + 1) % pts.length];
+          const ain = a.z < -NEAR;
+          const bin = b.z < -NEAR;
+          if (ain) out.push(a);
+          if (ain !== bin) {
+            const t = (-NEAR - a.z) / (b.z - a.z);
+            out.push({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, z: -NEAR });
+          }
+        }
+        return out;
+      }
+
+      /* 每块面在世界里的四个角（与 room.js 的 rebuild 一一对应） */
+      function cornersOf(k, W, H, D) {
+        switch (k) {
+          case 'back':
+            return [[-W, H, -D], [W, H, -D], [W, 0, -D], [-W, 0, -D]];
+          case 'right':
+            return [[W, H, -D], [W, H, D], [W, 0, D], [W, 0, -D]];
+          case 'front':
+            return [[W, H, D], [-W, H, D], [-W, 0, D], [W, 0, D]];
+          case 'left':
+            return [[-W, H, D], [-W, H, -D], [-W, 0, -D], [-W, 0, D]];
+          case 'ceil':
+            return [[-W, H, -D], [W, H, -D], [W, H, D], [-W, H, D]];
+          default:
+            return [[-W, 0, -D], [W, 0, -D], [W, 0, D], [-W, 0, D]];
+        }
+      }
+
+      /* 梦线两端在世界里的位置（只有四面墙有） */
+      function dreamEnds(k, W, D, Y) {
+        switch (k) {
+          case 'back':
+            return [[-W, Y, -D], [W, Y, -D]];
+          case 'right':
+            return [[W, Y, -D], [W, Y, D]];
+          case 'front':
+            return [[W, Y, D], [-W, Y, D]];
+          default:
+            return [[-W, Y, D], [-W, Y, -D]];
+        }
+      }
+
+      /* 「像不像」：把已知的角点与梦线端点投出去，跟 room.js 摆好的多边形对一遍。
+         就近配对而不是按序号，因为近平面会把多边形切掉几个角。 */
+      function costOf(yaw, pitch, env, obs) {
+        const cam = makeCam(yaw, pitch, env);
+        const { W, H, D, Y } = env;
+        let c = 0;
+        for (const f of obs) {
+          const cs = cornersOf(f.k, W, H, D);
+          for (let i = 0; i < 4; i++) {
+            const cc = cam(cs[i]);
+            if (-cc.z < 0.06) continue;
+            const s = scr(cc, env);
+            let best = 1e9;
+            for (const o of f.pts) {
+              const d = (o.x - s.x) ** 2 + (o.y - s.y) ** 2;
+              if (d < best) best = d;
+            }
+            if (best < 120 * 120) c += best;
+          }
+          if (f.line.length === 2) {
+            const ends = dreamEnds(f.k, W, D, Y);
+            for (let i = 0; i < 2; i++) {
+              const cc = cam(ends[i]);
+              if (-cc.z < 0.06) continue;
+              const s = scr(cc, env);
+              const o = f.line[i];
+              const d = (o.x - s.x) ** 2 + (o.y - s.y) ** 2;
+              if (d < 500 * 500) c += d * 3; // 梦线最准，权重给高
+            }
+          }
+        }
+        return c;
+      }
+
+      /* 一维细扫 */
+      function scan(fn, base, span, n) {
+        let v = base;
+        let bc = fn(base);
+        for (let i = -n; i <= n; i++) {
+          if (!i) continue;
+          const t = base + (span * i) / n;
+          const c = fn(t);
+          if (c < bc) {
+            bc = c;
+            v = t;
+          }
+        }
+        return v;
+      }
+
+      let yawEst = PHASE;
+      let pitchEst = 0;
+      let seeded = false;
+
+      function solveCam(env, obs) {
+        let yaw = yawEst;
+        let pitch = pitchEst;
+        if (!seeded) {
+          const v = +(document.documentElement.dataset.view || 1);
+          yaw = PHASE + (v - 1) * STEP;
+          pitch = document.documentElement.dataset.look === 'up' ? PITCH_UP : 0;
+          seeded = true;
+        }
+        const cost = (y, p) => costOf(y, p, env, obs);
+        for (const [span, n] of [
+          [6 * DEG, 12],
+          [0.7 * DEG, 10],
+          [0.08 * DEG, 8],
+        ]) {
+          yaw = scan((v) => cost(v, pitch), yaw, span, n);
+          pitch = scan((v) => cost(yaw, v), pitch, span, n);
+        }
+        yawEst = yaw;
+        pitchEst = pitch;
+      }
+
+      /* ══════════════════════════════════════════════════════════
+         二、笔
+
+         单线、恒定极细、不做明暗。远近只交给疏密——透视自己会给。
+         ══════════════════════════════════════════════════════════ */
+
+      const INK = (a) => `rgba(210,209,236,${(a < 0 ? 0 : a > 1 ? 1 : a).toFixed(3)})`;
+      const mix3 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+
+      /* 把一条世界里的线段推进当前路径。先在剖切面裁掉上半截（天花板不走这道裁），
+         再在近平面裁，然后才投——不会有一根线因为穿过相机而炸成满屏。 */
+      function push(g, cam, env, a, b, noCap) {
+        if (!noCap) {
+          const cap = env.Y;
+          const aA = a[1] > cap;
+          const bA = b[1] > cap;
+          if (aA && bA) return;
+          if (aA) a = mix3(a, b, (cap - a[1]) / (b[1] - a[1]));
+          else if (bA) b = mix3(a, b, (cap - a[1]) / (b[1] - a[1]));
+        }
+        let ca = cam(a);
+        let cb = cam(b);
+        const da = -ca.z;
+        const db = -cb.z;
+        if (da < NEAR && db < NEAR) return;
+        if (da < NEAR) {
+          const t = (NEAR - da) / (db - da);
+          ca = { x: ca.x + (cb.x - ca.x) * t, y: ca.y + (cb.y - ca.y) * t, z: -NEAR };
+        } else if (db < NEAR) {
+          const t = (NEAR - db) / (da - db);
+          cb = { x: cb.x + (ca.x - cb.x) * t, y: cb.y + (ca.y - cb.y) * t, z: -NEAR };
+        }
+        const p = scr(ca, env);
+        const q = scr(cb, env);
+        if (!isFinite(p.x) || !isFinite(q.x)) return;
+        g.moveTo(p.x, p.y);
+        g.lineTo(q.x, q.y);
+      }
+
+      function seg(g, cam, env, a, b, noCap) {
+        g.beginPath();
+        push(g, cam, env, a, b, noCap);
+        g.stroke();
+      }
+
+      /* 世界里的多边形 → 当前路径（近平面裁过）。给剖切断面的实心带用。 */
+      function polyPath(g, cam, env, pts) {
+        const cl = clipNear(pts.map(cam));
+        if (cl.length < 3) return false;
+        g.beginPath();
+        cl.forEach((c, i) => {
+          const p = scr(c, env);
+          if (i) g.lineTo(p.x, p.y);
+          else g.moveTo(p.x, p.y);
+        });
+        g.closePath();
+        return true;
+      }
+
+      /* 四面墙的参数化：a 沿墙长（米，−half → +half），y 是离地高 */
+      function wallAt(k, W, D) {
+        switch (k) {
+          case 'back':
+            return (a, y) => [a, y, -D];
+          case 'front':
+            return (a, y) => [a, y, D];
+          case 'right':
+            return (a, y) => [W, y, a];
+          default:
+            return (a, y) => [-W, y, a];
+        }
+      }
+
+      /* 一面墙分几个开间。窗在开间正中，竖分隔线落在开间线上——
+         窗的节奏与墙的分格是同一套数，看上去才像画过图。 */
+      function baysOf(half) {
+        const L = half * 2;
+        const n = Math.max(1, Math.round(L / 1.55));
+        const gap = L / n;
+        const inner = [];
+        const centers = [];
+        for (let i = 1; i < n; i++) inner.push(-half + gap * i);
+        for (let i = 0; i < n; i++) centers.push(-half + gap * (i + 0.5));
+        return { inner, centers, gap };
+      }
+
+      const SKIRT = 0.115; // 踢脚高
+      const SILL = 0.58; // 窗台高
+      const STILE = 0.5; // 窗半宽
+      const FRAME = 0.05; // 窗框宽
+      const DADO = 0.88; // 腰线高
+      const POCHE = 0.075; // 剖切断面的厚度（米）：这是「切」的记号，一条窄边，不是一条带
+
+      /* 线宽。画布是 0.65 分辨率、CSS 拉满的，所以这里的 1 个像素上屏是 1.54 个。
+         要「线宽不到 1px」，就得按 0.5 上下给数——粗一档才到 0.9。
+         注意：0.5 以下的线会被抗锯齿摊成一层几乎看不见的灰，所以浅色的线
+         宁可给 0.6–0.8 再压 alpha，也不要去赌 0.3。 */
+      const W_HAIR = 0.62;
+      const W_THIN = 0.72;
+      const W_MID = 0.85;
+      const W_STRONG = 1.05;
+      const W_DREAM = 1.5;
+
+      /* ══════════════════════════════════════════════════════════
+         三、画
+         ══════════════════════════════════════════════════════════ */
+
+      const smooth = (a, b, v) => {
+        const t = Math.min(1, Math.max(0, (v - a) / (b - a)));
+        return t * t * (3 - 2 * t);
+      };
+
+      /* 一整面墙的横线：碰到窗洞就断开（窗是空的，线不能穿过去） */
+      function across(g, cam, env, at, half, y, wins) {
+        g.beginPath();
+        let from = -half;
+        for (const c of wins) {
+          const L = c - STILE;
+          if (L > from) push(g, cam, env, at(from, y), at(L, y));
+          from = c + STILE;
+        }
+        if (from < half) push(g, cam, env, at(from, y), at(half, y));
+        g.stroke();
+      }
+
+      /* 把下面这块面裁出来：这一面的线不外溢到邻居身上去 */
+      function clipFace(g, poly) {
+        if (poly.length < 3) return false;
+        g.beginPath();
+        poly.forEach((p, i) => (i ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y)));
+        g.closePath();
+        g.clip();
+        return true;
+      }
+
+      room.onPaint(({ faces, g, sink, vw, vh, W, H, D, dreamY }) => {
+        if (sink <= 0.002) return;
+        const k = Math.min(1, Math.max(0, sink));
+        const Y = dreamY;
+
+        const env = { vw, vh, F: focal(vw, vh), box: boxOf(sink), W, H, D, Y };
+        solveCam(
+          env,
+          faces.map((f) => ({ k: f.k, pts: f.above.concat(f.below), line: f.line })),
+        );
+        const cam = makeCam(yawEst, pitchEst, env);
+
+        /* 剖切面在屏幕上的高度：取任一面墙的梦线，够用了 */
+        let cutY = vh * 0.6;
+        for (const f of faces) {
+          if (f.line.length === 2) {
+            cutY = (f.line[0].y + f.line[1].y) / 2;
+            break;
+          }
+        }
+
+        g.lineJoin = 'round';
+        g.lineCap = 'butt';
+
+        /* ── 一、铺底：剖切面以下压成一张纸，线上要有个安静的地方落 ──
+           不填纯黑：留一点冷暖差，纸才不是一块板；
+           下缘再压一层薄光，房间才有「深处还有东西」。 */
+        const grd = g.createLinearGradient(0, cutY - 20, 0, Math.max(cutY + 360, vh));
+        grd.addColorStop(0, `rgba(34,36,56,${(0.95 * k).toFixed(3)})`);
+        grd.addColorStop(0.32, `rgba(19,21,35,${(0.965 * k).toFixed(3)})`);
+        grd.addColorStop(1, `rgba(8,9,17,${(0.985 * k).toFixed(3)})`);
+        g.fillStyle = grd;
+        for (const f of faces) {
+          if (f.k === 'ceil' || !f.below.length) continue;
+          g.beginPath();
+          f.below.forEach((p, i) => (i ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y)));
+          g.closePath();
+          g.fill();
+        }
+
+        /* ── 一·b、排线的「影」：这是这张图唯一容许的灰度。
+           不用渐变糊，而按蚀刻的老办法——沿某条水平线挂一排短竖笔，
+           贴着线的密、往下迅速稀掉。线本身还是单线，只是疏密变了。
+           上半是像素流光，下半只有这种笔，两种画风才不会混。 ── */
+        for (const f of faces) {
+          if (f.k === 'ceil' || f.k === 'floor' || f.below.length < 3) continue;
+          const at = wallAt(f.k, W, D);
+          const half = f.k === 'back' || f.k === 'front' ? W : D;
+
+          g.save();
+          if (!clipFace(g, f.below)) {
+            g.restore();
+            continue;
+          }
+
+          /* 一道影：从 y 往下挂，长度按松紧衰减。dir = -1 向上挂。 */
+          const shade = (y, len, step, alpha, dir) => {
+            const n = Math.round((half * 2) / step);
+            for (let pass = 0; pass < 2; pass++) {
+              g.strokeStyle = INK(alpha * (pass ? 0.5 : 1) * k);
+              g.lineWidth = W_HAIR;
+              g.beginPath();
+              const off = pass ? step * 0.5 : 0;
+              for (let i = 0; i <= n; i++) {
+                const a = -half + off + (i / n) * (half * 2);
+                if (a > half) break;
+                /* 每三笔里有一笔更长一点，读起来才像手画的，不像机织的 */
+                const j = Math.abs(Math.sin(a * 21.7)) * 0.45 + Math.abs(Math.sin(a * 5.3)) * 0.3;
+                const L = len * (0.45 + j);
+                push(g, cam, env, at(a, y), at(a, y + dir * L));
+              }
+              g.stroke();
+            }
+          };
+
+          /* 墙根的那道影：最实，因为它踩着地 */
+          shade(0.02, 0.13, 0.028, 0.5, 1);
+          shade(0.02, 0.2, 0.062, 0.24, 1);
+          /* 腰线下面一道，浅得多 */
+          shade(DADO - 0.005, 0.06, 0.038, 0.26, 1);
+
+          g.restore();
+        }
+
+        /* ── 二、墙 ── */
+        for (const f of faces) {
+          if (f.k === 'ceil' || f.k === 'floor') continue;
+          if (!f.below.length) continue;
+          const at = wallAt(f.k, W, D);
+          const half = f.k === 'back' || f.k === 'front' ? W : D;
+          const bays = baysOf(half);
+          const wins = bays.centers;
+
+          g.save();
+          if (!clipFace(g, f.below)) {
+            g.restore();
+            continue;
+          }
+
+          /* 墙根：墙与地相接。整张图上最先要找平的一条线。 */
+          g.strokeStyle = INK(0.46 * k);
+          g.lineWidth = W_STRONG;
+          seg(g, cam, env, at(-half, 0), at(half, 0));
+
+          /* 踢脚：双线。一道贴地，一道是上沿，读作一条有厚度的边。 */
+          g.strokeStyle = INK(0.34 * k);
+          g.lineWidth = W_MID;
+          seg(g, cam, env, at(-half, SKIRT), at(half, SKIRT));
+          g.strokeStyle = INK(0.2 * k);
+          g.lineWidth = W_THIN;
+          seg(g, cam, env, at(-half, SKIRT + 0.04), at(half, SKIRT + 0.04));
+
+          /* 腰线：绕屋子一圈，落在 0.88。它把下面的墙分成两段——
+             墙不再是一块空面，而是一张有分层的立面。 */
+          g.strokeStyle = INK(0.3 * k);
+          g.lineWidth = W_MID;
+          across(g, cam, env, at, half, DADO, wins);
+          g.strokeStyle = INK(0.18 * k);
+          g.lineWidth = W_THIN;
+          across(g, cam, env, at, half, DADO + 0.045, wins);
+
+          /* 开间线：从地一直到剖切面，碰到窗洞就从两侧绕过去。 */
+          g.strokeStyle = INK(0.21 * k);
+          g.lineWidth = W_THIN;
+          for (const a of bays.inner) {
+            g.beginPath();
+            push(g, cam, env, at(a, 0), at(a, DADO));
+            push(g, cam, env, at(a, DADO + 0.045), at(a, Y - POCHE));
+            g.stroke();
+          }
+
+          /* 窗洞。窗台在剖切面之下，两侧窗框一路往上被剖切面切开——
+             顶边是敞的，这正是剖面该有的样子。 */
+          for (const c of wins) {
+            const L = c - STILE;
+            const R = c + STILE;
+            const Li = L + FRAME;
+            const Ri = R - FRAME;
+
+            /* 洞口：三面，顶面被切掉 */
+            g.strokeStyle = INK(0.56 * k);
+            g.lineWidth = W_STRONG;
+            g.beginPath();
+            push(g, cam, env, at(L, SILL), at(L, Y - POCHE));
+            push(g, cam, env, at(R, SILL), at(R, Y - POCHE));
+            push(g, cam, env, at(L, SILL), at(R, SILL));
+            g.stroke();
+
+            /* 窗框：内退一圈。两条框边就是「这堵墙有厚度」的全部依据。 */
+            g.strokeStyle = INK(0.3 * k);
+            g.lineWidth = W_THIN;
+            g.beginPath();
+            push(g, cam, env, at(Li, SILL + FRAME), at(Li, Y - POCHE));
+            push(g, cam, env, at(Ri, SILL + FRAME), at(Ri, Y - POCHE));
+            push(g, cam, env, at(Li, SILL + FRAME), at(Ri, SILL + FRAME));
+            g.stroke();
+
+            /* 中梃：一窗一竖。有它，窗才读成两扇。 */
+            g.strokeStyle = INK(0.38 * k);
+            g.lineWidth = W_MID;
+            seg(g, cam, env, at(c, SILL + FRAME), at(c, Y - POCHE));
+
+            /* 窗台挑出一点点，两端各收一枚端头 */
+            g.strokeStyle = INK(0.6 * k);
+            g.lineWidth = 0.95;
+            g.beginPath();
+            push(g, cam, env, at(L - 0.08, SILL), at(R + 0.08, SILL));
+            push(g, cam, env, at(L - 0.08, SILL), at(L - 0.08, SILL - 0.05));
+            push(g, cam, env, at(R + 0.08, SILL), at(R + 0.08, SILL - 0.05));
+            g.stroke();
+
+            /* 窗台底下那道影子：一排短竖笔，中间密、两头疏。
+               疏密就是明暗——这是图上下半截唯一一处「有光落下来」。 */
+            g.strokeStyle = INK(0.16 * k);
+            g.lineWidth = W_THIN;
+            g.beginPath();
+            const n = 15;
+            for (let i = 0; i <= n; i++) {
+              const a = L - 0.06 + ((R - L + 0.12) * i) / n;
+              const soft = Math.cos((i / n - 0.5) * Math.PI);
+              push(g, cam, env, at(a, SILL - 0.055), at(a, SILL - 0.055 - 0.028 - 0.085 * soft));
+            }
+            g.stroke();
+          }
+
+          /* ── 剖切断面（poché）：梦线往下这一带是「被切开的那层材料」。
+             先垫一层比墙更沉的实底，再压 45° 斜线——这是剖透视图的签名，
+             也是「梦线不是装饰，是剖切的位置」的凭据。
+             斜线走屏幕空间：真实的剖面图上排线是等距的，不随远近变形，
+             只在边角上被裁剪收住。 ── */
+          {
+            const band = [at(-half, Y - POCHE), at(half, Y - POCHE), at(half, Y), at(-half, Y)];
+            if (polyPath(g, cam, env, band)) {
+              g.fillStyle = `rgba(2,3,6,${(0.78 * k).toFixed(3)})`;
+              g.fill();
+
+              g.save();
+              g.clip();
+              /* 屏幕右上留白、左下压暗：断面不是一块平色，它有一点方向 */
+              const hg = g.createLinearGradient(0, cutY - 40, 0, cutY + 120);
+              hg.addColorStop(0, 'rgba(0,0,0,0)');
+              hg.addColorStop(1, `rgba(0,0,0,${(0.28 * k).toFixed(3)})`);
+              g.fillStyle = hg;
+              g.fillRect(0, cutY - 60, vw, 200);
+
+              g.strokeStyle = INK(0.3 * k);
+              g.lineWidth = W_THIN;
+              g.beginPath();
+              const step = 5.5;
+              const span = vw + vh;
+              for (let d = -vh; d < span; d += step) {
+                g.moveTo(d, cutY + 400);
+                g.lineTo(d + 400, cutY);
+              }
+              g.stroke();
+              g.restore();
+
+              /* 断面带的上下两条收边：上沿交给梦线，这里只收下沿 */
+              g.strokeStyle = INK(0.3 * k);
+              g.lineWidth = W_MID;
+              seg(g, cam, env, at(-half, Y - POCHE), at(half, Y - POCHE));
+            }
+          }
+
+          g.restore();
+        }
+
+        /* ── 三、四个墙角：从地到剖切面的一根竖线。
+             没有它，左右两片楔形会读成两张挂图而不是一间屋子。 ── */
+        g.strokeStyle = INK(0.34 * k);
+        g.lineWidth = W_MID;
+        g.beginPath();
+        for (const s of [
+          [-W, -D],
+          [W, -D],
+          [W, D],
+          [-W, D],
+        ]) {
+          push(g, cam, env, [s[0], 0, s[1]], [s[0], Y, s[1]]);
+        }
+        g.stroke();
+
+        /* ── 四、地：与墙同轴的铺地分格。它负责下半截的密度，
+             越远越密，透视自己会把它们收拢。 ── */
+        {
+          const fl = faces.find((f) => f.k === 'floor');
+          if (fl && fl.below.length) {
+            g.save();
+            if (clipFace(g, fl.below)) {
+              g.strokeStyle = INK(0.17 * k);
+              g.lineWidth = W_THIN;
+              g.beginPath();
+              for (let x = -W + 0.8; x < W - 0.05; x += 0.8) push(g, cam, env, [x, 0, -D], [x, 0, D]);
+              for (let z = -D + 0.78; z < D - 0.05; z += 0.78) push(g, cam, env, [-W, 0, z], [W, 0, z]);
+              g.stroke();
+
+              /* 顺着两道墙根各退进来一条，把地面收一圈边 */
+              g.strokeStyle = INK(0.26 * k);
+              g.lineWidth = W_MID;
+              g.beginPath();
+              push(g, cam, env, [-W + 0.4, 0, -D], [W - 0.4, 0, -D]);
+              push(g, cam, env, [-W + 0.4, 0, D], [W - 0.4, 0, D]);
+              push(g, cam, env, [-W, 0, -D + 0.4], [-W, 0, D - 0.4]);
+              push(g, cam, env, [W, 0, -D + 0.4], [W, 0, D - 0.4]);
+              g.stroke();
+            }
+            g.restore();
+          }
+        }
+
+        /* ── 五、天花板：梁的网格。
+           平视时那一片只是屏幕最上面很薄的一条，所以整组梁跟着俯仰淡入——
+           不看天花板的时候，上面就还给纯粹的流光；一抬头，盒子才现形。
+           梁只画线（这一份是线描，不是体块），但主梁比次梁粗一档、沉半米，
+           于是网格有前后，不是一张贴纸。 ── */
+        const ceilK = smooth(0.06, 0.42, pitchEst / PITCH_UP);
+        if (ceilK > 0.01) {
+          const ck = k * ceilK;
+          const cf = faces.find((f) => f.k === 'ceil');
+          if (cf && cf.above.length) {
+            g.save();
+            if (clipFace(g, cf.above)) {
+              /* 顶板：只压很薄一层。梁与梁之间要留出流光——
+                 天花板不画实，画的只是梁；光从梁与梁之间渗下来，这才是「上面是流光」。 */
+              g.fillStyle = `rgba(9,10,19,${(0.42 * ck).toFixed(3)})`;
+              g.fillRect(0, 0, vw, vh);
+
+              const CY = H;
+              const BEAM = 0.36; // 主梁高
+              const BW = 0.105; // 主梁半宽
+              const GX = 0.72; // 主梁间距（沿 x，顺进深方向铺）
+              const GZ = 0.9; // 次梁间距（沿 z）
+
+              /* 先算一遍位置，两端都收在墙内一档，别让梁头戳出盒子 */
+              const mainX = [];
+              for (let x = -W + GX * 0.5; x < W - 0.3; x += GX) mainX.push(x);
+              const subZ = [];
+              for (let z = -D + GZ * 0.5; z < D - 0.3; z += GZ) subZ.push(z);
+
+              /* 次梁：贴着顶板，横过进深方向，淡一档 */
+              g.strokeStyle = INK(0.42 * ck);
+              g.lineWidth = W_THIN;
+              g.beginPath();
+              for (const z of subZ) push(g, cam, env, [-W, CY, z], [W, CY, z], true);
+              g.stroke();
+
+              /* 主梁：顺进深方向。每条画两条底边——两条边分开一个梁宽，
+                 梁才有「厚」，才不是划痕；两头各落一小段到墙上，说明它是搭着的。 */
+              g.strokeStyle = INK(0.86 * ck);
+              g.lineWidth = W_MID;
+              g.beginPath();
+              for (const x of mainX) {
+                for (const o of [-BW, BW]) push(g, cam, env, [x + o, CY - BEAM, -D], [x + o, CY - BEAM, D], true);
+              }
+              g.stroke();
+              g.strokeStyle = INK(0.56 * ck);
+              g.lineWidth = W_THIN;
+              g.beginPath();
+              for (const x of mainX) {
+                for (const o of [-BW, BW]) {
+                  push(g, cam, env, [x + o, CY, -D], [x + o, CY - BEAM, -D], true);
+                  push(g, cam, env, [x + o, CY, D], [x + o, CY - BEAM, D], true);
+                }
+              }
+              g.stroke();
+
+              /* 顶板与墙相接的那一圈。抬头那一下「我在一个盒子里」，全落在这条线上。 */
+              g.strokeStyle = INK(0.9 * ck);
+              g.lineWidth = W_MID;
+              g.beginPath();
+              push(g, cam, env, [-W, CY, -D], [W, CY, -D], true);
+              push(g, cam, env, [-W, CY, D], [W, CY, D], true);
+              push(g, cam, env, [-W, CY, -D], [-W, CY, D], true);
+              push(g, cam, env, [W, CY, -D], [W, CY, D], true);
+              g.stroke();
+            }
+            g.restore();
+          }
+        }
+
+        /* ── 六、梦线：比别的线略亮、略粗。不是装饰，是剖切的位置。 ── */
+        for (const f of faces) {
+          if (f.line.length !== 2) continue;
+          g.strokeStyle = `rgba(238,235,253,${(0.85 * k).toFixed(3)})`;
+          g.lineWidth = W_DREAM;
+          g.beginPath();
+          g.moveTo(f.line[0].x, f.line[0].y);
+          g.lineTo(f.line[1].x, f.line[1].y);
+          g.stroke();
+        }
+      });
+
+      flow.onFrame((s) => {
+        approach.update(s.sink, s.vw);
+        stat.textContent = `视角 ${document.documentElement.dataset.view} / 4 · ${Math.round(s.vw)}×${Math.round(s.vh)}`;
+      });
+
+      flow.start();
+      room.start();
+    </script>
+  </body>
+</html>

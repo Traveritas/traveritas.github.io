@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="zh-CN" data-arrived="no">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>可以往下沉 · somewhere</title>
+    <link rel="stylesheet" href="./shell.css" />
+    <link rel="stylesheet" href="./s-D.css" />
+  </head>
+  <body>
+    <!-- 背景：正式站那支流光。整个页面只有它一个 WebGL 上下文。 -->
+    <canvas id="light"></canvas>
+
+    <!-- 遮罩：随深度收拢的那扇口子（DOM 渐变，不用图） -->
+    <div id="veil" aria-hidden="true"></div>
+
+    <!-- 自绘层：层与层的界线、台上的点、以后能点的记号 -->
+    <canvas id="ink" aria-hidden="true"></canvas>
+
+    <!-- 每层的那句话 -->
+    <div class="d-labs" id="dLabs" aria-hidden="true">
+      <div class="d-lab"></div>
+      <div class="d-lab"></div>
+      <div class="d-lab"></div>
+    </div>
+
+    <!-- 右边那把尺：现在是深度读数，以后每一格都能点 -->
+    <div class="d-scale" id="dScale" aria-hidden="true"><span class="d-mk" id="dMk"></span></div>
+
+    <div class="sw-corner sw-tl">somewhere · 往下</div>
+    <a class="sw-corner sw-br ret" href="./index.html">← 回索引</a>
+    <div class="sw-corner sw-br" id="stat"></div>
+
+    <!-- 转场那一下的提示（shell.css 自带，转完自动退场） -->
+    <p class="sw-hint"><span>向下</span><i></i></p>
+
+    <!-- 过了转场之后我自己的那一行：只说手，不说梦 -->
+    <p class="d-hint" id="dHint"><span>向上推 · 往下沉</span><i></i><span>滚轮 · 方向键</span></p>
+
+    <script type="module">
+      import { initWorld, options } from './shell.js';
+      import { initScene } from './s-D.js';
+
+      const opt = options();
+      // ?dive=3 直接沉到第三层（截图用；和 ?arrive 一样只是给作者自己的口子）
+      const q = new URLSearchParams(location.search);
+      if (q.has('dive')) opt.dive = Number(q.get('dive')) || 0;
+
+      /* 三段调色：天 / 地平线那一带 / 地。
+         都是低饱和的同一色族（靛 → 灰紫 → 青灰），亮芯只有天光那一处，
+         地为偏冷的深青 —— 和正式站「醒梦」的两面是同一个方向，只是更沉。 */
+      const themes = {
+        sky: [
+          [0.045, 0.05, 0.09],
+          [0.09, 0.1, 0.17],
+          [0.2, 0.22, 0.34],
+          [0.66, 0.66, 0.8],
+        ],
+        band: [
+          [0.05, 0.05, 0.08],
+          [0.11, 0.1, 0.15],
+          [0.26, 0.24, 0.32],
+          [0.82, 0.74, 0.64],
+        ],
+        ground: [
+          [0.035, 0.045, 0.055],
+          [0.07, 0.1, 0.12],
+          [0.15, 0.24, 0.27],
+          [0.52, 0.7, 0.72],
+        ],
+      };
+
+      const world = initWorld({
+        canvas: document.getElementById('light'),
+        themes,
+        // 地平线抬到三成高：它不是远景的海平线，是头顶那口光 —— 往下才有地方
+        horizon: 0.3,
+        // 光带窄一点，这样它像一圈口，不像一条海岸线
+        band: 46,
+        autoArrive: opt.autoArrive,
+        face: opt.face,
+        px: opt.px,
+        wind: false,
+        grain: [
+          [0.95, 0.22, 26], // 天：抖动重一点，亮芯收着
+          [1, 0.3, 24], // 那一带光：允许一点点亮
+          [0.9, 0.18, 28], // 地：更稳、更暗
+        ],
+      });
+
+      initScene({ world, opt });
+      world.start();
+    </script>
+  </body>
+</html>
