@@ -50,6 +50,13 @@ const B = process.env.BASE || 'http://127.0.0.1:4325';
   // 从名录点进一篇（跨页常驻）：「本页」要出现、目录要是这一篇的
   await run('24-list-to-read-tool', '/articles/', { act: async (p) => { await p.click('.pane--ch'); await p.waitForTimeout(1600); await p.click('.ts-star'); await p.waitForTimeout(600); await p.click('.ts-tool[data-t="page"]'); await p.waitForTimeout(900); } });
   await run('25-home-tools', '/', { act: async (p) => { await p.click('.ts-star'); await p.waitForTimeout(1000); } });
+  // NEXUS 的门：切面随时间变形；悬停停住；点下去化白
+  await run('26-gate', '/gate/');
+  await run('26b-gate-later', '/gate/', { wait: 9000 });
+  await run('26c-gate-wake', '/gate/', { face: 'wake' });
+  await run('27-gate-hover', '/gate/', { act: async (p) => { await p.mouse.move(720, 450); await p.waitForTimeout(1500); } });
+  await run('28-gate-door', '/gate/', { act: async (p) => { await p.click('.gate-door'); await p.waitForTimeout(700); } });
+  await run('29-to-gate', '/', { act: async (p) => { await p.click('.ts-star'); await p.waitForTimeout(600); await p.click('.ts-tool[data-t="go"]'); await p.waitForTimeout(700); await p.click('[data-ring="go"] a[href="/gate/"]'); await p.waitForTimeout(1800); } });
   await run('16-m-home', '/', { vp: { width: 390, height: 844 } });
   await run('17-m-list', '/moments/', { vp: { width: 390, height: 844 } });
   await run('18-m-read', '/articles/style-specimen/', { vp: { width: 390, height: 844 } });

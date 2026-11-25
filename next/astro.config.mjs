@@ -91,6 +91,8 @@ export default defineConfig({
   build: { format: 'directory' },
   // dev 时底部那条 Astro 工具栏会压在地面上，截图也会带上它
   devToolbar: { enabled: false },
+  // 旧站的关于页早已换成 NEXUS 的门；/new 是更早的主页预览地址
+  redirects: { '/about': '/gate/', '/new': '/' },
   // 内容（含配图）在上一级目录里
   vite: { server: { fs: { allow: ['..'] } } },
 });

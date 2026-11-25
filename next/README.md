@@ -42,7 +42,6 @@ node shots.cjs         # 截图 → _shots/，对照页 _shots/index.html（BASE
 
 ## 还没做
 
-- /gate/（NEXUS 入口）
 - Ave 的「读到文末」那几句（原站 watchEnd，只在初始化时挂；跨页常驻后要按页重挂）
 - 正文字体子集是根目录 `npm run fonts` 扫旧站 `src/` 切的，新站独有的字可能落进尾包
 

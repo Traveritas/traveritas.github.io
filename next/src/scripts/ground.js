@@ -356,6 +356,69 @@ export function cubeClean() {
   }
   return m;
 }
+/* NEXUS：一枚四维晶体（超立方体）在此处的切面。切的超平面法向是 (1,1,1,1)/2，离原点 d：
+   |d| 从 1 往 0 走，切面从正四面体 → 截角四面体 → 正八面体（d = 0），再往另一头翻过去。
+   切面的每一个面 = 超立方体的一个立方体胞被切出来的多边形；扇形三角化，扇里的对角线不画棱。
+   尺寸按外接球归一（不管切到哪儿都差不多大）。 */
+const TV = [];
+for (let i = 0; i < 16; i++) TV.push([0, 1, 2, 3].map((k) => ((i >> k) & 1 ? 1 : -1)));
+const TE = [];
+for (let i = 0; i < 16; i++) for (let k = 0; k < 4; k++) if (!((i >> k) & 1)) TE.push([i, i | (1 << k), k]);
+// 8 个立方体胞：某一维固定为 ±1
+const TC = [];
+for (let k = 0; k < 4; k++) for (const s of [-1, 1]) TC.push([k, s]);
+// 超平面里的正交基（都与 (1,1,1,1) 垂直）
+const HB = [[1, -1, 0, 0].map((x) => x / Math.SQRT2), [1, 1, -2, 0].map((x) => x / Math.sqrt(6)), [1, 1, 1, -3].map((x) => x / Math.sqrt(12))];
+export function tesseractSlice(d) {
+  const nd = (v) => (v[0] + v[1] + v[2] + v[3]) / 2;
+  // 棱与超平面的交点（四维），按棱记下来
+  const cut = TE.map(([a, b]) => {
+    const da = nd(TV[a]) - d, db = nd(TV[b]) - d;
+    if ((da > 0) === (db > 0) || da === db) return null;
+    const t = da / (da - db);
+    return TV[a].map((x, i) => x + (TV[b][i] - x) * t);
+  });
+  const to3 = (p) => HB.map((e) => e[0] * p[0] + e[1] * p[1] + e[2] * p[2] + e[3] * p[3]);
+  let R = 0;
+  const polys = [];
+  for (const [k, s] of TC) {
+    const pts = [];
+    TE.forEach(([a, b], j) => {
+      if (!cut[j] || TV[a][k] !== s || TV[b][k] !== s) return;
+      // 切在顶点上时同一点会从几条棱各来一次：去重
+      const p = to3(cut[j]);
+      if (!pts.some((q) => Math.hypot(q[0] - p[0], q[1] - p[1], q[2] - p[2]) < 1e-6)) pts.push(p);
+    });
+    if (pts.length < 3) continue;
+    const c = pts.reduce((m, p) => m.map((x, i) => x + p[i] / pts.length), [0, 0, 0]);
+    // 这个面的法向 = 胞的那一维投到超平面里（朝外）
+    const n = norm(to3([0, 1, 2, 3].map((i) => (i === k ? s : 0))));
+    const u = norm(pts[0].map((x, i) => x - c[i]));
+    const v = [n[1] * u[2] - n[2] * u[1], n[2] * u[0] - n[0] * u[2], n[0] * u[1] - n[1] * u[0]];
+    pts.sort((p, q) => {
+      const P = p.map((x, i) => x - c[i]), Q = q.map((x, i) => x - c[i]);
+      return Math.atan2(P[0] * v[0] + P[1] * v[1] + P[2] * v[2], P[0] * u[0] + P[1] * u[1] + P[2] * u[2]) - Math.atan2(Q[0] * v[0] + Q[1] * v[1] + Q[2] * v[2], Q[0] * u[0] + Q[1] * u[1] + Q[2] * u[2]);
+    });
+    for (const p of pts) R = Math.max(R, Math.hypot(...p));
+    polys.push(pts);
+  }
+  const P = [], B = [];
+  let n = 0;
+  for (const pts of polys) {
+    const L = pts.length;
+    for (let i = 1; i < L - 1; i++) {
+      for (const p of [pts[0], pts[i], pts[i + 1]]) P.push(...p.map((x) => x / (R || 1)));
+      // 重心坐标：对着第 1 个顶点的边是 (0,i+1)、对着第 2 个的是 (0,i)——扇里的对角线置 1 不画
+      const b0 = [1, 0, 0], b1 = [0, 1, 0], b2 = [0, 0, 1];
+      if (i + 1 < L - 1) for (const b of [b0, b1, b2]) b[1] = 1;
+      if (i > 1) for (const b of [b0, b1, b2]) b[2] = 1;
+      B.push(...b0, ...b1, ...b2);
+      n += 3;
+    }
+  }
+  return { P: new Float32Array(P), B: new Float32Array(B), n };
+}
+
 function rotAxis([x, y, z], a) {
   const c = Math.cos(a), s = Math.sin(a), t = 1 - c;
   return [t * x * x + c, t * x * y - s * z, t * x * z + s * y, t * x * y + s * z, t * y * y + c, t * y * z - s * x, t * x * z - s * y, t * y * z + s * x, t * z * z + c];
@@ -390,9 +453,20 @@ export function createGround(canvas) {
   let gw = 0, gh = 0;
 
   const meshes = new Map();
+  /* 同名再调一次 = 换形（NEXUS 的切面每帧都在变）：沿用原来的缓冲，只换数据 */
   function mesh(name, m) {
+    const had = meshes.get(name);
+    if (had) {
+      for (const [b, arr] of [[had.bP, m.P], [had.bB, m.B]]) {
+        gl.bindBuffer(gl.ARRAY_BUFFER, b);
+        gl.bufferData(gl.ARRAY_BUFFER, arr, gl.DYNAMIC_DRAW);
+      }
+      had.n = m.n;
+      return;
+    }
     const vao = gl.createVertexArray();
     gl.bindVertexArray(vao);
+    const bufs = [];
     for (const [attr, arr] of [['aP', m.P], ['aB', m.B]]) {
       const b = gl.createBuffer();
       gl.bindBuffer(gl.ARRAY_BUFFER, b);
@@ -400,9 +474,10 @@ export function createGround(canvas) {
       const loc = gl.getAttribLocation(P3.p, attr);
       gl.enableVertexAttribArray(loc);
       gl.vertexAttribPointer(loc, 3, gl.FLOAT, false, 0, 0);
+      bufs.push(b);
     }
     gl.bindVertexArray(null);
-    meshes.set(name, { vao, n: m.n });
+    meshes.set(name, { vao, n: m.n, bP: bufs[0], bB: bufs[1] });
   }
 
   const S = { dpr: 1, cell: 4 };

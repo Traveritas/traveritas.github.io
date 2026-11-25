@@ -7,14 +7,14 @@
    所以页与页之间不换背景——地面平移一段、变粗再一级级解析回来，晶体从旧位置飞到新位置。
    开屏：地面从一格极粗的夜色里一级级解析出来，字最后站起来。
    ───────────────────────────────────────────────────────────── */
-import { createGround, bipyramid, shard, cubeClean, euler } from './ground.js';
+import { createGround, bipyramid, shard, cubeClean, tesseractSlice, euler } from './ground.js';
 import { initSound } from './sound';
 import { initToolstar, toolstarPage } from './toolstar';
 import { initAve, aveEnterRoute } from './ave';
 import { setFace, setMix, setFlipper, reapply } from './reality';
 
 type Sec = 'articles' | 'moments' | 'projects';
-type Place = 'home' | 'list' | 'read' | 'lost' | 'find' | 'tag';
+type Place = 'home' | 'list' | 'read' | 'lost' | 'find' | 'tag' | 'gate';
 interface Route {
   place: Place;
   k?: Sec;
@@ -56,6 +56,8 @@ function parse(): Route {
   if (place === 'home') return { place, pan: [0, 0], gain: 1 };
   // 寻找 / 标签：不属于哪一处，地面停在三处之外的一片（没有元素）
   if (place === 'find' || place === 'tag') return { place, pan: [1.6, 1.1], gain: 0.75 };
+  // NEXUS 的门：三处的另一边
+  if (place === 'gate') return { place, pan: [-1.3, 1.5], gain: 0.95 };
   if (!k || !SECS[k]) return { place: 'lost', pan: [0.4, 1.2], gain: 0.8 };
   if (place === 'list') return { place, k, pan: SECS[k].pan, gain: 0.8 };
   return { place: 'read', k, slug: b.slug, pan: [SECS[k].pan[0] + 0.25, SECS[k].pan[1] + 0.55], gain: 0.85 };
@@ -200,10 +202,38 @@ const ground = createGround(document.getElementById('g') as HTMLCanvasElement);
 ground.mesh('essays', bipyramid(6, 1, 0.72, 0.4));
 ground.mesh('moments', shard(7));
 ground.mesh('projects', cubeClean());
+ground.mesh('nexus', tesseractSlice(0.5));
 
+/* 晶体：三处各一颗，外加 NEXUS 门上那一颗（四维晶体的切面，切的位置一直在慢慢走，形也跟着变） */
+type Crys = Sec | 'nexus';
+const CRYS: Crys[] = [...ORDER, 'nexus'];
+const TINT: Record<Crys, number[]> = { ...Object.fromEntries(ORDER.map((k) => [k, SECS[k].tint])), nexus: [0.93, 0.9, 1.0] } as Record<Crys, number[]>;
+const MESHOF: Record<Crys, string> = { ...MESH, nexus: 'nexus' };
 type X = { x: number; y: number; s: number; a: number; glow: number; spin: number; seen: boolean };
-const XS = {} as Record<Sec, X>;
-for (const k of ORDER) XS[k] = { x: innerWidth / 2, y: innerHeight / 2, s: 0, a: 0, glow: 0, spin: 0, seen: false };
+const XS = {} as Record<Crys, X>;
+for (const k of CRYS) XS[k] = { x: innerWidth / 2, y: innerHeight / 2, s: 0, a: 0, glow: 0, spin: 0, seen: false };
+let slicePh = 0.4;
+
+/* ── 进 NEXUS：开屏倒过来——格一拍拍变粗、晶体胀开，整屏化白，再跳过去（NEXUS 那边也从白里出来） ── */
+const DOOR = [1, 2, 3, 5, 8, 12, 18, 26, 40]; // 每拍 120ms
+const DOOR_MS = DOOR.length * 120 + 260;
+let door = -1;
+let doorHref = '';
+document.addEventListener('click', (e) => {
+  const a = (e.target as Element).closest?.<HTMLAnchorElement>('a[data-gate]');
+  if (!a || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+  e.preventDefault();
+  if (door > 0) return;
+  doorHref = a.href;
+  door = matchMedia('(prefers-reduced-motion: reduce)').matches ? performance.now() - DOOR_MS + 380 : performance.now();
+});
+// 从 NEXUS 后退回来（bfcache）：不留一屏白
+addEventListener('pageshow', (e) => {
+  if (!e.persisted) return;
+  door = -1;
+  const w = document.querySelector<HTMLElement>('.gate-white');
+  if (w) w.style.opacity = '0';
+});
 const mouse = [innerWidth / 2, innerHeight / 2];
 addEventListener('pointermove', (e) => {
   mouse[0] = e.clientX;
@@ -239,6 +269,15 @@ function frame(now: number) {
       st.boot = -1;
       html.classList.add('booted');
     } else st.coarse = BOOT[i];
+  } else if (door > 0) {
+    const e = now - door;
+    st.coarse = DOOR[Math.min(DOOR.length - 1, Math.floor(e / 120))];
+    const w = document.querySelector<HTMLElement>('.gate-white');
+    if (w) w.style.opacity = String(Math.min(1, Math.max(0, (e - DOOR_MS * 0.45) / (DOOR_MS * 0.5))));
+    if (e > DOOR_MS && doorHref) {
+      location.href = doorHref;
+      doorHref = '';
+    }
   } else if (st.pulse > 0) {
     const i = Math.floor((now - st.pulse) / 100);
     if (i >= PULSE.length) st.pulse = -1;
@@ -270,7 +309,8 @@ function frame(now: number) {
   // 晶体：追各自在页面里的锚点
   let hotT = [mouse[0], mouse[1], 0];
   const crystals = [];
-  for (const name of ORDER) {
+  const doorK = door > 0 ? Math.min(1, (now - door) / DOOR_MS) : 0;
+  for (const name of CRYS) {
     const c = XS[name];
     let el: Element | null = null;
     if (st.viewA > 0.02) el = view.querySelector(`[data-x="${name}"]`);
@@ -300,12 +340,24 @@ function frame(now: number) {
     c.s += (ts * (1 + hov * 0.12) - c.s) * sp;
     c.a += (ta - c.a) * (1 - Math.exp(-dt * 6));
     c.glow += (hov - c.glow) * k(8);
-    c.spin += dt * (0.25 + c.glow * 1.1);
+    // 三处的晶体悬停时转快一点；NEXUS 那一颗反过来，悬停时慢慢停住（切面也停在那儿）
+    const gate = name === 'nexus';
+    c.spin += dt * (gate ? 0.18 * (1 - c.glow * 0.9) : 0.25 + c.glow * 1.1);
     const sq = stepped ? Math.floor((c.spin * 12) / 1.4) * (1.4 / 12) : c.spin;
+    let size = c.s;
+    if (gate && c.a > 0.004) {
+      slicePh += dt * 0.11 * (1 - c.glow * 0.92);
+      // 只在截角四面体 ↔ 正八面体之间走（再往外就只剩一枚光秃的四面体）
+      ground.mesh('nexus', tesseractSlice(0.82 * Math.sin(slicePh)));
+      size *= 1 + doorK * doorK * 4;
+    }
 
-    const ph = ORDER.indexOf(name) * 2.1;
-    const rot = euler(0.35 + Math.sin(tq * 0.3 + ph) * 0.12, sq + ph, Math.sin(tq * 0.21 + ph) * 0.1);
-    crystals.push({ mesh: MESH[name], x: c.x, y: c.y, size: c.s, a: c.a * (st.viewA * 0.6 + 0.4), rot, tint: SECS[name].tint, glow: c.glow });
+    const ph = CRYS.indexOf(name) * 2.1;
+    // NEXUS 那一颗倾得更多、也晃得更多：总让人看见好几个面，不会正对成一片平的三角
+    const rot = gate
+      ? euler(0.62 + Math.sin(tq * 0.23) * 0.22, sq + ph, 0.32 + Math.sin(tq * 0.17) * 0.18)
+      : euler(0.35 + Math.sin(tq * 0.3 + ph) * 0.12, sq + ph, Math.sin(tq * 0.21 + ph) * 0.1);
+    crystals.push({ mesh: MESHOF[name], x: c.x, y: c.y, size, a: c.a * (st.viewA * 0.6 + 0.4), rot, tint: TINT[name], glow: c.glow });
   }
   for (let i = 0; i < 3; i++) st.hot[i] += (hotT[i] - st.hot[i]) * k(i === 2 ? 5 : 12);
 
