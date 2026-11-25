@@ -1,0 +1,107 @@
+---
+/* 读：一整片玻璃，正文在里面；晶体越界压在左上角，点它回这一处的名录 */
+import { render } from 'astro:content';
+import { Image } from 'astro:assets';
+import Base from '../../layouts/Base.astro';
+import { SECS, ORDER, entriesOf, type Sec } from '../../lib/entries';
+import { plain, chars, minutes, dot } from '../../lib/text';
+
+export async function getStaticPaths() {
+  const out = [];
+  for (const sec of ORDER) {
+    const list = await entriesOf(sec);
+    list.forEach((e, i) => out.push({ params: { sec, slug: e.id }, props: { sec, i, list } }));
+  }
+  return out;
+}
+
+const { sec, i, list } = Astro.props as { sec: Sec; i: number; list: Awaited<ReturnType<typeof entriesOf>> };
+const e = list[i] as any;
+const prev = list[i - 1] as any;
+const next = list[i + 1] as any;
+const { Content } = await render(e);
+const d = e.data;
+const imgs = (d.images ?? []).map((im: any) => ('src' in im && 'alt' in im ? im : { src: im, alt: '' }));
+const n = chars(e.body);
+const meta = [dot(d.date), d.status, sec === 'articles' ? `${n.toLocaleString()} 字 · 约 ${minutes(n)} 分钟` : ''].filter(Boolean).join(' · ');
+const tags: string[] = d.tags ?? [];
+const label = (x: any) => plain(x.data.title || dot(x.data.date));
+---
+
+<Base title={d.title || dot(d.date)} description={d.description} place="read" sec={sec} slug={e.id}>
+  <section class={`read read--${sec}`}>
+    <a class="back" href={`/${sec}/`} aria-label={`回到${SECS[sec].t}`}>
+      <i class="x x--back" data-x={sec}></i>
+      <span>{SECS[sec].t}</span>
+    </a>
+    <article class="sheet" data-glass="sheet">
+      <header>
+        {d.title && <h1>{d.title}</h1>}
+        {d.description && <p class="lede">{d.description}</p>}
+        <p class="meta mono">
+          {meta}
+          {
+            tags.length > 0 && (
+              <>
+                {' · '}
+                {tags.map((t, j) => (
+                  <>
+                    {j > 0 && ' / '}
+                    <a href={`/tags/${t}/`}>{t}</a>
+                  </>
+                ))}
+              </>
+            )
+          }
+        </p>
+      </header>
+      {
+        imgs.length > 0 && (
+          <div class={`gal n${Math.min(imgs.length, 4)}`}>
+            {imgs.map((im: any) => (
+              <Image src={im.src} alt={im.alt} />
+            ))}
+          </div>
+        )
+      }
+      <div class="prose"><Content /></div>
+      {
+        d.links?.length > 0 && (
+          <ul class="links">
+            {d.links.map((l: { label: string; href: string }) => (
+              <li>
+                <a href={l.href} target="_blank" rel="noreferrer">
+                  {l.label}
+                  <span class="mono">{l.href.replace(/^https?:\/\//, '')}</span>
+                  <b>↗</b>
+                </a>
+              </li>
+            ))}
+          </ul>
+        )
+      }
+      <footer>
+        {
+          prev ? (
+            <a href={`/${sec}/${prev.id}/`} class="pn">
+              <small class="mono">PREV</small>
+              {label(prev)}
+            </a>
+          ) : (
+            <span />
+          )
+        }
+        {
+          next ? (
+            <a href={`/${sec}/${next.id}/`} class="pn pn--n">
+              <small class="mono">NEXT</small>
+              {label(next)}
+            </a>
+          ) : (
+            <span />
+          )
+        }
+      </footer>
+    </article>
+  </section>
+</Base>

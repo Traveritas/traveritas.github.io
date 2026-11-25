@@ -1,0 +1,26 @@
+---
+/* 一个标签下的全部条目（三处混排，一行一条） */
+import Base from '../../layouts/Base.astro';
+import Hits from '../../components/Hits.astro';
+import { allEntries } from '../../lib/entries';
+import { pad } from '../../lib/text';
+
+export async function getStaticPaths() {
+  const all = await allEntries();
+  const tags = [...new Set(all.flatMap((e) => e.tags))];
+  return tags.map((tag) => ({ params: { tag }, props: { tag, list: all.filter((e) => e.tags.includes(tag)) } }));
+}
+const { tag, list } = Astro.props;
+---
+
+<Base title={`# ${tag}`} place="tag">
+  <section class="list list--tag">
+    <header class="lh lh--plain">
+      <div>
+        <h1># {tag}</h1>
+        <p class="mono">TAG · {pad(list.length)}</p>
+      </div>
+    </header>
+    <Hits list={list} />
+  </section>
+</Base>

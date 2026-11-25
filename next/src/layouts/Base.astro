@@ -1,0 +1,86 @@
+---
+/* 全站一个外壳：一张画布（地面、玻璃、晶体都在里面画）+ 左上的位置 + 正文 + 左下的星与右下的 Ave。
+   画布与左下 / 右下两件跨页常驻（transition:persist），换页只换 #view 里的字，见 scripts/site.ts。 */
+import { ClientRouter } from 'astro:transitions';
+import '@fontsource/ibm-plex-mono/400.css';
+import '../styles/tokens.css';
+import '../styles/site.css';
+import Toolstar from '../components/chrome/Toolstar.astro';
+import Ave from '../components/chrome/Ave.astro';
+import { SECS, type Sec } from '../lib/entries';
+
+interface Props {
+  title?: string;
+  description?: string;
+  place: 'home' | 'list' | 'read' | 'lost' | 'find' | 'tag';
+  sec?: Sec;
+  slug?: string;
+}
+const { title, description = '在即将醒来的那一瞬，世界究竟是在成形，还是正在融化？', place, sec, slug } = Astro.props;
+const NAME = 'AveritA 的昼梦叙集';
+---
+
+<!doctype html>
+<html lang="zh-CN" data-face="dream" transition:animate="none">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title ? `${title} · ${NAME}` : NAME}</title>
+    <meta name="description" content={description} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    {Astro.site && <link rel="canonical" href={new URL(Astro.url.pathname, Astro.site).href} />}
+    <link rel="alternate" type="application/rss+xml" title={NAME} href="/rss.xml" />
+    <link rel="sitemap" href="/sitemap-index.xml" />
+    <link rel="stylesheet" href="/fonts/noto-serif-sc/font.css" />
+    {/* 先定面，免得昼面的人先看到一帧夜色：?face=wake|dream 优先，其次记住的 */}
+    <script is:inline>
+      (function () {
+        var q = new URLSearchParams(location.search).get('face');
+        var day = null;
+        try { day = localStorage.getItem('rm-day'); } catch (e) {}
+        var night = q ? q !== 'wake' : day !== '1';
+        var h = document.documentElement;
+        h.dataset.face = night ? 'dream' : 'wake';
+        // 阅读设置（工具栏「本页」里调）
+        try {
+          var s = localStorage.getItem('xm-read-size'), l = localStorage.getItem('xm-read-lead');
+          if (s) h.dataset.readSize = s;
+          if (l) h.dataset.readLead = l;
+        } catch (e) {}
+      })();
+    </script>
+    <ClientRouter />
+  </head>
+  <body data-place={place} data-sec={sec} data-slug={slug}>
+    <canvas id="g" aria-hidden="true" transition:persist="ground"></canvas>
+    <nav id="crumb" class="mono" aria-label="位置">
+      {
+        place !== 'home' && (
+          <>
+            <a href="/" class="brand">AveritA</a>
+            {sec && (
+              <>
+                <span class="sep">/</span>
+                <a href={`/${sec}/`}>{SECS[sec].t}</a>
+              </>
+            )}
+            {(place === 'find' || place === 'tag') && (
+              <>
+                <span class="sep">/</span>
+                <a href="/find/">寻找</a>
+              </>
+            )}
+          </>
+        )
+      }
+    </nav>
+    <main id="view"><slot /></main>
+    <div id="chrome" transition:persist="chrome">
+      <Toolstar />
+      <Ave />
+    </div>
+    <script>
+      import '../scripts/site';
+    </script>
+  </body>
+</html>

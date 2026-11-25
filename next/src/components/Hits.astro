@@ -1,0 +1,35 @@
+---
+/* 一行一条的名录（寻找 / 标签页）：日期 · 哪一处 · 标题 · 一句。
+   data-hay 是给就地检索用的全文（小写）；data-month 给年月 */
+import { SECS } from '../lib/entries';
+import type { Flat } from '../lib/entries';
+import { dot, pad } from '../lib/text';
+interface Props {
+  list: Flat[];
+  hay?: boolean;
+}
+const { list, hay = false } = Astro.props;
+const month = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
+---
+
+<ol class="hits">
+  {
+    list.map((e, i) => (
+      <li
+        class="hit"
+        style={`--i:${Math.min(i, 16)}`}
+        data-hay={hay ? [e.title, e.desc, e.tags.join(' '), e.text, SECS[e.sec].t].join(' ').toLowerCase() : undefined}
+        data-month={hay ? month(e.date) : undefined}
+      >
+        <a class="pane pane--hit" data-glass href={e.href}>
+          <span class="meta mono">
+            <span>{dot(e.date)}</span>
+            <span>{SECS[e.sec].t}</span>
+          </span>
+          <span class="t">{e.title}</span>
+          {e.desc && <span class="d">{e.desc}</span>}
+        </a>
+      </li>
+    ))
+  }
+</ol>

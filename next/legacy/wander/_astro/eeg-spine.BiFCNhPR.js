@@ -1,0 +1,1 @@
+var e=globalThis,t=e.__eegSpine??={state:{xy:null,dark:0,reveal:1,amp:1},listeners:[]};function n(e){Object.assign(t.state,e);for(let e of t.listeners)e(t.state)}function r(e){t.listeners.push(e),t.state.xy&&e(t.state)}export{n,r as t};

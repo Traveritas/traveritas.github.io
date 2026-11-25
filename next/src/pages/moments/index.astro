@@ -1,0 +1,44 @@
+---
+/* 闪念 —— 散页：以图为主，列与列按 14° 错开（分列在 scripts/site.ts 的 layoutCols） */
+import { Image } from 'astro:assets';
+import Base from '../../layouts/Base.astro';
+import ListHead from '../../components/ListHead.astro';
+import { entriesOf } from '../../lib/entries';
+import { plain, firstLine, dot } from '../../lib/text';
+
+const list = await entriesOf('moments');
+const imgsOf = (e: (typeof list)[number]) => e.data.images.map((im) => ('src' in im && 'alt' in im ? im : { src: im, alt: '' }));
+---
+
+<Base title="闪念" place="list" sec="moments">
+  <section class="list list--moments">
+    <ListHead k="moments" n={list.length} />
+    <div class="cols">
+      {
+        list.map((e, i) => {
+          const imgs = imgsOf(e);
+          const first = firstLine(e.body);
+          return (
+            <div class="cell" style={`--i:${i}`}>
+              <a class:list={['pane pane--m', { 'pane--slip': !imgs.length }]} data-glass href={`/moments/${e.id}/`}>
+                {imgs.length > 0 && (
+                  <span class={`imgs n${Math.min(imgs.length, 4)}`}>
+                    {imgs.slice(0, 4).map((im) => (
+                      <Image src={im.src} alt={im.alt} width={480} loading="lazy" />
+                    ))}
+                  </span>
+                )}
+                <span class="t">{plain(e.data.title) || first}</span>
+                {!imgs.length && e.data.title && first && <span class="d">{first.slice(0, 60)}</span>}
+                <span class="meta mono">
+                  <span>{dot(e.data.date)}</span>
+                  {imgs.length > 0 && <span>{imgs.length} 张</span>}
+                </span>
+              </a>
+            </div>
+          );
+        })
+      }
+    </div>
+  </section>
+</Base>
