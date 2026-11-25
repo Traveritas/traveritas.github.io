@@ -11,6 +11,7 @@ import { createGround, bipyramid, shard, cubeClean, tesseractSlice, euler } from
 import { initSound } from './sound';
 import { initToolstar, toolstarPage } from './toolstar';
 import { initAve, aveEnterRoute, aveRouteEnd } from './ave';
+import { initCursor } from './cursor';
 import { setFace, setMix, setFlipper, reapply } from './reality';
 
 type Sec = 'articles' | 'moments' | 'projects';
@@ -373,5 +374,6 @@ setMix(night ? 0 : 1);
 initSound();
 initToolstar();
 initAve();
+initCursor();
 mount();
 requestAnimationFrame(frame);

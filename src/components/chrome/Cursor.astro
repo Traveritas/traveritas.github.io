@@ -1,0 +1,234 @@
+---
+/* ─────────────────────────────────────────────────────────────
+   光标 · 星环（定稿：design/mocks/cursor-J-star-rings.html）
+   · 中心一颗星（1:1 同帧热点），外绕三道发丝环；每环一个缺口，
+     缺口正中一粒小星芒；三环各自转（16s 顺 / 27s 逆 / 41s 顺，纯 CSS）。
+   · 默认不显示；只有 scripts/cursor.ts 的门控全部通过时，
+     html 上才出现 .fx-cursor-on（真实鼠标 / 非减弱动效 / 非强制颜色 / 未选原生指针）。
+   · 新站：昼夜同一个结构（三道正圆、同心、不倾斜）；夜里只把颜色染向 --amber（--reality-mix 纯 CSS）。
+     原站梦态那套倾斜 / 压扁 / 偏心作者嫌不好看，2026-11-26 去掉。
+   ───────────────────────────────────────────────────────────── */
+const STAR =
+  'M0,-10C0.5,-3 2,-0.9 6.5,0C2,0.9 0.5,3 0,10C-0.5,3 -2,0.9 -6.5,0C-2,-0.9 -0.5,-3 0,-10Z';
+
+/* 半径 / 缺口角（°）：dasharray = 弧长 · 缺口；小星芒落在缺口正中（角 −g/2） */
+const RINGS = [
+  { r: 11, gap: 48 },
+  { r: 17.5, gap: 40 },
+  { r: 24.5, gap: 34 },
+].map(({ r, gap }) => {
+  const c = 2 * Math.PI * r;
+  const g = (c * gap) / 360;
+  return { r, dash: `${(c - g).toFixed(2)} ${g.toFixed(2)}`, half: gap / 2 };
+});
+---
+
+<div class="cursor-slot" id="cursor-slot" aria-hidden="true">
+  {
+    RINGS.map((ring, i) => (
+      <div class={`ring r${i}`} data-cring={i}>
+        <div class="ring-spin">
+          <svg viewBox="-30 -30 60 60" width="60" height="60" aria-hidden="true">
+            <circle r={ring.r} stroke-dasharray={ring.dash} />
+            <path
+              class="gap-star"
+              d={STAR}
+              style={`transform: rotate(${-ring.half}deg) translate(${ring.r}px, 0) rotate(${ring.half}deg) scale(var(--gs))`}
+            />
+          </svg>
+        </div>
+      </div>
+    ))
+  }
+  <div class="caret" id="caret"><svg viewBox="-12 -12 24 24" width="24" height="24" aria-hidden="true"><path d="M0,-11V-4.6M0,4.6V11" /></svg></div>
+  <div class="star" id="star">
+    <div class="star-halo"></div>
+    <svg class="star-svg" viewBox="-12.8 -12.8 25.6 25.6" width="16" height="16" aria-hidden="true">
+      <g class="star-twinkle" id="star-twinkle">
+        <path class="s-main" d={STAR}></path>
+        <path class="s-main-amber" d={STAR}></path>
+      </g>
+    </svg>
+  </div>
+</div>
+
+<style is:global>
+  /* 隐藏系统指针的唯一规则：只在门控全部通过时 */
+  html.fx-cursor-on,
+  html.fx-cursor-on * {
+    cursor: none !important;
+  }
+
+  .cursor-slot {
+    position: fixed;
+    inset: 0;
+    z-index: 240;
+    pointer-events: none;
+    overflow: hidden;
+    opacity: 0;
+    transition: opacity 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+    --m: var(--reality-mix, 1);
+    --s: calc(1 - var(--m));
+    --ring: color-mix(in srgb, var(--fg-soft) calc(var(--m) * 100%), var(--amber));
+  }
+  html.fx-cursor-on .cursor-slot {
+    opacity: 1;
+  }
+  html.fx-cursor-out .cursor-slot {
+    opacity: 0;
+  }
+
+  .cursor-slot .ring,
+  .cursor-slot .caret,
+  .cursor-slot .star {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 0;
+    height: 0;
+    transform: translate3d(-200px, -200px, 0);
+  }
+  .cursor-slot.is-live .ring,
+  .cursor-slot.is-live .caret,
+  .cursor-slot.is-live .star {
+    will-change: transform, opacity;
+  }
+
+  /* 父级都是 0 宽的定位点；别让外面的 svg { max-width: 100% } 一类规则把图压成 0 宽 */
+  .cursor-slot svg {
+    position: absolute;
+    overflow: visible;
+    display: block;
+    max-width: none;
+  }
+
+  /* ── 环 ── */
+  .cursor-slot .ring svg {
+    left: -30px;
+    top: -30px;
+  }
+  .cursor-slot .ring circle {
+    fill: none;
+    stroke: var(--ring);
+    stroke-linecap: round;
+  }
+  .cursor-slot .ring .gap-star {
+    fill: var(--ring);
+  }
+  .cursor-slot .r0 {
+    --gs: 0.26;
+  }
+  .cursor-slot .r1 {
+    --gs: 0.22;
+  }
+  .cursor-slot .r2 {
+    --gs: 0.19;
+  }
+  .cursor-slot .r0 circle {
+    stroke-width: 1;
+    stroke-opacity: 0.62;
+  }
+  .cursor-slot .r1 circle {
+    stroke-width: 0.9;
+    stroke-opacity: 0.44;
+  }
+  .cursor-slot .r2 circle {
+    stroke-width: 0.8;
+    stroke-opacity: 0.28;
+  }
+  .cursor-slot .r0 .gap-star {
+    opacity: 0.9;
+  }
+  .cursor-slot .r1 .gap-star {
+    opacity: 0.75;
+  }
+  .cursor-slot .r2 .gap-star {
+    opacity: 0.6;
+  }
+
+  /* 自转与微烁只在门控打开（鼠标指针、光标层可见）时声明：触屏 / 原生指针下
+     光标层 opacity 0 却照样在转，其中 star-twinkle 是 SVG 动画、走主线程，
+     会让每一帧都跑一遍主线程动画更新，连带全站可合成的动画（构块场 160 块）
+     也被逐帧重算样式。 */
+  html.fx-cursor-on .cursor-slot .ring-spin {
+    animation: ringSpin 16s linear -3s infinite;
+  }
+  html.fx-cursor-on .cursor-slot .r1 .ring-spin {
+    animation: ringSpin 27s linear -11s infinite reverse;
+  }
+  html.fx-cursor-on .cursor-slot .r2 .ring-spin {
+    animation: ringSpin 41s linear -26s infinite;
+  }
+  @keyframes ringSpin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  /* ── 插入线：正文 / 输入框上接替系统 I 形指针，中空处是星 ── */
+  .cursor-slot .caret {
+    opacity: 0;
+  }
+  /* 与星同一坐标系画两段：中间留 9.2px 空给星（正文态星敛到 0.55，约 7px 高） */
+  .cursor-slot .caret svg {
+    left: -12px;
+    top: -12px;
+  }
+  .cursor-slot .caret path {
+    fill: none;
+    stroke: color-mix(in srgb, var(--fg) calc(var(--m) * 100%), var(--amber));
+    stroke-width: 1;
+    stroke-linecap: round;
+    stroke-opacity: 0.72;
+  }
+
+  /* ── 星：四芒内凹，竖长横短，芒不穿过形心 ── */
+  .cursor-slot .star-svg {
+    left: -8px;
+    top: -8px;
+  }
+  .cursor-slot .star-halo {
+    position: absolute;
+    left: -8px;
+    top: -8px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: radial-gradient(
+      circle closest-side,
+      color-mix(in srgb, color-mix(in srgb, #fff calc(var(--m) * 100%), var(--amber)) 60%, transparent) 0,
+      transparent 100%
+    );
+    opacity: 0.5;
+  }
+  .cursor-slot .s-main {
+    fill: var(--fg);
+  }
+  .cursor-slot .s-main-amber {
+    fill: color-mix(in srgb, var(--amber) 82%, var(--fg));
+    opacity: var(--s);
+  }
+  .cursor-slot .star-twinkle {
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+  html.fx-cursor-on .cursor-slot .star-twinkle {
+    animation: starTwinkle 4.6s ease-in-out infinite;
+  }
+  @keyframes starTwinkle {
+    0%,
+    100% {
+      transform: scale(1);
+    }
+    46%,
+    54% {
+      transform: scale(0.84);
+    }
+  }
+
+  @media (forced-colors: active) {
+    .cursor-slot {
+      display: none !important;
+    }
+  }
+</style>
