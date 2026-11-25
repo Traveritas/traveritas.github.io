@@ -13,7 +13,7 @@ npx astro build        # → next/dist/
 node shots.cjs         # 截图 → _shots/，对照页 _shots/index.html（BASE=http://127.0.0.1:<端口> 指定地址）
 ```
 
-依赖用仓库根目录的 `node_modules`（Node 往上找），不另装。正文字体 `public/fonts/noto-serif-sc/` 由根目录的 `npm run fonts` 生成。
+依赖用仓库根目录的 `node_modules`（Node 往上找），不另装。正文字体 `public/fonts/noto-serif-sc/` 由根目录的 `npm run fonts` 生成（扫 `src/` 与 `next/src/`）。
 
 ## 什么是搬过来的，什么是借用的
 
@@ -42,8 +42,7 @@ node shots.cjs         # 截图 → _shots/，对照页 _shots/index.html（BASE
 
 ## 还没做
 
-- Ave 的「读到文末」那几句（原站 watchEnd，只在初始化时挂；跨页常驻后要按页重挂）
-- 正文字体子集是根目录 `npm run fonts` 扫旧站 `src/` 切的，新站独有的字可能落进尾包
+- 立体星新参数（star-primitive.md 的 0.26 粗细 + 磨砂）：对照页 `design/mocks/star-compare/`，等作者定；定了以后改 toolstar.ts 的 drawStar 与 favicon（`node design/mocks/star-compare/favicon.mjs`）
 
 ## 替换旧站时
 

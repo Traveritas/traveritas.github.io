@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>立体星 · 前后对比</title>
+<style>
+  :root { --bg: #f0f3f6; --ink: #232830; --ink-3: #7a8090; --hair: #d8dde4; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 32px 16px 64px; background: var(--bg); color: var(--ink); font: 14px/1.7 system-ui, "PingFang SC", "Microsoft YaHei", sans-serif; }
+  main { max-width: 1400px; margin: 0 auto; }
+  h1 { font-size: 20px; font-weight: 500; margin: 0 0 4px; }
+  p.lede { color: var(--ink-3); margin: 0 0 28px; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { padding: 14px 10px; text-align: center; vertical-align: middle; border-bottom: 1px solid var(--hair); }
+  th { font-weight: 500; font-size: 13px; }
+  th small { display: block; font-weight: 400; color: var(--ink-3); font-size: 12px; }
+  td.k { text-align: left; color: var(--ink-3); font-size: 12px; white-space: nowrap; }
+  .cell { display: inline-flex; gap: 12px; align-items: center; padding: 12px 14px; border-radius: 8px; }
+  .g-light { background: #f0f3f6; } .g-dark { background: #2a2b38; } .g-umber { background: #4f4a66; }
+  .cell svg { border-radius: 0 !important; background: none !important; display: block; }
+  .px { image-rendering: pixelated; }
+  .wrap { overflow-x: auto; }
+</style>
+</head>
+<body>
+<main>
+  <h1>立体星 · 前后对比</h1>
+  <p class="lede">同一个 yaw 45° / pitch 35.26° 的三轴正交六尖星。尺寸：16 / 32 = favicon，38 = 左下工具栏实际大小，96 / 200 = 看细节。三种底：浅、深、梦面 umber（#4f4a66，扫描时没试过）。</p>
+  <div class="wrap"><table id="t"></table></div>
+</main>
+<script type="module">
+  import { star, markup, GROUNDS } from '../star-t-smooth/src.js';
+  GROUNDS.umber = { bg: '#4f4a66', ink: '#e8e4f4', label: '梦面' };
+
+  const COLS = [
+    { name: 'A · 现役', note: '平风筝，半宽 1.9（0.119）', opts: { legacy: true } },
+    { name: 'B · 磨砂', note: '同半宽 1.9 + 推荐光向 + 磨砂预设', opts: 'frost' },
+    { name: 'C · 只加粗', note: '现役平风筝，半宽改 0.26（4.16）', opts: { legacy: true, halfWidth: 4.16 } },
+    { name: 'D · 推荐', note: '磨砂 + 半宽 0.26 + 推荐光向', opts: 'frost-wide' },
+  ];
+  const FROST = { sides: 6, fold: 1.0, fillet: 0.14, tip: { kind: 'flat', len: 0.5 }, tones: { steps: 4, min: 0.24, max: 0.9, depth: 0.24 }, hub: { mode: 'split', radius: 2.5, split: 0.55 } };
+  const optsOf = (c) => (c.opts === 'frost' ? FROST : c.opts === 'frost-wide' ? { ...FROST, halfWidth: 4.16, hub: { ...FROST.hub, radius: 4.6 } } : c.opts);
+  const SIZES = [16, 32, 38, 96, 200];
+  const svgOf = (res, ground, size) =>
+    `<svg width="${size}" height="${size}" viewBox="-15.1 -15.1 30.2 30.2" class="${size <= 32 ? 'px' : ''}">${markup(res, { ground })}</svg>`;
+
+  const t = document.getElementById('t');
+  let h = '<tr><th></th>' + COLS.map((c) => `<th>${c.name}<small>${c.note}</small></th>`).join('') + '</tr>';
+  for (const g of ['light', 'dark', 'umber']) {
+    for (const group of [[16, 32, 38], [96], [200]]) {
+      h += `<tr><td class="k">${GROUNDS[g].label}<br>${group.join(' / ')}px</td>`;
+      for (const c of COLS) {
+        const res = star(optsOf(c));
+        h += `<td><div class="cell g-${g}">${group.map((s) => svgOf(res, g, s)).join('')}</div><br><small style="color:var(--ink-3)">${res.paths.length} path</small></td>`;
+      }
+      h += '</tr>';
+    }
+  }
+  t.innerHTML = h;
+  window.__ready = true;
+</script>
+</body>
+</html>

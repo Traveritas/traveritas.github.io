@@ -6,7 +6,7 @@
    再按常用程度分成几包，每包写一条带 unicode-range 的 @font-face：
    页面只下载自己用得到的那几包。
 
-   · 用字：扫 src/ 下全部源码与内容（含注释——多收几百个冷僻字只会落进很少被下载的尾包，
+   · 用字：扫 src/ 与 next/src/ 下全部源码与内容（含注释——多收几百个冷僻字只会落进很少被下载的尾包，
      换来的是「运行时冒出来的字」不会漏：乱码字池、梦面文案、标题推导都写在源码里）。
    · 排序：每页都有的公共部分（布局、全站仪器层、页头页脚、客户端脚本）里的字最先，
      其余按「出现在多少个文件里」由多到少；排序只看注释以外的文字。拉丁字符与标点一律进核心包。
@@ -29,10 +29,11 @@ const WEIGHTS = [500, 600];
 const CORE_CJK = 360; // 核心包里放多少个最常用的非拉丁字
 const CHUNK = 300; // 其余每包多少字
 const OUT_DIR = 'public/fonts/noto-serif-sc';
-const SCAN = ['src'];
+// next/src：新站（并行期借用这份字体，它独有的字也要收进来）
+const SCAN = ['src', 'next/src'];
 const SCAN_EXT = /\.(astro|md|mdx|ts|mjs|js|css|json)$/;
 /* 每页都会渲染的公共部分：这里的字排在最前，进核心包 */
-const SHARED = ['src/layouts', 'src/components/chrome', 'src/components/SiteHeader.astro', 'src/components/SiteFooter.astro', 'src/scripts'];
+const SHARED = ['src/layouts', 'src/components/chrome', 'src/components/SiteHeader.astro', 'src/components/SiteFooter.astro', 'src/scripts', 'next/src/layouts', 'next/src/components/chrome', 'next/src/scripts'];
 const VERSION = 3; // 改了切法就加一，强制重切
 
 const sha256 = (buf) => createHash('sha256').update(buf).digest('hex');

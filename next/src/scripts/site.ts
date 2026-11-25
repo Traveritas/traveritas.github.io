@@ -10,7 +10,7 @@
 import { createGround, bipyramid, shard, cubeClean, tesseractSlice, euler } from './ground.js';
 import { initSound } from './sound';
 import { initToolstar, toolstarPage } from './toolstar';
-import { initAve, aveEnterRoute } from './ave';
+import { initAve, aveEnterRoute, aveRouteEnd } from './ave';
 import { setFace, setMix, setFlipper, reapply } from './reality';
 
 type Sec = 'articles' | 'moments' | 'projects';
@@ -127,6 +127,7 @@ function aveFor(r: Route, first: boolean) {
   if (href || readingHref) dispatchEvent(new CustomEvent('xm:read', { detail: { href } }));
   readingHref = href;
   if (!first) aveEnterRoute(!!href);
+  aveRouteEnd(!!href);
 }
 
 /* ── 换页 ── */
