@@ -1,52 +1,31 @@
 ---
-import BaseLayout from '../../layouts/BaseLayout.astro';
-import WanderIndex from '../../components/wander/WanderIndex.astro';
-import YearGroup from '../../components/index/YearGroup.astro';
-import IndexRow from '../../components/index/IndexRow.astro';
-import { getCollection } from 'astro:content';
+/* 造物 —— 陈列：等宽小片，同样按 14° 错开，状态在右上 */
+import Base from '../../layouts/Base.astro';
+import ListHead from '../../components/ListHead.astro';
+import { entriesOf } from '../../lib/entries';
+import { plain, dot } from '../../lib/text';
 
-
-// 新→旧；按年份分组
-const projects = (await getCollection('projects', (p) => !p.data.draft))
-  .map(({ id, data }) => ({ id, ...data }))
-  .sort((a, b) => b.date.valueOf() - a.date.valueOf() || b.id.localeCompare(a.id));
-
-const byYear = new Map<number, typeof projects>();
-for (const p of projects) {
-  const y = p.date.getFullYear();
-  if (!byYear.has(y)) byYear.set(y, []);
-  byYear.get(y)!.push(p);
-}
+const list = await entriesOf('projects');
 ---
 
-<BaseLayout
-  title="项目 — Traveritas"
-  description="Traveritas 的项目与造物"
-  ambient
-  maskLines
-  fieldVeil
-  immersive
-  eeg
->
-  <WanderIndex scene="project" />
-  <div class="w-fallback">
-  <div class="container-wide page-body">
-    <header class="page-head">
-      <h1 data-morph data-true="项目" data-dream="造物">项目</h1>
-      <p class="lede" data-morph data-true="正在做、做过、以及还只存在于念头里的东西。" data-dream="“凡能够被构想的，也必能够被建造——散落在深眠中的世界切片。”">
-        正在做、做过、以及还只存在于念头里的东西。
-      </p>
-    </header>
-
-    {
-      [...byYear].map(([y, list]) => (
-        <YearGroup year={y}>
-          {list.map((p) => (
-            <IndexRow date={p.date} href={`/projects/${p.id}/`} title={p.title} desc={p.description} />
-          ))}
-        </YearGroup>
-      ))
-    }
-  </div>
-  </div>
-</BaseLayout>
+<Base title="造物" place="list" sec="projects">
+  <section class="list list--projects">
+    <ListHead k="projects" n={list.length} />
+    <div class="cols">
+      {
+        list.map((e, i) => (
+          <div class="cell" style={`--i:${i}`}>
+            <a class="pane pane--p" data-glass href={`/projects/${e.id}/`}>
+              <span class="meta mono">
+                <span>{dot(e.data.date)}</span>
+                <span class="st">{plain(e.data.status)}</span>
+              </span>
+              <span class="t">{plain(e.data.title)}</span>
+              {e.data.description && <span class="d">{plain(e.data.description)}</span>}
+            </a>
+          </div>
+        ))
+      }
+    </div>
+  </section>
+</Base>

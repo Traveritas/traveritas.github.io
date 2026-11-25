@@ -1,119 +1,34 @@
 ---
-/* ─────────────────────────────────────────────────────────────
-   主页 · 还没分开的那片空间（2026-10-18；上一版「一根线的一夜」存档在 /legacy/thread/）
-   主页与随笔 / 瞬间 / 项目三个目录页是同一片空间（components/wander/WanderIndex.astro），主页是它还没分开的样子：
-   三种夜色只是一池池浮在靛夜里，三个场景的窗混在一起、一扇扇从景深里经过焦平面；一根 14° 的线过屏幕中心，
-   名字站在线的左上方，三个栏头挂在线下，NEXUS 在右下角、RSS 的右边。
-   往下走（滚轮 / 上划 / ↓ / 点栏头）：线转过 90°、劈成两条缝，三栏分开，就是检索；地址随之变成那一栏的目录地址。
-   编排全在 src/scripts/wander/wander.js（home）与 light.js（池、转动的缝）。
-   下面 .w-fallback 是无脚本时的那一份（也是给搜索引擎的）：名字、三个入口、最近的几条。
-   ───────────────────────────────────────────────────────────── */
-import BaseLayout from '../layouts/BaseLayout.astro';
-import WanderIndex from '../components/wander/WanderIndex.astro';
-import GrainBoot from '../components/chrome/GrainBoot.astro';
-import { getCollection } from 'astro:content';
-import { fmtDate } from '../lib/format';
+/* 主页：一根 14° 的线，三颗晶体挂在上面 = 三处 */
+import Base from '../layouts/Base.astro';
+import { SECS, ORDER, entriesOf } from '../lib/entries';
+import { pad } from '../lib/text';
 
-const byDate = <T extends { id: string; data: { date: Date } }>(a: T, b: T) =>
-  b.data.date.valueOf() - a.data.date.valueOf() || b.id.localeCompare(a.id);
-
-const articles = (await getCollection('articles', (a) => !a.data.draft)).sort(byDate).slice(0, 3);
-const projects = (await getCollection('projects', (p) => !p.data.draft)).sort(byDate).slice(0, 3);
-
-const manifesto = '在即将醒来的那一瞬，世界究竟是在成形，还是正在融化？';
+const counts = Object.fromEntries(await Promise.all(ORDER.map(async (k) => [k, (await entriesOf(k)).length])));
 ---
 
-<BaseLayout title="Traveritas的个人网站" dreamTitle="AveritA的昼梦叙集" description={manifesto} immersive eeg boot={false}>
-  <Fragment slot="head">
-    <script is:inline>
-      /* 主页「加载幕 + 颗粒开屏」的判定。必须在首帧前落定：
-         - 加载幕（#boot-load，见 GrainBoot.astro）：页面永远先盖一层夜色纯色，直到地面（WebGL 流光）
-           画出来为止。不盖的话慢加载期间是一张浅灰空白——首页地面全靠 WebGL，流光要等脚本；
-           开屏期又把 #w-light 藏起来，于是字（#ece8f2）在浅灰上几乎看不见。?load=0 连幕也不盖。
-         - 颗粒开屏：每次进主页都放（2026-10-28 起；不再看 xm-boot-seen）。
-           减弱动效 / ?grain=0 → 不设 __grainBoot，BaseLayout 的 initBoot 会补 booted。
-         - 12s 兜底：脚本迟迟不来也不能让幕一直盖着。撤幕的同时摘掉 data-grain-boot 并记 __grainLate，
-           迟到的脚本只把页面点亮，不再补放一版残缺的开屏。 */
-      (function () {
-        var r = document.documentElement;
-        var q = location.search;
-        var RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
-        var off = /[?&]grain=0/.test(q);
-        var noVeil = /[?&]load=0/.test(q);
-
-        if (!noVeil) {
-          /* 幕的元素样式全内联（不等样式表）；显隐只由下面这条内联规则管。
-             元素默认 display:none（无脚本时不能留一块永久纯色），所以盖住它要 !important。 */
-          r.setAttribute('data-boot-load', '');
-          r.style.backgroundColor = '#0e0f1d'; /* 样式表到之前先别白闪 */
-          var s = document.createElement('style');
-          s.textContent = 'html[data-boot-load] #boot-load{display:block !important}';
-          document.head.appendChild(s);
-        }
-
-        if (!RM && !off) {
-          window.__grainBoot = true;
-          r.setAttribute('data-grain-boot', '');
-        }
-
-        window.__grainFallback = setTimeout(function () {
-          window.__grainLate = true;
-          var cv = document.getElementById('boot-load');
-          if (cv) cv.style.display = 'none';
-          r.removeAttribute('data-boot-load');
-          r.removeAttribute('data-grain-boot');
-          if (!r.classList.contains('booted')) r.classList.add('booted');
-        }, 12000);
-      })();
-    </script>
-  </Fragment>
-  <GrainBoot />
-  <WanderIndex scene="home" />
-  <div class="w-fallback">
-    <div class="container page-body">
-      <header class="page-head">
-        <h1>Traveritas</h1>
-        <p class="lede">{manifesto}</p>
-      </header>
-      <nav class="home-fb-nav" aria-label="版块">
-        <a href="/articles/">随笔</a>
-        <a href="/moments/">瞬间</a>
-        <a href="/projects/">项目</a>
-        <a href="/gate/">NEXUS</a>
-      </nav>
-      <section>
-        <h2>随笔</h2>
-        <ul>
-          {articles.map((a) => <li><a href={`/articles/${a.id}/`}>{a.data.title}</a> <time datetime={a.data.date.toISOString()}>{fmtDate(a.data.date)}</time></li>)}
-        </ul>
-      </section>
-      <section>
-        <h2>项目</h2>
-        <ul>
-          {projects.map((p) => <li><a href={`/projects/${p.id}/`}>{p.data.title}</a> <time datetime={p.data.date.toISOString()}>{fmtDate(p.data.date)}</time></li>)}
-        </ul>
-      </section>
+<Base place="home">
+  <section class="home">
+    <div class="name-wrap">
+      <h1 class="name">AveritA</h1>
+      <p class="kick">的昼梦叙集</p>
     </div>
-  </div>
-</BaseLayout>
-
-<style>
-  .home-fb-nav {
-    display: flex;
-    gap: 1.6rem;
-    margin: 2rem 0 3rem;
-  }
-  .w-fallback section {
-    margin-bottom: 2.4rem;
-  }
-  .w-fallback ul {
-    padding-left: 1.2rem;
-    line-height: 2;
-  }
-  .w-fallback time {
-    margin-left: 0.6rem;
-    font-family: var(--font-mono);
-    font-size: 0.8em;
-    color: var(--fg-soft);
-  }
-</style>
+    <div class="slash" aria-hidden="true"></div>
+    <nav class="doors">
+      {
+        ORDER.map((k, i) => (
+          <a class="door" href={`/${k}/`} data-sec={k} style={`--i:${i}`}>
+            <i class="x" data-x={k} />
+            <span class="door-t">
+              <span class="num">{['I', 'II', 'III'][i]}</span>
+              {SECS[k].t}
+            </span>
+            <span class="door-m mono">
+              {SECS[k].en} · {pad(counts[k])}
+            </span>
+          </a>
+        ))
+      }
+    </nav>
+  </section>
+</Base>

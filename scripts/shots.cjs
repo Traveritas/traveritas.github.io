@@ -1,9 +1,9 @@
-/* 截图：node next/shots.cjs [名字片段]（先 cd next && npx astro dev）→ next/_shots/
+/* 截图：node scripts/shots.cjs [名字片段]（先 npm run dev）→ .shots/
    与原型 design/mocks/remake/shots.cjs 同一组画面，地址换成真站的路径 */
 const path = require('path'), fs = require('fs');
 const { chromium } = require(path.join(require('child_process').execSync('npm root -g').toString().trim(), '@playwright', 'mcp', 'node_modules', 'playwright-core'));
-const OUT = path.join(__dirname, '_shots'); fs.mkdirSync(OUT, { recursive: true });
-const B = process.env.BASE || 'http://127.0.0.1:4325';
+const OUT = path.join(__dirname, '..', '.shots'); fs.mkdirSync(OUT, { recursive: true });
+const B = process.env.BASE || 'http://127.0.0.1:4321';
 (async () => {
   const br = await chromium.launch({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', args: ['--force-device-scale-factor=1', '--hide-scrollbars', '--use-gl=angle'] });
   const log = [];

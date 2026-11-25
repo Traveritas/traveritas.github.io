@@ -39,14 +39,13 @@
 ## 3. 工程硬性规范
 
 - **站点框架**：Astro 纯静态生成。正文内容在无 JS 时仍须完整可读；交互（页内导览轨、入梦检验等）可以使用客户端脚本。
-- **核心逻辑概览**：
-  - `src/data/night.ts`：一夜的时间轴数据源（23:07 → 06:31，444 分钟）——睡眠分期段 `SEGMENTS`、主页五幕的分钟区间 `SECTIONS`、轨图几何；底色不在它这里（主页的昼夜色板在 `src/scripts/home-storyboard.ts` 的 `PALETTE`，目录页三栏在 `src/styles/wander.css` 与 `src/scripts/wander/light.js`）；
-  - `src/scripts/reality.ts` & `src/scripts/morph.ts`：负责“入梦检验”与双声轨文字转换；
-  - `src/components/chrome/Gauge.astro` & `src/scripts/gauge.ts`：阅读页左侧的页内导览轨（滚动进度与节点）；
-  - `src/components/chrome/Toolstar.astro` & `src/scripts/toolstar.ts`：全站左下角的工具栏——一颗三轴六芒星开关，点开是绕星的同心轨道（去处 / 寻找 / 本页 / 换面 / 环境声 / 设置），阅读页的目录与字号、行距在「本页」里；
-  - `src/components/chrome/Ave.astro` & `src/scripts/ave.ts`：右下角偶尔冒出的 Ave 旁白（台词表 `src/data/ave-lines.ts`）；
-  - `src/components/chrome/Mist.astro` & `src/scripts/mist.ts`：随笔阅读页与 404 的地面（昼雾：一片走得很慢的流光，正文列里压平；404 版在正中让开一处空地）。这两页不出页头页脚、不画 14° 缝线与脑电，唯一的去处是 `components/chrome/Return.astro`；
-  - `src/styles/tokens.css` & `global.css`：全站设计令牌与全局样式。
+- **核心逻辑概览**（2026-11-25 起是重做后的这一版，结构见 `README.md`）：
+  - `src/scripts/ground.js` & `src/scripts/site.ts`：整站一张画布——像素流光的地面、玻璃、各处的晶体；路由、换页（平移地面 + 先粗再解析）、开屏、NEXUS 的门；
+  - `src/components/chrome/Toolstar.astro` & `src/scripts/toolstar.ts`：左下角的三轴六尖星与同心轨道（去处 / 寻找 / 本页 / 昼夜 / 声音 / 设置）；
+  - `src/components/chrome/Ave.astro` & `src/scripts/ave.ts`：右下角的 Ave 旁白（台词表 `src/data/ave-lines.ts`；新站换页不重载，按页挑话由 site.ts 调 `aveEnterRoute` / `aveRouteEnd`）；
+  - `src/scripts/reality.ts`：昼夜两面（正文里的 `[[昼|夜]]` 双面词跟着它）；
+  - `src/styles/tokens.css` & `site.css`：令牌与全站样式。
+  - `legacy/wander/`：上一版的静态快照，定格，不要改。
 - **修改验证**：任何代码修改后，务必在根目录运行 `npm run build`，确保 100% 静态编译通过。
 
 ---
@@ -58,7 +57,7 @@
 - **正文写作 / 界面文案 / 双态词汇**：
   👉 必读 `docs/writing.md`（包含双态行内 `[[醒|梦]]`、块级 `:::wake / :::dream`、行内光景 `((浮起))` / `{{流过}}` 参数表、导航与版块映射、维特根斯坦命题徽标体系等）。
 - **样式开发 / 组件设计 / 视觉验收**：
-  👉 必读 `docs/design/styleguide.md` 与 `docs/design/content-typography.md`（包含样式预览页 `/styleguide/` 规范、设计令牌、以及自动化截图验证脚本 `node design/.shot-styleguide.cjs`）。
+  👉 先看 `README.md` 的结构与 `design/mocks/remake/NOTES.md`（这一版的来由与取舍）；截图验收用 `node scripts/shots.cjs`。`docs/design/styleguide.md`、`content-typography.md` 写的是上一版（`/styleguide/` 已随上一版撤掉），只作参考。
 - **Ave（右下角旁白）/ 台词 / 她的声音**：
   👉 必读 `docs/design/ave.md`（台词表与出现条件、`npm run ave` 预渲染、节奏参数、声源许可）。Ave 的台词按作者本人的判断写，不套上面的文风红线，也不要替作者改词。
 - **环境声 / 两态 BGM / 换音频**：

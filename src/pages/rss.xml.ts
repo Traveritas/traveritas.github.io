@@ -52,7 +52,7 @@ export async function GET(context: APIContext) {
   );
 
   return rss({
-    title: 'Traveritas 的随笔',
+    title: 'AveritA 的昼梦叙集 · 断章',
     description: '随笔、项目，与一些尚在成形的东西。',
     site,
     items,

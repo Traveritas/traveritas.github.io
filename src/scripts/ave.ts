@@ -618,14 +618,15 @@ function follow() {
 }
 
 /* ── 触发 ───────────────────────────────────────────── */
-function cue(line: AveLine, at?: Element | null) {
-  if (isOff() || reading || !fresh(line)) return;
+function cue(line: AveLine, at?: Element | null, evenReading = false) {
+  if (isOff() || (reading && !evenReading) || !fresh(line)) return;
   if (Date.now() - session().last < CUE_GAP && !current) return;
   show(line, false, at);
 }
 
+// 新站的阅读页是整页（同原站的文章页），闲聊照常；reading 只管进页那句别和条目自带的抢
 function idleTick() {
-  if (isOff() || reading || current || pending || document.hidden) return;
+  if (isOff() || current || pending || document.hidden) return;
   if (Date.now() - pageStart < FIRST_QUIET) return;
   const chat = pref('chat');
   if (chat === 'off') return;
@@ -641,18 +642,20 @@ function idleTick() {
   if (line) show(line, true);
 }
 
-function watchEnd(lines: AveLine[]) {
-  const main = document.querySelector('main');
-  if (!main || !lines.length) return;
+/** 读到正文末尾：返回撤掉监听的函数（新站换页不重载，每页重挂一次）。
+    新站里读某一篇时 reading 为真（同原站漫游里开着窗），这一句照样说——它本来就是读的时候说的 */
+function watchEnd(lines: AveLine[], body: Element | null): () => void {
+  if (!body || !lines.length) return () => {};
   let done = false;
+  let t = 0;
   const check = () => {
     if (done) return;
     // 正文末尾进入视口（页很短、一进来就看得到底的不算「读完」）
-    if (scrollY > 200 && main.getBoundingClientRect().bottom <= innerHeight + 40) {
+    if (scrollY > 200 && body.getBoundingClientRect().bottom <= innerHeight + 40) {
       done = true;
       removeEventListener('scroll', onScroll);
       const line = pick(lines.filter(fresh));
-      if (line) setTimeout(() => cue(line), 1200);
+      if (line) t = window.setTimeout(() => cue(line, undefined, true), 1200);
     }
   };
   let raf = 0;
@@ -660,7 +663,13 @@ function watchEnd(lines: AveLine[]) {
     if (!raf) raf = requestAnimationFrame(() => ((raf = 0), check()));
   };
   addEventListener('scroll', onScroll, { passive: true });
+  return () => {
+    done = true;
+    clearTimeout(t);
+    removeEventListener('scroll', onScroll);
+  };
 }
+let endOff = () => {};
 
 function initToggle() {
   const btns = document.querySelectorAll<HTMLButtonElement>('[data-ave-toggle]');
@@ -841,10 +850,6 @@ export function initAve(): void {
     afterBoot(() => setTimeout(() => (enter === page ? !isOff() && !reading && fresh(enter) && show(enter) : cue(enter)), wait));
   }
 
-  if (document.body.dataset.pageType === 'article') {
-    watchEnd(AVE_LINES.filter((l) => l.when.on === 'end' && pathHits(l.when.path)));
-  }
-
   addEventListener('xm:ave', (e) => {
     const d = (e as CustomEvent<{ name?: string; at?: Element }>).detail;
     const line = pick(AVE_LINES.filter((l) => l.when.on === 'event' && l.when.name === d?.name && fresh(l)));
@@ -881,4 +886,23 @@ export function initAve(): void {
       lines: lines.map((l) => l.id),
     };
   }
+}
+
+/** 新站换页不整页重载（ClientRouter，Ave 跨页常驻）：换到一处（不是读某一篇）时，照 initAve 里进页那一段挑一句；
+    读某一篇由 site.ts 发 xm:read，走 watchReading */
+export function aveEnterRoute(read: boolean) {
+  if (read) return;
+  const enter = AVE_LINES.filter((l) => l.when.on === 'enter' && pathHits(l.when.path) && visitorOk(l) && fresh(l)).sort(
+    (a, b) => ('path' in b.when ? b.when.path!.length : 0) - ('path' in a.when ? a.when.path!.length : 0),
+  )[0];
+  if (enter && enter.when.on === 'enter') setTimeout(() => cue(enter), (enter.when.after ?? ENTER_AFTER) * 1000);
+}
+
+/** 新站每换一页调一次：读某一篇时挂上「读到文末」（台词按路径挑，如 /articles），别的页撤掉 */
+export function aveRouteEnd(read: boolean) {
+  endOff();
+  endOff = () => {};
+  if (!read) return;
+  const body = document.querySelector('#view .prose') ?? document.getElementById('view');
+  endOff = watchEnd(AVE_LINES.filter((l) => l.when.on === 'end' && pathHits(l.when.path)), body);
 }

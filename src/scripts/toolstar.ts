@@ -12,6 +12,7 @@
    · 帧循环只在有东西在动时运转：开合、转圈、梦面里星的自转（梦面自转降到约 24fps）。
    ───────────────────────────────────────────────────────────── */
 
+import { navigate } from 'astro:transitions/client';
 import { clamp, reducedMotion } from './lib';
 import { flipFrom, onRealityChange, type Reality } from './reality';
 import { getLevel, isLive, isSounding, onLevels, rememberLevel, setLevel, toggleLevel, type Channel } from './sound';
@@ -201,9 +202,18 @@ class Ring {
   }
 }
 
+/* 新站：工具栏跨页常驻（ClientRouter），每换一页由 site.ts 调一次 toolstarPage()：
+   「本页」只在阅读页出现、目录按这一页重建，「去处」里标出当前这一处 */
+let pageHook: (() => void) | null = null;
+export function toolstarPage() {
+  pageHook?.();
+}
+
 export function initToolstar() {
-  const root = document.getElementById('ts');
-  if (!root) return;
+  const rootEl = document.getElementById('ts');
+  if (!rootEl) return;
+  // 收窄到不可空：下面的闭包（sync 等）里也要认得出
+  const root: HTMLElement = rootEl;
   const star = root.querySelector<HTMLButtonElement>('.ts-star')!;
   const starG = root.querySelector<SVGGElement>('.ts-star-g')!;
   const orbit = root.querySelector<HTMLElement>('.ts-orbit')!;
@@ -214,7 +224,8 @@ export function initToolstar() {
   const pageSheet = sheet('page');
   const field = findSheet.querySelector<HTMLInputElement>('.ts-field')!;
   const count = findSheet.querySelector<HTMLElement>('.ts-count')!;
-  const inWander = !!document.getElementById('w-host');
+  // 新站没有漫游空间：就地检索的是「寻找」那一页（/find/，site.ts 接 xm:find、回 xm:found）；跨页常驻，所以每次现查
+  const inFind = () => !!document.getElementById('find');
 
   let RM = reducedMotion();
   matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', (e) => (RM = e.matches));
@@ -774,12 +785,12 @@ export function initToolstar() {
     for (const b of wordBtns) b.setAttribute('aria-pressed', String(has(ws, b.dataset.word!)));
     kick(); // 循环圈里的复制件在帧里跟着原件换高亮
   };
-  const toIndex = (q: string) => (location.href = `/articles/?q=${encodeURIComponent(q)}`);
+  const toIndex = (q: string) => navigate(`/find/?q=${encodeURIComponent(q)}`);
   let findT = 0;
   function find(q: string) {
     paintWords();
-    if (!inWander) {
-      count.textContent = q.trim() ? '回车 · 到目录里找' : '';
+    if (!inFind()) {
+      count.textContent = q.trim() ? '回车 · 去找' : '';
       return;
     }
     clearTimeout(findT);
@@ -787,7 +798,7 @@ export function initToolstar() {
   }
   field.addEventListener('input', () => find(field.value));
   field.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !inWander && field.value.trim()) toIndex(field.value.trim());
+    if (e.key === 'Enter' && !inFind() && field.value.trim()) toIndex(field.value.trim());
   });
   addEventListener('xm:found', (e) => {
     const d = (e as CustomEvent<{ query: string; hits: number; total: number }>).detail;
@@ -797,7 +808,7 @@ export function initToolstar() {
   for (const b of wordBtns) {
     b.addEventListener('click', () => {
       const w = b.dataset.word!;
-      if (!inWander) return toIndex(w);
+      if (!inFind()) return toIndex(w);
       let ws = words();
       if (has(ws, w)) ws = ws.filter((x) => x.toLowerCase() !== w.toLowerCase());
       else ws = [...(isMonth(w) ? ws.filter((x) => !isMonth(x)) : ws), w]; // 年月一次只取一个
@@ -873,14 +884,17 @@ export function initToolstar() {
     for (const { a, el } of tocLinks) if (el.getBoundingClientRect().top <= innerHeight * LEAD + 8) cur = a;
     for (const { a } of tocLinks) a.classList.toggle('is-current', a === cur);
   }
-  if (pageSheet) {
+  function buildToc() {
+    if (!pageSheet) return;
     const toc = pageSheet.querySelector<HTMLElement>('.ts-toc')!;
-    const heads = [...document.querySelectorAll<HTMLElement>('article.prose .md h2, article.prose .md h3')];
-    if (!heads.length) {
-      toc.previousElementSibling?.remove();
-      toc.remove();
-      pageSheet.querySelector('.ts-sec')?.classList.remove('ts-sec');
-    }
+    toc.textContent = '';
+    tocLinks.length = 0;
+    const heads = [...document.querySelectorAll<HTMLElement>('.sheet .prose h2, .sheet .prose h3')];
+    // 没有小节就只留字号 / 行距（新站跨页常驻：藏起来，不删）
+    const none = !heads.length;
+    toc.hidden = none;
+    (toc.previousElementSibling as HTMLElement | null)?.toggleAttribute('hidden', none);
+    pageSheet.querySelector('.ts-set')?.parentElement?.classList.toggle('ts-sec', !none);
     for (const el of heads) {
       const c = el.cloneNode(true) as HTMLElement;
       c.querySelectorAll('.ord, .ghost, [aria-hidden="true"]').forEach((x) => x.remove());
@@ -898,6 +912,8 @@ export function initToolstar() {
       toc.append(li);
       tocLinks.push({ a, el });
     }
+  }
+  if (pageSheet) {
     addEventListener('scroll', () => tool === 'page' && markToc(), { passive: true });
 
     const html = document.documentElement;
@@ -977,6 +993,39 @@ export function initToolstar() {
       }
     });
   }
+
+  const pageBtn = toolBtns.find((b) => b.dataset.t === 'page');
+  const goLinks = [...root.querySelectorAll<HTMLAnchorElement>('[data-ring="go"] > a.ts-item')];
+  pageHook = () => {
+    const back = document.querySelector<HTMLAnchorElement>('.read .back');
+    const reading = !!back;
+    root.toggleAttribute('data-reading', reading);
+    if (pageBtn) {
+      pageBtn.style.display = reading ? '' : 'none';
+      // 工具那一圈按现在摆得出的几件重新排
+      const tr = rings.tools;
+      tr.originals = [...tr.el.querySelectorAll<HTMLElement>(':scope > .ts-item')].filter((el) => el.style.display !== 'none');
+      tr.baseStep = tr.step = 88 / Math.max(1, tr.originals.length - 1 + 0.7);
+      tr.layout();
+    }
+    if (!reading && tool === 'page') tool = null;
+    dockPageOpen = false;
+    buildToc();
+    // 窄屏底栏的「返回」：回到这一处
+    const dBack = dock?.querySelector<HTMLAnchorElement>('.ts-dock-back');
+    if (dBack && back) {
+      dBack.href = back.getAttribute('href') || '/';
+      dBack.textContent = `← ${back.querySelector('span')?.textContent?.trim() || '返回'}`;
+    }
+    // 去处：当前这一处（主页只认 /）
+    const path = location.pathname;
+    for (const a of goLinks) {
+      const h = a.getAttribute('href') || '';
+      const on = !/^https?:/.test(h) && !h.endsWith('.xml') && (h === '/' ? path === '/' : path.startsWith(h));
+      on ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current');
+    }
+    sync();
+  };
 
   place();
   drawStar(0, performance.now());

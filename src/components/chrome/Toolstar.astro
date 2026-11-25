@@ -44,11 +44,12 @@ const path = Astro.url.pathname;
 const here = (href: string) => (href === '/' ? path === '/' : path.startsWith(href));
 const DESTS: { href: string; wake: string; dream?: string; ext?: boolean }[] = [
   { href: '/', wake: '主页' },
-  { href: '/articles/', wake: '随笔', dream: '断章' },
-  { href: '/moments/', wake: '瞬间', dream: '闪念' },
-  { href: '/projects/', wake: '项目', dream: '造物' },
+  // 新站：三处的名字定为梦面那一个，不随昼夜换
+  { href: '/articles/', wake: '断章' },
+  { href: '/moments/', wake: '闪念' },
+  { href: '/projects/', wake: '造物' },
   { href: '/gate/', wake: 'NEXUS' },
-  { href: '/legacy/thread/', wake: '旧处' }, // 上一版主页「一根线的一夜」，站内别处没有入口
+  { href: '/legacy/wander/', wake: '旧处' }, // 上一版整站（漫游那一版）的静态快照
   { href: 'https://github.com/Traveritas', wake: 'GitHub', ext: true },
   { href: '/rss.xml', wake: 'RSS', ext: true },
 ];
@@ -76,7 +77,8 @@ const TOOLS: { id: string; wake: string; dream?: string; en: string; panel?: boo
   { id: 'sound', wake: '声音', dream: '回响', en: 'SOUND', panel: true },
   { id: 'go', wake: '去处', en: 'GO', panel: true },
   { id: 'find', wake: '寻找', en: 'FIND', panel: true },
-  ...(reading ? [{ id: 'page', wake: '本页', en: 'PAGE', panel: true }] : []),
+  // 新站：跨页常驻，「本页」一直在标记里，只在阅读页显出来（toolstar.ts 的 toolstarPage）
+  { id: 'page', wake: '本页', en: 'PAGE', panel: true },
   { id: 'set', wake: '设置', en: 'PREFS', panel: true },
 ];
 /* 三圈音量，由内到外（sound.ts 的 Channel） */
@@ -258,7 +260,7 @@ const VOLS: { id: 'bgm' | 'voice' | 'fx'; wake: string; en: string }[] = [
   </section>
 
   {
-    reading && (
+    (
       <section class="ts-sheet" data-sheet="page" aria-label="本页" hidden>
         <p class="ts-h mono">目录 · CONTENTS</p>
         <ol class="ts-toc" />
@@ -284,7 +286,7 @@ const VOLS: { id: 'bgm' | 'voice' | 'fx'; wake: string; en: string }[] = [
   }
 
   {
-    reading && (
+    (
       <nav class="ts-dock" aria-label="阅读底栏" data-nofx>
         <a class="ts-dock-btn ts-dock-back" href="/articles/">← 返回</a>
         <button type="button" class="ts-dock-btn ts-dock-page" aria-expanded="false">本页</button>
@@ -298,10 +300,7 @@ const VOLS: { id: 'bgm' | 'voice' | 'fx'; wake: string; en: string }[] = [
   }
 </div>
 
-<script>
-  import { initToolstar } from '../../scripts/toolstar';
-  initToolstar();
-</script>
+<!-- 新站：initToolstar 由 scripts/site.ts 按 声音 → 工具栏 → Ave 的顺序调 -->
 
 <!-- 轨道上的条目是运行时摆的，样式一律 .ts / .ts- 前缀自守 -->
 <style is:global>

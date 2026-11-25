@@ -1,55 +1,37 @@
 ---
-import BaseLayout from '../../layouts/BaseLayout.astro';
-import WanderIndex from '../../components/wander/WanderIndex.astro';
-import YearGroup from '../../components/index/YearGroup.astro';
-import IndexRow from '../../components/index/IndexRow.astro';
-import { getCollection } from 'astro:content';
-import { countChars } from '../../lib/format';
+/* 断章 —— 章节：一列，编号与日期挂在列外的竖线上 */
+import Base from '../../layouts/Base.astro';
+import ListHead from '../../components/ListHead.astro';
+import { entriesOf } from '../../lib/entries';
+import { plain, chars, minutes, pad, dot } from '../../lib/text';
 
-
-// 新→旧；按年份分组
-const articles = (await getCollection('articles', (a) => !a.data.draft))
-  .map(({ id, body, data }) => ({ id, ...data, chars: countChars(body ?? '') }))
-  .sort((a, b) => b.date.valueOf() - a.date.valueOf() || b.id.localeCompare(a.id));
-
-const byYear = new Map<number, typeof articles>();
-for (const a of articles) {
-  const y = a.date.getFullYear();
-  if (!byYear.has(y)) byYear.set(y, []);
-  byYear.get(y)!.push(a);
-}
+const list = await entriesOf('articles');
 ---
 
-<BaseLayout
-  title="随笔 — Traveritas"
-  description="Traveritas 的随笔与记录"
-  ambient
-  maskLines
-  fieldVeil
-  immersive
-  eeg
->
-  <WanderIndex scene="essay" />
-  <div class="w-fallback">
-  <div class="container-wide page-body">
-    <header class="page-head">
-      <h1 data-morph data-true="随笔" data-dream="断章">随笔</h1>
-      <p class="lede" data-morph data-true="想法、记录，与白昼留下的草稿。" data-dream="“语言无法触及之处，皆为回声——那些从深眠中打捞出的断章。”">
-        想法、记录，与白昼留下的草稿。
-      </p>
-    </header>
-
-    {
-      [...byYear].map(([y, list]) => (
-        <YearGroup year={y}>
-          {list.map((a) => (
-            <IndexRow date={a.date} href={`/articles/${a.id}/`} title={a.title} desc={a.description} tags={a.tags}>
-              <Fragment slot="aside">{a.chars.toLocaleString('en-US')} 字</Fragment>
-            </IndexRow>
-          ))}
-        </YearGroup>
-      ))
-    }
-  </div>
-  </div>
-</BaseLayout>
+<Base title="断章" place="list" sec="articles">
+  <section class="list list--articles">
+    <ListHead k="articles" n={list.length} />
+    <ol class="chapters">
+      {
+        list.map((e, i) => {
+          const n = chars(e.body);
+          return (
+            <li class="ch" style={`--i:${i}`}>
+              <span class="ch-no mono">
+                <b>{pad(list.length - i)}</b>
+                {dot(e.data.date)}
+              </span>
+              <a class="pane pane--ch" data-glass href={`/articles/${e.id}/`}>
+                <span class="t">{plain(e.data.title)}</span>
+                {e.data.description && <span class="d">{plain(e.data.description)}</span>}
+                <span class="meta mono">
+                  {n.toLocaleString()} 字 · 约 {minutes(n)} 分钟{e.data.tags.length ? ' · ' + e.data.tags.join(' / ') : ''}
+                </span>
+              </a>
+            </li>
+          );
+        })
+      }
+    </ol>
+  </section>
+</Base>
