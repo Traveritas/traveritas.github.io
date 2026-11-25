@@ -23,8 +23,8 @@
 import { hexToRgb, reducedMotion } from './lib';
 import { onMixChange, wakeMix } from './reality';
 
-/* 一格 5 个 CSS 像素：1440 宽的屏上画布只有 288×180 —— 这是整套方案便宜的原因 */
-const CELL = 5;
+/* 一格 3 个 CSS 像素：细粒而不成粗糙马赛克，1440×900 仅 480×300 */
+const CELL = 3;
 /* 场的整体尺度：越大雾团越大越疏 */
 const ZOOM = 0.62;
 /* 12fps：雾的速度是秒级，12 帧足够连续 */
@@ -54,6 +54,7 @@ uniform vec2 uRes;
 uniform float uTime;
 uniform float uZoom;
 uniform float uGlow;
+uniform float uDither;
 uniform vec3 uP[4];
 /* 静域：x = 中心（画布 px，自左） · y = 半宽 · z = 羽化（都是画布 px） */
 uniform vec3 uCalm;
@@ -161,9 +162,9 @@ void main() {
     col = mix(col, mix(floorCol, uP[0], 0.34), inside * 0.95);
   }
 
-  /* 32 阶 + 4×4 Bayer：低分辨率放大后不出色带，近看是细噪点 */
-  float q = 32.0;
-  col = floor(col * q + 0.5 + (bayer4(gl_FragCoord.xy) - 0.5) * 0.6) / q;
+  /* 醒面：细柔近零抖动（64 阶光学晶雾）；梦面：3px 有序 Bayer 抖动（28 阶 + 0.72 强度） */
+  float q = mix(28.0, 64.0, clamp((0.72 - uDither) / 0.62, 0.0, 1.0));
+  col = floor(col * q + 0.5 + (bayer4(gl_FragCoord.xy) - 0.5) * uDither) / q;
 
   o = vec4(clamp(col, 0.0, 1.0), 1.0);
 }`;
@@ -206,6 +207,7 @@ export function initMist(): () => void {
     time: ctx.getUniformLocation(program, 'uTime'),
     zoom: ctx.getUniformLocation(program, 'uZoom'),
     glow: ctx.getUniformLocation(program, 'uGlow'),
+    dither: ctx.getUniformLocation(program, 'uDither'),
     palette: ctx.getUniformLocation(program, 'uP'),
     calm: ctx.getUniformLocation(program, 'uCalm'),
     leak: ctx.getUniformLocation(program, 'uLeak'),
@@ -215,11 +217,12 @@ export function initMist(): () => void {
   const WAKE_F = WAKE.map(toFloats);
   const DREAM_F = DREAM.map(toFloats);
 
-  /* 醒度变了才重算四档色（一次 12 个数，不重建画布） */
+  /* 醒度变了重算四档色与抖动量：梦面有序抖动、醒面平滑晶雾（色板保持浅色昼雾，正文对比度不跳） */
   const paintPalette = () => {
     const m = wakeMix();
     const flat = WAKE_F.flatMap((c, i) => mixFloats(DREAM_F[i], c, m));
     ctx.uniform3fv(u.palette, new Float32Array(flat));
+    ctx.uniform1f(u.dither, 0.72 - 0.62 * m);
   };
   paintPalette();
   ctx.uniform1f(u.zoom, ZOOM);

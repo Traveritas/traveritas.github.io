@@ -320,8 +320,14 @@ export function initToolstar() {
   /* ── 轨道与底色 ── */
   function place() {
     const r = star.getBoundingClientRect();
-    C.x = r.left + r.width / 2;
-    C.y = r.top + r.height / 2;
+    if (r.width > 0 && r.height > 0) {
+      C.x = r.left + r.width / 2;
+      C.y = r.top + r.height / 2;
+    } else {
+      // 窄屏阅读页 .ts-star 收进底栏时，轨道锚在底栏上方左下角
+      C.x = 46;
+      C.y = innerHeight - 76;
+    }
     orbit.style.setProperty('--ts-cx', `${C.x}px`);
     orbit.style.setProperty('--ts-cy', `${C.y}px`);
   }
@@ -581,11 +587,19 @@ export function initToolstar() {
   }
 
   /* ── 开合与切换 ── */
+  const dock = root.querySelector<HTMLElement>('.ts-dock');
+  const dockPageBtn = dock?.querySelector<HTMLButtonElement>('.ts-dock-page') ?? null;
+  const dockStarBtn = dock?.querySelector<HTMLButtonElement>('.ts-dock-star') ?? null;
+  let dockPageOpen = false;
   const toolBtns = [...root.querySelectorAll<HTMLButtonElement>('.ts-tool')];
   const catBtns = [...root.querySelectorAll<HTMLButtonElement>('[data-set-cat]')];
   function sync() {
     place();
+    document.documentElement.classList.toggle('ts-open', open);
+    root.classList.toggle('is-dock-page', dockPageOpen && !open);
     star.setAttribute('aria-expanded', String(open));
+    dockStarBtn?.setAttribute('aria-expanded', String(open));
+    dockPageBtn?.setAttribute('aria-expanded', String(dockPageOpen || (open && tool === 'page')));
     for (const b of toolBtns) if (b.hasAttribute('aria-expanded')) b.setAttribute('aria-expanded', String(open && tool === b.dataset.t));
     const want = new Set<keyof typeof rings>(open ? ['tools', ...(tool ? OUTER[tool] : [])] : []);
     if (open && tool === 'set' && setCat) want.add(CAT_RING[setCat]);
@@ -606,15 +620,17 @@ export function initToolstar() {
       else if (!want.has(name) && ring.visible) ring.hide(RM);
     }
     showVols(open && tool === 'sound');
-    showSheet(findSheet, open && tool === 'find', discR() + 14);
-    if (pageSheet) showSheet(pageSheet, open && tool === 'page', rings.tools.R + 34 + 14);
+    showSheet(findSheet, open && tool === 'find', discR() + 46);
+    if (pageSheet) showSheet(pageSheet, dockPageOpen || (open && tool === 'page'), rings.tools.R + 34 + 46);
     drawTracks();
     kick();
   }
   function showSheet(el: HTMLElement, on: boolean, above: number) {
     if (on) {
       el.hidden = false;
-      el.style.bottom = `${innerHeight - C.y + above}px`;
+      const btm = innerHeight - C.y + above;
+      el.style.bottom = `${btm}px`;
+      el.style.maxHeight = `${Math.max(120, innerHeight - btm - 20)}px`;
       requestAnimationFrame(() => el.classList.add('is-on'));
     } else if (!el.hidden) {
       el.classList.remove('is-on');
@@ -623,27 +639,47 @@ export function initToolstar() {
   }
   const captionEl = root.querySelector<HTMLElement>('.ts-caption');
   function setCaption(txt: string) {
-    if (captionEl) captionEl.textContent = txt;
+    if (!captionEl) return;
+    if (txt) {
+      captionEl.textContent = txt;
+      captionEl.classList.add('is-on');
+    } else {
+      captionEl.classList.remove('is-on');
+    }
+  }
+  function readLabel(b?: HTMLButtonElement | null): string {
+    const lab = b?.querySelector<HTMLElement>('.ts-lab');
+    if (!lab) return '';
+    const small = lab.querySelector('small')?.textContent?.trim() || '';
+    const morphEl = lab.querySelector<HTMLElement>('[data-morph]');
+    const zh = morphEl
+      ? ((reality === 'dream' ? morphEl.dataset.dream : morphEl.dataset.true) || morphEl.textContent || '').trim()
+      : (() => {
+          const clone = lab.cloneNode(true) as HTMLElement;
+          clone.querySelector('small')?.remove();
+          return (clone.textContent ?? '').replace(/\s+/g, ' ').trim();
+        })();
+    return small && zh ? `${zh} · ${small}` : zh || small;
   }
   for (const b of toolBtns) {
-    const readLabel = () => b.querySelector('.ts-lab')?.textContent?.replace(/\s+/g, ' ').trim() || '';
-    b.addEventListener('pointerenter', () => setCaption(readLabel()));
-    b.addEventListener('focus', () => setCaption(readLabel()));
+    b.addEventListener('pointerenter', () => setCaption(readLabel(b)));
+    b.addEventListener('focus', () => setCaption(readLabel(b)));
     b.addEventListener('pointerleave', () => {
       const cur = toolBtns.find((x) => x.dataset.t === tool);
-      setCaption(cur?.querySelector('.ts-lab')?.textContent?.replace(/\s+/g, ' ').trim() || '');
+      setCaption(readLabel(cur));
     });
   }
 
   function setOpen(v: boolean) {
-    if (v === open) return;
+    if (v === open && !dockPageOpen) return;
     open = v;
+    dockPageOpen = false;
     if (!v) {
       tool = null;
       setCaption('');
     } else {
       const first = toolBtns[0];
-      if (first) setCaption(first.querySelector('.ts-lab')?.textContent?.replace(/\s+/g, ' ').trim() || '');
+      if (first) setCaption(readLabel(first));
     }
     ST.spinTo += 90;
     sync();
@@ -652,7 +688,7 @@ export function initToolstar() {
     tool = t;
     sync();
     const cur = toolBtns.find((x) => x.dataset.t === t);
-    setCaption(cur?.querySelector('.ts-lab')?.textContent?.replace(/\s+/g, ' ').trim() || '');
+    setCaption(readLabel(cur));
     if (t === 'find') setTimeout(() => field.focus({ preventScroll: true }), 60);
     if (t === 'page') markToc();
   }
@@ -718,6 +754,13 @@ export function initToolstar() {
   onRealityChange((r) => {
     reality = r;
     root.querySelector('.ts-tool[data-t="face"]')?.classList.remove('is-turning');
+    if (open) {
+      const focused =
+        document.activeElement instanceof HTMLButtonElement && toolBtns.includes(document.activeElement)
+          ? document.activeElement
+          : undefined;
+      setCaption(readLabel(focused || toolBtns.find((x) => x.dataset.t === tool) || toolBtns[0]));
+    }
     kick();
   });
 
@@ -882,6 +925,57 @@ export function initToolstar() {
       }
       paint();
     }
+  }
+
+  if (dock) {
+    const back = dock.querySelector<HTMLAnchorElement>('.ts-dock-back');
+    const srcBack = document.querySelector<HTMLAnchorElement>('a.reback');
+    if (back && srcBack) {
+      back.href = srcBack.getAttribute('href') || '/articles/';
+      const wakeLabel = (srcBack.querySelector('[data-true]')?.getAttribute('data-true') || srcBack.textContent || '返回').trim();
+      const dreamLabel = (srcBack.querySelector('[data-dream]')?.getAttribute('data-dream') || wakeLabel).trim();
+      onRealityChange((r) => {
+        back.textContent = `← ${r === 'dream' ? dreamLabel : wakeLabel}`;
+      });
+    }
+    dockPageBtn?.addEventListener('click', () => {
+      if (dockPageOpen) {
+        dockPageOpen = false;
+        sync();
+      } else {
+        open = false;
+        tool = null;
+        setCaption('');
+        dockPageOpen = true;
+        markToc();
+        sync();
+      }
+    });
+    const dockFace = dock.querySelector<HTMLButtonElement>('.ts-dock-face');
+    if (dockFace) {
+      const faceTxt = dockFace.querySelector<HTMLElement>('.ts-dock-face-t');
+      onRealityChange((r) => {
+        dockFace.setAttribute('aria-pressed', String(r === 'wake'));
+        if (faceTxt) faceTxt.textContent = r === 'dream' ? '唤醒' : '入夜';
+      });
+      dockFace.addEventListener('click', () => {
+        const r = dockFace.getBoundingClientRect();
+        flipFrom(r.left + r.width / 2, r.top + r.height / 2);
+      });
+    }
+    dockStarBtn?.addEventListener('click', () => setOpen(!open));
+    addEventListener('pointerdown', (e) => {
+      if (dockPageOpen && !root.contains(e.target as Node)) {
+        dockPageOpen = false;
+        sync();
+      }
+    });
+    addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && dockPageOpen) {
+        dockPageOpen = false;
+        sync();
+      }
+    });
   }
 
   place();

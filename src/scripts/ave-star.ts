@@ -267,14 +267,19 @@ export interface AveStar {
 
 /** mask：压在星上面的那块框——星落在它矩形里的部分画成线框（随它的不透明度过渡） */
 export function createAveStar(canvas: HTMLCanvasElement, reduced: () => boolean, mask?: HTMLElement): AveStar | null {
-  const gl = canvas.getContext('webgl2', { alpha: true, premultipliedAlpha: true, antialias: true });
+  let gl: WebGL2RenderingContext | null = null;
+  try {
+    gl = canvas.getContext('webgl2', { alpha: true, premultipliedAlpha: true, antialias: true });
+  } catch {
+    return null;
+  }
   if (!gl) return null;
 
   const sh = (type: number, src: string) => {
-    const s = gl.createShader(type)!;
-    gl.shaderSource(s, src);
-    gl.compileShader(s);
-    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s) || 'shader');
+    const s = gl!.createShader(type)!;
+    gl!.shaderSource(s, src);
+    gl!.compileShader(s);
+    if (!gl!.getShaderParameter(s, gl!.COMPILE_STATUS)) throw new Error(gl!.getShaderInfoLog(s) || 'shader');
     return s;
   };
   let prog: WebGLProgram;
@@ -324,6 +329,17 @@ export function createAveStar(canvas: HTMLCanvasElement, reduced: () => boolean,
   let scale = 0;
   let anim: Anim | null = null;
   let raf = 0;
+  let lost = false;
+
+  canvas.addEventListener('webglcontextlost', (e) => {
+    e.preventDefault();
+    lost = true;
+    anim = null;
+    if (raf) {
+      cancelAnimationFrame(raf);
+      raf = 0;
+    }
+  });
 
   function resize() {
     const dpr = Math.min(2, devicePixelRatio || 1);
@@ -332,42 +348,44 @@ export function createAveStar(canvas: HTMLCanvasElement, reduced: () => boolean,
   }
 
   function draw() {
+    if (lost || !gl) return;
     resize();
-    gl!.viewport(0, 0, canvas.width, canvas.height);
-    gl!.clear(gl!.COLOR_BUFFER_BIT | gl!.DEPTH_BUFFER_BIT);
+    if (!canvas.width || !canvas.height) return;
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     if (scale < 0.002) return;
-    gl!.uniformMatrix4fv(u.model, false, modelMatrix(q, scale));
+    gl.uniformMatrix4fv(u.model, false, modelMatrix(q, scale));
     if (mask) {
       const c = canvas.getBoundingClientRect();
       const k = mask.getBoundingClientRect();
       const sx = canvas.width / (c.width || 1);
       const H = canvas.height;
-      gl!.uniform4f(u.mask, (k.left - c.left) * sx, H - (k.bottom - c.top) * sx, (k.right - c.left) * sx, H - (k.top - c.top) * sx);
-      gl!.uniform1f(u.maskK, Number(getComputedStyle(mask).opacity) || 0);
+      gl.uniform4f(u.mask, (k.left - c.left) * sx, H - (k.bottom - c.top) * sx, (k.right - c.left) * sx, H - (k.top - c.top) * sx);
+      gl.uniform1f(u.maskK, Number(getComputedStyle(mask).opacity) || 0);
     }
     // 背面：出射
-    gl!.cullFace(gl!.FRONT);
-    gl!.depthFunc(gl!.LESS);
-    gl!.depthMask(true);
-    gl!.colorMask(true, true, true, true);
-    gl!.uniform1f(u.pass, 0);
-    gl!.drawArrays(gl!.TRIANGLES, 0, mesh.count);
+    gl.cullFace(gl.FRONT);
+    gl.depthFunc(gl.LESS);
+    gl.depthMask(true);
+    gl.colorMask(true, true, true, true);
+    gl.uniform1f(u.pass, 0);
+    gl.drawArrays(gl.TRIANGLES, 0, mesh.count);
     // 正面：先只写深度，再只画最近的那一层
-    gl!.clear(gl!.DEPTH_BUFFER_BIT);
-    gl!.cullFace(gl!.BACK);
-    gl!.colorMask(false, false, false, false);
-    gl!.drawArrays(gl!.TRIANGLES, 0, mesh.count);
-    gl!.colorMask(true, true, true, true);
-    gl!.depthMask(false);
-    gl!.depthFunc(gl!.LEQUAL);
-    gl!.uniform1f(u.pass, 1);
-    gl!.drawArrays(gl!.TRIANGLES, 0, mesh.count);
+    gl.clear(gl.DEPTH_BUFFER_BIT);
+    gl.cullFace(gl.BACK);
+    gl.colorMask(false, false, false, false);
+    gl.drawArrays(gl.TRIANGLES, 0, mesh.count);
+    gl.colorMask(true, true, true, true);
+    gl.depthMask(false);
+    gl.depthFunc(gl.LEQUAL);
+    gl.uniform1f(u.pass, 1);
+    gl.drawArrays(gl.TRIANGLES, 0, mesh.count);
   }
 
   function frame(now: number) {
     raf = 0;
     const a = anim;
-    if (!a) return;
+    if (!a || lost) return;
     // 第一拍立刻动；之后每拍跳一次（定格）
     const beat = Math.floor(((now - a.t0) / 1000) * FPS) + 1;
     if (beat !== a.beat) {
@@ -431,6 +449,7 @@ export function createAveStar(canvas: HTMLCanvasElement, reduced: () => boolean,
       run('exit', sec, done);
     },
     look(dark, dream) {
+      if (lost || !gl) return;
       gl.uniform1f(u.dark, dark ? 1 : 0);
       gl.uniform1f(u.dream, dream ? 1 : 0);
       if (scale > 0.002 && !anim) draw();

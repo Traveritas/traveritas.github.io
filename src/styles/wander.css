@@ -41,10 +41,10 @@ html.w-dragging #w-stage { cursor: grabbing; }
 .w-space { position: absolute; inset: 0; pointer-events: none; }
 
 /* ══ 窗 ══
-   一张几乎看不见的纸：面是底图的一次值偏移（上轻下重），形由上亮下暗两条 .6px 与一圈 .5px 收口给出。
-   卡面图（faces.js 画的字、标签、配图）是 background-image 的第一层，铺在这层值偏移之上。
-   这四种颜色注册成 <color> 才能插值——悬停是这四个值自己在过渡里走。
-   没有投影、没有磨砂、没有反光；悬停不位移、不缩放。 */
+   一块半透明磨砂树脂玻璃片：面是同阶底色上的一层清透渐变（上轻下沉），
+   形由上沿 1px 光学倒角、下沿压边、外圈 1px 细边与克制落影给出；
+   卡面图（faces.js 画的字、标签、配图）铺在玻璃面之上。
+   悬停不在卡身中间扫俗套反光带——只在玻璃清晰度、微抬落影、外沿紫晶细边与顶沿 1px 棱光上安静响应。 */
 @property --w-face-a {
   syntax: '<color>';
   inherits: false;
@@ -70,6 +70,11 @@ html.w-dragging #w-stage { cursor: grabbing; }
   inherits: false;
   initial-value: rgba(0, 0, 0, 0);
 }
+@property --w-card-sh {
+  syntax: '<color>';
+  inherits: false;
+  initial-value: rgba(0, 0, 0, 0);
+}
 
 .w-card {
   position: absolute;
@@ -79,48 +84,56 @@ html.w-dragging #w-stage { cursor: grabbing; }
   background-image: var(--w-face, none), linear-gradient(180deg, var(--w-face-a), var(--w-face-b));
   background-size: 100% 100%;
   background-repeat: no-repeat;
-  border-radius: 3px;
+  border-radius: var(--chrome-radius, 3px);
   box-shadow:
-    inset 0 0.6px 0 var(--w-edge-hi),
-    0 0.6px 0 var(--w-edge-lo),
-    0 0 0 0.5px var(--w-edge-ring);
+    inset 0 1px 0 var(--w-edge-hi),
+    inset 0 -1px 0 var(--w-edge-lo),
+    0 0 0 1px var(--w-edge-ring),
+    0 16px 34px -20px var(--w-card-sh);
   will-change: transform, opacity;
   pointer-events: auto;
   cursor: pointer;
   outline: none;
   transition:
-    --w-face-a 0.22s ease,
-    --w-face-b 0.22s ease,
-    --w-edge-hi 0.22s ease,
-    --w-edge-lo 0.22s ease,
-    --w-edge-ring 0.22s ease;
+    --w-face-a 0.24s ease,
+    --w-face-b 0.24s ease,
+    --w-edge-hi 0.24s ease,
+    --w-edge-lo 0.24s ease,
+    --w-edge-ring 0.24s ease,
+    --w-card-sh 0.24s ease;
+}
+/* 仅清晰档（LOD 0）挂磨砂玻璃，远景失焦档保持零滤镜开销 */
+.w-card[data-lod='0'] {
+  -webkit-backdrop-filter: blur(11px) saturate(1.08);
+  backdrop-filter: blur(11px) saturate(1.08);
 }
 .w-card:not([data-lod='0']) { image-rendering: pixelated; }
-/* 远处的窗只剩像素块，但材质不换档：同一张纸，只是糊了 */
-.w-card.hot { transition-duration: 0.18s; }
+/* 远处的窗只剩像素块，但材质不换档：同一块片，只是糊了 */
+.w-card.hot { transition-duration: 0.2s; }
 
-/* 顶沿亮起来的那一小段：左边起笔，走到 62% 化掉。不是一圈描边 */
+/* 顶沿 1px 棱面切光：只贴在上缘微亮，不横穿卡片正文 */
 .w-card::before {
   content: '';
   position: absolute;
   left: 0;
   right: 0;
   top: 0;
-  height: 0.7px;
+  height: 1px;
   border-radius: 3px 3px 0 0;
   pointer-events: none;
   opacity: 0;
   background: linear-gradient(
     90deg,
-    var(--w-lit) 0%,
-    color-mix(in srgb, var(--w-lit) 62%, transparent) 26%,
-    transparent 62%
+    transparent 0%,
+    var(--w-lit) 18%,
+    color-mix(in srgb, var(--w-lit) 46%, transparent) 52%,
+    transparent 82%
   );
-  transition: opacity 0.22s ease;
+  transition: opacity 0.24s ease;
 }
-.w-card.hot::before { opacity: 1; transition-duration: 0.18s; }
+.w-card.hot::before { opacity: 1; transition-duration: 0.2s; }
 
-/* 键盘焦点：四角裁切标记。悬停亮的是顶沿那一段，焦点亮的是四个角，两件事不会混 */
+/* 键盘焦点：四角裁切标记。悬停亮的是顶沿棱光与细边，焦点亮的是四个角，两件事不会混 */
 .w-card::after {
   content: '';
   position: absolute;
@@ -145,20 +158,22 @@ html.w-reading #w-stage .w-card { pointer-events: none; }
 html[data-wview='explore'] .w-card:not(.clear) { cursor: zoom-in; }
 
 /* ── 三栏各一组数（rest / hover）──
-   随笔是浅底，纸比底亮一档（白色叠上去，上沿更实、下沿略淡）；瞬间与项目是深底，纸比底亮一层光。
-   方向一致：顶变轻、底变沉——一张纸的近边被指头挑起，远端压得更实。 */
+   随笔：冰白磨砂纸片；瞬间：烟熏紫晶玻璃；项目：深靛青晶玻璃。
+   悬停只微抬玻璃清透度、轻加深落影，并让外沿细边带上一缕薄暮紫晶色，干净克制。 */
 .w-space[data-wscene='essay'] .w-card {
-  --w-face-a: rgba(255, 255, 255, 0.62);
-  --w-face-b: rgba(255, 255, 255, 0.3);
-  --w-face-a-hov: rgba(255, 255, 255, 0.7);
-  --w-face-b-hov: rgba(255, 255, 255, 0.38);
-  --w-edge-hi-hov: rgba(255, 255, 255, 0.95);
-  --w-edge-lo-hov: rgba(23, 28, 40, 0.3);
-  --w-edge-ring-hov: rgba(23, 28, 40, 0.12);
-  --w-edge-hi: rgba(255, 255, 255, 0.88);
-  --w-edge-lo: rgba(23, 28, 40, 0.2);
-  --w-edge-ring: rgba(23, 28, 40, 0.09);
-  --w-lit: rgba(255, 255, 255, 0.94);
+  --w-face-a: rgba(250, 252, 255, 0.78);
+  --w-face-b: rgba(242, 246, 251, 0.56);
+  --w-face-a-hov: rgba(252, 253, 255, 0.88);
+  --w-face-b-hov: rgba(245, 248, 252, 0.7);
+  --w-edge-hi: rgba(255, 255, 255, 0.92);
+  --w-edge-hi-hov: rgba(255, 255, 255, 0.98);
+  --w-edge-lo: rgba(35, 42, 56, 0.14);
+  --w-edge-lo-hov: rgba(35, 42, 56, 0.2);
+  --w-edge-ring: rgba(140, 152, 174, 0.34);
+  --w-edge-ring-hov: rgba(126, 110, 168, 0.54);
+  --w-card-sh: rgba(34, 44, 62, 0.16);
+  --w-card-sh-hov: rgba(34, 44, 62, 0.24);
+  --w-lit: rgba(255, 255, 255, 0.98);
   --w-mark: rgba(23, 28, 40, 0.62);
 }
 .w-space[data-wscene='essay'] .w-card.hot {
@@ -167,20 +182,23 @@ html[data-wview='explore'] .w-card:not(.clear) { cursor: zoom-in; }
   --w-edge-hi: var(--w-edge-hi-hov);
   --w-edge-lo: var(--w-edge-lo-hov);
   --w-edge-ring: var(--w-edge-ring-hov);
+  --w-card-sh: var(--w-card-sh-hov);
 }
 
 .w-space[data-wscene='moment'] .w-card {
-  --w-face-a: rgba(255, 255, 255, 0.118);
-  --w-face-b: rgba(255, 255, 255, 0.022);
-  --w-face-a-hov: rgba(255, 255, 255, 0.15);
-  --w-face-b-hov: rgba(255, 255, 255, 0.014);
-  --w-edge-hi-hov: rgba(255, 255, 255, 0.66);
-  --w-edge-lo-hov: rgba(0, 0, 0, 0.33);
-  --w-edge-ring-hov: rgba(255, 255, 255, 0.15);
-  --w-edge-hi: rgba(255, 255, 255, 0.55);
-  --w-edge-lo: rgba(0, 0, 0, 0.28);
-  --w-edge-ring: rgba(255, 255, 255, 0.1);
-  --w-lit: rgba(255, 255, 255, 0.9);
+  --w-face-a: rgba(52, 46, 66, 0.58);
+  --w-face-b: rgba(38, 33, 50, 0.42);
+  --w-face-a-hov: rgba(62, 55, 78, 0.72);
+  --w-face-b-hov: rgba(44, 39, 58, 0.54);
+  --w-edge-hi: rgba(240, 234, 252, 0.34);
+  --w-edge-hi-hov: rgba(248, 244, 255, 0.54);
+  --w-edge-lo: rgba(8, 6, 16, 0.32);
+  --w-edge-lo-hov: rgba(8, 6, 16, 0.42);
+  --w-edge-ring: rgba(212, 200, 236, 0.2);
+  --w-edge-ring-hov: rgba(196, 178, 232, 0.52);
+  --w-card-sh: rgba(10, 8, 20, 0.38);
+  --w-card-sh-hov: rgba(10, 8, 20, 0.52);
+  --w-lit: rgba(244, 238, 255, 0.86);
   --w-mark: rgba(255, 255, 255, 0.72);
 }
 .w-space[data-wscene='moment'] .w-card.hot {
@@ -189,20 +207,23 @@ html[data-wview='explore'] .w-card:not(.clear) { cursor: zoom-in; }
   --w-edge-hi: var(--w-edge-hi-hov);
   --w-edge-lo: var(--w-edge-lo-hov);
   --w-edge-ring: var(--w-edge-ring-hov);
+  --w-card-sh: var(--w-card-sh-hov);
 }
 
 .w-space[data-wscene='project'] .w-card {
-  --w-face-a: rgba(255, 255, 255, 0.092);
-  --w-face-b: rgba(255, 255, 255, 0.014);
-  --w-face-a-hov: rgba(255, 255, 255, 0.12);
-  --w-face-b-hov: rgba(255, 255, 255, 0.008);
-  --w-edge-hi-hov: rgba(255, 255, 255, 0.62);
-  --w-edge-lo-hov: rgba(0, 0, 0, 0.31);
-  --w-edge-ring-hov: rgba(255, 255, 255, 0.17);
-  --w-edge-hi: rgba(255, 255, 255, 0.5);
-  --w-edge-lo: rgba(0, 0, 0, 0.26);
-  --w-edge-ring: rgba(255, 255, 255, 0.12);
-  --w-lit: rgba(255, 255, 255, 0.88);
+  --w-face-a: rgba(28, 36, 50, 0.6);
+  --w-face-b: rgba(19, 25, 37, 0.44);
+  --w-face-a-hov: rgba(36, 46, 63, 0.74);
+  --w-face-b-hov: rgba(24, 31, 45, 0.56);
+  --w-edge-hi: rgba(224, 234, 248, 0.3);
+  --w-edge-hi-hov: rgba(236, 242, 252, 0.48);
+  --w-edge-lo: rgba(6, 10, 18, 0.34);
+  --w-edge-lo-hov: rgba(6, 10, 18, 0.44);
+  --w-edge-ring: rgba(188, 202, 224, 0.19);
+  --w-edge-ring-hov: rgba(176, 164, 220, 0.5);
+  --w-card-sh: rgba(6, 10, 18, 0.42);
+  --w-card-sh-hov: rgba(6, 10, 18, 0.56);
+  --w-lit: rgba(232, 240, 252, 0.84);
   --w-mark: rgba(255, 255, 255, 0.68);
 }
 .w-space[data-wscene='project'] .w-card.hot {
@@ -211,6 +232,7 @@ html[data-wview='explore'] .w-card:not(.clear) { cursor: zoom-in; }
   --w-edge-hi: var(--w-edge-hi-hov);
   --w-edge-lo: var(--w-edge-lo-hov);
   --w-edge-ring: var(--w-edge-ring-hov);
+  --w-card-sh: var(--w-card-sh-hov);
 }
 
 #w-veil {
@@ -360,9 +382,10 @@ html.w-reading .w-chrome > * { opacity: 0 !important; pointer-events: none; }
       rgb(var(--w-panel-bot) / calc(var(--w-panel-b) * var(--w-panel-k)))
     );
   box-shadow:
-    inset 0 0.6px 0 var(--w-edge-hi),
-    0 0.6px 0 var(--w-edge-lo),
-    0 0 0 0.5px var(--w-edge-ring);
+    inset 0 1px 0 var(--w-edge-hi),
+    inset 0 -1px 0 var(--w-edge-lo),
+    0 0 0 1px var(--w-edge-ring),
+    0 24px 56px -22px rgba(8, 12, 24, 0.36);
   display: flex;
   flex-direction: column;
   /* 0.42s：前 45% 把卡那一层翻掉、纸浓到能读，剩下的路程交给长（字最后才显影） */
@@ -703,7 +726,8 @@ html:not(.w-brand-small) .w-brand { opacity: 0 !important; pointer-events: none;
   color: #827f98;
   opacity: var(--home);
 }
-.w-home-clock { left: var(--hx); }
+.w-home-clock { left: var(--hx); transition: opacity 0.25s ease; }
+html.ts-open .w-home-clock { opacity: 0; pointer-events: none; }
 .w-home-exits { right: 7vw; display: flex; align-items: center; gap: 22px; pointer-events: auto; }
 .w-home-exits a:not(.w-home-gate) { color: inherit; text-decoration: none; transition: color 0.3s ease; }
 .w-home-exits a:not(.w-home-gate):is(:hover, :focus-visible) { color: #ece8f2; outline: none; }
@@ -763,6 +787,7 @@ html[data-wview='home'] #w-stage { cursor: default; }
 }
 @media (prefers-reduced-motion: reduce) {
   html.w-ready[data-wview='home'] .w-home-brand-box, .w-home-hint i { animation: none; }
+  .w-home-clock { transition: none; }
   .w-home-brand-box:has(.is-morphing) .w-home-win { opacity: 1; }
 }
 

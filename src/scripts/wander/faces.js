@@ -18,9 +18,9 @@ const SCENE_ORDER = ['essay', 'moment', 'project'];
 /* 纸上那套墨：与 wander.css 里三栏的值偏移一起定的（2026-11-04 换成 A「同阶冷夜」那一版）。
    随笔的纸比底亮（白纸盖在浅灰蓝上），两种深底的纸比底亮一层光；chip 是标签那一圈细边。 */
 const INK = {
-  essay: { fg: '#232830', soft: '#4f5866', faint: '#6b7280', ink: '#4f4a66', dot: '#3a414c', chip: 'rgba(79, 74, 102, 0.3)' },
-  project: { fg: 'rgba(226, 231, 240, 0.93)', soft: 'rgba(205, 214, 230, 0.62)', faint: 'rgba(205, 214, 230, 0.45)', ink: '#a088a5', dot: '#cfdbe6', chip: 'rgba(160, 136, 165, 0.3)' },
-  moment: { fg: 'rgba(244, 240, 249, 0.93)', soft: 'rgba(232, 226, 240, 0.64)', faint: 'rgba(232, 226, 240, 0.47)', ink: '#b49cba', dot: '#e8dcec', chip: 'rgba(180, 156, 186, 0.3)' },
+  essay: { fg: '#1e242e', soft: '#4a5464', faint: '#667080', ink: '#4f4a66', dot: '#3a414c', chip: 'rgba(79, 74, 102, 0.34)', rule: 'rgba(35, 42, 56, 0.11)' },
+  project: { fg: 'rgba(236, 241, 248, 0.95)', soft: 'rgba(212, 221, 236, 0.76)', faint: 'rgba(196, 207, 224, 0.58)', ink: '#b8a2cc', dot: '#cfdbe6', chip: 'rgba(184, 162, 204, 0.34)', rule: 'rgba(220, 230, 246, 0.12)' },
+  moment: { fg: 'rgba(246, 242, 252, 0.95)', soft: 'rgba(234, 228, 244, 0.78)', faint: 'rgba(216, 208, 232, 0.6)', ink: '#c4acd4', dot: '#e8dcec', chip: 'rgba(196, 172, 212, 0.36)', rule: 'rgba(238, 230, 250, 0.12)' },
 };
 const LABEL = { essay: ['随笔', 'ESSAY'], project: ['项目', 'PROJECT'], moment: ['瞬间', 'MOMENT'] };
 const SERIF = "'Noto Serif SC', 'Source Han Serif SC', SimSun, serif";
@@ -252,8 +252,12 @@ async function content(ctx, it, c) {
     ctx.font = `400 13.5px ${SERIF}`;
     ctx.fillStyle = c.soft;
     dl.forEach((l, i) => ctx.fillText(l, pad, d0 + i * 22.5));
-    // 底：标签（项目是链接）
-    chips(ctx, c, labels, pad, chipY, w - pad);
+    // 底：极淡分隔发丝线 + 标签（项目是链接）
+    if (labels.length) {
+      ctx.fillStyle = c.rule;
+      ctx.fillRect(pad, chipY - 12, w - pad * 2, 1);
+      chips(ctx, c, labels, pad, chipY, w - pad);
+    }
   } else if (it.kind === 'img') {
     const n = a.images.length;
     const pl = it._pl;
@@ -313,7 +317,11 @@ async function content(ctx, it, c) {
     ctx.font = `500 17px ${SERIF}`;
     ctx.fillStyle = c.fg;
     it._lay.tl.forEach((l, i) => ctx.fillText(l, pad, TB + 42 + i * 28));
-    chips(ctx, c, a.tags || [], pad, it._lay.chipY, w - pad);
+    if ((a.tags || []).length) {
+      ctx.fillStyle = c.rule;
+      ctx.fillRect(pad, it._lay.chipY - 12, w - pad * 2, 1);
+      chips(ctx, c, a.tags || [], pad, it._lay.chipY, w - pad);
+    }
   }
 }
 

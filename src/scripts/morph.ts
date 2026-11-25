@@ -24,7 +24,10 @@ export interface Dual {
   flipped: boolean;
 }
 
-const POOL = '醒梦之间夜深空site0123456789abcdefghijklmnopqrstuvwxyz·—';
+const POOL_CJK = '醒梦光雾影汐尘微晴暮星静空镜露';
+const POOL_ASCII = '0123456789·—';
+const CJK_RE = /[\u4e00-\u9fff]/;
+const ASCII_ALNUM_RE = /[A-Za-z0-9]/;
 const RM = () =>
   typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -43,21 +46,25 @@ interface MEl {
 
 const els: MEl[] = [];
 const rand = (n: number) => Math.floor(Math.random() * n);
-const pick = () => POOL[rand(POOL.length)];
+const pickFor = (ch: string): string => {
+  if (CJK_RE.test(ch)) return POOL_CJK[rand(POOL_CJK.length)];
+  if (ASCII_ALNUM_RE.test(ch)) return POOL_ASCII[rand(POOL_ASCII.length)];
+  return ch;
+};
 
 function render(target: string, p: number): string {
   const n = Math.floor(p * target.length);
   let out = '';
   for (let i = 0; i < target.length; i++) {
     if (i < n) out += target[i];
-    else out += Math.random() < 0.55 ? target[i] : pick();
+    else out += Math.random() < 0.55 ? target[i] : pickFor(target[i]);
   }
   return out;
 }
 
 function scrambleFace(src: string): string {
   let out = '';
-  for (const ch of src) out += Math.random() < 0.55 ? pick() : ch;
+  for (const ch of src) out += Math.random() < 0.55 ? pickFor(ch) : ch;
   return out;
 }
 
@@ -145,13 +152,14 @@ function ambientTick() {
     setTimeout(ambientTick, 9000 + rand(5000));
     return;
   }
-  // 进场归位过的元素（文章标题等）不再随机走神；
+  // 进场归位过的元素（文章标题等）与导航/按钮内部文本不再随机走神，只留诗意正文与页脚双面句；
   // 醒态下双面元素不参与走神（醒面该是稳的）
   const pool = els.filter(
     (m) =>
       visible(m) &&
       !m.el.dataset.faces &&
       m.el.dataset.entrance === undefined &&
+      !m.el.closest('a, button, nav, .ts-item, .reback, .ts-dock') &&
       !(m.el.dataset.dream !== undefined && realityFace === 'wake'),
   );
   if (pool.length) {
@@ -193,6 +201,8 @@ export function initMorph() {
   setInterval(clockTick, 5000);
 
   for (const el of document.querySelectorAll<HTMLElement>('[data-morph]')) {
+    // 防止误把包含链接/按钮的容器文本整块覆写
+    if (el.querySelector('a, button')) continue;
     const faces = el.dataset.faces
       ? el.dataset.faces.split('|').map((s) => s.trim())
       : [el.dataset.true || el.textContent.trim()];

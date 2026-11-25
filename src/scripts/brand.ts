@@ -61,6 +61,7 @@ function wire(el: HTMLElement) {
     for (let i = 0; i < length; i++) {
       const span = document.createElement('span');
       span.className = 'brand-char';
+      span.setAttribute('aria-hidden', 'true');
       span.style.setProperty('--i', String(i));
       el.appendChild(span);
     }
@@ -101,6 +102,7 @@ function wire(el: HTMLElement) {
     step = 0;
     el.classList.remove('is-wake');
     el.classList.add('is-dream');
+    if (el.getAttribute('aria-hidden') !== 'true') el.setAttribute('aria-label', CYCLE_WORDS[0]);
 
     if (RM) {
       el.textContent = CYCLE_WORDS[0];
@@ -115,6 +117,7 @@ function wire(el: HTMLElement) {
     window.clearTimeout(cycleTimer);
     el.classList.remove('is-dream');
     el.classList.add('is-wake');
+    if (el.getAttribute('aria-hidden') !== 'true') el.setAttribute('aria-label', WAKE_WORD);
     el.textContent = WAKE_WORD;
   }
 
