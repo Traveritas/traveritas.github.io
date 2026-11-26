@@ -194,7 +194,8 @@ void main(){
     vec3 tone = min(uWash.rgb / max(dot(uWash.rgb, Y), 0.05) * dot(col, Y), vec3(1.0));
     col = mix(col, tone, f * 0.8) + uWash.rgb * f * 0.035 * (1.0 - uDay);
   }
-  col = mix(uP[0] * 0.55, col, uVeil);
+  vec3 veilBg = mix(vec3(0.047, 0.051, 0.106), vec3(0.839, 0.835, 0.886), uDay);
+  col = mix(veilBg, col, uVeil);
   o = vec4(col, 1.0);
 }`;
 

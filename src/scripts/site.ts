@@ -177,11 +177,16 @@ setFlipper(() => {
 });
 
 /* ── 画布 ── */
-const ground = createGround(document.getElementById('g') as HTMLCanvasElement);
-ground.mesh('essays', bipyramid(6, 1, 0.72, 0.4));
-ground.mesh('moments', shard(7));
-ground.mesh('projects', cubeClean());
-ground.mesh('nexus', tesseractSlice(0.5));
+let ground: ReturnType<typeof createGround> | null = null;
+try {
+  ground = createGround(document.getElementById('g') as HTMLCanvasElement);
+  ground.mesh('essays', bipyramid(6, 1, 0.72, 0.4));
+  ground.mesh('moments', shard(7));
+  ground.mesh('projects', cubeClean());
+  ground.mesh('nexus', tesseractSlice(0.5));
+} catch {
+  /* WebGL2 不可用时退回纯静态底色，不阻断页面进入 */
+}
 
 /* 晶体：三处各一颗，外加 NEXUS 门上那一颗（四维晶体的切面，切的位置一直在慢慢走，形也跟着变） */
 type Crys = Sec | 'nexus';
@@ -249,10 +254,111 @@ addEventListener('pointermove', (e) => {
   mouse[1] = e.clientY;
 });
 
-const BOOT = [40, 40, 20, 12, 8, 5, 3, 2, 1]; // 开屏：每拍 150ms 一级
+const BOOT_STEPS = [48, 34, 24, 16, 11, 7, 4, 2, 1]; // 加载格阶：由真实加载进度推进，全部就绪才收至 1
+const BOOT_HOLD_IDX = 4; // 资源未就绪前最细停在 11 格，绝不提前放行
+const BOOT_STEP_MS = 130;
+const BOOT_FINISH_MS = 115;
+const BOOT_MAX_WAIT_MS = 8500; // 弱网或个别资源异常时的兜底上限
 const PULSE = [1, 2, 4, 7, 7, 5, 3, 2, 1]; // 换页：每拍 100ms 一级
 const t0 = performance.now();
 st.boot = t0;
+let bootIdx = 0;
+let bootStepAt = t0;
+let bootProg = 0;
+let bootReady = false;
+let bootDoneAt = -1;
+let glDrawn = false;
+let resolveGl!: () => void;
+const glFirstFrame = new Promise<void>((res) => {
+  resolveGl = res;
+});
+if (!ground) resolveGl();
+
+function finishBoot(now: number) {
+  if (st.boot < 0) return;
+  st.boot = -1;
+  st.coarse = 1;
+  st.veil = 1;
+  bootDoneAt = now;
+  html.classList.remove('booting');
+  html.classList.add('booted');
+}
+
+/* ── 真实资源门控：WebGL 首帧 + 自切字体 + 首屏图片 ── */
+function waitForReady(onProgress: (p: number) => void): Promise<void> {
+  const raw = (document.getElementById('view')?.textContent || 'AveritA 的昼梦叙集 断章 闪念 造物').replace(/\s+/g, '');
+  const sampleText = [...new Set(raw)].slice(0, 240).join('');
+  const hasBold = !!document.querySelector('#view h1, #view h2, #view h3, #view strong');
+  const imgs = [...document.querySelectorAll<HTMLImageElement>('#view img')].filter((img, idx) => {
+    const r = img.getBoundingClientRect();
+    return (idx < 4 && img.loading !== 'lazy') || (r.top < innerHeight * 1.25 && r.bottom > -100);
+  });
+
+  const tasks: { weight: number; done: boolean; p: Promise<unknown> }[] = [];
+  const report = () => {
+    const total = tasks.reduce((s, t) => s + t.weight, 0) || 1;
+    const got = tasks.reduce((s, t) => s + (t.done ? t.weight : 0), 0);
+    onProgress(got / total);
+  };
+  const add = (weight: number, p: Promise<unknown>) => {
+    const item = { weight, done: false, p };
+    tasks.push(item);
+    item.p = p.catch(() => {}).finally(() => {
+      item.done = true;
+      report();
+    });
+  };
+
+  add(0.2, glFirstFrame);
+
+  const fontSheet = document.querySelector<HTMLLinkElement>('link[href*="noto-serif-sc/font.css"]');
+  const sheetReady =
+    !fontSheet || fontSheet.sheet
+      ? Promise.resolve()
+      : new Promise<void>((res) => {
+          fontSheet.addEventListener('load', () => res(), { once: true });
+          fontSheet.addEventListener('error', () => res(), { once: true });
+        });
+  add(0.15, sheetReady);
+
+  const monoReady = document.fonts ? document.fonts.load('400 12px "IBM Plex Mono"', 'AveritA 0123456789/·') : Promise.resolve();
+  add(0.15, monoReady);
+
+  const serifReady = sheetReady.then(async () => {
+    if (!document.fonts) return;
+    const loads: Promise<unknown>[] = [document.fonts.load('500 16px "Noto Serif SC"', sampleText)];
+    if (hasBold) loads.push(document.fonts.load('600 16px "Noto Serif SC"', sampleText));
+    await Promise.allSettled(loads);
+    await document.fonts.ready;
+  });
+  add(imgs.length ? 0.35 : 0.5, serifReady);
+
+  if (imgs.length) {
+    const w = 0.15 / imgs.length;
+    for (const img of imgs) {
+      const p = img.complete
+        ? img.decode?.().catch(() => {}) ?? Promise.resolve()
+        : new Promise<void>((res) => {
+            const fin = () => (img.decode?.().catch(() => {}) ?? Promise.resolve()).finally(() => res());
+            img.addEventListener('load', fin, { once: true });
+            img.addEventListener('error', () => res(), { once: true });
+          });
+      add(w, p);
+    }
+  }
+
+  const timeout = new Promise<void>((res) => setTimeout(res, BOOT_MAX_WAIT_MS));
+  return Promise.race([Promise.all(tasks.map((t) => t.p)).then(() => {}), timeout]);
+}
+
+waitForReady((p) => {
+  bootProg = p;
+}).then(() => {
+  bootProg = 1;
+  bootReady = true;
+  if (!ground) finishBoot(performance.now());
+});
+
 let last = t0;
 function frame(now: number) {
   const dt = Math.min(0.05, (now - last) / 1000);
@@ -271,15 +377,27 @@ function frame(now: number) {
   st.pan[1] += (st.panT[1] + scrollY * 0.0006 - st.pan[1]) * k(2.2);
   st.gain += (st.gainT - st.gain) * k(2);
 
-  // 开屏 / 换页：格先粗、再一拍一拍解析回来
+  // 加载 / 换页：格随真实加载进度一拍拍收细，全部就绪后落到 1 再放行页面
   st.coarse = 1;
   if (st.boot > 0) {
-    const i = Math.floor((now - st.boot) / 150);
-    st.veil = Math.min(1, (now - st.boot) / 900);
-    if (i >= BOOT.length) {
-      st.boot = -1;
-      html.classList.add('booted');
-    } else st.coarse = BOOT[i];
+    const veilTarget = bootReady ? 1 : 0.78;
+    st.veil += (veilTarget - st.veil) * k(bootReady ? 7 : 3.2);
+    const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduced) {
+      if (bootReady) finishBoot(now);
+      else st.coarse = BOOT_STEPS[BOOT_HOLD_IDX];
+    } else {
+      const cap = bootReady ? BOOT_STEPS.length - 1 : Math.min(BOOT_HOLD_IDX, Math.floor(bootProg * (BOOT_HOLD_IDX + 1)));
+      const stepMs = bootReady ? BOOT_FINISH_MS : BOOT_STEP_MS;
+      if (bootIdx < cap && now - bootStepAt >= stepMs) {
+        bootIdx++;
+        bootStepAt = now;
+      }
+      st.coarse = BOOT_STEPS[bootIdx];
+      if (bootReady && bootIdx >= BOOT_STEPS.length - 1 && now - bootStepAt >= 80) {
+        finishBoot(now);
+      }
+    }
   } else if (door > 0) {
     const e = now - door;
     st.coarse = DOOR[Math.min(DOOR.length - 1, Math.floor(e / 120))];
@@ -296,7 +414,6 @@ function frame(now: number) {
   }
   const shown = view.classList.contains('in') && st.boot < 0 ? 1 : 0;
   st.viewA += (shown - st.viewA) * k(shown ? 5 : 14);
-  view.style.visibility = st.boot > 0 ? 'hidden' : '';
 
   // 三处的地面元素：名录 / 阅读里是那一处的；主页上悬停哪扇门，那一处的就先漫出来一点
   const hoverDoor = route.place === 'home' ? view.querySelector<HTMLElement>('.door:hover')?.dataset.sec : null;
@@ -321,6 +438,7 @@ function frame(now: number) {
   let hotT = [mouse[0], mouse[1], 0];
   const crystals = [];
   const doorK = door > 0 ? Math.min(1, (now - door) / DOOR_MS) : 0;
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   for (const name of CRYS) {
     const c = XS[name];
     let el: Element | null = null;
@@ -345,23 +463,38 @@ function frame(now: number) {
         c.seen = true;
       }
     }
+    // 主页首次加载完成后的进场错峰：三颗晶体顺着 14° 斜线依次凝结、微亮后落定
+    let enterK = 1;
+    let enterGlow = 0;
+    if (!reducedMotion && route.place === 'home' && bootDoneAt > 0 && name !== 'nexus') {
+      const idx = ORDER.indexOf(name);
+      const elapsed = now - bootDoneAt - (200 + idx * 140);
+      if (elapsed < 0) {
+        enterK = 0;
+        ta = 0;
+      } else if (elapsed < 780) {
+        const t = elapsed / 780;
+        enterK = 1 - (1 - t) * (1 - t) * (1 - t);
+        enterGlow = Math.sin(t * Math.PI) * 0.42 * (1 - t * 0.3);
+      }
+    }
     // 停在条目旁边时不点亮脚下的地面（小，底下一亮就被它放大成一团白）
     if (hov && !el?.hasAttribute('data-xh')) hotT = [tx, ty, 1];
     const sp = 1 - Math.exp(-dt * 7);
     c.x += (tx - c.x) * sp;
     c.y += (ty - c.y) * sp;
     c.s += (ts * (1 + hov * 0.12) - c.s) * sp;
-    c.a += (ta - c.a) * (1 - Math.exp(-dt * 6));
+    c.a += (ta * enterK - c.a) * (1 - Math.exp(-dt * 6));
     c.glow += (hov - c.glow) * k(8);
     // 三处的晶体悬停时转快一点；NEXUS 那一颗反过来，悬停时慢慢停住（切面也停在那儿）
     const gate = name === 'nexus';
     c.spin += dt * (gate ? 0.18 * (1 - c.glow * 0.9) : 0.25 + c.glow * 1.1);
     const sq = xStepped ? Math.floor((c.spin * 12) / 1.4) * (1.4 / 12) : c.spin;
-    let size = c.s;
+    let size = c.s * (0.62 + 0.38 * enterK);
     if (gate && c.a > 0.004) {
       slicePh += dt * 0.11 * (1 - c.glow * 0.92);
       // 只在截角四面体 ↔ 正八面体之间走（再往外就只剩一枚光秃的四面体）
-      ground.mesh('nexus', tesseractSlice(0.82 * Math.sin(slicePh)));
+      ground?.mesh('nexus', tesseractSlice(0.82 * Math.sin(slicePh)));
       size *= 1 + doorK * doorK * 4;
     }
 
@@ -370,7 +503,16 @@ function frame(now: number) {
     const rot = gate
       ? euler(0.62 + Math.sin(xq * 0.23) * 0.22, sq + ph, 0.32 + Math.sin(xq * 0.17) * 0.18)
       : euler(0.35 + Math.sin(xq * 0.3 + ph) * 0.12, sq + ph, Math.sin(xq * 0.21 + ph) * 0.1);
-    crystals.push({ mesh: MESHOF[name], x: c.x, y: c.y, size, a: c.a * (st.viewA * 0.6 + 0.4), rot, tint: TINT[name], glow: c.glow });
+    crystals.push({
+      mesh: MESHOF[name],
+      x: c.x,
+      y: c.y,
+      size,
+      a: c.a * (st.viewA * 0.6 + 0.4),
+      rot,
+      tint: TINT[name],
+      glow: Math.min(1, c.glow + enterGlow),
+    });
   }
   // 闪念：悬停的那一条的颜色
   const toned = route.k === 'moments' ? view.querySelector<HTMLElement>('[data-tone]:hover') : null;
@@ -386,7 +528,13 @@ function frame(now: number) {
   view.style.setProperty('--sy', String(scrollY));
   for (let i = 0; i < 3; i++) st.hot[i] += (hotT[i] - st.hot[i]) * k(i === 2 ? 5 : 12);
 
-  ground.draw({ time: tq, pan: st.pan, hot: st.hot, mouse, day: st.day, coarse: st.coarse, veil: st.veil, place: st.place, gain: st.gain, glass, crystals, wash, washAt });
+  if (ground) {
+    ground.draw({ time: tq, pan: st.pan, hot: st.hot, mouse, day: st.day, coarse: st.coarse, veil: st.veil, place: st.place, gain: st.gain, glass, crystals, wash, washAt });
+    if (!glDrawn) {
+      glDrawn = true;
+      requestAnimationFrame(() => resolveGl());
+    }
+  }
   requestAnimationFrame(frame);
 }
 

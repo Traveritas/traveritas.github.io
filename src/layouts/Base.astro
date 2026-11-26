@@ -33,7 +33,7 @@ const NAME = 'AveritA 的昼梦叙集';
     <link rel="alternate" type="application/rss+xml" title={NAME} href="/rss.xml" />
     <link rel="sitemap" href="/sitemap-index.xml" />
     <link rel="stylesheet" href="/fonts/noto-serif-sc/font.css" />
-    {/* 先定面，免得昼面的人先看到一帧夜色：?face=wake|dream 优先，其次记住的 */}
+    {/* 先定面与加载态，免得首帧闪出昼夜错色或未加载完的 DOM（无 JS 时不打 booting，正文仍完整可读） */}
     <script is:inline>
       (function () {
         var q = new URLSearchParams(location.search).get('face');
@@ -42,6 +42,7 @@ const NAME = 'AveritA 的昼梦叙集';
         var night = q ? q !== 'wake' : day !== '1';
         var h = document.documentElement;
         h.dataset.face = night ? 'dream' : 'wake';
+        if (!h.classList.contains('booted')) h.classList.add('booting');
         // 阅读设置（工具栏「本页」里调）
         try {
           var s = localStorage.getItem('xm-read-size'), l = localStorage.getItem('xm-read-lead');
@@ -50,6 +51,28 @@ const NAME = 'AveritA 的昼梦叙集';
         } catch (e) {}
       })();
     </script>
+    <style is:inline>
+      html.booting body {
+        background: #0c0d1b;
+        overflow: hidden;
+      }
+      html.booting[data-face='wake'] body {
+        background: #d6d5e2;
+      }
+      html.booting #view,
+      html.booting #crumb,
+      html.booting #ts,
+      html.booting #ave,
+      html.booting #cursor-slot {
+        visibility: hidden;
+        opacity: 0;
+        pointer-events: none;
+      }
+      html.booting #view,
+      html.booting #view * {
+        animation: none !important;
+      }
+    </style>
     <ClientRouter />
   </head>
   <body data-place={place} data-sec={sec} data-slug={slug}>

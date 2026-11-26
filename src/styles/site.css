@@ -38,10 +38,11 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 :root[data-face='wake'] [data-side='wake'] { display: block; }
 :root[data-face='wake'] [data-side='dream'] { display: none; }
 
-/* 换页：字先退、再从下面站起来 */
+/* 换页：字先退、再从下面站起来（主页由各元素单独编排进场） */
 #view { transition: opacity 0.26s, filter 0.26s, transform 0.26s; }
 #view.out { opacity: 0; filter: blur(3px); transform: translateY(-6px); }
 #view.in { animation: rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+body[data-place='home'] #view.in { animation: none; }
 @keyframes rise { from { opacity: 0; filter: blur(4px); transform: translateY(10px); } }
 .x { display: block; pointer-events: none; }
 
@@ -50,7 +51,6 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 #crumb .brand { font-family: var(--serif); text-transform: none; letter-spacing: 0.06em; font-size: 15px; color: var(--ink); }
 #crumb .sep { color: var(--ink-3); }
 #crumb a:hover { color: var(--ink); }
-html:not(.booted) #crumb { visibility: hidden; }
 
 /* ── 主页 ── */
 .home { position: relative; height: 100vh; overflow: hidden; --cy: 58vh; }
@@ -75,7 +75,60 @@ html:not(.booted) #crumb { visibility: hidden; }
 .outs .nx { display: flex; align-items: center; gap: 7px; }
 .outs .nx svg { width: 7px; height: 10px; fill: none; stroke: var(--amber); stroke-width: 1.3; stroke-linejoin: round; transition: fill 0.2s; }
 .outs .nx:hover svg { fill: color-mix(in srgb, var(--amber) 35%, transparent); }
-html:not(.booted) .outs { visibility: hidden; }
+
+/* ── 加载完成后的进场编排（主页：14° 线延展 → 站名合焦 → 三处晶体与标题依次浮起 → 边缘控件） ── */
+@keyframes home-slash {
+  from { opacity: 0; clip-path: inset(0 100% 0 0); }
+  to { opacity: 1; clip-path: inset(0 0 0 0); }
+}
+@keyframes home-title {
+  from { opacity: 0; translate: 0 14px; filter: blur(8px); }
+}
+@keyframes home-kick {
+  from { opacity: 0; translate: 0 8px; filter: blur(4px); letter-spacing: 0.76em; }
+}
+@keyframes home-door-t {
+  from { opacity: 0; translate: -10px 4px; filter: blur(4px); }
+}
+@keyframes home-door-m {
+  from { opacity: 0; translate: -6px 3px; }
+}
+@keyframes home-outs {
+  from { opacity: 0; translate: 0 6px; }
+}
+@keyframes chrome-in {
+  from { opacity: 0; scale: 0.86; }
+}
+@keyframes crumb-in {
+  from { opacity: 0; translate: 0 -6px; }
+}
+html.booted #view.in .home .slash {
+  animation: home-slash 1.05s cubic-bezier(0.16, 1, 0.3, 1) 0.02s backwards;
+}
+html.booted #view.in .home .name {
+  animation: home-title 0.95s cubic-bezier(0.16, 1, 0.3, 1) 0.08s backwards;
+}
+html.booted #view.in .home .kick {
+  animation: home-kick 0.85s cubic-bezier(0.16, 1, 0.3, 1) 0.22s backwards;
+}
+html.booted #view.in .home .door-t {
+  animation: home-door-t 0.78s cubic-bezier(0.16, 1, 0.3, 1) calc(0.32s + var(--i) * 0.14s) backwards;
+}
+html.booted #view.in .home .door-m {
+  animation: home-door-m 0.68s cubic-bezier(0.16, 1, 0.3, 1) calc(0.40s + var(--i) * 0.14s) backwards;
+}
+html.booted #view.in .home .outs {
+  animation: home-outs 0.72s cubic-bezier(0.16, 1, 0.3, 1) 0.66s backwards;
+}
+html.booted #ts .ts-star {
+  animation: chrome-in 0.75s cubic-bezier(0.16, 1, 0.3, 1) 0.25s backwards;
+}
+html.booted body[data-place='home'] #ts .ts-star {
+  animation-delay: 0.62s;
+}
+html.booted #crumb {
+  animation: crumb-in 0.65s cubic-bezier(0.16, 1, 0.3, 1) 0.12s backwards;
+}
 
 /* ── 名录 ── */
 .list { padding: 120px 8vw 160px; }
@@ -194,6 +247,16 @@ a:hover .tag { color: var(--ink); border-color: var(--ink-3); }
 .ar-date, .ar-t, .ar-d, .ar-len, .mo-cap, .mo--txt, .pj-lead, .pj-t, .pj-d { text-shadow: 0 0 14px color-mix(in srgb, var(--rm-bg) 75%, transparent), 0 0 3px color-mix(in srgb, var(--rm-bg) 50%, transparent); }
 @media (prefers-reduced-motion: reduce) {
   .mo { translate: none; }
+  html.booted #view.in .home .slash,
+  html.booted #view.in .home .name,
+  html.booted #view.in .home .kick,
+  html.booted #view.in .home .door-t,
+  html.booted #view.in .home .door-m,
+  html.booted #view.in .home .outs,
+  html.booted #ts .ts-star,
+  html.booted #crumb {
+    animation: none;
+  }
 }
 
 /* ── 读 ── */

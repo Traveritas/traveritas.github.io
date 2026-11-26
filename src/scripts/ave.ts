@@ -790,9 +790,9 @@ function watchReading(pages: Record<string, AvePageLine>) {
   });
 }
 
-/** 开屏面纱打开（html.booted）之后再计时：首访面纱要演三秒，别在面纱底下开口。
+/** 开屏面纱打开（html.booted）之后再计时：首访加载期间绝不在底幕下开口。
     不带面纱的页可能一直不打 booted，最多等 BOOT_WAIT 就照常开始 */
-const BOOT_WAIT = 4000;
+const BOOT_WAIT = 12000;
 function afterBoot(fn: () => void) {
   const h = document.documentElement;
   if (h.classList.contains('booted')) return fn();
