@@ -21,12 +21,12 @@ export async function allEntries() {
   const out = [];
   for (const sec of ORDER) {
     for (const e of await entriesOf(sec)) {
-      const d = e.data as { title?: string; description?: string; tags?: string[]; date: Date };
+      const d = e.data as { title?: string; plainTitle?: string; description?: string; tags?: string[]; date: Date };
       out.push({
         sec,
         id: e.id,
         href: `/${sec}/${e.id}/`,
-        title: plain(d.title || '') || firstLine(e.body ?? ''),
+        title: d.plainTitle || plain(d.title || '') || firstLine(e.body ?? ''),
         desc: plain(d.description || ''),
         tags: d.tags ?? [],
         date: d.date,

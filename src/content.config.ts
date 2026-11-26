@@ -12,6 +12,8 @@ const articles = defineCollection({
   loader: glob({ pattern: '**/[^_]*.{md,mdx}', base: './src/content/articles' }),
   schema: z.object({
     title: z.string(),
+    // 名录与检索里用的纯文本名（花体无法直接 NFKC 还原时手写，例如 Petween）
+    plainTitle: z.string().optional(),
     description: z.string().optional(),
     date: z.coerce.date(),
     tags: z.array(tag).default([]),
@@ -27,6 +29,8 @@ const projects = defineCollection({
   loader: glob({ pattern: '**/[^_]*.{md,mdx}', base: './src/content/projects' }),
   schema: z.object({
     title: z.string(),
+    // 名录与检索里用的纯文本名（花体无法直接 NFKC 还原时手写，例如 Petween）
+    plainTitle: z.string().optional(),
     description: z.string().optional(),
     date: z.coerce.date(),
     status: z.string().default('进行中'),

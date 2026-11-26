@@ -672,12 +672,32 @@ export function initToolstar() {
         })();
     return small && zh ? `${zh} · ${small}` : zh || small;
   }
+  let hoveredTool: HTMLButtonElement | null = null;
+  function refreshCaption() {
+    if (!open) return setCaption('');
+    const focused =
+      document.activeElement instanceof HTMLButtonElement &&
+      toolBtns.includes(document.activeElement) &&
+      document.activeElement.matches(':focus-visible')
+        ? document.activeElement
+        : null;
+    const cur = toolBtns.find((x) => x.dataset.t === tool) ?? null;
+    setCaption(readLabel(hoveredTool || focused || cur));
+  }
   for (const b of toolBtns) {
-    b.addEventListener('pointerenter', () => setCaption(readLabel(b)));
-    b.addEventListener('focus', () => setCaption(readLabel(b)));
-    b.addEventListener('pointerleave', () => {
-      const cur = toolBtns.find((x) => x.dataset.t === tool);
-      setCaption(readLabel(cur));
+    b.addEventListener('pointerenter', (e) => {
+      if (e.pointerType === 'touch') return;
+      hoveredTool = b;
+      setCaption(readLabel(b));
+    });
+    b.addEventListener('focus', () => {
+      if (b.matches(':focus-visible')) setCaption(readLabel(b));
+    });
+    b.addEventListener('blur', () => refreshCaption());
+    b.addEventListener('pointerleave', (e) => {
+      if (e.pointerType === 'touch') return;
+      if (hoveredTool === b) hoveredTool = null;
+      refreshCaption();
     });
   }
 
@@ -685,21 +705,16 @@ export function initToolstar() {
     if (v === open && !dockPageOpen) return;
     open = v;
     dockPageOpen = false;
-    if (!v) {
-      tool = null;
-      setCaption('');
-    } else {
-      const first = toolBtns[0];
-      if (first) setCaption(readLabel(first));
-    }
+    hoveredTool = null;
+    if (!v) tool = null;
+    setCaption('');
     ST.spinTo += 90;
     sync();
   }
   function setTool(t: Tool | null) {
     tool = t;
     sync();
-    const cur = toolBtns.find((x) => x.dataset.t === t);
-    setCaption(readLabel(cur));
+    refreshCaption();
     if (t === 'find') setTimeout(() => field.focus({ preventScroll: true }), 60);
     if (t === 'page') markToc();
   }
@@ -765,13 +780,7 @@ export function initToolstar() {
   onRealityChange((r) => {
     reality = r;
     root.querySelector('.ts-tool[data-t="face"]')?.classList.remove('is-turning');
-    if (open) {
-      const focused =
-        document.activeElement instanceof HTMLButtonElement && toolBtns.includes(document.activeElement)
-          ? document.activeElement
-          : undefined;
-      setCaption(readLabel(focused || toolBtns.find((x) => x.dataset.t === tool) || toolBtns[0]));
-    }
+    if (open) refreshCaption();
     kick();
   });
 

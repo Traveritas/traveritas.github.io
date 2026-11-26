@@ -1,5 +1,6 @@
 ---
 title: wᴾₑᵉₑᵗₙ
+plainTitle: Petween
 description: 跨 agent、高自由度插件化的桌面宠物
 date: 2026-08-21
 status: INDEV
