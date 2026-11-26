@@ -1,9 +1,12 @@
 ---
-/* 断章 —— 章节：一列，编号与日期挂在列外的竖线上 */
+/* 断章 —— 题即版面：没有卡片，题目直接写在地面上，日期挂在左边。
+   悬停的那一行，一片玻璃从左边扫过来垫在它下面（地面在那里变清楚）；
+   每篇底下一根篇幅线，长短照字数（满五千字到头），线尾一道 14° 的小撇，字数跟在撇后面 */
 import Base from '../../layouts/Base.astro';
 import ListHead from '../../components/ListHead.astro';
+import Tags from '../../components/Tags.astro';
 import { entriesOf } from '../../lib/entries';
-import { plain, chars, minutes, pad, dot } from '../../lib/text';
+import { plain, chars, minutes, dot } from '../../lib/text';
 
 const list = await entriesOf('articles');
 ---
@@ -11,21 +14,25 @@ const list = await entriesOf('articles');
 <Base title="断章" place="list" sec="articles">
   <section class="list list--articles">
     <ListHead k="articles" n={list.length} />
-    <ol class="chapters">
+    <ol class="ars">
       {
         list.map((e, i) => {
           const n = chars(e.body);
           return (
-            <li class="ch" style={`--i:${i}`}>
-              <span class="ch-no mono">
-                <b>{pad(list.length - i)}</b>
-                {dot(e.data.date)}
-              </span>
-              <a class="pane pane--ch" data-glass href={`/articles/${e.id}/`}>
-                <span class="t">{plain(e.data.title)}</span>
-                {e.data.description && <span class="d">{plain(e.data.description)}</span>}
-                <span class="meta mono">
-                  {n.toLocaleString()} 字 · 约 {minutes(n)} 分钟{e.data.tags.length ? ' · ' + e.data.tags.join(' / ') : ''}
+            <li class="ar" style={`--i:${i};--len:${Math.min(1, n / 5000).toFixed(3)}`}>
+              <a href={`/articles/${e.id}/`}>
+                <span class="ar-lens" data-glass aria-hidden="true" />
+                <time class="ar-date mono" datetime={e.data.date.toISOString()}>
+                  {dot(e.data.date)}
+                </time>
+                <span class="ar-t">{plain(e.data.title)}</span>
+                {e.data.description && <span class="ar-d">{plain(e.data.description)}</span>}
+                <Tags tags={e.data.tags} />
+                <span class="ar-len">
+                  <i aria-hidden="true" />
+                  <span class="mono">
+                    {n.toLocaleString()} 字 · 约 {minutes(n)} 分钟
+                  </span>
                 </span>
               </a>
             </li>

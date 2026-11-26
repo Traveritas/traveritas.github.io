@@ -131,6 +131,8 @@ uniform int uN;
 uniform vec4 uR[12];   // 玻璃：x, y, w, h（画布 px，y 朝下）
 uniform vec4 uRs[12];  // 玻璃：圆角, 显现 0–1, 底色浓度, 0
 uniform float uVeil;   // 开屏：地面从夜色里亮起来
+uniform vec4 uWash;    // 闪念：悬停那张图的颜色漫到它周围的地面上（rgb, 浓度）
+uniform vec3 uWashAt;  // 漫开的中心（画布 px，y 朝下）, 半径
 ${PAL}
 out vec4 o;
 float bayer(vec2 p){ ivec2 i = ivec2(mod(p, 4.0));
@@ -183,6 +185,14 @@ void main(){
     float lip = (1.0 - smoothstep(0.0, 6.0 * uDpr, -d)) * inside * (1.0 - smoothstep(-0.2, 0.4, ny));
     g += uP[3] * lip * 0.05;
     col = mix(col, g, max(inside, edge) * S.y);
+  }
+  // 染：保留原来的明暗，只把色相换成那张图的（底子暗的地方几乎看不出，亮纹上才显）
+  if (uWash.w > 0.001) {
+    vec2 dw = (ys - uWashAt.xy) / uWashAt.z;
+    float f = uWash.w * exp(-dot(dw, dw) * 1.4);
+    vec3 Y = vec3(0.299, 0.587, 0.114);
+    vec3 tone = min(uWash.rgb / max(dot(uWash.rgb, Y), 0.05) * dot(col, Y), vec3(1.0));
+    col = mix(col, tone, f * 0.8) + uWash.rgb * f * 0.035 * (1.0 - uDay);
   }
   col = mix(uP[0] * 0.55, col, uVeil);
   o = vec4(col, 1.0);
@@ -502,7 +512,7 @@ export function createGround(canvas) {
   }
 
   const pal = new Float32Array(12);
-  /* f: { time, pan:[x,y], hot:[x,y,k] (css px), mouse:[x,y], day, coarse, glass:[{x,y,w,h,r,a,fill}], crystals:[{mesh,x,y,size,rot,a,tint,glow}] } */
+  /* f: { time, pan:[x,y], hot:[x,y,k] (css px), mouse:[x,y], day, coarse, glass:[{x,y,w,h,r,a,fill}], crystals:[{mesh,x,y,size,rot,a,tint,glow}], wash:[r,g,b,k], washAt:[x,y,r] (css px) } */
   function draw(f) {
     resize();
     const W = canvas.width, H = canvas.height, d = S.dpr, cp = S.cellPx;
@@ -543,6 +553,9 @@ export function createGround(canvas) {
     gl.uniform1f(P2.u.uDpr, d);
     gl.uniform3fv(P2.u.uP, pal);
     gl.uniform1f(P2.u.uVeil, f.veil);
+    const w = f.wash || [0, 0, 0, 0], wa = f.washAt || [0, 0, 1];
+    gl.uniform4f(P2.u.uWash, w[0], w[1], w[2], w[3]);
+    gl.uniform3f(P2.u.uWashAt, wa[0] * d, wa[1] * d, wa[2] * d);
     const gs = f.glass.slice(0, 12);
     const R = new Float32Array(48), Rs = new Float32Array(48);
     gs.forEach((g, i) => {

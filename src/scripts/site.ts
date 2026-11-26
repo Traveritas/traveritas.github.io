@@ -60,32 +60,9 @@ function parse(): Route {
   // NEXUS 的门：三处的另一边
   if (place === 'gate') return { place, pan: [-1.3, 1.5], gain: 0.95 };
   if (!k || !SECS[k]) return { place: 'lost', pan: [0.4, 1.2], gain: 0.8 };
-  if (place === 'list') return { place, k, pan: SECS[k].pan, gain: 0.8 };
+  if (place === 'list') return { place, k, pan: SECS[k].pan, gain: 0.66 }; // 名录的字直接写在地面上，地面再压低一点
   return { place: 'read', k, slug: b.slug, pan: [SECS[k].pan[0] + 0.25, SECS[k].pan[1] + 0.55], gain: 0.85 };
 }
-
-/* 闪念 / 造物的名录：列数跟着窗宽，列与列按 14° 错开（第 j 列下沉 j × 列宽 × tan14°）。
-   页面里条目平铺在 .cols 里（无 JS 时就是一列），这里按列数分进各列 */
-const colsFor = () => (innerWidth < 760 ? 1 : innerWidth < 1180 ? 2 : 3);
-function layoutCols() {
-  const box = document.querySelector<HTMLElement>('.cols');
-  if (!box) return;
-  const n = colsFor();
-  if (box.dataset.n === String(n)) return;
-  const cells = [...box.querySelectorAll<HTMLElement>('.cell')].sort((a, b) => +a.style.getPropertyValue('--i') - +b.style.getPropertyValue('--i'));
-  box.textContent = '';
-  const cols = Array.from({ length: n }, (_, j) => {
-    const c = document.createElement('div');
-    c.className = 'col';
-    c.style.setProperty('--j', String(j));
-    box.append(c);
-    return c;
-  });
-  cells.forEach((el, i) => cols[i % n].append(el));
-  box.dataset.n = String(n);
-  box.style.setProperty('--n', String(n));
-}
-addEventListener('resize', layoutCols);
 
 /* ── 寻找（/find/）：工具栏的输入框发 xm:find，这里就地筛，回 xm:found 给它报数 ──
    多个词之间是「且」；形如 2026-10 的词按年月筛 */
@@ -157,7 +134,7 @@ function mount() {
   view = document.getElementById('view')!;
   mounted = view;
   applyFace();
-  layoutCols();
+  for (const img of view.querySelectorAll<HTMLImageElement>('[data-tone] img')) toneOf(img);
   toolstarPage();
   findHere();
   view.classList.remove('out');
@@ -215,6 +192,36 @@ type X = { x: number; y: number; s: number; a: number; glow: number; spin: numbe
 const XS = {} as Record<Crys, X>;
 for (const k of CRYS) XS[k] = { x: innerWidth / 2, y: innerHeight / 2, s: 0, a: 0, glow: 0, spin: 0, seen: false };
 let slicePh = 0.4;
+
+/* 闪念：每张图取一个主色（缩成 16×16 按饱和度加权平均），悬停时它周围的地面染上这个色 */
+const wash = [0, 0, 0, 0];
+const washAt = [0, 0, 300];
+function toneOf(img: HTMLImageElement) {
+  const go = () => {
+    try {
+      const c = document.createElement('canvas');
+      c.width = c.height = 16;
+      const g = c.getContext('2d', { willReadFrequently: true })!;
+      g.drawImage(img, 0, 0, 16, 16);
+      const d = g.getImageData(0, 0, 16, 16).data;
+      let r = 0, gg = 0, b = 0, w = 0;
+      for (let i = 0; i < d.length; i += 4) {
+        const mx = Math.max(d[i], d[i + 1], d[i + 2]), mn = Math.min(d[i], d[i + 1], d[i + 2]);
+        const k = 0.15 + (mx - mn) / 255;
+        r += d[i] * k; gg += d[i + 1] * k; b += d[i + 2] * k; w += k;
+      }
+      const host = img.closest<HTMLElement>('[data-tone]');
+      // 平均出来的色总是发灰：离灰再推开一倍，染出来才看得出是哪种颜色
+      const c3 = [r, gg, b].map((x) => x / w / 255);
+      const m = (c3[0] + c3[1] + c3[2]) / 3;
+      if (host && !host.dataset.tone) host.dataset.tone = c3.map((x) => Math.min(1, Math.max(0, m + (x - m) * 2.2)).toFixed(3)).join(',');
+    } catch {
+      /* 取不到就不染 */
+    }
+  };
+  if (img.complete && img.naturalWidth) go();
+  else img.addEventListener('load', go, { once: true });
+}
 
 /* ── 进 NEXUS：开屏倒过来——格一拍拍变粗、晶体胀开，整屏化白，再跳过去（NEXUS 那边也从白里出来） ── */
 const DOOR = [1, 2, 3, 5, 8, 12, 18, 26, 40]; // 每拍 120ms
@@ -315,7 +322,8 @@ function frame(now: number) {
   for (const name of CRYS) {
     const c = XS[name];
     let el: Element | null = null;
-    if (st.viewA > 0.02) el = view.querySelector(`[data-x="${name}"]`);
+    // 锚点：平时在页里的 [data-x]；悬停的链接里若有 [data-xh]（造物的名录），晶体飞过去停在那儿
+    if (st.viewA > 0.02) el = view.querySelector(`a:hover [data-xh="${name}"]`) || view.querySelector(`[data-x="${name}"]`);
     let tx = c.x,
       ty = c.y,
       ts = 0,
@@ -335,7 +343,8 @@ function frame(now: number) {
         c.seen = true;
       }
     }
-    if (hov) hotT = [tx, ty, 1];
+    // 停在条目旁边时不点亮脚下的地面（小，底下一亮就被它放大成一团白）
+    if (hov && !el?.hasAttribute('data-xh')) hotT = [tx, ty, 1];
     const sp = 1 - Math.exp(-dt * 7);
     c.x += (tx - c.x) * sp;
     c.y += (ty - c.y) * sp;
@@ -361,9 +370,21 @@ function frame(now: number) {
       : euler(0.35 + Math.sin(tq * 0.3 + ph) * 0.12, sq + ph, Math.sin(tq * 0.21 + ph) * 0.1);
     crystals.push({ mesh: MESHOF[name], x: c.x, y: c.y, size, a: c.a * (st.viewA * 0.6 + 0.4), rot, tint: TINT[name], glow: c.glow });
   }
+  // 闪念：悬停的那一条的颜色
+  const toned = route.k === 'moments' ? view.querySelector<HTMLElement>('[data-tone]:hover') : null;
+  if (toned?.dataset.tone) {
+    const r = toned.getBoundingClientRect();
+    const t = toned.dataset.tone.split(',').map(Number);
+    for (let i = 0; i < 3; i++) wash[i] += (t[i] - wash[i]) * k(wash[3] < 0.05 ? 40 : 4);
+    washAt[0] += (r.left + r.width / 2 - washAt[0]) * k(wash[3] < 0.05 ? 40 : 4);
+    washAt[1] += (r.top + r.height / 2 - washAt[1]) * k(wash[3] < 0.05 ? 40 : 4);
+    washAt[2] = Math.max(r.width, r.height) * 1.1;
+  }
+  wash[3] += ((toned?.dataset.tone ? 1 : 0) - wash[3]) * k(toned ? 2.2 : 1.6);
+  view.style.setProperty('--sy', String(scrollY));
   for (let i = 0; i < 3; i++) st.hot[i] += (hotT[i] - st.hot[i]) * k(i === 2 ? 5 : 12);
 
-  ground.draw({ time: tq, pan: st.pan, hot: st.hot, mouse, day: st.day, coarse: st.coarse, veil: st.veil, place: st.place, gain: st.gain, glass, crystals });
+  ground.draw({ time: tq, pan: st.pan, hot: st.hot, mouse, day: st.day, coarse: st.coarse, veil: st.veil, place: st.place, gain: st.gain, glass, crystals, wash, washAt });
   requestAnimationFrame(frame);
 }
 

@@ -1,43 +1,67 @@
 ---
-/* 闪念 —— 散页：以图为主，列与列按 14° 错开（分列在 scripts/site.ts 的 layoutCols） */
+/* 闪念 —— 散页：没有框。左右两道错开的泳道，条目在道里各自偏一点、宽窄不一，
+   各有一层远近（--dp：滚动时快慢不同，scripts/site.ts 每帧写 --sy）。
+   有图的：一张主图，其余几张收成主图旁边的窄条；悬停时它的颜色漫到周围的地面上（data-tone）。
+   只有字的：竖排，直接写在地面上；右边一枚小菱形接一根细线（.mo-mark），告诉人这里点得进去 */
 import { Image } from 'astro:assets';
 import Base from '../../layouts/Base.astro';
 import ListHead from '../../components/ListHead.astro';
+import Tags from '../../components/Tags.astro';
 import { entriesOf } from '../../lib/entries';
 import { plain, firstLine, dot } from '../../lib/text';
 
 const list = await entriesOf('moments');
 const imgsOf = (e: (typeof list)[number]) => e.data.images.map((im) => ('src' in im && 'alt' in im ? im : { src: im, alt: '' }));
+// 宽（占泳道的比例）· 横偏 · 远近：五条一轮
+const LOOK = [
+  { w: 0.86, dx: 0.0, dp: 0.0 },
+  { w: 0.7, dx: 0.22, dp: 0.07 },
+  { w: 0.78, dx: 0.08, dp: -0.04 },
+  { w: 0.64, dx: 0.3, dp: 0.1 },
+  { w: 0.74, dx: 0.14, dp: 0.03 },
+];
+const items = list.map((e, i) => ({ e, i, imgs: imgsOf(e), first: firstLine(e.body), look: LOOK[i % LOOK.length] }));
+const lanes = [items.filter((x) => x.i % 2 === 0), items.filter((x) => x.i % 2 === 1)];
 ---
 
 <Base title="闪念" place="list" sec="moments">
   <section class="list list--moments">
     <ListHead k="moments" n={list.length} />
-    <div class="cols">
+    <div class="mos">
       {
-        list.map((e, i) => {
-          const imgs = imgsOf(e);
-          const first = firstLine(e.body);
-          return (
-            <div class="cell" style={`--i:${i}`}>
-              <a class:list={['pane pane--m', { 'pane--slip': !imgs.length }]} data-glass href={`/moments/${e.id}/`}>
-                {imgs.length > 0 && (
-                  <span class={`imgs n${Math.min(imgs.length, 4)}`}>
-                    {imgs.slice(0, 4).map((im) => (
-                      <Image src={im.src} alt={im.alt} width={480} loading="lazy" />
+        lanes.map((lane, j) => (
+          <div class={`mo-lane mo-lane--${j}`}>
+            {lane.map(({ e, i, imgs, first, look }) => {
+              const style = `--i:${i};--w:${look.w};--dx:${look.dx};--dp:${look.dp}`;
+              const title = plain(e.data.title) || first;
+              return imgs.length > 0 ? (
+                <a class="mo mo--img" data-tone href={`/moments/${e.id}/`} style={style}>
+                  <span class={`mo-pics n${Math.min(imgs.length, 4)}`}>
+                    {imgs.slice(0, 4).map((im, k) => (
+                      <Image src={im.src} alt={im.alt} width={k ? 360 : 820} loading="lazy" />
                     ))}
                   </span>
-                )}
-                <span class="t">{plain(e.data.title) || first}</span>
-                {!imgs.length && e.data.title && first && <span class="d">{first.slice(0, 60)}</span>}
-                <span class="meta mono">
-                  <span>{dot(e.data.date)}</span>
-                  {imgs.length > 0 && <span>{imgs.length} 张</span>}
-                </span>
-              </a>
-            </div>
-          );
-        })
+                  <span class="mo-cap">
+                    <span class="mo-t">{title}</span>
+                    <span class="mo-meta mono">
+                      {dot(e.data.date)}
+                      {imgs.length > 1 && <span> · {imgs.length} 张</span>}
+                    </span>
+                  </span>
+                  <Tags tags={e.data.tags} />
+                </a>
+              ) : (
+                <a class="mo mo--txt" href={`/moments/${e.id}/`} style={style}>
+                  <i class="mo-mark" aria-hidden="true" />
+                  <span class="mo-t">{title}</span>
+                  {e.data.title && first && <span class="mo-d">{first.slice(0, 40)}</span>}
+                  <span class="mo-meta mono">{dot(e.data.date)}</span>
+                  <Tags tags={e.data.tags} />
+                </a>
+              );
+            })}
+          </div>
+        ))
       }
     </div>
   </section>

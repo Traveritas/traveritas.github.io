@@ -1,5 +1,7 @@
 ---
-/* 造物 —— 陈列：等宽小片，同样按 14° 错开，状态在右上 */
+/* 造物 —— 展墙：只有字，一行一件。整页只有一颗物——页头那颗立方体：
+   悬停哪一件，它就飞过去停在名字前面那块空位上（.pj-slot 的 data-xh，scripts/site.ts 认它），移开再飞回页头。
+   名字平时是统一的字形，悬停时换回它自己的那一套（花体只在这一下露出来） */
 import Base from '../../layouts/Base.astro';
 import ListHead from '../../components/ListHead.astro';
 import { entriesOf } from '../../lib/entries';
@@ -11,21 +13,35 @@ const list = await entriesOf('projects');
 <Base title="造物" place="list" sec="projects">
   <section class="list list--projects">
     <ListHead k="projects" n={list.length} />
-    <div class="cols">
+    <ol class="pjs">
       {
-        list.map((e, i) => (
-          <div class="cell" style={`--i:${i}`}>
-            <a class="pane pane--p" data-glass href={`/projects/${e.id}/`}>
-              <span class="meta mono">
-                <span>{dot(e.data.date)}</span>
-                <span class="st">{plain(e.data.status)}</span>
-              </span>
-              <span class="t">{plain(e.data.title)}</span>
-              {e.data.description && <span class="d">{plain(e.data.description)}</span>}
-            </a>
-          </div>
-        ))
+        list.map((e, i) => {
+          const own = e.data.title;
+          const flat = plain(own);
+          return (
+            <li class="pj" style={`--i:${i}`}>
+              <a href={`/projects/${e.id}/`}>
+                <span class="pj-lead mono">
+                  <time datetime={e.data.date.toISOString()}>{dot(e.data.date)}</time>
+                  <span class="st">{plain(e.data.status)}</span>
+                </span>
+                <span class="pj-slot" aria-hidden="true">
+                  <i data-xh="projects" />
+                </span>
+                <span class="pj-t">
+                  <span class="pj-flat">{flat}</span>
+                  {own !== flat && (
+                    <span class="pj-own" aria-hidden="true">
+                      {own}
+                    </span>
+                  )}
+                </span>
+                {e.data.description && <span class="pj-d">{plain(e.data.description)}</span>}
+              </a>
+            </li>
+          );
+        })
       }
-    </div>
+    </ol>
   </section>
 </Base>
