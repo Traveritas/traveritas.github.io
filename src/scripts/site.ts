@@ -258,9 +258,11 @@ function frame(now: number) {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
   const T = (now - t0) / 1000;
-  // 夜：12 帧一拍；闪念那一处不定格，留着连续感
+  // 夜：12 帧一拍；闪念那一处的地面不定格，留着雨的连续感（晶体照样定格）
   const stepped = night && route.k !== 'moments';
   const tq = stepped ? Math.floor(T * 12) / 12 : T;
+  const xStepped = night;
+  const xq = xStepped ? Math.floor(T * 12) / 12 : T;
   const k = (r: number) => 1 - Math.exp(-dt * r);
 
   st.day += ((night ? 0 : 1) - st.day) * k(3);
@@ -354,7 +356,7 @@ function frame(now: number) {
     // 三处的晶体悬停时转快一点；NEXUS 那一颗反过来，悬停时慢慢停住（切面也停在那儿）
     const gate = name === 'nexus';
     c.spin += dt * (gate ? 0.18 * (1 - c.glow * 0.9) : 0.25 + c.glow * 1.1);
-    const sq = stepped ? Math.floor((c.spin * 12) / 1.4) * (1.4 / 12) : c.spin;
+    const sq = xStepped ? Math.floor((c.spin * 12) / 1.4) * (1.4 / 12) : c.spin;
     let size = c.s;
     if (gate && c.a > 0.004) {
       slicePh += dt * 0.11 * (1 - c.glow * 0.92);
@@ -366,8 +368,8 @@ function frame(now: number) {
     const ph = CRYS.indexOf(name) * 2.1;
     // NEXUS 那一颗倾得更多、也晃得更多：总让人看见好几个面，不会正对成一片平的三角
     const rot = gate
-      ? euler(0.62 + Math.sin(tq * 0.23) * 0.22, sq + ph, 0.32 + Math.sin(tq * 0.17) * 0.18)
-      : euler(0.35 + Math.sin(tq * 0.3 + ph) * 0.12, sq + ph, Math.sin(tq * 0.21 + ph) * 0.1);
+      ? euler(0.62 + Math.sin(xq * 0.23) * 0.22, sq + ph, 0.32 + Math.sin(xq * 0.17) * 0.18)
+      : euler(0.35 + Math.sin(xq * 0.3 + ph) * 0.12, sq + ph, Math.sin(xq * 0.21 + ph) * 0.1);
     crystals.push({ mesh: MESHOF[name], x: c.x, y: c.y, size, a: c.a * (st.viewA * 0.6 + 0.4), rot, tint: TINT[name], glow: c.glow });
   }
   // 闪念：悬停的那一条的颜色
