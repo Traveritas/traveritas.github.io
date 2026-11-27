@@ -8,7 +8,7 @@
    开屏：地面从一格极粗的夜色里一级级解析出来，字最后站起来。
    ───────────────────────────────────────────────────────────── */
 import { createGround, bipyramid, shard, cubeClean, tesseractSlice, euler } from './ground.js';
-import { initSound } from './sound';
+import { initSound, playFx, type FxId } from './sound';
 import { initToolstar, toolstarPage } from './toolstar';
 import { initAve, aveEnterRoute, aveRouteEnd } from './ave';
 import { initCursor } from './cursor';
@@ -147,6 +147,7 @@ function mount() {
 }
 // 点下去：字先退、地面开始变粗；新页拿到并且退场演完（300ms）才换
 document.addEventListener('astro:before-preparation', (e) => {
+  playFx('confirm');
   st.pulse = performance.now();
   view.classList.remove('in');
   view.classList.add('out');
@@ -172,6 +173,7 @@ setFlipper(() => {
   night = !night;
   store('rm-day', night ? '0' : '1');
   st.pulse = performance.now();
+  playFx(night ? 'flip-dream' : 'flip-wake');
   applyFace();
   setTimeout(() => setFace(night ? 'dream' : 'wake'), 900);
 });
@@ -239,7 +241,48 @@ document.addEventListener('click', (e) => {
   e.preventDefault();
   if (door > 0) return;
   doorHref = a.href;
+  playFx('gate-nexus');
   door = matchMedia('(prefers-reduced-motion: reduce)').matches ? performance.now() - DOOR_MS + 380 : performance.now();
+});
+
+/* ── 交互悬停与外链音效 ── */
+const SEC_FX: Record<Sec, FxId> = {
+  articles: 'sec-articles',
+  moments: 'sec-moments',
+  projects: 'sec-projects',
+};
+const panOf = (el: Element) => {
+  const r = el.getBoundingClientRect();
+  return Math.max(-0.35, Math.min(0.35, ((r.left + r.width * 0.5) / Math.max(innerWidth, 1) - 0.5) * 0.6));
+};
+let lastHoverEl: Element | null = null;
+document.addEventListener('pointerover', (e) => {
+  if (e.pointerType === 'touch') return;
+  const hit = (e.target as Element).closest?.(
+    'a.door[data-sec], a.sib, .pj > a, .ar > a, .mo, a.gate-door, .read .back',
+  );
+  if (!hit || hit === lastHoverEl) return;
+  if (e.relatedTarget instanceof Node && hit.contains(e.relatedTarget)) return;
+  lastHoverEl = hit;
+  if (hit.matches('a.door[data-sec], a.sib')) {
+    const k = ((hit as HTMLElement).dataset.sec || hit.querySelector<HTMLElement>('[data-x]')?.dataset.x) as Sec | undefined;
+    if (k && SEC_FX[k]) playFx(SEC_FX[k], { jitter: 0.012, pan: panOf(hit) });
+  } else if (hit.matches('a.gate-door')) {
+    playFx('hover', { jitter: 0.01, gain: 0.85, pan: 0 });
+  } else if (hit.matches('.read .back')) {
+    playFx('hover', { jitter: 0.014, gain: 0.72, pan: -0.25 });
+  } else {
+    playFx('hover', { jitter: 0.016, gain: 0.62, pan: panOf(hit) });
+  }
+});
+document.addEventListener('pointerout', (e) => {
+  if (!lastHoverEl) return;
+  if (e.relatedTarget instanceof Node && lastHoverEl.contains(e.relatedTarget)) return;
+  lastHoverEl = null;
+});
+document.addEventListener('click', (e) => {
+  const a = (e.target as Element).closest?.<HTMLAnchorElement>('.outs a[target="_blank"], .prose a[target="_blank"], .outs a[href="/rss.xml"]');
+  if (a && !a.hasAttribute('data-gate') && !a.hasAttribute('data-nofx')) playFx('confirm', { gain: 0.75 });
 });
 // 从 NEXUS 后退回来（bfcache）：不留一屏白
 addEventListener('pageshow', (e) => {

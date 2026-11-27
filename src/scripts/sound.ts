@@ -28,7 +28,10 @@
 
 import { clamp } from './lib';
 import { BGM_VERSION, OPEN_SEAM } from '../data/bgm-assets';
+import { FX_IDS, FX_VERSION, type FxId } from '../data/fx-assets';
 import { getReality, wakeMix, type Reality } from './reality';
+
+export type { FxId };
 
 type Seg = 'open' | 'loop';
 const FORMS: Reality[] = ['wake', 'dream'];
@@ -116,6 +119,7 @@ const levels: Record<Channel, number> = { bgm: 0, voice: 0, fx: 0 };
 const lastLevels: Partial<Record<Channel, number>> = {};
 const levelSubs = new Set<() => void>();
 let voiceGain: GainNode | null = null;
+let fxGain: GainNode | null = null;
 let storedDurs: Partial<Record<Seg, number>> = {};
 /** 本页的页面级电平（阅读页退后一档），进场时由 body[data-bgm] 定下 */
 let pageGain = 1;
@@ -234,6 +238,10 @@ function buildGraph() {
   voiceGain = ctx.createGain();
   voiceGain.gain.value = curve(levels.voice);
   voiceGain.connect(ctx.destination);
+  // 音效同上：单走一路，不吃阅读页退后量
+  fxGain = ctx.createGain();
+  fxGain.gain.value = curve(levels.fx);
+  fxGain.connect(ctx.destination);
 }
 
 /* ── 页内演出的压声（关于页退场：世界退去，声音一起退到无） ──────────
@@ -365,6 +373,146 @@ function stopVoice() {
     /* 已停 */
   }
   voiceSrc = null;
+}
+
+/* ── 交互音效（FX）─────────────────────────────────────
+   与环境声 / Ave 共用同一个 AudioContext，单独一路 fxGain 直出。
+   没开声（levels.fx === 0）一个字节都不取；开启后串行整包预取 12 条（合计 ~227 KB），
+   解码后缓存在内存里，悬停、刻度、换面均零等待触发。 */
+const fxUrl = (id: FxId) => `${DIR}/fx/${id}.mp3?v=${FX_VERSION}`;
+const fxBufs = new Map<FxId, AudioBuffer>();
+const fxInflight = new Map<FxId, Promise<AudioBuffer | null>>();
+const fxLastAt = new Map<FxId, number>();
+let fxWarming = false;
+let flipFxSrc: AudioBufferSourceNode | null = null;
+
+const FX_THROTTLE: Partial<Record<FxId, number>> = {
+  hover: 110,
+  'sec-articles': 130,
+  'sec-moments': 130,
+  'sec-projects': 130,
+  'ring-tick': 32,
+  confirm: 60,
+};
+
+function loadFx(c: AudioContext, id: FxId): Promise<AudioBuffer | null> {
+  const got = fxBufs.get(id);
+  if (got) return Promise.resolve(got);
+  let p = fxInflight.get(id);
+  if (!p) {
+    p = fetch(fxUrl(id))
+      .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(`fx/${id}: HTTP ${r.status}`))))
+      .then((ab) => c.decodeAudioData(ab))
+      .then((decoded) => {
+        fxBufs.set(id, decoded);
+        return decoded;
+      })
+      .catch(() => null)
+      .finally(() => {
+        fxInflight.delete(id);
+      });
+    fxInflight.set(id, p);
+  }
+  return p;
+}
+
+function warmFx() {
+  if (fxWarming || !ctx || levels.fx === 0) return;
+  const net = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection;
+  if (net?.saveData) return;
+  const c = ctx;
+  fxWarming = true;
+  const run = (i: number) => {
+    if (i >= FX_IDS.length || levels.fx === 0 || ctx !== c) {
+      fxWarming = false;
+      return;
+    }
+    void loadFx(c, FX_IDS[i]).then(() => run(i + 1));
+  };
+  const ric = (
+    window as unknown as {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+    }
+  ).requestIdleCallback;
+  if (ric) ric(() => run(0), { timeout: 1200 });
+  else setTimeout(() => run(0), 600);
+}
+
+export interface FxOpts {
+  /** 随机微变播放速率（±jitter，例如 0.015 = ±1.5%） */
+  jitter?: number;
+  /** 本次触发相对音量（默认 1） */
+  gain?: number;
+  /** 立体声微偏（-1..1，默认 0） */
+  pan?: number;
+  /** 覆盖默认节流间隔（ms） */
+  throttleMs?: number;
+  /** 缓冲尚未解码时最多等待多少 ms（悬停/刻度默认 0 = 不补播迟到音） */
+  waitMs?: number;
+}
+
+function fireFxBuffer(c: AudioContext, id: FxId, b: AudioBuffer, opts: FxOpts) {
+  if (!fxGain || levels.fx === 0 || c.state !== 'running') return;
+  // 连续切换昼夜时收掉上一条换面音，避免叠糊
+  if (id === 'flip-dream' || id === 'flip-wake') {
+    if (flipFxSrc) {
+      try {
+        flipFxSrc.stop();
+      } catch {
+        /* 已停 */
+      }
+      flipFxSrc = null;
+    }
+  }
+  const src = c.createBufferSource();
+  src.buffer = b;
+  if (opts.jitter) src.playbackRate.value = 1 + (Math.random() * 2 - 1) * opts.jitter;
+
+  let tail: AudioNode = src;
+  if (opts.gain !== undefined && Math.abs(opts.gain - 1) > 0.01) {
+    const g = c.createGain();
+    g.gain.value = clamp(opts.gain, 0, 1.2);
+    tail.connect(g);
+    tail = g;
+  }
+  if (opts.pan && Math.abs(opts.pan) > 0.02 && typeof c.createStereoPanner === 'function') {
+    const p = c.createStereoPanner();
+    p.pan.value = clamp(opts.pan, -0.6, 0.6);
+    tail.connect(p);
+    tail = p;
+  }
+  tail.connect(fxGain);
+  src.start();
+  if (id === 'flip-dream' || id === 'flip-wake') {
+    flipFxSrc = src;
+    src.onended = () => {
+      if (flipFxSrc === src) flipFxSrc = null;
+    };
+  }
+}
+
+/** 播放一条交互音效。音效路关闭或音频上下文未运行时静默跳过。 */
+export function playFx(id: FxId, opts: FxOpts = {}): void {
+  if (levels.fx === 0 || !ctx || ctx.state !== 'running' || !fxGain) return;
+  const throttle = opts.throttleMs ?? FX_THROTTLE[id] ?? 0;
+  const tNow = performance.now();
+  if (throttle > 0 && tNow - (fxLastAt.get(id) ?? -Infinity) < throttle) return;
+  fxLastAt.set(id, tNow);
+
+  const cached = fxBufs.get(id);
+  if (cached) {
+    fireFxBuffer(ctx, id, cached, opts);
+    return;
+  }
+  const c = ctx;
+  const waitMs = opts.waitMs ?? (id === 'hover' || id === 'ring-tick' || id.startsWith('sec-') ? 0 : 240);
+  const loading = loadFx(c, id);
+  if (waitMs <= 0) return;
+  const startAt = performance.now();
+  void loading.then((b) => {
+    if (!b || performance.now() - startAt > waitMs) return;
+    if (ctx === c && c.state === 'running' && levels.fx > 0) fireFxBuffer(c, id, b, opts);
+  });
 }
 
 /* ── 混合（等功率）+ 余量 + 悬停 ───────────────────── */
@@ -581,9 +729,9 @@ async function ensureCtx(): Promise<boolean> {
   return ctx.state === 'running';
 }
 
-/** 环境声停了、人声也拉到 0：ctx 挂起，不空转 */
+/** 环境声、人声、音效三路全关：ctx 挂起，不空转 */
 function suspendIfIdle() {
-  if (!on && levels.voice === 0) ctx?.suspend().catch(() => {});
+  if (!on && levels.voice === 0 && levels.fx === 0) ctx?.suspend().catch(() => {});
 }
 
 async function turnOn() {
@@ -634,6 +782,7 @@ function armUnlock() {
     // 只要把 ctx 跑起来就接着响，不重排时间轴
     else if (on) void ensureCtx().then(paint);
     if (levels.voice > 0) void ensureCtx().then((ok) => (ok ? warmVoices() : null)).then(paint);
+    if (levels.fx > 0) void ensureCtx().then((ok) => (ok ? warmFx() : null)).then(paint);
   };
   for (const e of evs) addEventListener(e, go, true);
   // 进页时就已经有用户激活（访客点得比这里的判定还快，激活被那一次用掉了）：
@@ -706,8 +855,21 @@ export function setLevel(ch: Channel, value: number): void {
       if (voiceGain) voiceGain.gain.setTargetAtTime(0, now(), LEVEL_TAU);
       suspendIfIdle();
     }
+  } else if (ch === 'fx') {
+    if (v > 0) {
+      void ensureCtx().then((ok) => {
+        if (!ok) return armUnlock();
+        fxGain?.gain.setTargetAtTime(curve(levels.fx), now(), LEVEL_TAU);
+        warmFx();
+        paint();
+        // 音效从 0 拉起：放一条轻柔启封应答音（与 Ave 的 voice-hello 呼应）
+        if (prev === 0 && levels.fx > 0) playFx('unlock', { waitMs: 800 });
+      });
+    } else {
+      if (fxGain) fxGain.gain.setTargetAtTime(0, now(), LEVEL_TAU);
+      suspendIfIdle();
+    }
   }
-  // fx：还没有音效，值先记着；以后的音效从这里取 getLevel('fx')
   paint();
 }
 
@@ -857,10 +1019,13 @@ export function initSound(): void {
         bedIn: bedAtCtx === null ? null : +(bedAtCtx - now()).toFixed(2),
         bedPhase: +bedPhase.toFixed(3),
         offFor: offAt === null ? null : +((Date.now() - offAt) / 1000).toFixed(2),
-        /* Ave 人声整包预取：取到几个 / 共几个、还在不在跑 */
+        /* Ave 人声与交互音效整包预取进度 */
         voices: `${voiceBufs.size}/${voicePool.length}`,
         voicesWarming: voiceWarming,
+        fx: `${fxBufs.size}/${FX_IDS.length}`,
+        fxWarming,
       }),
+      playFx,
       /* 量输出端实际电平：只看调度不算数，要看到样本在流 */
       probe: async (ms = 320) => {
         if (!ctx || !master) return null;
@@ -900,6 +1065,12 @@ export function initSound(): void {
     void ensureCtx().then((ok) => {
       if (!ok) return armUnlock();
       warmVoices();
+      paint();
+    });
+  if (levels.fx > 0)
+    void ensureCtx().then((ok) => {
+      if (!ok) return armUnlock();
+      warmFx();
       paint();
     });
   paint();

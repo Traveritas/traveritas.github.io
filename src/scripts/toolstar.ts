@@ -15,7 +15,7 @@
 import { navigate } from 'astro:transitions/client';
 import { clamp, reducedMotion } from './lib';
 import { flipFrom, onRealityChange, type Reality } from './reality';
-import { getLevel, isLive, isSounding, onLevels, rememberLevel, setLevel, toggleLevel, type Channel } from './sound';
+import { getLevel, isLive, isSounding, onLevels, playFx, rememberLevel, setLevel, toggleLevel, type Channel } from './sound';
 
 const DEG = Math.PI / 180;
 const mod = (a: number, n: number) => ((a % n) + n) % n;
@@ -60,6 +60,7 @@ class Ring {
   originals: HTMLElement[];
   snapT = 0;
   hideT = 0;
+  lastDetent = 0;
   /** 第几项之后多空 0.7 格（-1 = 不空） */
   gapAfter: number;
   /** 条目从轨道往外伸出的最长距离（放射的字有多长；显形时量） */
@@ -161,11 +162,13 @@ class Ring {
     this.measure();
     this.alphaTo = 1;
     this.target = 0;
+    this.lastDetent = 0;
     if (this.alpha === 0) this.offset = rm ? 0 : -50;
   }
 
   hide(rm: boolean) {
     this.alphaTo = 0;
+    this.lastDetent = 0;
     if (!rm) this.target -= 30;
     clearTimeout(this.hideT);
     this.hideT = window.setTimeout(
@@ -190,9 +193,20 @@ class Ring {
     return this.alphaTo > 0;
   }
 
+  checkDetent() {
+    if (!this.P || this.step <= 0) return;
+    const d = Math.round(this.target / this.step);
+    if (d !== this.lastDetent) {
+      this.lastDetent = d;
+      playFx('ring-tick', { jitter: 0.018 });
+    }
+  }
+
   nudge(d: number) {
-    if (this.P) this.target += d;
-    else this.target = clamp(this.target + d, -20, 20);
+    if (this.P) {
+      this.target += d;
+      this.checkDetent();
+    } else this.target = clamp(this.target + d, -20, 20);
     clearTimeout(this.snapT);
     this.snapT = window.setTimeout(() => this.snap(), 160);
   }
@@ -427,6 +441,7 @@ export function initToolstar() {
     if (drag.ring.P) {
       drag.ring.target += d;
       drag.ring.offset += d;
+      drag.ring.checkDetent();
     } else drag.ring.target = clamp(drag.ring.target + d, -20, 20);
     kick();
   });
@@ -484,7 +499,7 @@ export function initToolstar() {
       // 图标：开着就有第三态（起伏 / 呼吸），与「此刻真有样本在流」无关
       const live = isLive(v.ch);
       // 滑条：开着却还没真的出声（曲子还在缓冲、或浏览器还没给播放许可）时淡一档
-      const waiting = live && !isSounding(v.ch) && v.ch !== 'fx';
+      const waiting = live && !isSounding(v.ch);
       const [tx, ty] = polar(v.R, v.s + x * v.span);
       v.thumb.setAttribute('cx', tx.toFixed(1));
       v.thumb.setAttribute('cy', ty.toFixed(1));
@@ -505,6 +520,16 @@ export function initToolstar() {
     const a = Math.atan2(C.y - e.clientY, e.clientX - C.x);
     return clamp((a - v.s) / v.span, 0, 1);
   };
+  const nudgeVol = (ch: Channel, next: number) => {
+    const prev = getLevel(ch);
+    const prevStep = Math.round(prev * 20);
+    setLevel(ch, next);
+    const nowStep = Math.round(getLevel(ch) * 20);
+    // 跨过 5% 刻度时轻点一记（FX 从 0 启封自带 unlock 应答音，不叠加）
+    if (nowStep !== prevStep && !(ch === 'fx' && prev === 0)) {
+      playFx('ring-tick', { jitter: 0.015, gain: 0.42 });
+    }
+  };
   for (const v of vols) {
     v.g.addEventListener('pointerdown', (e) => {
       if (e.button !== 0) return;
@@ -514,10 +539,10 @@ export function initToolstar() {
       v.g.classList.add('is-drag');
       v.btn.classList.add('is-drag');
       v.g.focus({ preventScroll: true });
-      setLevel(v.ch, volAt(v, e));
+      nudgeVol(v.ch, volAt(v, e));
     });
     v.g.addEventListener('pointermove', (e) => {
-      if (volDrag?.v === v && e.pointerId === volDrag.id) setLevel(v.ch, volAt(v, e));
+      if (volDrag?.v === v && e.pointerId === volDrag.id) nudgeVol(v.ch, volAt(v, e));
     });
     const end = (e: PointerEvent) => {
       if (volDrag?.v !== v || e.pointerId !== volDrag.id) return;
@@ -533,7 +558,7 @@ export function initToolstar() {
       'wheel',
       (e) => {
         e.preventDefault();
-        setLevel(v.ch, clamp(getLevel(v.ch) - e.deltaY * 0.0006, 0, 1));
+        nudgeVol(v.ch, clamp(getLevel(v.ch) - e.deltaY * 0.0006, 0, 1));
       },
       { passive: false },
     );
@@ -552,9 +577,13 @@ export function initToolstar() {
       if (!(e.key in to)) return;
       e.preventDefault();
       if (to[e.key] <= 0.005 && x > 0) rememberLevel(v.ch, x);
-      setLevel(v.ch, clamp(to[e.key], 0, 1));
+      nudgeVol(v.ch, clamp(to[e.key], 0, 1));
     });
-    v.btn.addEventListener('click', () => toggleLevel(v.ch));
+    v.btn.addEventListener('click', () => {
+      const prev = getLevel(v.ch);
+      toggleLevel(v.ch);
+      if (!(v.ch === 'fx' && prev === 0)) playFx('confirm', { gain: 0.65 });
+    });
   }
 
   /* 显隐与别的圈同一套：从顺时针 50° 处转进来，收起时再往前转 30° 淡掉（见 Ring.show / hide / frame）。
@@ -709,6 +738,7 @@ export function initToolstar() {
     if (!v) tool = null;
     setCaption('');
     ST.spinTo += 90;
+    playFx(v ? 'star-open' : 'star-close');
     sync();
   }
   function setTool(t: Tool | null) {
@@ -730,6 +760,7 @@ export function initToolstar() {
         flipFrom(r.left + r.width / 2, r.top + r.height / 2);
         return;
       }
+      playFx('confirm', { gain: 0.72 });
       setTool(tool === t ? null : (t as Tool));
     });
   }
@@ -737,9 +768,17 @@ export function initToolstar() {
     b.addEventListener('click', () => {
       const c = b.dataset.setCat as SetCat;
       setCat = setCat === c ? null : c;
+      playFx('confirm', { gain: 0.72 });
       sync();
     });
   }
+  // 设置项（界面 / 阅读 / Ave 轨道上的按钮）、寻找词条、本页字号/目录点击统一给轻确认音
+  root.addEventListener('click', (e) => {
+    const t = e.target as Element;
+    if (t.closest('[data-ring^="set-"] > .ts-item, [data-word], .ts-seg button, .ts-toc a')) {
+      playFx('confirm', { gain: 0.7 });
+    }
+  });
   // 设置里「音量 → 声音」：直接换到声音那三圈
   for (const b of root.querySelectorAll<HTMLButtonElement>('[data-goto]')) {
     b.addEventListener('click', () => setTool(b.dataset.goto as Tool));
