@@ -342,6 +342,16 @@ function paint(n: number) {
   });
 }
 
+function ensureStar(): AveStar | null {
+  if (star) return star;
+  const starCv = root.querySelector<HTMLCanvasElement>('.ave-star');
+  if (starCv) {
+    star = createAveStar(starCv, reducedMotion, card);
+    star?.look(document.documentElement.dataset.face !== 'wake', getReality() === 'dream');
+  }
+  return star;
+}
+
 function show(line: AveLine, idle = false, at?: Element | null) {
   if (isOff()) return;
   if (current) {
@@ -396,10 +406,7 @@ function show(line: AveLine, idle = false, at?: Element | null) {
   else root.style.left = root.style.top = '';
   void root.offsetWidth; // 先落下 hidden=false 再起过渡
   root.classList.add('is-on');
-  if (!star) {
-    const starCv = root.querySelector<HTMLCanvasElement>('.ave-star');
-    if (starCv) star = createAveStar(starCv, reducedMotion, card);
-  }
+  ensureStar();
   if (star) {
     // 深底：框里的字是浅色的那种场景
     const [r, g, b] = (getComputedStyle(card).color.match(/[\d.]+/g) || ['0', '0', '0']).map(Number);
@@ -840,6 +847,14 @@ export function initAve(): void {
     if (current && revealDone) hold(HOLD_AFTER_HOVER);
   });
   card.addEventListener('focusin', () => clearTimeout(holdT));
+
+  // 开屏与首屏进场基本落定后（但早于最早的 1.5s 进页台词），提前初始化星的 WebGL2 上下文与并行着色器编译，
+  // 避免首次弹出对话框时同步编译或重建画布缓冲造成卡顿
+  afterBoot(() => {
+    setTimeout(() => {
+      if (!isOff() && !star) ensureStar();
+    }, 750);
+  });
 
   // 进页：随笔 / 项目自己那一整页只说它自带的那句，没写就不说；其余页按路径挑最具体的那一句
   const enter = (page && fresh(page) ? [page] : []).concat(entry !== undefined ? [] : AVE_LINES.filter((l) => l.when.on === 'enter' && pathHits(l.when.path) && visitorOk(l) && fresh(l)).sort(

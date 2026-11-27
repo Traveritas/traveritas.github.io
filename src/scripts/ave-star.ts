@@ -68,32 +68,23 @@ function buildMesh(polys: V3[][]) {
 
 /* ── 着色器 ── */
 
-const VS = `#version 300 es
-in vec3 aPos; in vec3 aNor; in vec3 aBary; in vec3 aMask;
-uniform mat4 uProj, uView, uModel;
-out vec3 vN; out vec3 vP; out vec3 vB; out vec3 vM; out float vR;
+const ENV_VS = `#version 300 es
+in vec2 aP;
+out vec2 vUv;
 void main() {
-  vR = length(aPos);
-  vec4 wp = uModel * vec4(aPos, 1.0);
-  vP = wp.xyz;
-  vN = normalize(mat3(uModel) * aNor);
-  vB = aBary; vM = aMask;
-  gl_Position = uProj * uView * wp;
+  vUv = aP;
+  gl_Position = vec4(aP, 0.0, 1.0);
 }`;
 
-const FS = `#version 300 es
+/* 影棚环境：按醒 / 梦各烘焙一次到 256×256 立方体贴图（值 ×0.5 写进 RGBA8，保留 0–2 的高光余量），
+   避免把 9 个亮箱 × 多次折射/反射全部内联进晶体片元着色器导致首次同步链接卡顿近一秒 */
+const ENV_FS = `#version 300 es
 precision highp float;
-uniform float uPass;   // 0 背面出射，1 正面
-uniform float uDream;  // 0 醒 1 梦
-uniform float uColor;  // 彩
-uniform float uAlpha;  // 体的不透明度
-uniform float uDark;   // 深底
-uniform vec4 uMask;    // 框的矩形（画布像素，左下为原点）：x0 y0 x1 y1
-uniform float uMaskK;  // 框的不透明度：框里那一块从实体过渡到线框
-uniform vec3 uCam;
-in vec3 vN; in vec3 vP; in vec3 vB; in vec3 vM; in float vR;
+uniform float uDream;
+uniform float uColor;
+uniform mat3 uFace;
+in vec2 vUv;
 out vec4 o;
-const float IOR = 1.6;
 
 float box(vec3 d, vec3 c, float w, float h, float soft) {
   c = normalize(c);
@@ -129,6 +120,41 @@ vec3 env(vec3 d) {
   return c;
 }
 
+void main() {
+  vec3 d = normalize(uFace * vec3(vUv, 1.0));
+  o = vec4(env(d) * 0.5, 1.0);
+}`;
+
+const VS = `#version 300 es
+in vec3 aPos; in vec3 aNor; in vec3 aBary; in vec3 aMask;
+uniform mat4 uProj, uView, uModel;
+out vec3 vN; out vec3 vP; out vec3 vB; out vec3 vM; out float vR;
+void main() {
+  vR = length(aPos);
+  vec4 wp = uModel * vec4(aPos, 1.0);
+  vP = wp.xyz;
+  vN = normalize(mat3(uModel) * aNor);
+  vB = aBary; vM = aMask;
+  gl_Position = uProj * uView * wp;
+}`;
+
+const FS = `#version 300 es
+precision highp float;
+uniform float uPass;   // 0 背面出射，1 正面
+uniform float uDream;  // 0 醒 1 梦
+uniform float uColor;  // 彩
+uniform float uAlpha;  // 体的不透明度
+uniform float uDark;   // 深底
+uniform vec4 uMask;    // 框的矩形（画布像素，左下为原点）：x0 y0 x1 y1
+uniform float uMaskK;  // 框的不透明度：框里那一块从实体过渡到线框
+uniform vec3 uCam;
+uniform samplerCube uEnv;
+in vec3 vN; in vec3 vP; in vec3 vB; in vec3 vM; in float vR;
+out vec4 o;
+const float IOR = 1.6;
+
+vec3 env(vec3 d) { return texture(uEnv, d).rgb * 2.0; }
+
 vec3 film(float x) { return 0.5 + 0.5 * cos(6.2832 * (x * 1.7 + vec3(0.0, 0.33, 0.67))); }
 
 float edge() {
@@ -156,10 +182,12 @@ void main() {
 
   if (uPass < 0.5) {
     vec3 n = -N;
+    vec3 R0 = reflect(I, n);
     vec3 col;
     for (int i = 0; i < 3; i++) {
       vec3 r = refract(I, n, IOR + (float(i) - 1.0) * disp);
-      vec3 s = dot(r, r) < 1e-4 ? env(reflect(I, n)) * 0.85 : env(r);
+      bool tir = dot(r, r) < 1e-4;
+      vec3 s = env(tir ? R0 : r) * (tir ? 0.85 : 1.0);
       col[i] = i == 0 ? s.r : (i == 1 ? s.g : s.b);
     }
     float l = dot(col, vec3(0.299, 0.587, 0.114));
@@ -188,6 +216,17 @@ void main() {
   float wl = e * 0.38 * wf;
   o = mix(vec4(col, clamp(a, 0.0, 1.0)), vec4(wc * wl, wl), w);
 }`;
+
+const ENV_SIZE = 256;
+/** 立方体贴图六个面的方向基底（列主序 mat3，对应 GLSL uFace * vec3(u, v, 1)） */
+const CUBE_FACES = [
+  new Float32Array([0, 0, -1, 0, -1, 0, 1, 0, 0]),   // +X
+  new Float32Array([0, 0, 1, 0, -1, 0, -1, 0, 0]),   // -X
+  new Float32Array([1, 0, 0, 0, 0, 1, 0, 1, 0]),     // +Y
+  new Float32Array([1, 0, 0, 0, 0, -1, 0, -1, 0]),   // -Y
+  new Float32Array([1, 0, 0, 0, -1, 0, 0, 0, 1]),    // +Z
+  new Float32Array([-1, 0, 0, 0, -1, 0, 0, 0, -1]),  // -Z
+];
 
 /* ── 小数学 ── */
 
@@ -267,6 +306,18 @@ export interface AveStar {
 
 /** mask：压在星上面的那块框——星落在它矩形里的部分画成线框（随它的不透明度过渡） */
 export function createAveStar(canvas: HTMLCanvasElement, reduced: () => boolean, mask?: HTMLElement): AveStar | null {
+  // 在拿 WebGL2 上下文前先把画布尺寸定到目标像素，避免首次进场时由 300×150 重建 MSAA 缓冲导致主线程卡顿
+  const targetPx = () => {
+    const dpr = Math.min(2, devicePixelRatio || 1);
+    const css = canvas.clientWidth || parseFloat(getComputedStyle(canvas).getPropertyValue('--ave-star')) || 230;
+    return Math.round(css * dpr);
+  };
+  const initW = targetPx();
+  if (initW && (canvas.width !== initW || canvas.height !== initW)) {
+    canvas.width = initW;
+    canvas.height = initW;
+  }
+
   let gl: WebGL2RenderingContext | null = null;
   try {
     gl = canvas.getContext('webgl2', { alpha: true, premultipliedAlpha: true, antialias: true });
@@ -275,60 +326,82 @@ export function createAveStar(canvas: HTMLCanvasElement, reduced: () => boolean,
   }
   if (!gl) return null;
 
-  const sh = (type: number, src: string) => {
-    const s = gl!.createShader(type)!;
-    gl!.shaderSource(s, src);
-    gl!.compileShader(s);
-    if (!gl!.getShaderParameter(s, gl!.COMPILE_STATUS)) throw new Error(gl!.getShaderInfoLog(s) || 'shader');
-    return s;
-  };
-  let prog: WebGLProgram;
-  try {
-    prog = gl.createProgram()!;
-    gl.attachShader(prog, sh(gl.VERTEX_SHADER, VS));
-    gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS));
-    gl.linkProgram(prog);
-    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog) || 'link');
-  } catch (e) {
-    console.warn('[ave-star]', e);
-    return null;
-  }
-  gl.useProgram(prog);
+  const parallel = gl.getExtension('KHR_parallel_shader_compile') as { COMPLETION_STATUS_KHR: number } | null;
 
+  const startProgram = (vsSrc: string, fsSrc: string, attribs: string[]) => {
+    const vs = gl!.createShader(gl!.VERTEX_SHADER)!;
+    gl!.shaderSource(vs, vsSrc);
+    gl!.compileShader(vs);
+    const fs = gl!.createShader(gl!.FRAGMENT_SHADER)!;
+    gl!.shaderSource(fs, fsSrc);
+    gl!.compileShader(fs);
+    const prog = gl!.createProgram()!;
+    gl!.attachShader(prog, vs);
+    gl!.attachShader(prog, fs);
+    attribs.forEach((name, idx) => gl!.bindAttribLocation(prog, idx, name));
+    gl!.linkProgram(prog);
+    return { prog, vs, fs };
+  };
+
+  // 先发起并行编译与链接，不在此处同步查询 LINK_STATUS（否则会阻塞主线程等 D3D11 编译完）
+  const envP = startProgram(ENV_VS, ENV_FS, ['aP']);
+  const starP = startProgram(VS, FS, ['aPos', 'aNor', 'aBary', 'aMask']);
+
+  // 几何与环境立方体贴图（均不触发同步等待）
   const mesh = buildMesh(starPolys());
-  gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+  const starVao = gl.createVertexArray();
+  gl.bindVertexArray(starVao);
+  const starBuf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, starBuf);
   gl.bufferData(gl.ARRAY_BUFFER, mesh.data, gl.STATIC_DRAW);
-  ['aPos', 'aNor', 'aBary', 'aMask'].forEach((name, i) => {
-    const loc = gl.getAttribLocation(prog, name);
-    gl.enableVertexAttribArray(loc);
-    gl.vertexAttribPointer(loc, 3, gl.FLOAT, false, 48, i * 12);
-  });
-  const U = (n: string) => gl.getUniformLocation(prog, n);
-  const u = {
-    proj: U('uProj'), view: U('uView'), model: U('uModel'), cam: U('uCam'),
-    pass: U('uPass'), dream: U('uDream'), color: U('uColor'), alpha: U('uAlpha'), dark: U('uDark'), mask: U('uMask'), maskK: U('uMaskK'),
-  };
+  for (let i = 0; i < 4; i++) {
+    gl.enableVertexAttribArray(i);
+    gl.vertexAttribPointer(i, 3, gl.FLOAT, false, 48, i * 12);
+  }
 
-  // 相机：16° 视角，退到半径 1.04 恰好填满
-  const dist = 1.04 / Math.tan(8 * D);
-  const f = 1 / Math.tan(8 * D);
-  const near = 0.1;
-  const far = 50;
-  gl.uniformMatrix4fv(u.proj, false, new Float32Array([f, 0, 0, 0, 0, f, 0, 0, 0, 0, (far + near) / (near - far), -1, 0, 0, (2 * far * near) / (near - far), 0]));
-  gl.uniformMatrix4fv(u.view, false, new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, -dist, 1]));
-  gl.uniform3f(u.cam, 0, 0, dist);
-  gl.uniform1f(u.color, 0.9); // 浓
-  gl.uniform1f(u.alpha, 0.38); // 很透
-  gl.enable(gl.BLEND);
-  gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-  gl.enable(gl.DEPTH_TEST);
-  gl.enable(gl.CULL_FACE);
-  gl.clearColor(0, 0, 0, 0);
+  const quadVao = gl.createVertexArray();
+  gl.bindVertexArray(quadVao);
+  const quadBuf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, quadBuf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(0);
+  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+  gl.bindVertexArray(null);
+
+  const envTex = gl.createTexture();
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_CUBE_MAP, envTex);
+  for (let f = 0; f < 6; f++) {
+    gl.texImage2D(gl.TEXTURE_CUBE_MAP_POSITIVE_X + f, 0, gl.RGBA8, ENV_SIZE, ENV_SIZE, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  }
+  gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_R, gl.CLAMP_TO_EDGE);
+  const envFb = gl.createFramebuffer();
+
+  const COLOR = 0.9; // 浓
+  const ALPHA = 0.38; // 很透
+
+  let uEnv: { dream: WebGLUniformLocation | null; color: WebGLUniformLocation | null; face: WebGLUniformLocation | null } | null = null;
+  let u: {
+    proj: WebGLUniformLocation | null; view: WebGLUniformLocation | null; model: WebGLUniformLocation | null; cam: WebGLUniformLocation | null;
+    pass: WebGLUniformLocation | null; dream: WebGLUniformLocation | null; color: WebGLUniformLocation | null; alpha: WebGLUniformLocation | null;
+    dark: WebGLUniformLocation | null; mask: WebGLUniformLocation | null; maskK: WebGLUniformLocation | null; env: WebGLUniformLocation | null;
+  } | null = null;
 
   let q: Quat = REST;
   let scale = 0;
+  let darkVal = 0;
+  let dreamVal = 0;
+  let bakedDream = -1;
   let anim: Anim | null = null;
   let raf = 0;
+  let readyRaf = 0;
+  let ready = false;
+  let failed = false;
+  let pendingDraw = false;
   let lost = false;
 
   canvas.addEventListener('webglcontextlost', (e) => {
@@ -339,22 +412,61 @@ export function createAveStar(canvas: HTMLCanvasElement, reduced: () => boolean,
       cancelAnimationFrame(raf);
       raf = 0;
     }
+    if (readyRaf) {
+      cancelAnimationFrame(readyRaf);
+      readyRaf = 0;
+    }
   });
 
-  function resize() {
-    const dpr = Math.min(2, devicePixelRatio || 1);
-    const w = Math.round(canvas.clientWidth * dpr);
-    if (w && canvas.width !== w) canvas.width = canvas.height = w;
+  function isCompiled() {
+    if (!gl) return false;
+    if (!parallel) return true;
+    return (
+      !!gl.getProgramParameter(envP.prog, parallel.COMPLETION_STATUS_KHR) &&
+      !!gl.getProgramParameter(starP.prog, parallel.COMPLETION_STATUS_KHR)
+    );
   }
 
-  function draw() {
-    if (lost || !gl) return;
-    resize();
-    if (!canvas.width || !canvas.height) return;
+  function bakeEnv(dream: number) {
+    if (!gl || !uEnv || lost) return;
+    bakedDream = dream;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, envFb);
+    gl.viewport(0, 0, ENV_SIZE, ENV_SIZE);
+    gl.disable(gl.DEPTH_TEST);
+    gl.disable(gl.BLEND);
+    gl.disable(gl.CULL_FACE);
+    gl.colorMask(true, true, true, true);
+    gl.useProgram(envP.prog);
+    gl.uniform1f(uEnv.dream, dream);
+    gl.uniform1f(uEnv.color, COLOR);
+    gl.bindVertexArray(quadVao);
+    for (let f = 0; f < 6; f++) {
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_CUBE_MAP_POSITIVE_X + f, envTex, 0);
+      gl.uniformMatrix3fv(uEnv.face, false, CUBE_FACES[f]);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  }
+
+  function renderStar(drawScale: number) {
+    if (!gl || !u || lost) return;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, canvas.width, canvas.height);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+    gl.enable(gl.DEPTH_TEST);
+    gl.enable(gl.CULL_FACE);
+    gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-    if (scale < 0.002) return;
-    gl.uniformMatrix4fv(u.model, false, modelMatrix(q, scale));
+    if (drawScale < 0.002) return;
+
+    gl.useProgram(starP.prog);
+    gl.bindVertexArray(starVao);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_CUBE_MAP, envTex);
+    gl.uniform1f(u.dark, darkVal);
+    gl.uniform1f(u.dream, dreamVal);
+    gl.uniformMatrix4fv(u.model, false, modelMatrix(q, drawScale));
     if (mask) {
       const c = canvas.getBoundingClientRect();
       const k = mask.getBoundingClientRect();
@@ -382,10 +494,104 @@ export function createAveStar(canvas: HTMLCanvasElement, reduced: () => boolean,
     gl.drawArrays(gl.TRIANGLES, 0, mesh.count);
   }
 
+  function finalize(): boolean {
+    if (ready) return true;
+    if (failed || lost || !gl) return false;
+    try {
+      for (const [label, item] of [['env', envP], ['star', starP]] as const) {
+        if (!gl.getProgramParameter(item.prog, gl.LINK_STATUS)) {
+          const msg = gl.getProgramInfoLog(item.prog) || gl.getShaderInfoLog(item.fs) || gl.getShaderInfoLog(item.vs) || `${label} link`;
+          throw new Error(msg);
+        }
+        gl.deleteShader(item.vs);
+        gl.deleteShader(item.fs);
+      }
+    } catch (e) {
+      failed = true;
+      console.warn('[ave-star]', e);
+      return false;
+    }
+
+    uEnv = {
+      dream: gl.getUniformLocation(envP.prog, 'uDream'),
+      color: gl.getUniformLocation(envP.prog, 'uColor'),
+      face: gl.getUniformLocation(envP.prog, 'uFace'),
+    };
+    const U = (n: string) => gl!.getUniformLocation(starP.prog, n);
+    u = {
+      proj: U('uProj'), view: U('uView'), model: U('uModel'), cam: U('uCam'),
+      pass: U('uPass'), dream: U('uDream'), color: U('uColor'), alpha: U('uAlpha'),
+      dark: U('uDark'), mask: U('uMask'), maskK: U('uMaskK'), env: U('uEnv'),
+    };
+
+    // 相机：16° 视角，退到半径 1.04 恰好填满
+    const dist = 1.04 / Math.tan(8 * D);
+    const f = 1 / Math.tan(8 * D);
+    const near = 0.1;
+    const far = 50;
+    gl.useProgram(starP.prog);
+    gl.uniformMatrix4fv(u.proj, false, new Float32Array([f, 0, 0, 0, 0, f, 0, 0, 0, 0, (far + near) / (near - far), -1, 0, 0, (2 * far * near) / (near - far), 0]));
+    gl.uniformMatrix4fv(u.view, false, new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, -dist, 1]));
+    gl.uniform3f(u.cam, 0, 0, dist);
+    gl.uniform1f(u.color, COLOR);
+    gl.uniform1f(u.alpha, ALPHA);
+    gl.uniform1i(u.env, 0);
+
+    bakeEnv(dreamVal);
+    // 预热一次正/背面管线状态后再清透明，避免首帧出画时首次创建 GPU 管线产生毛刺
+    if (canvas.width && canvas.height) {
+      renderStar(0.01);
+      gl.clearColor(0, 0, 0, 0);
+      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    }
+    ready = true;
+    return true;
+  }
+
+  function pollReady() {
+    readyRaf = 0;
+    if (ready || failed || lost || !gl) return;
+    if (!isCompiled()) {
+      readyRaf = requestAnimationFrame(pollReady);
+      return;
+    }
+    if (finalize() && (pendingDraw || anim || scale >= 0.002)) {
+      pendingDraw = false;
+      draw();
+    }
+  }
+  readyRaf = requestAnimationFrame(pollReady);
+
+  function resize() {
+    if (!canvas.clientWidth) return;
+    const dpr = Math.min(2, devicePixelRatio || 1);
+    const w = Math.round(canvas.clientWidth * dpr);
+    if (w && (canvas.width !== w || canvas.height !== w)) {
+      canvas.width = w;
+      canvas.height = w;
+    }
+  }
+
+  function draw() {
+    if (lost || failed || !gl) return;
+    if (!ready) {
+      if (parallel && !isCompiled()) {
+        pendingDraw = true;
+        if (!readyRaf) readyRaf = requestAnimationFrame(pollReady);
+        return;
+      }
+      if (!finalize()) return;
+    }
+    resize();
+    if (!canvas.width || !canvas.height) return;
+    if (dreamVal !== bakedDream) bakeEnv(dreamVal);
+    renderStar(scale);
+  }
+
   function frame(now: number) {
     raf = 0;
     const a = anim;
-    if (!a || lost) return;
+    if (!a || lost || failed) return;
     // 第一拍立刻动；之后每拍跳一次（定格）
     const beat = Math.floor(((now - a.t0) / 1000) * FPS) + 1;
     if (beat !== a.beat) {
@@ -449,9 +655,11 @@ export function createAveStar(canvas: HTMLCanvasElement, reduced: () => boolean,
       run('exit', sec, done);
     },
     look(dark, dream) {
-      if (lost || !gl) return;
-      gl.uniform1f(u.dark, dark ? 1 : 0);
-      gl.uniform1f(u.dream, dream ? 1 : 0);
+      if (lost || failed || !gl) return;
+      darkVal = dark ? 1 : 0;
+      dreamVal = dream ? 1 : 0;
+      if (!ready) return;
+      if (dreamVal !== bakedDream) bakeEnv(dreamVal);
       if (scale > 0.002 && !anim) draw();
     },
   };
