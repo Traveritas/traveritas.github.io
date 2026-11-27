@@ -74,24 +74,24 @@ const SESSION_KEY = 'xm-ave'; // sessionStorage：本次来访的记录
 const PREFS_KEY = 'xm-ave-prefs'; // localStorage：访客的设置（只存改过的项）
 
 /* ── 访客设置（工具栏「设置 → Ave」：[data-ave-opt] 点一下换到下一档，ave.ts 管值与文案） ──
-   点一下按 opts 的顺序换到下一档（转到头回到第一档）。闲聊的「常」就是原先的固定参数；
+   点一下按 opts 的顺序换到下一档（转到头回到第一档）。闲聊的「好」就是原先的固定参数；
    文章里默认每次都说（2026-10-26 作者定） */
 const PREFS = {
   chat: {
     def: 'mid',
     opts: [
-      ['off', '不闲聊'],
-      ['low', '少'],
-      ['mid', '常'],
-      ['high', '多'],
+      ['high', '好啊❤'],
+      ['mid', '好'],
+      ['low', '行'],
+      ['off', '不'],
     ],
   },
   page: {
     def: 'always',
     opts: [
-      ['off', '不说'],
-      ['ever', '第一次'],
       ['always', '每次'],
+      ['ever', '一次'],
+      ['off', '不'],
     ],
   },
   reveal: {
@@ -112,8 +112,8 @@ const PREFS = {
   anchor: {
     def: 'on',
     opts: [
-      ['on', '贴着说'],
-      ['off', '右下角'],
+      ['on', '就近'],
+      ['off', '角落'],
     ],
   },
 } as const;
@@ -129,7 +129,7 @@ function setPref(k: PrefKey, v: string) {
   else all[k] = v;
   store.set(localStorage, PREFS_KEY, all);
 }
-/** 闲聊各档：掷中的概率、两句之间至少隔多久（ms）、每次来访最多几句。不闲聊 = 随机池（含按时段、静置）整个不掷 */
+/** 闲聊各档：掷中的概率、两句之间至少隔多久（ms）、每次来访最多几句。「不」= 随机池（含按时段、静置）整个不掷 */
 const CHAT = {
   low: { chance: 0.2, gap: 240_000, cap: 3 },
   mid: { chance: IDLE_CHANCE, gap: IDLE_GAP, cap: SESSION_CAP },
@@ -760,7 +760,7 @@ function keyOfHref(href: string) {
   return m ? `${m[1]}/${decodeURIComponent(m[2])}` : '';
 }
 
-/** 条目自带的那句；访客选了「文章里不说」就没有。「第一次」= 这台设备上只说一次 */
+/** 条目自带的那句；访客选了「不」就没有。「一次」= 这台设备上只说一次 */
 function pageToLine(p: AvePageLine, after: number): AveLine | null {
   const mode = pref('page');
   if (mode === 'off') return null;
