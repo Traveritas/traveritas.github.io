@@ -491,7 +491,7 @@ export function createGround(canvas) {
     meshes.set(name, { vao, n: m.n, bP: bufs[0], bB: bufs[1] });
   }
 
-  const S = { dpr: 1, cell: 4 };
+  const S = { dpr: 1, cell: 4, cellPx: 4 };
   function resize() {
     S.dpr = Math.min(devicePixelRatio || 1, 2);
     const W = Math.round(innerWidth * S.dpr), H = Math.round(innerHeight * S.dpr);

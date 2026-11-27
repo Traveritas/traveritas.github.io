@@ -145,9 +145,11 @@ function mount() {
   aveFor(route, first);
   first = false;
 }
+const mqReduce = matchMedia('(prefers-reduced-motion: reduce)');
 // 点下去：字先退、地面开始变粗；新页拿到并且退场演完（300ms）才换
 document.addEventListener('astro:before-preparation', (e) => {
   playFx('confirm');
+  if (mqReduce.matches) return;
   st.pulse = performance.now();
   view.classList.remove('in');
   view.classList.add('out');
@@ -172,9 +174,13 @@ document.addEventListener('astro:page-load', mount);
 setFlipper(() => {
   night = !night;
   store('rm-day', night ? '0' : '1');
-  st.pulse = performance.now();
   playFx(night ? 'flip-dream' : 'flip-wake');
   applyFace();
+  if (mqReduce.matches) {
+    setFace(night ? 'dream' : 'wake');
+    return;
+  }
+  st.pulse = performance.now();
   setTimeout(() => setFace(night ? 'dream' : 'wake'), 900);
 });
 
@@ -331,7 +337,7 @@ function finishBoot(now: number) {
 function waitForReady(onProgress: (p: number) => void): Promise<void> {
   const raw = (document.getElementById('view')?.textContent || 'AveritA 的昼梦叙集 断章 闪念 造物').replace(/\s+/g, '');
   const sampleText = [...new Set(raw)].slice(0, 240).join('');
-  const hasBold = !!document.querySelector('#view h1, #view h2, #view h3, #view strong');
+  const hasBold = !!document.querySelector('#view .sheet h1, #view h2, #view h3, #view strong');
   const imgs = [...document.querySelectorAll<HTMLImageElement>('#view img')].filter((img, idx) => {
     const r = img.getBoundingClientRect();
     return (idx < 4 && img.loading !== 'lazy') || (r.top < innerHeight * 1.25 && r.bottom > -100);
@@ -406,26 +412,28 @@ let last = t0;
 function frame(now: number) {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
+  const reduced = mqReduce.matches;
   const T = (now - t0) / 1000;
-  // 夜：12 帧一拍；闪念那一处的地面不定格，留着雨的连续感（晶体照样定格）
+  // 夜：12 帧一拍；闪念那一处的地面不定格，留着雨的连续感（晶体照样定格）；减弱动态下冻结时间轴
   const stepped = night && route.k !== 'moments';
-  const tq = stepped ? Math.floor(T * 12) / 12 : T;
+  const tq = reduced ? 0 : stepped ? Math.floor(T * 12) / 12 : T;
   const xStepped = night;
-  const xq = xStepped ? Math.floor(T * 12) / 12 : T;
-  const k = (r: number) => 1 - Math.exp(-dt * r);
+  const xq = reduced ? 0 : xStepped ? Math.floor(T * 12) / 12 : T;
+  const k = (r: number) => (reduced ? 1 : 1 - Math.exp(-dt * r));
 
   st.day += ((night ? 0 : 1) - st.day) * k(3);
   setMix(st.day);
-  st.pan[0] += (st.panT[0] + scrollY * 0.00025 - st.pan[0]) * k(2.2);
-  st.pan[1] += (st.panT[1] + scrollY * 0.0006 - st.pan[1]) * k(2.2);
+  const scrollPanX = reduced ? 0 : scrollY * 0.00025;
+  const scrollPanY = reduced ? 0 : scrollY * 0.0006;
+  st.pan[0] += (st.panT[0] + scrollPanX - st.pan[0]) * k(2.2);
+  st.pan[1] += (st.panT[1] + scrollPanY - st.pan[1]) * k(2.2);
   st.gain += (st.gainT - st.gain) * k(2);
 
   // 加载 / 换页：格随真实加载进度一拍拍收细，全部就绪后落到 1 再放行页面
   st.coarse = 1;
   if (st.boot > 0) {
     const veilTarget = bootReady ? 1 : 0.78;
-    st.veil += (veilTarget - st.veil) * k(bootReady ? 7 : 3.2);
-    const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    st.veil += (veilTarget - st.veil) * (1 - Math.exp(-dt * (bootReady ? 7 : 3.2)));
     if (reduced) {
       if (bootReady) finishBoot(now);
       else st.coarse = BOOT_STEPS[BOOT_HOLD_IDX];
@@ -443,7 +451,7 @@ function frame(now: number) {
     }
   } else if (door > 0) {
     const e = now - door;
-    st.coarse = DOOR[Math.min(DOOR.length - 1, Math.floor(e / 120))];
+    st.coarse = reduced ? 1 : DOOR[Math.min(DOOR.length - 1, Math.floor(e / 120))];
     const w = document.querySelector<HTMLElement>('.gate-white');
     if (w) w.style.opacity = String(Math.min(1, Math.max(0, (e - DOOR_MS * 0.45) / (DOOR_MS * 0.5))));
     if (e > DOOR_MS && doorHref) {
@@ -451,9 +459,12 @@ function frame(now: number) {
       doorHref = '';
     }
   } else if (st.pulse > 0) {
-    const i = Math.floor((now - st.pulse) / 100);
-    if (i >= PULSE.length) st.pulse = -1;
-    else st.coarse = PULSE[i];
+    if (reduced) st.pulse = -1;
+    else {
+      const i = Math.floor((now - st.pulse) / 100);
+      if (i >= PULSE.length) st.pulse = -1;
+      else st.coarse = PULSE[i];
+    }
   }
   const shown = view.classList.contains('in') && st.boot < 0 ? 1 : 0;
   st.viewA += (shown - st.viewA) * k(shown ? 5 : 14);
@@ -481,7 +492,7 @@ function frame(now: number) {
   let hotT = [mouse[0], mouse[1], 0];
   const crystals = [];
   const doorK = door > 0 ? Math.min(1, (now - door) / DOOR_MS) : 0;
-  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const reducedMotion = reduced;
   for (const name of CRYS) {
     const c = XS[name];
     let el: Element | null = null;
@@ -523,22 +534,24 @@ function frame(now: number) {
     }
     // 停在条目旁边时不点亮脚下的地面（小，底下一亮就被它放大成一团白）
     if (hov && !el?.hasAttribute('data-xh')) hotT = [tx, ty, 1];
-    const sp = 1 - Math.exp(-dt * 7);
+    const sp = reduced ? 1 : 1 - Math.exp(-dt * 7);
     c.x += (tx - c.x) * sp;
     c.y += (ty - c.y) * sp;
     c.s += (ts * (1 + hov * 0.12) - c.s) * sp;
-    c.a += (ta * enterK - c.a) * (1 - Math.exp(-dt * 6));
+    c.a += (ta * enterK - c.a) * (reduced ? 1 : 1 - Math.exp(-dt * 6));
     c.glow += (hov - c.glow) * k(8);
     // 三处的晶体悬停时转快一点；NEXUS 那一颗反过来，悬停时慢慢停住（切面也停在那儿）
     const gate = name === 'nexus';
-    c.spin += dt * (gate ? 0.18 * (1 - c.glow * 0.9) : 0.25 + c.glow * 1.1);
-    const sq = xStepped ? Math.floor((c.spin * 12) / 1.4) * (1.4 / 12) : c.spin;
+    if (!reduced) c.spin += dt * (gate ? 0.18 * (1 - c.glow * 0.9) : 0.25 + c.glow * 1.1);
+    const sq = reduced ? 0 : xStepped ? Math.floor((c.spin * 12) / 1.4) * (1.4 / 12) : c.spin;
     let size = c.s * (0.62 + 0.38 * enterK);
     if (gate && c.a > 0.004) {
-      slicePh += dt * 0.11 * (1 - c.glow * 0.92);
-      // 只在截角四面体 ↔ 正八面体之间走（再往外就只剩一枚光秃的四面体）
-      ground?.mesh('nexus', tesseractSlice(0.82 * Math.sin(slicePh)));
-      size *= 1 + doorK * doorK * 4;
+      if (!reduced) {
+        slicePh += dt * 0.11 * (1 - c.glow * 0.92);
+        // 只在截角四面体 ↔ 正八面体之间走（再往外就只剩一枚光秃的四面体）
+        ground?.mesh('nexus', tesseractSlice(0.82 * Math.sin(slicePh)));
+      }
+      size *= 1 + (reduced ? 0 : doorK * doorK * 4);
     }
 
     const ph = CRYS.indexOf(name) * 2.1;

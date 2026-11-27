@@ -1,6 +1,13 @@
 # 技术选型决议
 
-日期：2026-09-19 ｜ 状态：建议稿（待用户确认） ｜ 调研：两路并行智能体调研 + 官方来源核实
+日期：2026-09-19（初版选型留档） ｜ 2026-11-25 重做更新说明见下
+
+> [!NOTE]
+> **现行实现说明（2026-11-25 重做版起，以此为准）**
+> - **站点骨架与路由**：Astro 7 纯静态输出 + `ClientRouter`（`src/layouts/Base.astro` 唯一外壳，画布 `#g`、左下工具星 `Toolstar`、右下旁白 `Ave` 与自绘光标跨页 `transition:persist` 常驻，无整页重载）。
+> - **图形与动效层**：采用手写原生 **WebGL2 单画布**（`src/scripts/ground.js` + `src/scripts/site.ts`）统一绘制低分辨率像素流光场、双线性插值磨砂玻璃与四类多面体/四维切面晶体；**未引入 GSAP 与 Lenis**，页面过渡与交互动画全部由原生 CSS 与轻量 `requestAnimationFrame` 状态机完成。
+> - **字体与部署**：思源宋体由 `scripts/fonts.mjs` 按站内实际用字自切 500/600 子集包；部署于 GitHub Pages（`https://traveritas.github.io`）。
+> - 下文保留 2026-09-19 建站初期的技术选型调研原稿作为历史背景参考。
 
 ## 0. 背景与前提
 

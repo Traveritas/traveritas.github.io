@@ -9,11 +9,11 @@
      会被原样写进行内样式，于是代码的颜色跟着醒梦两态（reality.ts 逐帧改写的
      --umber / --ghost-ink）与夜色（--fg / --fg-soft）一起走，不需要另立一套色板。
 
-   墨色只用站内已有的四枚，且**琥珀一次都不出现**（它属于锚点与进度）：
-     · 注释        → --fg-soft      退到背景里
-     · 关键字      → --umber        借链接那枚墨
-     · 字符串 / 类型 → --ghost-ink  残影的暖墨（梦色压深的位置）
-     · 数字与其余  → --fg           中性（数字靠 tabular 自己对齐）
+   墨色只用站内低饱和薄暮紫与雾蓝冷灰，且**琥珀一次都不出现**（它属于锚点与进度）：
+     · 注释        → --fg-soft    退到背景里
+     · 关键字      → --code-kw    薄暮紫墨（按昼夜两态自动切换明暗，保证深浅底对比度）
+     · 字符串 / 类型 → --code-str  雾蓝灰墨（同上）
+     · 数字与其余  → --fg         中性（数字靠 tabular 自己对齐）
 
    底交给 CSS：editor.background 写成与 .md pre 同一个 color-mix 面板色。
    注意不能写 `transparent` —— 主题的值会作为**行内** background-color 落到 <pre> 上，
@@ -34,7 +34,7 @@ export const xingmeng = {
     },
     {
       scope: ['keyword', 'storage', 'storage.type', 'storage.modifier', 'keyword.control'],
-      settings: { foreground: 'var(--umber)' },
+      settings: { foreground: 'var(--code-kw)' },
     },
     /* 放在关键字之后：运算符与标点回到中性，免得满屏都是那枚最深的墨 */
     {
@@ -51,7 +51,7 @@ export const xingmeng = {
         'support.type',
         'support.class',
       ],
-      settings: { foreground: 'var(--ghost-ink)' },
+      settings: { foreground: 'var(--code-str)' },
     },
   ],
 };

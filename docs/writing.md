@@ -1,6 +1,6 @@
 # 两态正文写作手册
 
-正文可以随全站醒/梦两个状态切换内容。长按空白处 2200ms 入梦检验（或已入梦时同手势 1300ms 回醒）即换面；无 JS、读屏器、`prefers-reduced-motion` 恒读醒面真值。
+正文可以随全站昼（醒）/ 夜（梦）两个状态切换内容。通过左下角工具星的「换面」按钮（或阅读页移动底栏「换面」、URL 参数 `?face=wake` / `?face=dream`）即可切换；HTML 原文默认存放醒面真值（无 JS 时行内双面元素保留醒面字面，首屏脚本默认进入夜/梦面）。
 
 ## 行内换字 `[[醒|梦]]`
 
@@ -11,11 +11,10 @@
 ```
 
 - 醒面读到「同一段已经」，梦面读到「这段忽然」。
-- 产出为站内标准双文案元素（`data-morph`），随长按线到达逐个乱码换面，梦态还会随机走神。
+- 产出为站内标准双文案元素（`data-morph`，带 `data-true` 与 `data-dream`），由 `src/scripts/site.ts` 的 `applyFace()` 随昼夜状态切换文本。
 - 两侧均为**纯文本**，不能嵌 markdown 语法（加粗、链接都不行）；两侧不能含 `]`。
 - 标题里也可用（如 `## 器物[[志|谱]]`）。
-- 视觉显影质感：行内双面文案在字身附带一层琥珀零模糊微错位潜影（Micro Echo，错位 1.2px 1px，混入 46% 琥珀温色），在黑夜与白昼底色下皆清晰可见，静默提示背后存在另一声轨；两态皆保持纯静态，零渲染与动画开销。
-- 适度使用：每个双面元素都注册进换面清单，一篇文章几处到十几处为宜，整段整句请用块级。
+- 适度使用：一篇文章几处到十几处为宜，整段整句请用块级。
 
 ## 块级换段 `:::dream` / `:::wake`
 
@@ -34,8 +33,7 @@
 - 块内是完整 markdown（标题、列表、引文都可以）。
 - 未标记的正文两面共读——通常用它承住两版的共同骨架，只在分岔处写块。
 - `:::wake` 与 `:::dream` 相邻摆放即可表达「同一段的两种写法」。
-- 视觉显影指示：文段本身绝对不动（无额外缩进），外侧两侧悬浮相距字面约 12px 的发丝方括号「[」与「]」（醒态冷沙微温，梦态琥珀转亮），像光学对焦框般静默提示该段存在另一声轨。
-- 换面发生在长按闩锁的瞬间：出现的一侧淡入浮现（约 0.9s），消失侧即时让位；行内换字才有逐个乱码。
+- 显隐由 `src/styles/site.css` 的 `:root[data-face='wake'] [data-side=...]` 控制，随全站昼夜状态即时切换。
 - 容器标记只认 `dream` / `wake` 两个名字。
 
 ## 行内光景 `((浮起))` / `{{流过}}`
@@ -74,7 +72,7 @@
 | | `dur` | s / ms | `--sheen-dur` | 7s |
 | | `steps` | 整数（抽帧档数，构建期烘焙进曲线） | —— | 不抽帧 |
 
-不写参数时全部走 `src/styles/global.css` 的默认值；也可以在容器上覆盖同名变量一次改一片（样式预览页「醒梦双态」一节的滑杆就是这么接的）。
+不写参数时保留默认自定义属性标记（注：2026-11-25 重做版将全站动效收敛至 `ground.js` 像素流光与晶体画布，`twilight.mjs` 仍完整解析并输出 `.float-run` / `.sheen-run` 结构与参数，旧版视觉呈现留存于 `/legacy/wander/`）。
 
 ## 文风与两态语感规范
 
@@ -88,16 +86,11 @@
 6. **梦态 (Dream)**：浪漫、空灵、具有哲学知觉悖论与纯善透明的电波感（汲取《素晴日》式维特根斯坦哲学命题、银河铁道与意识漂浮感，善用知觉悖论与诗性发问，但剔除猎奇与阴暗，保留纯净哲思）。
 
 ### 导航与版块映射
-- **随笔 (Articles)**：醒态 `随笔` ↔ 梦态 `断章`
-- **瞬间 (Moments)**：醒态 `瞬间` ↔ 梦态 `闪念`
-- **项目 (Projects)**：醒态 `项目` ↔ 梦态 `造物`
-- **关于 (About)**：醒态 `关于` ↔ 梦态 `此身`
-
-### 核心版块徽标体系（维特根斯坦命题边界）
-- **随笔**：`可言说的 · SAYABLE`
-- **瞬间**：`即逝的 · EPHEMERAL`
-- **项目**：`可构造的 · BUILDABLE`
-- **关于/出口**：`存在于此 · PRESENCE`
+2026-11-25 重做版起，三处版块名固定使用梦面定名（路径仍与集合名一致）：
+- **断章 (`articles`)**：`ESSAYS`（随笔长文）
+- **闪念 (`moments`)**：`MOMENTS`（图文散页与短句）
+- **造物 (`projects`)**：`PROJECTS`（项目展墙）
+- **NEXUS 的门 (`gate`)**：`/gate/`（旧路径 `/about` 自动重定向至此）
 
 
 ## 语义与边界
@@ -140,15 +133,12 @@ RSS 输出全文，同样只有醒面（`:::dream` 块整块略去）。
 ## 实现位置
 
 - 语法解析：`src/markdown/twilight.mjs`（经 `@astrojs/markdown-satteri` 的 `features.directive` 挂入 `astro.config.mjs`）
-- 小节序号：`src/markdown/ordinal.mjs`（同一份 `mdastPlugins`，构建期把 `h2` 的序号拆成一枚数字一个 span 注入；**写作侧不用管它，`##` 就是全部语法**。样式与形制见 `docs/design/content-typography.md` 第二节末）
-- 行内光景的样式：`src/styles/global.css`「行内光景」一节（`.float-run` / `.sheen-run`）。
-  逐字浮起的动画**常驻**、位移与顶点色都乘 `--still`（梦 1 → 醒 0）：醒面（含无 JS、读屏、RM）位移为零、
-  字色回到正文原色，而换面时不再有一下骤停；流光没有「振幅」可收，仍按 `body[data-reality='dream']` 开关。
-  流光的逐字曲线由 `src/markdown/sheen-timing.mjs` 在构建期算出（`span` / `steps` 烘焙进每个字的 `--sh-e`），
-  样式预览页的 span 滑杆调用同一函数实时重算。
-- ⚠ **改完解析器要重启 dev server**：`astro.config.mjs` 与它引入的 mdast 插件只在 dev 启动时读一次，热更新不会带上（症状是新的行内语法原样输出成 `((…))`，而 CSS、老语法一切正常）。
+- 小节序号：`src/markdown/ordinal.mjs`（同一份 `mdastPlugins`，构建期把 `h2` 的序号拆成 `.ord` 数字 span 注入；**写作侧不用管它，`##` 就是全部语法**，样式见 `src/styles/site.css` 的 `.prose .ord`）
+- 任务清单无障碍：`src/markdown/task-a11y.mjs`（`hastPlugins`，构建期为 GFM `- [x]` / `- [ ]` 的只读 checkbox 自动补齐 `aria-label`）
+- 代码配色：`src/markdown/shiki-theme.mjs`（令牌引用 `src/styles/tokens.css` 的 `--fg` / `--fg-soft` / `--code-kw` / `--code-str`，随昼夜两态自动切换对比度）
+- ⚠ **改完解析器要重启 dev server**：`astro.config.mjs` 与它引入的 mdast / hast 插件只在 dev 启动时读一次，热更新不会带上。
 - ⚠ **改完插件还要清构建缓存**：插件的改动不算内容改动，`npm run build` 会直接复用 `.astro/` 与
   `node_modules/.astro/` 里缓存的渲染结果（症状是「插件改了、构建成功、`dist/` 里的标记没变」）。
-  先 `rm -rf .astro node_modules/.astro` 再构建。
-- 块级显隐：`src/styles/global.css` 的 `[data-side]` 规则（挂 `body[data-reality]`）
-- 行内换面：`src/scripts/morph.ts` 双面元素 + `src/scripts/reality.ts` 入梦检验
+  先清理 `.astro` 与 `node_modules/.astro` 再构建。
+- 块级显隐：`src/styles/site.css` 的 `[data-side]` 规则（挂 `:root[data-face='wake']`）
+- 行内换面与昼夜状态：`src/scripts/site.ts`（`applyFace` 同步 `[data-morph]`）+ `src/scripts/reality.ts`（广播昼夜状态与混色令牌）

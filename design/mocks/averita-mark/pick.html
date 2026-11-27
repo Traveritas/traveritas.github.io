@@ -1,0 +1,701 @@
+<!doctype html>
+<html lang="zh-CN" data-face="wake">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AveritA 几种笔画</title>
+<style>
+  :root {
+    --bg: #f0f3f6; --fg: #232830; --soft: #56606d; --faint: #858f9d;
+    --line: rgba(35, 40, 48, 0.12); --accent: #9a86c4;
+    --serif: 'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif;
+    --mono: 'IBM Plex Mono', 'Cascadia Mono', Consolas, monospace;
+  }
+  :root[data-face='dream'] {
+    --bg: #121327; --fg: #ece7f3; --soft: #b7b0c8; --faint: #847e98;
+    --line: rgba(236, 231, 243, 0.14); --accent: #b9a8ec;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--fg); font: 14px/1.7 system-ui, 'Microsoft YaHei UI', sans-serif; padding: 48px 16px 96px; transition: background .4s, color .4s; }
+  .wrap { max-width: 1080px; margin: 0 auto; }
+  header.top { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; border-bottom: 1px solid var(--line); padding-bottom: 18px; margin-bottom: 30px; }
+  header.top h1 { font: 400 22px var(--serif); letter-spacing: .04em; }
+  header.top p { color: var(--soft); font-size: 13px; max-width: 780px; }
+  header.top a { color: var(--soft); }
+  button { font: 12px var(--mono); letter-spacing: .14em; background: none; border: 1px solid var(--line); color: var(--soft); padding: 6px 12px; cursor: pointer; border-radius: 3px; }
+  button:hover, button[aria-pressed='true'] { color: var(--fg); border-color: color-mix(in srgb, var(--fg) 35%, transparent); }
+  .card { border: 1px solid var(--line); border-radius: 3px; overflow: hidden; margin-bottom: 26px; }
+  .stage { position: relative; height: 440px; }
+  .stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .stage canvas.pix { image-rendering: pixelated; }
+  .stage .ctl { position: absolute; right: 12px; bottom: 10px; display: flex; gap: 8px; }
+  .meta { padding: 16px 20px 18px; border-top: 1px solid var(--line); display: grid; grid-template-columns: 180px 1fr; gap: 20px; }
+  .meta .k { font: 11px var(--mono); letter-spacing: .16em; color: var(--faint); }
+  .meta h2 { font: 400 18px var(--serif); margin-top: 2px; }
+  .meta p { color: var(--soft); font-size: 13px; }
+  .meta p + p { margin-top: 6px; }
+  .small { display: flex; align-items: center; gap: 14px; margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--line); font: 11px var(--mono); letter-spacing: .1em; color: var(--faint); }
+  .small canvas { width: 150px; height: 46px; }
+  .stars { display: grid; grid-template-columns: repeat(5, 1fr); }
+  .stars > div { border-right: 1px solid var(--line); padding: 0 0 12px; display: flex; flex-direction: column; align-items: center; gap: 4px; font: 12px var(--mono); letter-spacing: .08em; color: var(--soft); }
+  .stars > div:last-child { border-right: 0; }
+  .stars canvas { width: 100%; height: 170px; display: block; }
+  @media (max-width: 640px) { .meta { grid-template-columns: 1fr; gap: 6px; } .stage { height: 300px; } .stars { grid-template-columns: repeat(3, 1fr); } .stars > div:nth-child(3) { border-right: 0; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>AveritA · 几种笔画</h1>
+      <p>发丝、流光是从 <a href="form.html">form.html</a> / <a href="hand.html">hand.html</a> 挑出来的，后三种是新的。每种用自己的一副字形和比例，不求统一。i 上的星都是细长的四芒星（四芒等长、带一点歪），但每种样式配自己的一颗：歪的角度、细的程度、材质各不相同。</p>
+    </div>
+    <button id="face">昼 / 夜</button>
+  </header>
+
+  <section class="card">
+    <div class="stars" id="stars"></div>
+    <div class="meta">
+      <div><div class="k">00 · STAR</div><h2>五颗星</h2></div>
+      <div>
+        <p>四芒等长，每一芒从中心往尖端收细，腰极细、尖极长。不再用分面的紫色晶体：发丝、解析、余像的星就是和笔画同一种墨色的实心，跟字是一体的；流光是像素；星屑那颗是一团光，芒往尖端化进背景，中心一粒亮点。</p>
+        <p>发丝 歪 12°；流光 歪 22°、更细；解析 几乎立正、四芒延出虚线作图线；余像 歪 28°、细成针；星屑 歪 10°、最饱满，带一颗伴星。</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="stage" id="s1"><canvas></canvas>
+      <div class="ctl"><button data-p="old">原比例</button><button data-p="new" aria-pressed="true">调整后</button><button data-re>再成形</button></div>
+    </div>
+    <div class="meta">
+      <div><div class="k">01 · HAIRLINE</div><h2>发丝</h2></div>
+      <div>
+        <p>比例沿用上一轮的调整：e 收到 68 宽、A 放到 68，t 降到 132，三条下拖线 128 / 104 / 80，整词横纵比约 1.7。右下角可以切回原比例。</p>
+        <p>星和字同墨，实心；光走过 i 时它染上一点薄暮色，四芒一起拉长。</p>
+        <div class="small"><canvas id="m1"></canvas><span>左上角尺寸（静帧）</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="stage" id="s2"><canvas class="pix"></canvas><div class="ctl"><button data-re>重写</button></div></div>
+    <div class="meta">
+      <div><div class="k">02 · PIXEL STREAM</div><h2>流光</h2></div>
+      <div>
+        <p>手写骨架，字是粗像素格，光粒顺着笔顺流，流到下拖线尽头继续往下淌一小段再散掉；开场先粗再解析。</p>
+        <p>星是像素画的细长四芒，歪着；隔几秒，光沿四芒各拉出一截。</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="stage" id="s3"><canvas></canvas><div class="ctl"><button data-re>重来</button></div></div>
+    <div class="meta">
+      <div><div class="k">03 · RESOLVE</div><h2>解析</h2></div>
+      <div>
+        <p>一副宽扁、圆角方折的字：A 是方拱加一道通长的横，e 是方的，r、t 收成直角。字先是一张很粗的像素格，一道竖向的光从左扫到右，光经过的地方格子一档档变细，最后落成一根细线；停一会儿，光再从右扫回去，字又退回粗格。</p>
+        <p>流光和发丝之间的那一步，单独拿出来做成一个过程。</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="stage" id="s4"><canvas></canvas><div class="ctl"><button data-re>重来</button></div></div>
+    <div class="meta">
+      <div><div class="k">04 · ECHO</div><h2>余像</h2></div>
+      <div>
+        <p>一副很窄很高的字，x 高 160、字宽只有 22–44，下拖线都拉得长。主线之外还有两道薄暮色、浅粉色的余像，绕着主线慢慢错开、变虚，又慢慢收回来叠成一道；完全叠上的那一刻，星亮一下。</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="stage" id="s5"><canvas></canvas><div class="ctl"><button data-re>重来</button></div></div>
+    <div class="meta">
+      <div><div class="k">05 · SPARKLE</div><h2>星屑</h2></div>
+      <div>
+        <p>手写骨架往右斜过去，字距放开。笔画全由大小不一的小四芒星排成，和 i 上那颗同一个形、同一个歪角，各自明灭。按笔顺一颗颗亮起；下拖线上的星越往下越稀，慢慢往下飘。</p>
+      </div>
+    </div>
+  </section>
+</div>
+
+<svg width="0" height="0" style="position:absolute"><path id="probe" /></svg>
+
+<script>
+/* ───────── 共用 ───────── */
+const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+const ease = (t) => 1 - Math.pow(1 - clamp(t), 3);
+const easeIO = (t) => { t = clamp(t); return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; };
+const hex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+const mix = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
+const dark = () => document.documentElement.dataset.face === 'dream';
+function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function noise1(r) { const T = Array.from({ length: 256 }, r); return (x) => { const i = Math.floor(x), f = x - i, u = f * f * (3 - 2 * f); return T[i & 255] * (1 - u) + T[(i + 1) & 255] * u; }; }
+const probe = document.getElementById('probe');
+function sample(d) {
+  probe.setAttribute('d', d);
+  const L = probe.getTotalLength(), n = Math.max(2, Math.ceil(L));
+  return Array.from({ length: n + 1 }, (_, i) => { const p = probe.getPointAtLength(L * i / n); return [p.x, p.y]; });
+}
+function setup(cv) {
+  const dpr = devicePixelRatio || 1, r = cv.getBoundingClientRect();
+  cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
+  const c = cv.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { c, W: r.width, H: r.height };
+}
+const TINTS = (D) => (D ? ['#6f86a8', '#9a86c4', '#c69cba'] : ['#7f93a8', '#8576b0', '#a77f9a']).map(hex);
+const tintAt = (T, u) => { u = clamp(u); return u < 0.5 ? mix(T[0], T[1], u * 2) : mix(T[1], T[2], u * 2 - 1); };
+
+/* ───────── 四芒星：等长、细长、带歪 ─────────
+   每一芒：中心处半宽 hw·R，往尖端按 (1−s)^p 收细；四芒等长。
+   每种样式配自己的一颗（形 + 材质），不共用。 */
+const STARS = {
+  hair:    { name: '发丝 · 墨',   tilt: -12, hw: 0.07, p: 1.8, mat: 'ink' },
+  stream:  { name: '流光 · 像素', tilt: -22, hw: 0.05, p: 2.4, mat: 'pixel' },
+  resolve: { name: '解析 · 作图', tilt: -6, hw: 0.06, p: 2.0, mat: 'ink', ext: 1.25 },
+  echo:    { name: '余像 · 针',   tilt: -28, hw: 0.042, p: 2.6, mat: 'ink' },
+  spark:   { name: '星屑 · 光',   tilt: -10, hw: 0.085, p: 1.6, mat: 'light', twin: true },
+};
+const armDir = (o, k) => { const a = (o.tilt - 90 + k * 90) * Math.PI / 180; return [Math.cos(a), Math.sin(a)]; };
+function starHalves(o, R, len = 1, N = 18) {
+  const out = [];
+  for (let k = 0; k < 4; k++) {
+    const d = armDir(o, k), nr = [-d[1], d[0]];
+    for (const side of [-1, 1]) {
+      const pts = [[0, 0]];
+      for (let i = 0; i <= N; i++) { const s = i / N, w = side * o.hw * R * Math.pow(1 - s, o.p), al = s * R * len; pts.push([d[0] * al + nr[0] * w, d[1] * al + nr[1] * w]); }
+      out.push({ pts, k, d });
+    }
+  }
+  return out;
+}
+const pathHalf = (c, h, cx, cy) => { h.pts.forEach(([x, y], i) => c[i ? 'lineTo' : 'moveTo'](cx + x, cy + y)); c.closePath(); };
+/* 材质
+   ink   —— 和笔画同一种墨色，实心，干净；
+   light —— 一团光：芒从中心往尖端化进背景，中心一粒亮点，外面一圈很淡的晕。
+   ext   —— 四芒延长出去的作图细线（虚线）。 */
+function drawStar(c, cx, cy, R, o, { col = [35, 40, 48], a = 1, glow = 0, core = null } = {}) {
+  const len = 1 + glow * 0.5;
+  if (o.ext || glow > 0.02) {
+    c.save(); c.lineWidth = 0.7; if (o.ext) c.setLineDash([2, 3]);
+    for (let k = 0; k < 4; k++) {
+      const d = armDir(o, k), r0 = R * len * 0.9, r1 = R * (len + (o.ext || 0) + glow * 1.6);
+      const g = c.createLinearGradient(cx + d[0] * r0, cy + d[1] * r0, cx + d[0] * r1, cy + d[1] * r1);
+      g.addColorStop(0, `rgba(${col},${(0.35 + glow * 0.45) * a})`); g.addColorStop(1, `rgba(${col},0)`);
+      c.strokeStyle = g; c.beginPath(); c.moveTo(cx + d[0] * r0, cy + d[1] * r0); c.lineTo(cx + d[0] * r1, cy + d[1] * r1); c.stroke();
+    }
+    c.restore();
+  }
+  const hs = starHalves(o, R, len);
+  if (o.mat === 'light') {
+    const halo = c.createRadialGradient(cx, cy, 0, cx, cy, R * 0.75);
+    halo.addColorStop(0, `rgba(${col},${0.22 * a})`); halo.addColorStop(1, `rgba(${col},0)`);
+    c.fillStyle = halo; c.fillRect(cx - R, cy - R, R * 2, R * 2);
+    hs.forEach((h) => {
+      const g = c.createLinearGradient(cx, cy, cx + h.d[0] * R * len, cy + h.d[1] * R * len);
+      g.addColorStop(0, `rgba(${col},${a})`); g.addColorStop(0.55, `rgba(${col},${0.55 * a})`); g.addColorStop(1, `rgba(${col},0)`);
+      c.fillStyle = g; c.beginPath(); pathHalf(c, h, cx, cy); c.fill();
+    });
+    const cr = Math.max(1.2, o.hw * R * 1.6), g = c.createRadialGradient(cx, cy, 0, cx, cy, cr * 2.2);
+    g.addColorStop(0, `rgba(${core || col},${a})`); g.addColorStop(1, `rgba(${core || col},0)`);
+    c.fillStyle = g; c.fillRect(cx - cr * 3, cy - cr * 3, cr * 6, cr * 6);
+  } else {
+    // 一条外轮廓：每一芒先走朝上一芒的那侧（根→尖），再走另一侧（尖→根）
+    c.fillStyle = `rgba(${col},${a})`; c.beginPath();
+    for (let k = 0; k < 4; k++) {
+      const [l, r] = [hs[k * 2], hs[k * 2 + 1]];
+      l.pts.slice(1).forEach(([x, y], i) => c[k || i ? 'lineTo' : 'moveTo'](cx + x, cy + y));
+      r.pts.slice(1).reverse().forEach(([x, y]) => c.lineTo(cx + x, cy + y));
+    }
+    c.closePath(); c.fill();
+  }
+  if (o.twin) {
+    const t = (o.tilt - 45) * Math.PI / 180;
+    drawStar(c, cx + Math.cos(t) * R * 0.66, cy + Math.sin(t) * R * 0.66, R * 0.3, { ...o, twin: false, ext: 0 }, { col, a, glow, core });
+  }
+}
+// 像素版：格子落在某一芒里（沿芒距离 s、离芒中线距离 ≤ 半宽）就算
+function starCells(S, o) {
+  const cells = new Map(), t = -o.tilt * Math.PI / 180, ct = Math.cos(t), st = Math.sin(t);
+  const add = (ox, oy, S) => {
+    const E = Math.ceil(S + 1);
+    for (let y = -E; y <= E; y++) for (let x = -E; x <= E; x++) {
+      const u = Math.abs(x * ct - y * st), v = Math.abs(x * st + y * ct);
+      let w = 0;
+      for (const [al, pe] of [[v, u], [u, v]]) { const s = al / S; if (s <= 1 && pe <= Math.max(0.5, 1.8 * o.hw * S * Math.pow(1 - s, o.p))) w = Math.max(w, 1 - s * 0.75); }
+      if (w) { const key = `${x + ox},${y + oy}`; cells.set(key, Math.max(cells.get(key) || 0, w)); }
+    }
+  };
+  add(0, 0, S);
+  if (o.twin) { const a = (o.tilt - 45) * Math.PI / 180; add(Math.round(Math.cos(a) * S * 0.66), Math.round(Math.sin(a) * S * 0.66), Math.max(2.5, S * 0.3)); }
+  return [...cells].map(([k, w]) => [...k.split(',').map(Number), w]);
+}
+
+/* ───────── 骨架工具（单位：基线 y=0，向下为正） ───────── */
+function buildWord(glyphs, gap, { shear = 0, starR = 34 } = {}) {
+  let x = 0; const strokes = [], guides = []; let star;
+  const sh = ([a, b]) => [a - b * shear, b];
+  glyphs.forEach((g, gi) => {
+    g.s.forEach((d) => strokes.push({ glyph: gi, pts: sample(d).map(([a, b]) => sh([a + x, b])) }));
+    (g.g || []).forEach(([, cx, cy, rx, ry]) => guides.push([cx + x, cy, rx, ry]));
+    if (g.star) star = sh([g.star[0] + x, g.star[1]]);
+    x += g.w + (gap[gi] || 0);
+  });
+  strokes.forEach((s) => { s.drip = s.pts[s.pts.length - 1][1] > 20; });
+  let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+  strokes.forEach((s) => s.pts.forEach(([a, b]) => { x0 = Math.min(x0, a); x1 = Math.max(x1, a); y0 = Math.min(y0, b); y1 = Math.max(y1, b); }));
+  y0 = Math.min(y0, star[1] - starR - 8); x1 = Math.max(x1, star[0] + starR * 0.6);
+  return { strokes, guides, star, starR, width: x, box: [x0, y0, x1, y1] };
+}
+function fitWord(Wd, W, H, pad) {
+  const [x0, y0, x1, y1] = Wd.box;
+  const k = Math.min((W - pad * 2) / (x1 - x0), (H - pad * 2) / (y1 - y0));
+  const ox = (W - (x1 - x0) * k) / 2 - x0 * k, oy = (H - (y1 - y0) * k) / 2 - y0 * k;
+  const f = ([x, y]) => [x * k + ox, y * k + oy];
+  const strokes = Wd.strokes.map((s) => {
+    const pts = s.pts.map(f), cum = [0];
+    for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+    const nrm = pts.map((_, i) => { const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)]; const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; return [-(b[1] - a[1]) / l, (b[0] - a[0]) / l]; });
+    // 下拖线越往下越淡
+    const endY = pts[pts.length - 1][1], y0 = oy + 4 * k;
+    const w = pts.map(([, y]) => s.drip ? 1 - Math.pow(clamp((y - y0) / (endY - y0)), 0.7) * 0.96 : 1);
+    return { ...s, pts, cum, nrm, w, len: cum[cum.length - 1] };
+  });
+  return { k, f, ox, oy, strokes, star: f(Wd.star), SR: Wd.starR * k, Wd, left: f([x0, 0])[0], right: f([x1, 0])[0] };
+}
+function at(s, d) {
+  let lo = 0, hi = s.cum.length - 1;
+  while (hi - lo > 1) { const m = (lo + hi) >> 1; if (s.cum[m] < d) lo = m; else hi = m; }
+  const seg = s.cum[hi] - s.cum[lo] || 1, f = clamp((d - s.cum[lo]) / seg), a = s.pts[lo], b = s.pts[hi];
+  return { x: a[0] + (b[0] - a[0]) * f, y: a[1] + (b[1] - a[1]) * f, n: s.nrm[lo], w: s.w[lo] };
+}
+// 整词描一遍；下拖线按 w 渐淡并染向 tint
+function strokeWord(c, F, ink, tint, lw, alpha = 1, off = [0, 0]) {
+  c.lineWidth = lw; c.lineCap = 'round'; c.lineJoin = 'round';
+  for (const s of F.strokes) {
+    if (!s.drip) {
+      c.strokeStyle = `rgba(${ink},${alpha})`; c.beginPath();
+      s.pts.forEach(([x, y], i) => c[i ? 'lineTo' : 'moveTo'](x + off[0], y + off[1])); c.stroke(); continue;
+    }
+    for (let i = 1; i < s.pts.length; i += 2) {
+      const [ax, ay] = s.pts[i - 1], [bx, by] = s.pts[Math.min(i + 1, s.pts.length - 1)], w = s.w[i];
+      c.strokeStyle = `rgba(${mix(ink, tint, Math.min(1, (1 - w) * 1.6)).map(Math.round)},${w * alpha})`;
+      c.beginPath(); c.moveTo(ax + off[0], ay + off[1]); c.lineTo(bx + off[0], by + off[1]); c.stroke();
+    }
+  }
+}
+function mountLoop(root, init) {
+  const cv = root.querySelector('canvas'); let raf;
+  function start() {
+    cancelAnimationFrame(raf);
+    const { c, W, H } = setup(cv), frame = init(c, W, H), T0 = performance.now();
+    const tick = (now) => { frame((now - T0) / 1000); raf = requestAnimationFrame(tick); };
+    raf = requestAnimationFrame(tick);
+  }
+  root.querySelector('[data-re]').onclick = start;
+  return start;
+}
+const BG = (D) => D ? '#121327' : '#f0f3f6';
+
+/* ───────── 骨架们 ───────── */
+// 手写（流光、星屑共用）
+const HAND_A = (tail) => [
+  `M0 -4 C0 -60 2 -112 14 -132 C26 -152 52 -150 60 -126 C67 -104 68 -60 68 -4 C68 ${tail * 0.35} 69 ${tail * 0.7} 71 ${tail}`,
+  'M-7 -58 L31 -61',
+];
+const HAND = [
+  { w: 70, s: HAND_A(150) },
+  { w: 46, s: ['M0 -98 C5 -60 15 -14 23 0 C31 -14 41 -60 46 -100'] },
+  { w: 58, s: ['M4 -50 L56 -52 C58 -82 46 -100 30 -100 C12 -100 2 -78 2 -50 C2 -20 14 0 32 0 C44 0 52 -6 57 -16'] },
+  { w: 34, s: ['M0 -100 C0 -60 0 -30 0 0', 'M0 -62 C4 -88 18 -100 34 -95'] },
+  { w: 4, s: ['M1 -124 C0 -40 1 60 3 182'], star: [6, -178] },
+  { w: 28, s: ['M4 -142 C4 -90 2 -40 4 -14 C6 -2 14 2 27 -3', 'M-14 -96 L27 -99'] },
+  { w: 70, s: HAND_A(104) },
+];
+// 几何（发丝）
+const GEO_A = (tail, w, bar) => { const r = w / 2; return { w, s: [`M0 0 V${-150 + r} A${r} ${r} 0 0 1 ${w} ${-150 + r} V${tail}`, `M-12 -58 H${bar}`], g: [['c', r, -150 + r, r, r]] }; };
+const GEO = {
+  old: [[
+    GEO_A(150, 64, 24),
+    { w: 48, s: ['M0 -100 L24 0 L48 -100'] },
+    { w: 82, s: ['M2 -50 H82 A40 50 0 1 0 74.8 -21.3'], g: [['c', 42, -50, 40, 50]] },
+    { w: 36, s: ['M0 0 V-100', 'M0 -60 A36 36 0 0 1 36 -96'], g: [['c', 36, -60, 36, 36]] },
+    { w: 0, s: ['M0 -100 V120'], star: [0, -148] },
+    { w: 28, s: ['M0 -138 V-24 A24 24 0 0 0 24 0', 'M-14 -100 H28'], g: [['c', 24, -24, 24, 24]] },
+    GEO_A(96, 64, 24),
+  ], [24, 20, 20, 20, 22, 26]],
+  new: [[
+    GEO_A(128, 68, 26),
+    { w: 50, s: ['M0 -100 L25 0 L50 -100'] },
+    { w: 68, s: ['M2 -50 H68 A34 50 0 1 0 61.85 -21.3'], g: [['c', 34, -50, 34, 50]] },
+    { w: 32, s: ['M0 0 V-100', 'M0 -64 A32 32 0 0 1 32 -96'], g: [['c', 32, -64, 32, 32]] },
+    { w: 0, s: ['M0 -100 V104'], star: [0, -148] },
+    { w: 26, s: ['M0 -132 V-24 A24 24 0 0 0 24 0', 'M-14 -100 H26'], g: [['c', 24, -24, 24, 24]] },
+    GEO_A(80, 68, 26),
+  ], [22, 18, 18, 18, 20, 24]],
+};
+// 宽扁方折（解析）
+const WIDE_A = (tail) => ({ w: 104, s: [`M0 0 V-112 A18 18 0 0 1 18 -130 H86 A18 18 0 0 1 104 -112 V${tail}`, 'M0 -56 H104'] });
+const WIDE = [[
+  WIDE_A(64),
+  { w: 84, s: ['M0 -100 L42 0 L84 -100'] },
+  { w: 92, s: ['M0 -50 H92 V-82 A18 18 0 0 0 74 -100 H18 A18 18 0 0 0 0 -82 V-18 A18 18 0 0 0 18 0 H86'] },
+  { w: 58, s: ['M0 0 V-100', 'M0 -64 A36 36 0 0 1 36 -100 H58'] },
+  { w: 0, s: ['M0 -100 V44'], star: [0, -152] },
+  { w: 54, s: ['M0 -136 V-18 A18 18 0 0 0 18 0 H54', 'M-24 -100 H54'] },
+  WIDE_A(30),
+], [28, 26, 26, 30, 30, 30]];
+// 窄高（余像）
+const TALL_A = (tail) => ({ w: 44, s: [`M0 0 V-208 A22 22 0 0 1 44 -208 V${tail}`, 'M-9 -92 H20'] });
+const TALL = [[
+  TALL_A(130),
+  { w: 36, s: ['M0 -160 L18 0 L36 -160'] },
+  { w: 44, s: ['M1 -80 H44 A22 80 0 1 0 40 -34'] },
+  { w: 26, s: ['M0 0 V-160', 'M0 -112 A26 48 0 0 1 26 -160'] },
+  { w: 0, s: ['M0 -160 V100'], star: [0, -214] },
+  { w: 22, s: ['M0 -212 V-22 A22 22 0 0 0 22 0', 'M-12 -160 H24'] },
+  TALL_A(70),
+], [15, 13, 13, 14, 15, 17]];
+
+/* ───────── 00 五颗星 ───────── */
+const INK = (D) => D ? [236, 231, 243] : [35, 40, 48];
+const LIGHT_COL = (D) => D ? { col: [228, 220, 255], core: [255, 255, 255] } : { col: [124, 106, 184], core: [74, 62, 130] };
+function drawStars() {
+  const box = document.getElementById('stars'), D = dark();
+  if (!box.children.length) Object.values(STARS).forEach((o) => {
+    const d = document.createElement('div'); d.innerHTML = `<canvas></canvas><span>${o.name}</span>`; box.appendChild(d);
+  });
+  Object.values(STARS).forEach((o, i) => {
+    const { c, W, H } = setup(box.children[i].querySelector('canvas')), R = Math.min(W, H) * 0.36;
+    c.fillStyle = BG(D); c.fillRect(0, 0, W, H);
+    if (o.mat === 'pixel') {
+      const C = 4, peak = D ? [246, 242, 255] : [75, 68, 112], bg = hex(BG(D));
+      for (const [x, y, w] of starCells(Math.round(R / C), o)) { c.fillStyle = `rgb(${mix(bg, peak, Math.min(1, 0.55 + 0.6 * w)).map(Math.round)})`; c.fillRect(Math.round(W / 2 / C + x) * C, Math.round(H / 2 / C + y) * C, C, C); }
+    } else drawStar(c, W / 2, H / 2, R, o, o.mat === 'light' ? LIGHT_COL(D) : { col: INK(D) });
+  });
+}
+
+/* ───────── 01 发丝 ───────── */
+const HAIR = (() => {
+  const words = {};
+  const word = (key) => words[key] || (words[key] = buildWord(...GEO[key], { starR: 34 }));
+  function render(c, W, H, F, t, st, still) {
+    const D = dark(), ink = D ? [236, 231, 243] : [35, 40, 48], tint = D ? [167, 155, 208] : [147, 137, 174];
+    const lw = Math.max(1, 2.1 * F.k);
+    c.fillStyle = BG(D); c.fillRect(0, 0, W, H);
+    // 参考线与辅助圆
+    const ga = still ? 0 : ease(t / 0.8) * (1 - ease((t - 2.6) / 1.0));
+    if (ga > 0.01) {
+      c.save(); c.strokeStyle = `rgba(${ink},${0.28 * ga})`; c.lineWidth = 0.7; c.setLineDash([2, 4]);
+      const x0 = F.f([-24, 0])[0], x1 = F.f([F.Wd.width + 10, 0])[0];
+      [0, -100, -150].forEach((y) => { const yy = F.f([0, y])[1]; const p = ease((t - 0.1) / 0.8); c.beginPath(); c.moveTo(x0, yy); c.lineTo(x0 + (x1 - x0) * p, yy); c.stroke(); });
+      F.Wd.guides.forEach(([cx, cy, rx, ry], i) => { const p = ease((t - 0.2 - i * 0.08) / 0.7); if (p <= 0) return; const [X, Y] = F.f([cx, cy]); c.beginPath(); c.ellipse(X, Y, rx * F.k, ry * F.k, 0, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * p); c.stroke(); });
+      c.restore();
+    }
+    // 笔画（按笔顺长出来）
+    let T = 0.7; const order = [];
+    F.strokes.forEach((s) => { const dur = 0.16 + s.len / (900 * F.k + 200); order.push([T, dur]); T += dur * 0.72; });
+    c.lineWidth = lw; c.lineCap = 'round'; c.lineJoin = 'round';
+    F.strokes.forEach((s, j) => {
+      const p = still ? 1 : easeIO((t - order[j][0]) / order[j][1]); if (p <= 0) return;
+      const n = Math.max(1, Math.floor((s.pts.length - 1) * p));
+      if (!s.drip) {
+        c.strokeStyle = `rgb(${ink})`; c.beginPath(); c.moveTo(...s.pts[0]);
+        for (let i = 1; i <= n; i++) c.lineTo(...s.pts[i]); c.stroke(); return;
+      }
+      for (let i = 1; i <= n; i += 2) {
+        const [ax, ay] = s.pts[i - 1], [bx, by] = s.pts[Math.min(i + 1, n)], w = s.w[i];
+        c.strokeStyle = `rgba(${mix(ink, tint, Math.min(1, (1 - w) * 1.6)).map(Math.round)},${w})`;
+        c.beginPath(); c.moveTo(ax, ay); c.lineTo(bx, by); c.stroke();
+      }
+    });
+    if (still) { drawStar(c, F.star[0], F.star[1], F.SR, STARS.hair, { col: ink }); return; }
+    // 末端脱落的像素
+    const G = Math.max(2, Math.round(3 * F.k * 1.4));
+    if (t > T) F.strokes.forEach((s) => {
+      if (!s.drip || Math.random() > 0.07) return;
+      const q = at(s, s.len * (0.72 + Math.random() * 0.28));
+      st.px.push({ x: q.x + (Math.random() - 0.5) * 6, y: q.y, vy: 0.08 + Math.random() * 0.22, vx: (Math.random() - 0.5) * 0.05, life: 1, s: Math.random() < 0.3 ? G * 1.5 : G });
+    });
+    st.px = st.px.filter((p) => (p.life -= 0.006) > 0);
+    for (const p of st.px) {
+      p.x += p.vx; p.y += p.vy;
+      c.fillStyle = `rgba(${tint},${0.55 * p.life * Math.min(1, (1 - p.life) * 6)})`;
+      c.fillRect(Math.round(p.x / G) * G, Math.round(p.y / G) * G, p.s, p.s);
+    }
+    // 走过一遍的光
+    const total = F.strokes.reduce((a, s) => a + s.len, 0), PER = 7, tt = (t - T - 1.2) % PER;
+    let flare = 0;
+    if (t > T + 1.2 && tt < 2.2) {
+      let d = (tt / 2.2) * total * 1.04;
+      const iStroke = F.strokes.findIndex((s) => s.glyph === 4);
+      const before = F.strokes.slice(0, iStroke).reduce((a, s) => a + s.len, 0);
+      flare = Math.exp(-Math.pow((d - before) / (total * 0.05), 2));
+      for (const s of F.strokes) {
+        if (d < s.len) {
+          const tail = Math.min(d, 60 * F.k + 20);
+          c.save(); c.shadowColor = D ? 'rgba(220,210,255,.9)' : 'rgba(154,134,196,.9)'; c.shadowBlur = 10;
+          for (let q = 0; q < 12; q++) {
+            const a0 = at(s, d - tail * (q + 1) / 12), a1 = at(s, d - tail * q / 12);
+            c.strokeStyle = D ? `rgba(255,252,255,${(1 - q / 12) * 0.95})` : `rgba(154,134,196,${(1 - q / 12) * 0.95})`;
+            c.lineWidth = lw * 1.6; c.beginPath(); c.moveTo(a0.x, a0.y); c.lineTo(a1.x, a1.y); c.stroke();
+          }
+          c.restore(); break;
+        }
+        d -= s.len;
+      }
+    }
+    const sp = ease((t - T + 0.1) / 0.6); if (sp <= 0) return;
+    const [sx, sy] = F.star, R = F.SR * sp * (1 + 0.03 * Math.sin(t * 2.2));
+    if (flare > 0.05) { const g = c.createRadialGradient(sx, sy, 0, sx, sy, R * 1.6); g.addColorStop(0, `rgba(185,168,236,${0.35 * flare})`); g.addColorStop(1, 'rgba(185,168,236,0)'); c.fillStyle = g; c.fillRect(sx - R * 2, sy - R * 2, R * 4, R * 4); }
+    drawStar(c, sx, sy, R, STARS.hair, { col: mix(ink, tint, flare * 0.8).map(Math.round), glow: flare });
+  }
+  function mount(root) {
+    const cv = root.querySelector('canvas'); let raf, key = 'new';
+    function start() {
+      cancelAnimationFrame(raf);
+      const { c, W, H } = setup(cv), F = fitWord(word(key), W, H, 36), st = { px: [] }, T0 = performance.now();
+      const tick = (now) => { render(c, W, H, F, (now - T0) / 1000, st, false); raf = requestAnimationFrame(tick); };
+      raf = requestAnimationFrame(tick);
+      const m = setup(document.getElementById('m1')); render(m.c, m.W, m.H, fitWord(word(key), m.W, m.H, 3), 0, {}, true);
+    }
+    root.querySelector('[data-re]').onclick = start;
+    root.querySelectorAll('[data-p]').forEach((b) => b.onclick = () => {
+      key = b.dataset.p;
+      root.querySelectorAll('[data-p]').forEach((o) => o.setAttribute('aria-pressed', String(o === b)));
+      start();
+    });
+    return start;
+  }
+  return { mount };
+})();
+
+/* ───────── 02 流光 ───────── */
+const STREAM = (() => {
+  let WORD;
+  function wobble(r, amp, freq) {
+    WORD = WORD || buildWord(HAND, [26, 24, 24, 22, 20, 30], { starR: 44 });
+    const strokes = WORD.strokes.map((s) => {
+      const nz = noise1(r), ph = r() * 100, dy = (r() - 0.5) * 6, p = s.pts;
+      return { ...s, pts: p.map(([x, y], i) => {
+        const a = p[Math.max(0, i - 1)], b = p[Math.min(p.length - 1, i + 1)];
+        let nx = -(b[1] - a[1]), ny = b[0] - a[0]; const l = Math.hypot(nx, ny) || 1;
+        const o = (nz(ph + i * freq) - 0.5) * 2 * amp;
+        return [x + nx / l * o, y + ny / l * o + dy];
+      }) };
+    });
+    return { ...WORD, strokes };
+  }
+  function mount(root) {
+    const cv = root.querySelector('canvas');
+    let raf, seed = 11;
+    function start() {
+      cancelAnimationFrame(raf);
+      const CELL = 4, rect = cv.getBoundingClientRect();
+      const gw = Math.ceil(rect.width / CELL), gh = Math.ceil(rect.height / CELL);
+      cv.width = gw; cv.height = gh;
+      const c = cv.getContext('2d'), img = c.createImageData(gw, gh);
+      const r = rng(seed), D = dark();
+      const F = fitWord(wobble(r, 1.2, 0.02), gw, gh, 9);
+      const N = gw * gh, buf = new Float32Array(N), base = new Float32Array(N), stb = new Float32Array(N);
+      const put = (a, x, y, v) => { x = Math.round(x); y = Math.round(y); if (x >= 0 && y >= 0 && x < gw && y < gh) a[y * gw + x] += v; };
+      F.strokes.forEach((s) => s.pts.forEach(([x, y]) => { const i = (y | 0) * gw + (x | 0); base[i] = Math.max(base[i], 0.4); }));
+      const lens = F.strokes.map((s) => s.pts.length), tot = lens.reduce((a, b) => a + b, 0);
+      const pick = () => { let q = r() * tot; for (let k = 0; k < lens.length; k++) { if ((q -= lens[k]) < 0) return k; } return 0; };
+      const parts = Array.from({ length: 240 }, () => ({ k: pick(), s: r() * 40, v: 0.25 + r() * 0.5, drip: 0 }));
+      const bg = hex(BG(D)), tints = TINTS(D), peak = hex(D ? '#f6f2ff' : '#4b4470');
+      const [sx, sy] = F.star, SA = Math.max(9, Math.round(F.SR)), cells = starCells(SA, STARS.stream);
+      const T0 = performance.now();
+      const fine = document.createElement('canvas'); fine.width = gw; fine.height = gh;
+      const small = document.createElement('canvas'), sc = small.getContext('2d');
+      const tick = (now) => {
+        const el = (now - T0) / 1000;
+        for (let i = 0; i < N; i++) { buf[i] *= 0.84; stb[i] = 0; }
+        for (const p of parts) {
+          const pts = F.strokes[p.k].pts;
+          if (!p.drip) {
+            p.s += p.v;
+            if (p.s >= pts.length - 1) {
+              if (F.strokes[p.k].drip) { const e = pts[pts.length - 1]; Object.assign(p, { drip: 1, x: e[0], y: e[1], vy: p.v * 0.6 }); }
+              else Object.assign(p, { k: pick(), s: 0, v: 0.25 + r() * 0.5 });
+              continue;
+            }
+            const i = p.s | 0, f = p.s - i, a = pts[i], b = pts[i + 1];
+            put(buf, a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, 0.2);
+          } else {
+            p.y += p.vy; p.vy *= 1.015; p.drip -= 0.022;
+            put(buf, p.x, p.y, 0.3 * p.drip);
+            if (p.drip <= 0) Object.assign(p, { drip: 0, k: pick(), s: 0, v: 0.25 + r() * 0.5 });
+          }
+        }
+        // 星 + 隔一阵沿四芒拉出的光
+        const pulse = 0.8 + 0.2 * Math.sin(el * 2.1), ph = el % 5.5, gl = ph < 0.9 ? Math.sin(ph / 0.9 * Math.PI) : 0;
+        for (const [x, y, w] of cells) put(stb, sx + x, sy + y, (0.62 + 0.6 * w) * pulse);
+        if (gl > 0.01) for (let k = 0; k < 4; k++) {
+          const d = armDir(STARS.stream, k), ext = SA * gl * 1.2;
+          for (let s = 0; s <= ext; s += 0.5) put(stb, sx + d[0] * (SA + s), sy + d[1] * (SA + s), 0.6 * gl * (1 - s / ext));
+        }
+        const dd = img.data, raw = (j) => base[j] + buf[j] + stb[j];
+        for (let y = 0, i = 0; y < gh; y++) for (let x = 0; x < gw; x++, i++) {
+          const nb = (x > 0 ? raw(i - 1) : 0) + (x < gw - 1 ? raw(i + 1) : 0) + (y > 0 ? raw(i - gw) : 0) + (y < gh - 1 ? raw(i + gw) : 0);
+          const v = clamp(raw(i) + nb * 0.07), t = tintAt(tints, x / gw);
+          const col = v < 0.55 ? mix(bg, t, v / 0.55) : mix(t, peak, (v - 0.55) / 0.45);
+          dd[i * 4] = col[0]; dd[i * 4 + 1] = col[1]; dd[i * 4 + 2] = col[2]; dd[i * 4 + 3] = 255;
+        }
+        const k = el < 0.25 ? 6 : el < 0.5 ? 4 : el < 0.75 ? 2 : 1;
+        if (k === 1) c.putImageData(img, 0, 0);
+        else {
+          fine.getContext('2d').putImageData(img, 0, 0);
+          small.width = Math.ceil(gw / k); small.height = Math.ceil(gh / k);
+          sc.imageSmoothingEnabled = true; sc.drawImage(fine, 0, 0, small.width, small.height);
+          c.imageSmoothingEnabled = false; c.drawImage(small, 0, 0, small.width * k, small.height * k);
+        }
+        raf = requestAnimationFrame(tick);
+      };
+      raf = requestAnimationFrame(tick);
+    }
+    root.querySelector('[data-re]').onclick = () => { seed = (Math.random() * 1e9) | 0; start(); };
+    return start;
+  }
+  return { mount };
+})();
+
+/* ───────── 03 解析 ───────── */
+const RESOLVE_WORD = () => RESOLVE_WORD.w || (RESOLVE_WORD.w = buildWord(...WIDE, { starR: 40 }));
+function resolveInit(c, W, H) {
+  const D = dark(), F = fitWord(RESOLVE_WORD(), W, H, 72);
+  const ink = D ? [236, 231, 243] : [35, 40, 48], tint = D ? [167, 155, 208] : [147, 137, 174];
+  const tints = TINTS(D), peak = hex(D ? '#f6f2ff' : '#4b4470'), lw = Math.max(1, 2 * F.k);
+  // 三档格子：每格累计落进来的笔画长度（下拖线按淡度加权）
+  const pts = [];
+  F.strokes.forEach((s) => s.pts.forEach(([x, y], i) => pts.push([x, y, s.w[i]])));
+  for (let k = 0; k < 4; k++) { const d = armDir(STARS.resolve, k); for (let s = 0; s <= 1; s += 0.02) pts.push([F.star[0] + d[0] * F.SR * s, F.star[1] + d[1] * F.SR * s, 1.4 * (1 - s * 0.6)]); }
+  const grid = (C) => {
+    const m = new Map();
+    pts.forEach(([x, y, w]) => { const key = `${Math.floor(x / C)},${Math.floor(y / C)}`; m.set(key, (m.get(key) || 0) + w); });
+    return [...m].map(([key, n]) => { const [i, j] = key.split(',').map(Number); return [i * C, j * C, clamp(n / (C * 0.75))]; });
+  };
+  const LV = [[16, grid(16)], [8, grid(8)], [4, grid(4)]];
+  const top = F.star[1] - F.SR - 10, bot = F.f([0, F.Wd.box[3]])[1] + 10;
+  const x0 = F.left - 90, x1 = F.right + 110, P = 10.5;
+  const sweep = (tt) => tt < 1.2 ? x0 : tt < 3.8 ? x0 + (x1 - x0) * easeIO((tt - 1.2) / 2.6) : tt < 7.6 ? x1 : tt < 10 ? x1 - (x1 - x0) * easeIO((tt - 7.6) / 2.4) : x0;
+  const clip = (a, b, fn) => { if (b <= a) return; c.save(); c.beginPath(); c.rect(a, 0, b - a, H); c.clip(); fn(); c.restore(); };
+  return (t) => {
+    const tt = t % P, sx = sweep(tt), fade = ease(t / 0.6);
+    c.fillStyle = BG(D); c.fillRect(0, 0, W, H);
+    clip(-1, sx, () => {
+      strokeWord(c, F, ink, tint, lw);
+      const fl = Math.exp(-Math.pow((tt - 4.6) / 0.35, 2));
+      drawStar(c, F.star[0], F.star[1], F.SR, STARS.resolve, { col: ink, glow: fl });
+    });
+    [[sx + 80, W + 1], [sx + 26, sx + 80], [sx, sx + 26]].forEach(([a, b], li) => clip(Math.max(a, -1), b, () => {
+      const [C, cells] = LV[li];
+      for (const [x, y, v] of cells) {
+        if (x + C < a || x > b) continue;
+        const col = mix(tintAt(tints, (x - F.left) / (F.right - F.left)), peak, v * 0.6).map(Math.round);
+        c.fillStyle = `rgba(${col},${(0.1 + 0.55 * v) * fade})`; const g = C > 4 ? 1 : 0; c.fillRect(x + g, y + g, C - g, C - g);
+      }
+    }));
+    // 扫过的那道光
+    if (sx > 0 && sx < W) {
+      const g = c.createLinearGradient(sx - 30, 0, sx + 6, 0);
+      g.addColorStop(0, 'rgba(185,168,236,0)'); g.addColorStop(1, `rgba(185,168,236,${D ? 0.22 : 0.16})`);
+      c.fillStyle = g; c.fillRect(sx - 30, top, 36, bot - top);
+      const v = c.createLinearGradient(0, top, 0, bot);
+      v.addColorStop(0, 'rgba(185,168,236,0)'); v.addColorStop(0.5, D ? 'rgba(240,234,255,.9)' : 'rgba(120,104,180,.8)'); v.addColorStop(1, 'rgba(185,168,236,0)');
+      c.fillStyle = v; c.fillRect(sx, top, 1, bot - top);
+    }
+  };
+}
+
+/* ───────── 04 余像 ───────── */
+const ECHO_WORD = () => ECHO_WORD.w || (ECHO_WORD.w = buildWord(...TALL, { starR: 46 }));
+function echoInit(c, W, H) {
+  const D = dark(), F = fitWord(ECHO_WORD(), W, H, 30);
+  const ink = D ? [236, 231, 243] : [35, 40, 48], tint = D ? [167, 155, 208] : [147, 137, 174];
+  const ghosts = D ? [[150, 136, 214], [214, 150, 190]] : [[140, 124, 196], [204, 140, 176]];
+  const lw = Math.max(1, 1.5 * F.k), P = 9, MAX = 9 * F.k;
+  // 余像各画一张离屏图，每帧只贴图 + 一次模糊
+  const dpr = devicePixelRatio || 1;
+  const sheets = ghosts.map((g) => {
+    const o = document.createElement('canvas'); o.width = W * dpr; o.height = H * dpr;
+    const x = o.getContext('2d'); x.setTransform(dpr, 0, 0, dpr, 0, 0);
+    strokeWord(x, F, g, g, lw * 1.25);
+    drawStar(x, F.star[0], F.star[1], F.SR, STARS.echo, { col: g, a: 0.75 });
+    return o;
+  });
+  return (t) => {
+    c.fillStyle = BG(D); c.fillRect(0, 0, W, H);
+    const m = Math.pow(Math.sin(Math.PI * ((t + 1.2) % P) / P), 2), a = t * 0.33, appear = ease(t / 1.2);
+    c.save(); c.globalCompositeOperation = D ? 'screen' : 'multiply';
+    sheets.forEach((o, i) => {
+      const ang = a + i * 2.4, r = MAX * m * (i ? 0.8 : 1);
+      c.filter = `blur(${(0.3 + 1.8 * m).toFixed(2)}px)`;
+      c.globalAlpha = (0.5 + 0.35 * m) * appear;
+      c.drawImage(o, Math.cos(ang) * r, Math.sin(ang) * r * 0.6, W, H);
+    });
+    c.restore();
+    strokeWord(c, F, ink, tint, lw, (0.45 + 0.55 * (1 - m)) * appear);
+    const fl = Math.max(0, 1 - m / 0.06);
+    if (fl > 0) { const [sx, sy] = F.star, g = c.createRadialGradient(sx, sy, 0, sx, sy, F.SR * 1.4); g.addColorStop(0, `rgba(185,168,236,${0.35 * fl})`); g.addColorStop(1, 'rgba(185,168,236,0)'); c.fillStyle = g; c.fillRect(sx - F.SR * 2, sy - F.SR * 2, F.SR * 4, F.SR * 4); }
+    drawStar(c, F.star[0], F.star[1], F.SR * appear, STARS.echo, { col: ink, glow: fl });
+  };
+}
+
+/* ───────── 05 星屑 ───────── */
+const SPARK_WORD = () => SPARK_WORD.w || (SPARK_WORD.w = buildWord(HAND, [38, 34, 34, 32, 30, 40], { shear: 0.24, starR: 42 }));
+function sparkInit(c, W, H) {
+  const D = dark(), F = fitWord(SPARK_WORD(), W, H, 36), r = rng(5);
+  const ink = D ? [236, 231, 243] : [52, 50, 72], tints = TINTS(D), sc = F.k / 1.2;
+  const parts = []; let T = 0.4;
+  F.strokes.forEach((s) => {
+    const dur = 0.12 + s.len / (1100 * F.k + 260), endY = s.pts[s.pts.length - 1][1];
+    let d = 0;
+    while (d < s.len) {
+      const q = at(s, d), below = s.drip ? clamp((q.y - F.oy) / (endY - F.oy)) : 0;
+      const big = r() < 0.08, R = (big ? 6 + r() * 5 : 2 + r() * 2.4) * sc, j = (r() - 0.5) * 3.2 * sc;
+      parts.push({
+        x: q.x + q.n[0] * j, y: q.y + q.n[1] * j, R, born: T + dur * (d / s.len), w: 1.2 + r() * 2.6, ph: r() * 7,
+        col: mix(ink, tintAt(tints, (q.x - F.left) / (F.right - F.left)), 0.35 + below * 0.5).map(Math.round),
+        a: 1 - below * 0.45, fall: below > 0.05 ? { range: (18 + r() * 40) * sc * (0.4 + below), sp: 0.12 + r() * 0.2 } : null,
+      });
+      d += ((big ? 8 : 3.4) + r() * 2.6) * sc * (1 + below * 1.3);
+    }
+    T += dur * 0.75;
+  });
+  const u = armDir(STARS.spark, 0), v = armDir(STARS.spark, 1), dust = { ...STARS.spark, twin: false, mat: 'ink' };
+  return (t) => {
+    c.fillStyle = BG(D); c.fillRect(0, 0, W, H);
+    for (const p of parts) {
+      if (t < p.born) continue;
+      let a = ease((t - p.born) / 0.35) * p.a * (0.5 + 0.5 * Math.sin(t * p.w + p.ph)), y = p.y;
+      if (p.fall) { const f = (t * p.fall.sp + p.ph) % 1; y += f * p.fall.range; a *= 0.3 + 0.7 * Math.sin(f * Math.PI); }
+      if (a < 0.02) continue;
+      if (p.R < 3.2) {
+        c.strokeStyle = `rgba(${p.col},${a})`; c.lineWidth = 1; c.beginPath();
+        c.moveTo(p.x - u[0] * p.R, y - u[1] * p.R); c.lineTo(p.x + u[0] * p.R, y + u[1] * p.R);
+        c.moveTo(p.x - v[0] * p.R, y - v[1] * p.R); c.lineTo(p.x + v[0] * p.R, y + v[1] * p.R); c.stroke();
+      } else drawStar(c, p.x, y, p.R, dust, { col: p.col, a });
+    }
+    const sp = ease((t - T + 0.1) / 0.6);
+    if (sp > 0) drawStar(c, F.star[0], F.star[1], F.SR * sp * (1 + 0.04 * Math.sin(t * 2)), STARS.spark, { ...LIGHT_COL(D), glow: Math.max(0, Math.sin(t * 0.9)) ** 12 });
+  };
+}
+
+const runs = [
+  HAIR.mount(document.getElementById('s1')),
+  STREAM.mount(document.getElementById('s2')),
+  mountLoop(document.getElementById('s3'), resolveInit),
+  mountLoop(document.getElementById('s4'), echoInit),
+  mountLoop(document.getElementById('s5'), sparkInit),
+];
+const all = () => { drawStars(); runs.forEach((f) => f()); };
+if (new URLSearchParams(location.search).get('face') === 'dream') document.documentElement.dataset.face = 'dream';
+document.getElementById('face').onclick = () => { const h = document.documentElement; h.dataset.face = h.dataset.face === 'dream' ? 'wake' : 'dream'; requestAnimationFrame(all); };
+let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(all, 200); });
+all();
+</script>
+</body>
+</html>

@@ -48,7 +48,7 @@ const B = process.env.BASE || 'http://127.0.0.1:4321';
   await run('22-tag', '/tags/' + encodeURIComponent('醒梦') + '/');
   await run('23-read-page-tool', '/articles/style-specimen/', { act: async (p) => { await p.click('.ts-star'); await p.waitForTimeout(600); await p.click('.ts-tool[data-t="page"]'); await p.waitForTimeout(900); } });
   // 从名录点进一篇（跨页常驻）：「本页」要出现、目录要是这一篇的
-  await run('24-list-to-read-tool', '/articles/', { act: async (p) => { await p.click('.pane--ch'); await p.waitForTimeout(1600); await p.click('.ts-star'); await p.waitForTimeout(600); await p.click('.ts-tool[data-t="page"]'); await p.waitForTimeout(900); } });
+  await run('24-list-to-read-tool', '/articles/', { act: async (p) => { await p.click('.ar a'); await p.waitForTimeout(1600); await p.click('.ts-star'); await p.waitForTimeout(600); await p.click('.ts-tool[data-t="page"]'); await p.waitForTimeout(900); } });
   await run('25-home-tools', '/', { act: async (p) => { await p.click('.ts-star'); await p.waitForTimeout(1000); } });
   // NEXUS 的门：切面随时间变形；悬停停住；点下去化白
   await run('26-gate', '/gate/');

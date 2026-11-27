@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="zh-CN" data-face="wake">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AveritA 字标</title>
+<style>
+  :root {
+    --bg: #f0f3f6; --bg-2: #e5ebf2; --fg: #232830; --soft: #56606d; --faint: #858f9d;
+    --line: rgba(35, 40, 48, 0.12); --wake: #a7b1ba; --dream: #9389ae; --accent: #9a86c4;
+    --glass: rgba(247, 249, 253, 0.6); --glow: rgba(154, 134, 196, 0.16);
+    --serif: 'Palatino Linotype', 'Book Antiqua', Palatino, 'Noto Serif SC', Georgia, serif;
+    --mono: 'IBM Plex Mono', 'Cascadia Mono', Consolas, monospace;
+  }
+  :root[data-face='dream'] {
+    --bg: #121327; --bg-2: #0c0d1b; --fg: #ece7f3; --soft: #b7b0c8; --faint: #847e98;
+    --line: rgba(236, 231, 243, 0.14); --wake: #6f7686; --dream: #a79bd0; --accent: #b9a8ec;
+    --glass: rgba(22, 22, 42, 0.6); --glow: rgba(185, 168, 236, 0.14);
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--fg); font: 14px/1.7 system-ui, 'Microsoft YaHei UI', sans-serif; padding: 48px 16px 96px; transition: background .4s, color .4s; }
+  .wrap { max-width: 1080px; margin: 0 auto; }
+  header.top { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; border-bottom: 1px solid var(--line); padding-bottom: 18px; margin-bottom: 36px; }
+  header.top h1 { font: 400 22px var(--serif); letter-spacing: .04em; }
+  header.top p { color: var(--soft); font-size: 13px; }
+  .face { font: 12px var(--mono); letter-spacing: .14em; background: none; border: 1px solid var(--line); color: var(--soft); padding: 6px 12px; cursor: pointer; border-radius: 3px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 500px), 1fr)); gap: 22px; }
+  .card { border: 1px solid var(--line); border-radius: 3px; background: linear-gradient(180deg, var(--glass), transparent); overflow: hidden; }
+  .stage { height: 240px; display: grid; place-items: center; position: relative; background: radial-gradient(60% 70% at 50% 45%, var(--glow), transparent 70%); overflow: hidden; }
+  .meta { padding: 16px 20px 18px; border-top: 1px solid var(--line); }
+  .meta .k { font: 11px var(--mono); letter-spacing: .16em; color: var(--faint); }
+  .meta h2 { font: 400 17px var(--serif); margin: 2px 0 6px; }
+  .meta p { color: var(--soft); font-size: 13px; }
+  .use { display: flex; align-items: center; gap: 18px; margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--line); color: var(--faint); font: 11px var(--mono); letter-spacing: .1em; }
+  .use .crumb { display: flex; align-items: center; gap: 8px; color: var(--fg); font: 15px var(--serif); letter-spacing: .06em; }
+  .tile { width: 32px; height: 32px; border: 1px solid var(--line); border-radius: 3px; display: grid; place-items: center; }
+  .tile svg { width: 22px; height: 22px; }
+  .word { font: 400 76px/1 var(--serif); letter-spacing: .02em; color: var(--fg); white-space: nowrap; }
+  .hint { position: absolute; right: 12px; bottom: 8px; font: 10px var(--mono); letter-spacing: .14em; color: var(--faint); }
+
+  /* 01 对镜 */
+  .mirror { position: relative; }
+  .mirror .word { position: relative; z-index: 1; }
+  .mirror .refl { position: absolute; left: 0; top: 100%; transform: scaleY(-1); margin-top: 8px;
+    filter: blur(2.2px); opacity: .5; -webkit-mask-image: linear-gradient(0deg, #000 0%, transparent 62%); mask-image: linear-gradient(0deg, #000 0%, transparent 62%); color: var(--dream); }
+  .mirror .horizon { position: absolute; left: -40px; right: -40px; top: calc(100% + 5px); height: 1px; background: linear-gradient(90deg, transparent, var(--line), var(--dream), var(--line), transparent); }
+
+  /* 03 星作横画 */
+  .starA { display: inline-block; height: .78em; width: .7em; vertical-align: baseline; overflow: visible; }
+  .w-star { display: flex; align-items: baseline; gap: .02em; }
+  .w-star .mid { font-weight: 400; letter-spacing: .06em; font-size: .78em; color: var(--soft); }
+
+  /* 04 14° 缝 */
+  .seam { position: relative; }
+  .seam .word { display: block; }
+  .seam .l { color: var(--fg); clip-path: polygon(0 0, 47% 0, 39% 100%, 0 100%); }
+  .seam .r { position: absolute; inset: 0; color: var(--dream); clip-path: polygon(47.6% 0, 100% 0, 100% 100%, 39.6% 100%); transform: translate(3px, -2px); filter: blur(.5px); }
+  .seam .r::after { content: 'AveritA'; position: absolute; inset: 0; transform: translate(7px, -4px); opacity: .22; filter: blur(1.5px); }
+  .seam .cut { position: absolute; left: 43.5%; top: -46px; bottom: -46px; width: 1px; background: linear-gradient(180deg, transparent, var(--accent) 30%, var(--accent) 70%, transparent); transform: rotate(14deg); opacity: .7; }
+
+  /* 05 先粗再解析 */
+  canvas.px { width: 440px; max-width: 92%; height: auto; }
+
+  /* 06 两端留下 */
+  .melt .word span { display: inline-block; transition: filter 1.2s cubic-bezier(.2,.7,.2,1), opacity 1.2s, transform 1.2s; }
+  .melt .word .m { color: var(--dream); }
+  .melt .word .m1 { filter: blur(1.2px); opacity: .62; }
+  .melt .word .m2 { filter: blur(2.6px); opacity: .38; transform: translateY(-2px); }
+  .melt .word .m3 { filter: blur(4px); opacity: .22; transform: translateY(-4px); }
+  .melt .stage:hover .word span { filter: none; opacity: 1; transform: none; color: var(--fg); }
+  .melt .stage:hover .word .m { transition-delay: calc(var(--i) * 90ms); }
+
+  /* 07 括起 */
+  .bracket { display: flex; align-items: center; gap: 14px; }
+  .bracket .A { font: 400 110px/1 var(--serif); }
+  .bracket .A.b { color: var(--dream); }
+  .bracket .in { display: flex; flex-direction: column; align-items: center; gap: 6px; transform: translateY(8px); }
+  .bracket .in b { font: 400 13px var(--mono); letter-spacing: .62em; padding-left: .62em; color: var(--soft); }
+  .bracket .in i { width: 100%; height: 1px; background: var(--line); }
+  .bracket .in s { font: italic 13px var(--serif); text-decoration: none; color: var(--faint); letter-spacing: .1em; }
+
+  /* 08 花体起首 */
+  .frak .word { font-size: 80px; }
+  .frak .f { font-family: 'Cambria Math', 'Segoe UI Symbol', serif; font-size: .96em; color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>AveritA · 字标草图</h1>
+      <p>八个方向。每张卡：大样 · 左上角站名尺寸 · 32px 标签页图标（有的方向才有）。悬停带 ↺ 的卡有动态。</p>
+    </div>
+    <button class="face" id="face">昼 / 夜</button>
+  </header>
+
+  <div class="grid">
+
+    <!-- 01 -->
+    <section class="card">
+      <div class="stage"><div class="mirror"><div class="word">AveritA</div><div class="horizon"></div><div class="word refl">AveritA</div></div></div>
+      <div class="meta">
+        <div class="k">01 · MIRROR</div>
+        <h2>对镜</h2>
+        <p>首尾两个大写 A 本来就是对称的。字落在一条发丝地平线上，下面是它在玻璃里的倒影：薄暮色、失焦、往下渐渐没了。用的是现成衬线体，最好做。</p>
+        <div class="use"><span class="crumb">AveritA</span><span>倒影只在大尺寸出现</span></div>
+      </div>
+    </section>
+
+    <!-- 02 -->
+    <section class="card">
+      <div class="stage">
+        <svg id="mono" viewBox="0 0 120 120" width="190" height="190" aria-label="A∀ 交叠"></svg>
+      </div>
+      <div class="meta">
+        <div class="k">02 · A∀</div>
+        <h2>正倒双 A</h2>
+        <p>把尾 A 倒过来，叠在首 A 上：∀ 是逻辑里的「对一切」，两个三角交出一枚六角——跟左下角的三轴星是同一个骨架。昼 A 是实线，倒过来的那个是薄暮色的影子。</p>
+        <div class="use"><span class="crumb"><svg class="m-sm" viewBox="0 0 120 120" width="18" height="18"></svg>AveritA</span><span class="tile"><svg class="m-sm" viewBox="0 0 120 120"></svg></span></div>
+      </div>
+    </section>
+
+    <!-- 03 -->
+    <section class="card">
+      <div class="stage"><div class="word w-star"><svg class="starA" viewBox="0 0 70 78"></svg><span class="mid">verit</span><svg class="starA" viewBox="0 0 70 78"></svg></div></div>
+      <div class="meta">
+        <div class="k">03 · STAR BAR</div>
+        <h2>星作横画</h2>
+        <p>两个 A 只留下两条斜腿，横画的位置换成一枚小小的三轴六尖星。中间的 verit 缩小、退成灰，像被两颗星挑起来的一根梁。</p>
+        <div class="use"><span class="crumb"><span class="w-star" style="font-size:17px"><svg class="starA" viewBox="0 0 70 78"></svg><span class="mid">verit</span><svg class="starA" viewBox="0 0 70 78"></svg></span></span><span class="tile"><svg class="starA" viewBox="0 0 70 78" style="width:20px;height:22px"></svg></span></div>
+      </div>
+    </section>
+
+    <!-- 04 -->
+    <section class="card">
+      <div class="stage"><div class="seam"><span class="word l">AveritA</span><span class="word r">AveritA</span><i class="cut"></i></div></div>
+      <div class="meta">
+        <div class="k">04 · 14°</div>
+        <h2>斜缝</h2>
+        <p>站里那条 14° 的线，从 Ave 和 ritA 之间斜着划过去。左半冷、清楚；右半是薄暮色，微微错开，后面还拖一层更淡的叠影。Ave 正好被单独切出来——也是右下角那位的名字。</p>
+        <div class="use"><span class="crumb"><span style="color:var(--fg)">Ave</span><span style="color:var(--dream)">ritA</span></span><span>小尺寸只留双色</span></div>
+      </div>
+    </section>
+
+    <!-- 05 -->
+    <section class="card">
+      <div class="stage" id="pxStage"><canvas class="px" id="px" width="880" height="200"></canvas><span class="hint">↺ 悬停</span></div>
+      <div class="meta">
+        <div class="k">05 · RESOLVE</div>
+        <h2>先粗再解析</h2>
+        <p>和换页一样的「先粗再解析」：从左到右，像素块由粗到细，到尾 A 才完全清楚。悬停时整串从最粗的一档重新解析一遍。地面是像素流光，这个字标跟它是一种语言。</p>
+        <div class="use"><span class="crumb"><canvas id="pxSm" width="170" height="40" style="width:85px;height:20px"></canvas></span><span>小尺寸粗块要收着</span></div>
+      </div>
+    </section>
+
+    <!-- 06 -->
+    <section class="card melt">
+      <div class="stage"><div class="word"><span>A</span><span class="m m1" style="--i:0">v</span><span class="m m2" style="--i:1">e</span><span class="m m3" style="--i:2">r</span><span class="m m2" style="--i:3">i</span><span class="m m1" style="--i:4">t</span><span>A</span></div><span class="hint">↺ 悬停</span></div>
+      <div class="meta">
+        <div class="k">06 · KEPT ENDS</div>
+        <h2>两端留下</h2>
+        <p>只有首尾两个 A 是确定的，中间的字母越往中心越淡、越虚、微微浮起；鼠标停上来，它们一个接一个被想起来。「随时可能消失，又随时可能重新被记起」，直接落在名字上。</p>
+        <div class="use"><span class="crumb">A<span style="color:var(--dream);opacity:.55">verit</span>A</span><span>静态时中间留半透明</span></div>
+      </div>
+    </section>
+
+    <!-- 07 -->
+    <section class="card">
+      <div class="stage"><div class="bracket"><span class="A">A</span><span class="in"><b>VERIT</b><i></i><s>veritas</s></span><span class="A b">A</span></div></div>
+      <div class="meta">
+        <div class="k">07 · HELD</div>
+        <h2>括起</h2>
+        <p>两个大 A 像一对括号，中间托着一行很小的等宽 VERIT；下面一行更小的斜体 veritas，把名字里藏着的那个词轻轻点出来（也接上 Traveritas）。首 A 昼色，尾 A 薄暮色。</p>
+        <div class="use"><span class="crumb">A<span style="font:10px var(--mono);letter-spacing:.3em;color:var(--soft);margin:0 2px 0 4px">VERIT</span><span style="color:var(--dream)">A</span></span></div>
+      </div>
+    </section>
+
+    <!-- 08 -->
+    <section class="card frak">
+      <div class="stage"><div class="word"><span class="f">𝔄</span>veritA</div></div>
+      <div class="meta">
+        <div class="k">08 · FANCY</div>
+        <h2>花体起首</h2>
+        <p>𝔖𝔬 𝔉𝔞𝔫𝔠𝔶~ 那种口吻：开头一个哥特花体 𝔄，之后平平常常的罗马体，尾巴上是规规矩矩的大写 A。最轻、最不正经的一版，适合放在不那么正式的地方（Ave 的气泡、页脚）。</p>
+        <div class="use"><span class="crumb"><span style="font-family:'Cambria Math',serif;color:var(--accent)">𝔄</span>veritA</span></div>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<script>
+const NS = 'http://www.w3.org/2000/svg';
+const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const el = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); parent && parent.appendChild(e); return e; };
+
+// 三轴六尖星：竖轴长、两条斜轴略短，尖很细
+function starPath(cx, cy, R, k = 0.14) {
+  const pts = [];
+  for (let i = 0; i < 12; i++) {
+    const a = (-90 + i * 30) * Math.PI / 180;
+    const tip = i % 2 === 0;
+    const r = tip ? (i % 6 === 0 ? R : R * 0.78) : R * k;
+    pts.push((cx + r * Math.cos(a)).toFixed(2) + ',' + (cy + r * Math.sin(a)).toFixed(2));
+  }
+  return 'M' + pts.join('L') + 'Z';
+}
+
+let gid = 0;
+function grad(svg, c1, c2) {
+  const id = 'g' + (gid++);
+  const d = el('defs', {}, svg);
+  const g = el('linearGradient', { id, x1: 0, y1: 0, x2: 1, y2: 1 }, d);
+  el('stop', { offset: 0, 'stop-color': c1 }, g);
+  el('stop', { offset: 1, 'stop-color': c2 }, g);
+  return 'url(#' + id + ')';
+}
+
+function drawMono(svg, small) {
+  svg.innerHTML = '';
+  const fg = css('--fg'), dr = css('--dream'), ac = css('--accent');
+  const sw = small ? 7 : 2.4;
+  // 正 A
+  el('path', { d: 'M18 104 L60 14 L102 104', fill: 'none', stroke: fg, 'stroke-width': sw, 'stroke-linejoin': 'miter' }, svg);
+  if (!small) el('path', { d: 'M38 72 H82', stroke: fg, 'stroke-width': sw }, svg);
+  // 倒 ∀
+  el('path', { d: 'M18 16 L60 106 L102 16', fill: 'none', stroke: dr, 'stroke-width': sw, opacity: small ? 1 : 0.85 }, svg);
+  if (!small) el('path', { d: 'M38 48 H82', stroke: dr, 'stroke-width': sw, opacity: 0.85 }, svg);
+  // 交出的六角里一点光
+  if (!small) {
+    const f = grad(svg, '#fff', ac);
+    el('path', { d: starPath(60, 60, 9, 0.2), fill: f, opacity: 0.9 }, svg);
+  }
+}
+
+function drawStarA(svg) {
+  svg.innerHTML = '';
+  const fg = css('--fg'), ac = css('--accent'), dr = css('--dream');
+  const small = svg.getBoundingClientRect().height < 30;
+  const sw = small ? 6 : 3.2;
+  el('path', { d: 'M4 78 L35 2 L66 78', fill: 'none', stroke: fg, 'stroke-width': sw, 'stroke-linejoin': 'miter', 'stroke-miterlimit': 10 }, svg);
+  const f = grad(svg, '#ffffff', ac);
+  el('path', { d: starPath(35, 50, small ? 17 : 15, 0.13), fill: f, stroke: dr, 'stroke-width': small ? 0 : 0.5 }, svg);
+}
+
+// 05：画一遍清楚的字，再按每个字母的位置用不同的块尺寸重采样
+const px = document.getElementById('px'), pxSm = document.getElementById('pxSm');
+function renderPx(cv, fontPx, blocksFor) {
+  const W = cv.width, H = cv.height, ctx = cv.getContext('2d');
+  const src = document.createElement('canvas'); src.width = W; src.height = H;
+  const s = src.getContext('2d');
+  s.font = `400 ${fontPx}px 'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif`;
+  s.fillStyle = css('--fg'); s.textBaseline = 'alphabetic';
+  const word = 'AveritA';
+  const total = s.measureText(word).width;
+  let x = (W - total) / 2; const y = H * 0.72;
+  const spans = [];
+  for (const ch of word) { const w = s.measureText(ch).width; s.fillText(ch, x, y); spans.push([x, w]); x += w; }
+  ctx.clearRect(0, 0, W, H); ctx.imageSmoothingEnabled = false;
+  const tmp = document.createElement('canvas'); const t = tmp.getContext('2d');
+  spans.forEach(([sx, w], i) => {
+    const b = blocksFor(i);
+    const x0 = Math.floor(sx) - 2, ww = Math.ceil(w) + 4;
+    if (b <= 1) { ctx.drawImage(src, x0, 0, ww, H, x0, 0, ww, H); return; }
+    tmp.width = Math.ceil(ww / b); tmp.height = Math.ceil(H / b);
+    t.imageSmoothingEnabled = true; t.clearRect(0, 0, tmp.width, tmp.height);
+    t.drawImage(src, x0, 0, ww, H, 0, 0, tmp.width, tmp.height);
+    // 块的透明度收成三档，粗块才像像素而不是糊
+    const id = t.getImageData(0, 0, tmp.width, tmp.height), a = id.data;
+    for (let j = 3; j < a.length; j += 4) a[j] = a[j] > 96 ? 255 : a[j] > 28 ? 120 : 0;
+    t.putImageData(id, 0, 0);
+    ctx.globalAlpha = 1; ctx.drawImage(tmp, 0, 0, tmp.width, tmp.height, x0, 0, tmp.width * b, tmp.height * b);
+  });
+}
+const RAMP = [14, 10, 7, 5, 3, 2, 1];
+let anim = null;
+function pxStatic() { renderPx(px, 150, (i) => RAMP[i]); renderPx(pxSm, 30, (i) => [4, 3, 2, 2, 1, 1, 1][i]); }
+document.getElementById('pxStage').addEventListener('mouseenter', () => {
+  cancelAnimationFrame(anim); const t0 = performance.now();
+  const step = (now) => {
+    const p = Math.min(1, (now - t0) / 1600);
+    // 每个字母自己的进度错开一点，最后停回静态那一档
+    renderPx(px, 150, (i) => {
+      const q = Math.min(1, Math.max(0, p * 1.6 - i * 0.08));
+      const from = 18, to = RAMP[i];
+      return Math.max(1, Math.round(from + (to - from) * (1 - Math.pow(1 - q, 3))));
+    });
+    if (p < 1) anim = requestAnimationFrame(step);
+  };
+  anim = requestAnimationFrame(step);
+});
+
+function drawAll() {
+  drawMono(document.getElementById('mono'), false);
+  document.querySelectorAll('.m-sm').forEach((s) => drawMono(s, true));
+  document.querySelectorAll('.starA').forEach(drawStarA);
+  pxStatic();
+}
+document.getElementById('face').addEventListener('click', () => {
+  const r = document.documentElement; r.dataset.face = r.dataset.face === 'dream' ? 'wake' : 'dream';
+  requestAnimationFrame(drawAll);
+});
+if (new URLSearchParams(location.search).get('face') === 'dream') document.documentElement.dataset.face = 'dream';
+(document.fonts ? document.fonts.ready : Promise.resolve()).then(drawAll);
+</script>
+</body>
+</html>

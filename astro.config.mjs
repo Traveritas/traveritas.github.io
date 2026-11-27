@@ -3,6 +3,7 @@ import { satteri } from '@astrojs/markdown-satteri';
 import sitemap from '@astrojs/sitemap';
 import { twilight } from './src/markdown/twilight.mjs';
 import { ordinal } from './src/markdown/ordinal.mjs';
+import { taskA11y } from './src/markdown/task-a11y.mjs';
 import { xingmeng } from './src/markdown/shiki-theme.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -70,6 +71,7 @@ export default defineConfig({
     processor: satteri({
       features: { directive: true },
       mdastPlugins: [twilight, ordinal],
+      hastPlugins: [taskA11y],
     }),
     shikiConfig: { theme: xingmeng },
   },

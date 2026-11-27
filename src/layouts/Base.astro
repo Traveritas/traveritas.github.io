@@ -16,9 +16,67 @@ interface Props {
   place: 'home' | 'list' | 'read' | 'lost' | 'find' | 'tag' | 'gate';
   sec?: Sec;
   slug?: string;
+  publishedTime?: Date;
+  ogImage?: string;
 }
-const { title, description = '在即将醒来的那一瞬，世界究竟是在成形，还是正在融化？', place, sec, slug } = Astro.props;
+const {
+  title,
+  description = '在即将醒来的那一瞬，世界究竟是在成形，还是正在融化？',
+  place,
+  sec,
+  slug,
+  publishedTime,
+  ogImage,
+} = Astro.props;
 const NAME = 'AveritA 的昼梦叙集';
+const fullTitle = title ? `${title} · ${NAME}` : NAME;
+const isLost = place === 'lost';
+const siteHref = Astro.site ? new URL('/', Astro.site).href : undefined;
+const canonicalUrl = !isLost && Astro.site ? new URL(Astro.url.pathname, Astro.site).href : undefined;
+const ogImgUrl = !isLost && Astro.site ? new URL(ogImage || '/og-default.png', Astro.site).href : undefined;
+const ogType = place === 'read' && (sec === 'articles' || sec === 'moments') ? 'article' : 'website';
+const jsonLd =
+  place === 'home' && siteHref
+    ? {
+        '@context': 'https://schema.org',
+        '@graph': [
+          {
+            '@type': 'WebSite',
+            '@id': `${siteHref}#website`,
+            name: NAME,
+            url: siteHref,
+            description,
+            inLanguage: 'zh-CN',
+          },
+          {
+            '@type': 'Person',
+            '@id': `${siteHref}#person`,
+            name: 'AveritA',
+            alternateName: 'Traveritas',
+            url: siteHref,
+            sameAs: ['https://github.com/Traveritas'],
+          },
+        ],
+      }
+    : place === 'read' && canonicalUrl && siteHref
+      ? {
+          '@context': 'https://schema.org',
+          '@type': sec === 'projects' ? 'CreativeWork' : 'BlogPosting',
+          headline: title || NAME,
+          description,
+          url: canonicalUrl,
+          inLanguage: 'zh-CN',
+          ...(publishedTime ? { datePublished: publishedTime.toISOString() } : {}),
+          ...(ogImgUrl ? { image: ogImgUrl } : {}),
+          author: {
+            '@type': 'Person',
+            '@id': `${siteHref}#person`,
+            name: 'AveritA',
+            url: siteHref,
+          },
+        }
+      : null;
+const jsonLdHtml = jsonLd ? JSON.stringify(jsonLd).replace(/</g, '\\u003c') : '';
 ---
 
 <!doctype html>
@@ -26,13 +84,46 @@ const NAME = 'AveritA 的昼梦叙集';
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{title ? `${title} · ${NAME}` : NAME}</title>
+    <title>{fullTitle}</title>
     <meta name="description" content={description} />
+    {isLost && <meta name="robots" content="noindex" />}
     <link rel="icon" type="image/svg+xml" href="/favicon-star.svg" />
-    {Astro.site && <link rel="canonical" href={new URL(Astro.url.pathname, Astro.site).href} />}
+    {canonicalUrl && <link rel="canonical" href={canonicalUrl} />}
+    {
+      !isLost && (
+        <>
+          <meta property="og:site_name" content={NAME} />
+          <meta property="og:locale" content="zh_CN" />
+          <meta property="og:type" content={ogType} />
+          <meta property="og:title" content={fullTitle} />
+          <meta property="og:description" content={description} />
+          {canonicalUrl && <meta property="og:url" content={canonicalUrl} />}
+          {ogImgUrl && (
+            <>
+              <meta property="og:image" content={ogImgUrl} />
+              {!ogImage && <meta property="og:image:width" content="1200" />}
+              {!ogImage && <meta property="og:image:height" content="630" />}
+            </>
+          )}
+          {publishedTime && ogType === 'article' && (
+            <meta property="article:published_time" content={publishedTime.toISOString()} />
+          )}
+          <meta name="twitter:card" content="summary_large_image" />
+          <meta name="twitter:title" content={fullTitle} />
+          <meta name="twitter:description" content={description} />
+          {ogImgUrl && <meta name="twitter:image" content={ogImgUrl} />}
+        </>
+      )
+    }
+    {jsonLdHtml && <script type="application/ld+json" set:html={jsonLdHtml} />}
     <link rel="alternate" type="application/rss+xml" title={NAME} href="/rss.xml" />
     <link rel="sitemap" href="/sitemap-index.xml" />
     <link rel="stylesheet" href="/fonts/noto-serif-sc/font.css" />
+    <noscript>
+      <style>
+        #ts { display: none !important; }
+      </style>
+    </noscript>
     {/* 先定面与加载态，免得首帧闪出昼夜错色或未加载完的 DOM（无 JS 时不打 booting，正文仍完整可读） */}
     <script is:inline>
       (function () {
