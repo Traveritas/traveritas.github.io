@@ -61,9 +61,9 @@ const ICON: Record<string, string> = {
   page: '<path d="M7 4V20 M7 7.5H16 M7 11.5H12.5 M7 15.5H17.5"/>',
   // 一枚圆被那条 14° 的发丝线劈开，一半薄薄地亮着；线与亮面是一组（.ts-cut），换面时绕圆心转半圈
   face: '<circle cx="12" cy="12" r="7"/><g class="ts-cut"><path class="ts-fill ts-fill--face" d="M13.69 5.21A7 7 0 0 1 10.31 18.79Z"/><path d="M14.3 2.8 9.7 21.2"/></g>',
-  // 声音：一点，三道等长的弧——就是它展开出来的那三圈的缩影
+  // 声音：双相驻波——一条平滑正弦波叠一层淡色反相残影，静音时收浅，有声时展开并各自呼吸起伏
   sound:
-    '<circle class="ts-dot" cx="4.5" cy="16" r="1.3"/><path d="M10 16A5.5 5.5 0 0 0 4.5 10.5 M14.5 16A10 10 0 0 0 10.99 8.4 M19 16A14.5 14.5 0 0 0 16.51 7.87"/>',
+    '<path class="ts-wave-echo" stroke-width="1" stroke-dasharray="1.6 2.2" d="M3.8 12C6.2 12 7.3 15.8 9.8 15.8C12 15.8 13.2 8.2 15.4 8.2C17.4 8.2 18.2 12 20.2 12"/><path class="ts-wave-main" d="M3.8 12C5.8 12 6.8 6.5 9.1 6.5C11.4 6.5 12.6 17.5 14.9 17.5C17.2 17.5 18.2 12 20.2 12"/>',
   // 三路音量各自的图标：关着时都平卧下去
   bgm: '<line x1="7" y1="6" x2="7" y2="18"/><line x1="12" y1="6" x2="12" y2="18"/><line x1="17" y1="6" x2="17" y2="18"/>',
   voice: '<g class="ts-dia"><path class="ts-fill" d="M12 4.5 17.5 12 12 19.5 6.5 12Z"/><path d="M12 4.5 17.5 12 12 19.5 6.5 12Z"/></g>',
@@ -558,20 +558,46 @@ const VOLS: { id: 'bgm' | 'voice' | 'fx'; wake: string; en: string }[] = [
     fill: currentColor;
     stroke: none;
   }
-  /* 声音：有一路在响时，三道弧由内往外轮流亮一下 */
+  /* 声音：双相驻波——静音时收为浅波，有一路在响时展开并错相呼吸 */
   .ts-ico-sound path {
-    stroke-opacity: 0.9;
+    transform-box: view-box;
+    transform-origin: 12px 12px;
+    transition:
+      transform 0.45s cubic-bezier(0.16, 1, 0.3, 1),
+      opacity 0.4s;
   }
-  html[data-sound='on'] .ts-ico-sound path {
-    animation: ts-echo 2.4s ease-in-out infinite;
+  .ts-ico-sound .ts-wave-main {
+    transform: scaleY(0.45);
+    opacity: 0.78;
   }
-  @keyframes ts-echo {
-    0%,
-    100% {
-      stroke-opacity: 0.9;
+  .ts-ico-sound .ts-wave-echo {
+    transform: scaleY(0.25);
+    opacity: 0.24;
+  }
+  html[data-sound='on'] .ts-ico-sound .ts-wave-main {
+    transform: none;
+    opacity: 1;
+    animation: ts-wave-a 2.4s ease-in-out infinite alternate;
+  }
+  html[data-sound='on'] .ts-ico-sound .ts-wave-echo {
+    transform: none;
+    opacity: 0.45;
+    animation: ts-wave-b 3.1s ease-in-out infinite alternate;
+  }
+  @keyframes ts-wave-a {
+    from {
+      transform: scaleY(0.76);
     }
-    20% {
-      stroke-opacity: 0.35;
+    to {
+      transform: scaleY(1.06);
+    }
+  }
+  @keyframes ts-wave-b {
+    from {
+      transform: scaleY(-0.55);
+    }
+    to {
+      transform: scaleY(0.88);
     }
   }
 
