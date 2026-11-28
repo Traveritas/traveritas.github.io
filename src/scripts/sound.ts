@@ -377,8 +377,8 @@ function stopVoice() {
 
 /* ── 交互音效（FX）─────────────────────────────────────
    与环境声 / Ave 共用同一个 AudioContext，单独一路 fxGain 直出。
-   没开声（levels.fx === 0）一个字节都不取；开启后串行整包预取 12 条（合计 ~227 KB），
-   解码后缓存在内存里，悬停、刻度、换面均零等待触发。 */
+   没开声（levels.fx === 0）一个字节都不取；开启后串行整包预取（见 FX_IDS），
+   解码后缓存在内存里，悬停、刻度、分级点击与换面均零等待触发。 */
 const fxUrl = (id: FxId) => `${DIR}/fx/${id}.mp3?v=${FX_VERSION}`;
 const fxBufs = new Map<FxId, AudioBuffer>();
 const fxInflight = new Map<FxId, Promise<AudioBuffer | null>>();
@@ -393,6 +393,9 @@ const FX_THROTTLE: Partial<Record<FxId, number>> = {
   'sec-projects': 130,
   'ring-tick': 32,
   confirm: 60,
+  tap: 45,
+  back: 45,
+  outlink: 60,
 };
 
 function loadFx(c: AudioContext, id: FxId): Promise<AudioBuffer | null> {

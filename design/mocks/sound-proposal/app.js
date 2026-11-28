@@ -474,4 +474,124 @@
   bindControls();
   setActiveDir(activeDir, false);
   applyBgmMix();
+
+  /* ==================== Click Refinement Lab ==================== */
+  const CL = CAT.clickLab;
+  if (CL) {
+    const clickFavs = { ...CL.defaultFavs };
+    const cueOf = (role) => `${clickFavs[role]}_${role}`;
+
+    const fixedBox = $("#clickFixedBtns");
+    if (fixedBox) {
+      fixedBox.innerHTML = CL.fixedCues.map((c) => {
+        const m = METRICS[c.id] || {};
+        return `<button class="btn sm" type="button" data-cue="${c.id}" title="${c.desc}">▶ ${c.name} <span style="opacity:.68;font-family:var(--mono)">${(m.dur_s || 0).toFixed(2)}s</span></button>`;
+      }).join("");
+      $$("#clickFixedBtns [data-cue]").forEach((btn) =>
+        btn.addEventListener("click", () => playCue(btn.dataset.cue))
+      );
+    }
+
+    const renderClickLab = () => {
+      const famRow = $("#clickFamRow");
+      if (famRow) {
+        famRow.innerHTML = CL.families.map((f) => `
+          <div class="click-fam">
+            <div class="click-fam-top">
+              <h4>${f.code} · ${f.name}</h4>
+              <button class="btn sm" type="button" data-click-all="${f.id}">整套选用</button>
+            </div>
+            <p>${f.desc}</p>
+          </div>
+        `).join("");
+        $$("[data-click-all]").forEach((btn) => btn.addEventListener("click", () => {
+          const fid = btn.dataset.clickAll;
+          for (const r of CL.roles) clickFavs[r.id] = fid;
+          renderClickLab();
+          playCue(`${fid}_click_tap`);
+        }));
+      }
+
+      const tbl = $("#clickMatrix");
+      if (tbl) {
+        const thead = `<tr><th>点击档位 / 触发场景</th>${CL.families.map((f) => `<th>${f.code} · ${f.name}</th>`).join("")}</tr>`;
+        const rows = CL.roles.map((r) => {
+          const cells = CL.families.map((f) => {
+            const id = `${f.id}_${r.id}`;
+            const m = METRICS[id] || {};
+            const isFav = clickFavs[r.id] === f.id;
+            return `<td>
+              <div class="cell-btn ${isFav ? "fav" : ""}" data-cue="${id}" role="button" tabindex="0">
+                <div class="cell-top">
+                  <span class="cell-label">${r.notes[f.id]}</span>
+                  <button class="star-btn ${isFav ? "on" : ""}" data-cfav-role="${r.id}" data-cfav-fam="${f.id}" title="设为该档首选">★</button>
+                </div>
+                <div class="cell-stats">${(m.dur_s || 0).toFixed(2)}s · ${m.peak_db ?? "-"}dB · ${m.mp3_kb ?? "-"}KB</div>
+              </div>
+            </td>`;
+          }).join("");
+          return `<tr>
+            <td class="spot-col">
+              <div class="spot-name">${r.name}<span class="kbd">${r.badge}</span></div>
+              <div class="spot-desc">${r.desc}</div>
+            </td>${cells}
+          </tr>`;
+        }).join("");
+        tbl.innerHTML = `<thead>${thead}</thead><tbody>${rows}</tbody>`;
+
+        $$("#clickMatrix .cell-btn").forEach((el) => el.addEventListener("click", (e) => {
+          if (e.target.dataset.cfavRole) {
+            e.stopPropagation();
+            clickFavs[e.target.dataset.cfavRole] = e.target.dataset.cfavFam;
+            renderClickLab();
+            playCue(el.dataset.cue);
+            return;
+          }
+          playCue(el.dataset.cue);
+        }));
+      }
+
+      const hint = $("#clickSelHint");
+      if (hint) {
+        hint.textContent = `当前模拟选型：选开 ${cueOf("click_tap")} · 收退 ${cueOf("click_back")} · 跨页 ${cueOf("click_nav")} · 外链 ${cueOf("click_out")}`;
+      }
+    };
+
+    $$(".click-playground [data-pg]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const kind = btn.dataset.pg;
+        if (kind === "toggle" || kind === "chip") {
+          const next = btn.getAttribute("aria-pressed") !== "true";
+          btn.setAttribute("aria-pressed", String(next));
+          btn.classList.toggle("is-on", next);
+          if (btn.textContent.includes("声道")) btn.textContent = next ? "♪ 声道开" : "♪ 声道关";
+          playCue(cueOf(next ? "click_tap" : "click_back"), { jitter: 0.012 });
+        } else if (kind === "seg") {
+          btn.closest(".pg-seg")?.querySelectorAll(".pg-btn").forEach((x) => x.classList.toggle("is-on", x === btn));
+          playCue(cueOf("click_tap"), { jitter: 0.014 });
+        } else if (kind === "nav") {
+          playCue(cueOf("click_nav"));
+        } else if (kind === "back") {
+          playCue(cueOf("click_back"));
+        } else if (kind === "out") {
+          playCue(cueOf("click_out"));
+        }
+      });
+    });
+
+    $("#copyClickRecipe")?.addEventListener("click", async () => {
+      const famName = Object.fromEntries(CL.families.map((f) => [f.id, `${f.code}·${f.name}`]));
+      const lines = [
+        "### AveritA 分级点击音效选型",
+        ...CL.roles.map((r) => `- **${r.name}** (\`${r.id}\`): \`${cueOf(r.id)}\` (${famName[clickFavs[r.id]]})`),
+      ];
+      try {
+        await navigator.clipboard.writeText(lines.join("\n"));
+        $("#copyClickRecipe").textContent = "✓ 已复制点击方案";
+        setTimeout(() => { $("#copyClickRecipe").textContent = "复制点击选型方案"; }, 1800);
+      } catch { prompt("复制以下点击选型方案：", lines.join("\n")); }
+    });
+
+    renderClickLab();
+  }
 })();

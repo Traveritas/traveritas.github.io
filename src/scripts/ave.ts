@@ -20,7 +20,7 @@
 import { AVE_LINES, type AveLine } from '../data/ave-lines';
 import { AVE_VOICE, type AveVoiceClip } from '../data/ave-voice';
 import { getReality } from './reality';
-import { playVoice, preloadVoice, prefetchVoices } from './sound';
+import { playFx, playVoice, preloadVoice, prefetchVoices } from './sound';
 import { reducedMotion } from './lib';
 import { createAveFlow } from './ave-flow';
 import { createAveStar, type AveStar } from './ave-star';
@@ -835,6 +835,7 @@ export function initAve(): void {
   if (!USE_FACES) flow = createAveFlow(el.querySelector('.ave-flow')!);
 
   el.querySelector('.ave-x')!.addEventListener('click', () => {
+    playFx('back', { gain: 0.78 });
     pending = null;
     hide();
   });

@@ -189,7 +189,7 @@ Home / End 调音量，拉到 0 就是关。
   人声单走一路 `voiceGain` 直出，不吃阅读页退后量与页内演出压声。
 - 人声的 0 只管声音：Ave 照样出现、出字（她出不出现由「设置」里的 Ave 开关管）。人声从 0 拉起来时发
   `xm:ave` 的 `voice-on`（台词 voice-hello）。
-- 音效（FX）已接入 12 条立体声素材（`public/audio/fx/*.mp3`，共 ~227 KB，清单与版本号在 `src/data/fx-assets.ts`，导出脚本 `design/audio/export-fx.mjs`）。
+- 音效（FX）已接入 15 条立体声素材（`public/audio/fx/*.mp3`，含 4 档分级点击 `tap / back / confirm / outlink`，清单与版本号在 `src/data/fx-assets.ts`，导出脚本 `design/audio/export-fx.mjs`）。
   走独立 `fxGain` 直出（不吃阅读页退后量），未开声时不取一个字节；拉起后串行整包预取并在从 0 启封时播放 `unlock` 应答音。
 - 接口（`sound.ts`）：`getLevel / setLevel / toggleLevel / rememberLevel / isLive / isSounding / onLevels / playFx`，
   `toolstar.ts` 与 `site.ts` 直接调。

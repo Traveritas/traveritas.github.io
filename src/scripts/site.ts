@@ -148,7 +148,9 @@ function mount() {
 const mqReduce = matchMedia('(prefers-reduced-motion: reduce)');
 // 点下去：字先退、地面开始变粗；新页拿到并且退场演完（300ms）才换
 document.addEventListener('astro:before-preparation', (e) => {
-  playFx('confirm');
+  const nav = e as Event & { sourceElement?: Element; direction?: string };
+  const isBack = nav.direction === 'back' || !!nav.sourceElement?.closest?.('.read .back, .ts-dock-back');
+  playFx(isBack ? 'back' : 'confirm');
   if (mqReduce.matches) return;
   st.pulse = performance.now();
   view.classList.remove('in');
@@ -287,8 +289,11 @@ document.addEventListener('pointerout', (e) => {
   lastHoverEl = null;
 });
 document.addEventListener('click', (e) => {
-  const a = (e.target as Element).closest?.<HTMLAnchorElement>('.outs a[target="_blank"], .prose a[target="_blank"], .outs a[href="/rss.xml"]');
-  if (a && !a.hasAttribute('data-gate') && !a.hasAttribute('data-nofx')) playFx('confirm', { gain: 0.75 });
+  if (e.defaultPrevented) return;
+  const a = (e.target as Element).closest?.<HTMLAnchorElement>(
+    'a[target="_blank"], a[href="/rss.xml"], [data-ring="go"] a[href^="http"]',
+  );
+  if (a && !a.hasAttribute('data-gate')) playFx('outlink', { gain: 0.9 });
 });
 // 从 NEXUS 后退回来（bfcache）：不留一屏白
 addEventListener('pageshow', (e) => {

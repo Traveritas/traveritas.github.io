@@ -198,7 +198,7 @@ class Ring {
     const d = Math.round(this.target / this.step);
     if (d !== this.lastDetent) {
       this.lastDetent = d;
-      playFx('ring-tick', { jitter: 0.018 });
+      playFx('ring-tick', { jitter: 0.018, gain: 0.52 });
     }
   }
 
@@ -527,7 +527,7 @@ export function initToolstar() {
     const nowStep = Math.round(getLevel(ch) * 20);
     // 跨过 5% 刻度时轻点一记（FX 从 0 启封自带 unlock 应答音，不叠加）
     if (nowStep !== prevStep && !(ch === 'fx' && prev === 0)) {
-      playFx('ring-tick', { jitter: 0.015, gain: 0.42 });
+      playFx('ring-tick', { jitter: 0.015, gain: 0.36 });
     }
   };
   for (const v of vols) {
@@ -582,7 +582,9 @@ export function initToolstar() {
     v.btn.addEventListener('click', () => {
       const prev = getLevel(v.ch);
       toggleLevel(v.ch);
-      if (!(v.ch === 'fx' && prev === 0)) playFx('confirm', { gain: 0.65 });
+      // FX 从 0 启封自带 unlock 应答音；把 FX 自己关成 0 时不发声
+      if (v.ch === 'fx') return;
+      playFx(prev > 0 ? 'back' : 'tap', { gain: 0.86 });
     });
   }
 
@@ -760,23 +762,32 @@ export function initToolstar() {
         flipFrom(r.left + r.width / 2, r.top + r.height / 2);
         return;
       }
-      playFx('confirm', { gain: 0.72 });
-      setTool(tool === t ? null : (t as Tool));
+      const closing = tool === t;
+      playFx(closing ? 'back' : 'tap', { gain: 0.9 });
+      setTool(closing ? null : (t as Tool));
     });
   }
   for (const b of catBtns) {
     b.addEventListener('click', () => {
       const c = b.dataset.setCat as SetCat;
-      setCat = setCat === c ? null : c;
-      playFx('confirm', { gain: 0.72 });
+      const closing = setCat === c;
+      setCat = closing ? null : c;
+      playFx(closing ? 'back' : 'tap', { gain: 0.9 });
       sync();
     });
   }
-  // 设置项（界面 / 阅读 / Ave 轨道上的按钮）、寻找词条、本页字号/目录点击统一给轻确认音
+  // 设置项（界面 / 阅读 / Ave 轨道上的按钮）、本页字号/目录点击区分轻触选开与收退
   root.addEventListener('click', (e) => {
     const t = e.target as Element;
-    if (t.closest('[data-ring^="set-"] > .ts-item, [data-word], .ts-seg button, .ts-toc a')) {
-      playFx('confirm', { gain: 0.7 });
+    const setItem = t.closest<HTMLElement>('[data-ring^="set-"] > .ts-item');
+    if (setItem) {
+      const pressed = setItem.getAttribute('aria-pressed');
+      if (pressed !== null) playFx(pressed === 'true' ? 'tap' : 'back', { gain: 0.88, jitter: 0.012 });
+      else playFx('tap', { gain: 0.88, jitter: 0.014 });
+      return;
+    }
+    if (t.closest('.ts-seg button, .ts-toc a')) {
+      playFx('tap', { gain: 0.86, jitter: 0.015 });
     }
   });
   // 设置里「音量 → 声音」：直接换到声音那三圈
@@ -858,8 +869,10 @@ export function initToolstar() {
       const w = b.dataset.word!;
       if (!inFind()) return toIndex(w);
       let ws = words();
-      if (has(ws, w)) ws = ws.filter((x) => x.toLowerCase() !== w.toLowerCase());
+      const removing = has(ws, w);
+      if (removing) ws = ws.filter((x) => x.toLowerCase() !== w.toLowerCase());
       else ws = [...(isMonth(w) ? ws.filter((x) => !isMonth(x)) : ws), w]; // 年月一次只取一个
+      playFx(removing ? 'back' : 'tap', { gain: 0.88, jitter: 0.014 });
       field.value = ws.join(' ');
       find(field.value);
     });
@@ -1005,12 +1018,14 @@ export function initToolstar() {
     dockPageBtn?.addEventListener('click', () => {
       if (dockPageOpen) {
         dockPageOpen = false;
+        playFx('back', { gain: 0.88 });
         sync();
       } else {
         open = false;
         tool = null;
         setCaption('');
         dockPageOpen = true;
+        playFx('tap', { gain: 0.88 });
         markToc();
         sync();
       }

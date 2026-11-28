@@ -24,21 +24,21 @@ from dsp_v3 import (
 
 def j_hover_crystal() -> np.ndarray:
     """Featherlight glass-rim breath + delicate felt-crystal harmonic glint."""
-    buf = make_buf(0.38)
-    mix_at(buf, glass_harmonica(NOTE3["Eb6"], dur=0.28, atk=0.055, pan=0.18, air=0.22, drift_hz=0.7, seed=701), 0.0, 0.36)
-    mix_at(buf, felt_celesta(NOTE3["Ab5"], dur=0.30, bright=0.52, felt=0.82, pan=-0.16, decay_scale=0.68, seed=702), 0.006, 0.56)
-    wet = silk_space(buf, rt60=0.85, wet=0.36, bright_hz=4200.0, predelay_ms=9.0, tail_pad=0.30, seed=703)
-    return soft_finalize(wet, target_peak_db=-9.6, fade_in_ms=5.0, fade_out_ms=65.0)
+    buf = make_buf(0.48)
+    mix_at(buf, glass_harmonica(NOTE3["Eb6"], dur=0.38, atk=0.055, pan=0.18, air=0.22, drift_hz=0.7, seed=701), 0.0, 0.36)
+    mix_at(buf, felt_celesta(NOTE3["Ab5"], dur=0.44, bright=0.52, felt=0.82, pan=-0.16, decay_scale=0.66, seed=702), 0.006, 0.56)
+    wet = silk_space(buf, rt60=0.85, wet=0.36, bright_hz=4200.0, predelay_ms=9.0, tail_pad=0.38, seed=703)
+    return soft_finalize(wet, target_peak_db=-9.6, fade_in_ms=5.0, fade_out_ms=95.0)
 
 
 def j_click_confirm() -> np.ndarray:
     """Warm felt-hammer celesta + clear resin-glass contact: poised, intimate confirmation."""
-    buf = make_buf(0.54)
-    mix_at(buf, felt_celesta(NOTE3["Ab4"], dur=0.44, bright=0.60, felt=0.86, pan=-0.10, decay_scale=0.88, seed=704), 0.0, 0.78)
-    mix_at(buf, felt_celesta(NOTE3["Eb5"], dur=0.48, bright=0.68, felt=0.72, pan=0.14, decay_scale=0.92, seed=705), 0.018, 0.62)
-    mix_at(buf, glass_harmonica(NOTE3["Ab5"], dur=0.34, atk=0.045, pan=0.20, air=0.16, seed=706), 0.022, 0.24)
-    wet = silk_space(buf, rt60=1.02, wet=0.36, bright_hz=4400.0, predelay_ms=11.0, tail_pad=0.36, seed=707)
-    return soft_finalize(wet, target_peak_db=-6.4, fade_in_ms=1.5, fade_out_ms=72.0)
+    buf = make_buf(0.70)
+    mix_at(buf, felt_celesta(NOTE3["Ab4"], dur=0.62, bright=0.60, felt=0.86, pan=-0.10, decay_scale=0.86, seed=704), 0.0, 0.78)
+    mix_at(buf, felt_celesta(NOTE3["Eb5"], dur=0.66, bright=0.68, felt=0.72, pan=0.14, decay_scale=0.90, seed=705), 0.018, 0.62)
+    mix_at(buf, glass_harmonica(NOTE3["Ab5"], dur=0.46, atk=0.045, pan=0.20, air=0.16, seed=706), 0.022, 0.24)
+    wet = silk_space(buf, rt60=1.02, wet=0.36, bright_hz=4400.0, predelay_ms=11.0, tail_pad=0.46, seed=707)
+    return soft_finalize(wet, target_peak_db=-6.4, fade_in_ms=1.5, fade_out_ms=115.0)
 
 
 def j_star_open() -> np.ndarray:
@@ -179,16 +179,16 @@ def z_sec_moments() -> np.ndarray:
 
 def z_sec_projects() -> np.ndarray:
     """造物 · 三层星尘与立方落槽 (3 parallax stardust breaths far->mid->near + amber felt-crystal dock)."""
-    buf = make_buf(0.74)
+    buf = make_buf(0.84)
     # 3 parallax layers: far (soft, narrow), mid, near (crisp, wide)
     mix_at(buf, tactile_bead(NOTE3["C6"], dur=0.055, quant_mix=0.60, felt=0.70, pan=-0.42, seed=810), 0.0, 0.28)
     mix_at(buf, tactile_bead(NOTE3["Bb5"], dur=0.060, quant_mix=0.38, felt=0.72, pan=-0.14, seed=811), 0.068, 0.44)
     mix_at(buf, tactile_bead(NOTE3["F5"], dur=0.065, quant_mix=0.20, felt=0.78, pan=0.12, seed=812), 0.132, 0.62)
     # Warm amber cube gently settling into .pj-slot
-    mix_at(buf, felt_celesta(NOTE3["F5"], dur=0.48, bright=0.64, felt=0.84, pan=0.18, decay_scale=0.92, seed=813), 0.165, 0.74)
-    mix_at(buf, pixel_to_glass(NOTE3["C6"], dur=0.44, morph_s=0.09, hold_hz=3200.0, pan=0.26, bright=0.70, seed=814), 0.182, 0.56)
-    wet = silk_space(buf, rt60=1.08, wet=0.38, bright_hz=4500.0, predelay_ms=11.0, tail_pad=0.36, seed=815)
-    return soft_finalize(wet, target_peak_db=-6.8, fade_in_ms=2.0, fade_out_ms=75.0)
+    mix_at(buf, felt_celesta(NOTE3["F5"], dur=0.62, bright=0.64, felt=0.84, pan=0.18, decay_scale=0.88, seed=813), 0.165, 0.74)
+    mix_at(buf, pixel_to_glass(NOTE3["C6"], dur=0.58, morph_s=0.09, hold_hz=3200.0, pan=0.26, bright=0.70, seed=814), 0.182, 0.56)
+    wet = silk_space(buf, rt60=1.08, wet=0.38, bright_hz=4500.0, predelay_ms=11.0, tail_pad=0.44, seed=815)
+    return soft_finalize(wet, target_peak_db=-6.8, fade_in_ms=2.0, fade_out_ms=100.0)
 
 
 def z_fx_unlock() -> np.ndarray:

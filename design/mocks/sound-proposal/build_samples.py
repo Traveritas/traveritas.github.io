@@ -17,6 +17,7 @@ from recipes_g import RECIPES_G
 from recipes_h import RECIPES_H
 from recipes_i import RECIPES_I
 from recipes_j import RECIPES_J
+from recipes_click import RECIPES_CLICK
 
 ROOT = Path(__file__).resolve().parent
 WAV_DIR = ROOT / "samples" / "wav"
@@ -55,6 +56,7 @@ def main() -> None:
         **RECIPES_H,
         **RECIPES_I,
         **RECIPES_J,
+        **RECIPES_CLICK,
     }
     bundle: dict[str, str] = {}
     metrics: dict[str, dict] = {}

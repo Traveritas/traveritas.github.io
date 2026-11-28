@@ -343,5 +343,67 @@ window.SFX_CATALOG = {
         gate_nexus: "a"
       }
     }
+  },
+
+  clickLab: {
+    fixedCues: [
+      { id: "j_click_confirm", name: "confirm（已修截断）", desc: "修复 440ms / 500ms 干声硬切，延长自然尾韵" },
+      { id: "j_hover_crystal", name: "hover（已修截断）", desc: "修复 310ms 骤降，顺滑消散" },
+      { id: "z_sec_projects", name: "sec-projects（已修截断）", desc: "修复 650ms 骤降，立方落槽自然收尾" },
+    ],
+    families: [
+      { id: "k1", code: "K1", name: "霜璃微触", en: "Frosted Glass", desc: "清透晶面微触点 + 利落短玻璃共振（最贴近 visionOS / 磨砂树脂）" },
+      { id: "k2", code: "K2", name: "绒晶微光", en: "Silk Felt & Prism", desc: "原 DIR J 全面精修：去低频浑浊、补清晰微触点、温润清甜不拖沓" },
+      { id: "k3", code: "K3", name: "像素凝晶", en: "Pixel-to-Glass", desc: "背光微格瞬态平滑插值成透明玻璃，收退时柔化归静（最贴合站点视觉）" },
+      { id: "k4", code: "K4", name: "露滴玉瓷", en: "Dew & Porcelain", desc: "高阻尼哑光瓷触 + 极轻晶露气韵，几乎无铃声感，连点百次不腻" },
+    ],
+    roles: [
+      {
+        id: "click_tap", key: "1", name: "轻触 · 选开", badge: "高频短音",
+        desc: "展开工具子圈、切字号/行距、勾选标签、开启开关、目录跳转",
+        notes: {
+          k1: "清脆霜璃微点 C6",
+          k2: "温润微绒晶点 Ab5",
+          k3: "微格凝晶 Bb5",
+          k4: "玉瓷轻叩 + 极浅上露",
+        }
+      },
+      {
+        id: "click_back", key: "2", name: "轻触 · 收退", badge: "成对回落",
+        desc: "收起工具子圈、取消标签、关闭开关/声道、阅读页点「返回」",
+        notes: {
+          k1: "柔阻尼微落 Bb5→Ab5",
+          k2: "绒面轻落 Ab5→F5",
+          k3: "玻璃柔散回像素微粒",
+          k4: "温瓷沉落归静",
+        }
+      },
+      {
+        id: "click_nav", key: "3", name: "进入 · 跨页", badge: "空间纵深",
+        desc: "首页三扇门、名录文章/造物卡片、去处跨页（承接 300ms 退场）",
+        notes: {
+          k1: "霜璃触点 + 清澈五度 F5→C6",
+          k2: "绒晶双音 F5·C6 + 玻缘薄晕",
+          k3: "柔格插值五度 F5→C6",
+          k4: "双玉瓷叩落 + Ab5 玻璃余韵",
+        }
+      },
+      {
+        id: "click_out", key: "4", name: "离站 · 外链", badge: "可选",
+        desc: "GitHub 仓库、外链、RSS 订阅（带一点向外舒展的清亮）",
+        notes: {
+          k1: "清亮微光上展 Ab5→Eb6",
+          k2: "柔亮星芒 Bb5→F6",
+          k3: "微格透亮 Eb6",
+          k4: "瓷点轻弹 + 上扬露滴 C6→F6",
+        }
+      },
+    ],
+    defaultFavs: {
+      click_tap: "k1",
+      click_back: "k1",
+      click_nav: "k2",
+      click_out: "k1",
+    },
   }
 };

@@ -14,10 +14,13 @@ const WAV_DIR = resolve(ROOT, 'design/mocks/sound-proposal/samples/wav');
 const OUT_DIR = resolve(ROOT, 'public/audio/fx');
 const MANIFEST = resolve(ROOT, 'src/data/fx-assets.ts');
 
-// Final locked selection (Batch 3 mix: DIR J touches + DIR I transitions + Z2/Z signatures)
+// Final locked selection (Batch 3 + Click Refinement K1/K2 mix)
 const SELECTION = [
   ['hover', 'j_hover_crystal'],
-  ['confirm', 'j_click_confirm'],
+  ['confirm', 'k2_click_nav'],
+  ['tap', 'k1_click_tap'],
+  ['back', 'k2_click_back'],
+  ['outlink', 'k2_click_out'],
   ['star-open', 'b_star_open'],
   ['star-close', 'b_star_close'],
   ['ring-tick', 'i_ring_tick'],
@@ -35,7 +38,7 @@ mkdirSync(OUT_DIR, { recursive: true });
 const hash = createHash('sha256');
 let totalBytes = 0;
 
-console.log('Exporting 12 UI SFX assets to public/audio/fx/ ...');
+console.log(`Exporting ${SELECTION.length} UI SFX assets to public/audio/fx/ ...`);
 for (const [id, srcName] of SELECTION) {
   const wav = resolve(WAV_DIR, `${srcName}.wav`);
   const mp3 = resolve(OUT_DIR, `${id}.mp3`);
@@ -57,7 +60,7 @@ const idList = SELECTION.map(([id]) => `  '${id}',`).join('\n');
 writeFileSync(
   MANIFEST,
   `/* 本文件由 design/audio/export-fx.mjs 生成，勿手改。
-   成片在 public/audio/fx/，共 12 条（合计 ${(totalBytes / 1024).toFixed(1)} KB）；
+   成片在 public/audio/fx/，共 ${SELECTION.length} 条（合计 ${(totalBytes / 1024).toFixed(1)} KB）；
    靠版本号把 URL 区分开，换稿后浏览器才会取新音效。重跑 export-fx.mjs 后记得一起提交。 */
 export const FX_VERSION = '${version}';
 

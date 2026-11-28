@@ -121,6 +121,12 @@ def felt_celesta(
         felt_sig = pan_mono((thump * th_env * 0.26 + hair * th_env * 0.07) * felt, pan)
         mix_at(out, felt_sig, 0.0, 1.0)
 
+    # Smooth raised-cosine release so short dur buffers never hard-clip mid-decay
+    rel_n = min(n // 2, max(int(round(0.055 * SR)), int(round(dur * 0.36 * SR))))
+    if rel_n > 1:
+        rel = 0.5 * (1.0 + np.cos(math.pi * np.arange(rel_n, dtype=np.float64) / rel_n))
+        out[-rel_n:] *= rel[:, None]
+
     return out
 
 
@@ -224,6 +230,9 @@ def tactile_bead(
     tap = biquad_filter(rng.standard_normal(n), "bandpass", (320.0, 1800.0), order=2)
     tap_env = atk * np.exp(-t / 0.0038)
     mono = body * 0.78 + tap * tap_env * (0.28 * felt)
+    rel_n = min(n // 2, max(int(round(0.012 * SR)), int(round(dur * 0.28 * SR))))
+    if rel_n > 1:
+        mono[-rel_n:] *= 0.5 * (1.0 + np.cos(math.pi * np.arange(rel_n, dtype=np.float64) / rel_n))
     sig = pan_mono(mono, pan)
     if quant_mix > 0.01:
         sig = soft_quantize(sig, hold_hz=3600.0, levels=16, wet=quant_mix, smooth_hz=4800.0)
@@ -235,6 +244,7 @@ def upward_dew(
     f1: float,
     dur: float = 0.26,
     pan: float = 0.0,
+    decay_s: float | None = None,
     seed: int = 67,
 ) -> np.ndarray:
     """Weightless upward-floating luminous droplet (inspired by 闪念's slow upward pixel rain)."""
@@ -244,7 +254,11 @@ def upward_dew(
     f_t = f0 + (f1 - f0) * (1.0 - np.exp(-t / tau))
     ph = 2.0 * math.pi * np.cumsum(f_t) / SR
     atk = np.where(t < 0.008, 0.5 * (1.0 - np.cos(math.pi * t / 0.008)), 1.0)
-    env = atk * np.exp(-t / max(dur * 0.34, 0.035))
+    d_tau = decay_s if decay_s is not None else max(dur * 0.34, 0.035)
+    env = atk * np.exp(-t / d_tau)
+    rel_n = min(n // 2, max(int(round(0.035 * SR)), int(round(dur * 0.34 * SR))))
+    if rel_n > 1:
+        env[-rel_n:] *= 0.5 * (1.0 + np.cos(math.pi * np.arange(rel_n, dtype=np.float64) / rel_n))
     mono = (np.sin(ph) + 0.16 * np.sin(2.0 * ph + 0.4) * np.exp(-t / 0.045)) * env
     return pan_mono(mono, pan)
 
