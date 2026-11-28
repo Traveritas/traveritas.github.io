@@ -8,7 +8,8 @@
    开屏：地面从一格极粗的夜色里一级级解析出来，字最后站起来。
    ───────────────────────────────────────────────────────────── */
 import { createGround, bipyramid, shard, cubeClean, tesseractSlice, euler } from './ground.js';
-import { initSound, playFx, type FxId } from './sound';
+import { initSound, isSaveData, playFx, preloadCoreAudio, prefetchLoopsIdle, type FxId } from './sound';
+import { AVE_VOICE } from '../data/ave-voice';
 import { initToolstar, toolstarPage } from './toolstar';
 import { initAve, aveEnterRoute, aveRouteEnd } from './ave';
 import { initCursor } from './cursor';
@@ -312,13 +313,17 @@ const BOOT_STEPS = [48, 34, 24, 16, 11, 7, 4, 2, 1]; // 加载格阶：由真实
 const BOOT_HOLD_IDX = 4; // 资源未就绪前最细停在 11 格，绝不提前放行
 const BOOT_STEP_MS = 130;
 const BOOT_FINISH_MS = 115;
-const BOOT_MAX_WAIT_MS = 8500; // 弱网或个别资源异常时的兜底上限
+const BOOT_MAX_WAIT_MS = 18000; // 弱网或个别资源异常时的兜底上限（加载中可随时跳过）
+const BOOT_SKIP_DELAY_MS = 850; // 加载超过此时长仍未就绪再淡入跳过按钮，避免秒开时闪一下
 const PULSE = [1, 2, 4, 7, 7, 5, 3, 2, 1]; // 换页：每拍 100ms 一级
 const t0 = performance.now();
 st.boot = t0;
 let bootIdx = 0;
 let bootStepAt = t0;
 let bootProg = 0;
+let bootDisp = 0;
+let bootLastPct = -1;
+let bootSkippable = false;
 let bootReady = false;
 let bootDoneAt = -1;
 let glDrawn = false;
@@ -328,17 +333,57 @@ const glFirstFrame = new Promise<void>((res) => {
 });
 if (!ground) resolveGl();
 
-function finishBoot(now: number) {
+const bootHud = document.getElementById('boot-hud');
+const bootPct = document.getElementById('boot-pct');
+const bootFill = document.getElementById('boot-fill');
+const bootSkip = document.getElementById('boot-skip') as HTMLButtonElement | null;
+
+function renderBootHud(p: number) {
+  const clamped = Math.max(0, Math.min(1, p));
+  if (bootFill) bootFill.style.transform = `scaleX(${clamped.toFixed(4)})`;
+  const pct = Math.round(clamped * 100);
+  if (bootPct && pct !== bootLastPct) {
+    bootLastPct = pct;
+    bootPct.textContent = `${pct}%`;
+  }
+}
+
+function setBootSkippable(show: boolean) {
+  if (bootSkippable === show || !bootSkip) return;
+  bootSkippable = show;
+  bootHud?.classList.toggle('is-skippable', show);
+  bootSkip.tabIndex = show ? 0 : -1;
+  bootSkip.setAttribute('aria-hidden', show ? 'false' : 'true');
+}
+
+function finishBoot(now: number, skipped = false) {
   if (st.boot < 0) return;
   st.boot = -1;
   st.coarse = 1;
   st.veil = 1;
   bootDoneAt = now;
+  if (!skipped) {
+    bootDisp = 1;
+    renderBootHud(1);
+  }
+  setBootSkippable(false);
+  if (bootHud) {
+    bootHud.classList.add('is-done');
+    html.classList.add('boot-fade');
+    setTimeout(() => html.classList.remove('boot-fade'), mqReduce.matches ? 0 : 420);
+  }
   html.classList.remove('booting');
   html.classList.add('booted');
+  prefetchLoopsIdle(night ? 'dream' : 'wake');
 }
 
-/* ── 真实资源门控：WebGL 首帧 + 自切字体 + 首屏图片 ── */
+bootSkip?.addEventListener('click', () => {
+  if (st.boot < 0) return;
+  bootReady = true;
+  finishBoot(performance.now(), true);
+});
+
+/* ── 真实资源门控：WebGL 首帧 + 自切字体 + 首屏图片 + 核心音频包（当前面 open + FX + Ave） ── */
 function waitForReady(onProgress: (p: number) => void): Promise<void> {
   const raw = (document.getElementById('view')?.textContent || 'AveritA 的昼梦叙集 断章 闪念 造物').replace(/\s+/g, '');
   const sampleText = [...new Set(raw)].slice(0, 240).join('');
@@ -347,23 +392,31 @@ function waitForReady(onProgress: (p: number) => void): Promise<void> {
     const r = img.getBoundingClientRect();
     return (idx < 4 && img.loading !== 'lazy') || (r.top < innerHeight * 1.25 && r.bottom > -100);
   });
+  const withAudio = !isSaveData();
 
-  const tasks: { weight: number; done: boolean; p: Promise<unknown> }[] = [];
+  const tasks: { weight: number; progress: number; p: Promise<unknown> }[] = [];
   const report = () => {
     const total = tasks.reduce((s, t) => s + t.weight, 0) || 1;
-    const got = tasks.reduce((s, t) => s + (t.done ? t.weight : 0), 0);
+    const got = tasks.reduce((s, t) => s + t.weight * t.progress, 0);
     onProgress(got / total);
   };
   const add = (weight: number, p: Promise<unknown>) => {
-    const item = { weight, done: false, p };
+    const item = { weight, progress: 0, p };
     tasks.push(item);
     item.p = p.catch(() => {}).finally(() => {
-      item.done = true;
+      item.progress = 1;
       report();
     });
+    return (v: number) => {
+      const next = Math.max(item.progress, Math.min(1, v));
+      if (next !== item.progress) {
+        item.progress = next;
+        report();
+      }
+    };
   };
 
-  add(0.2, glFirstFrame);
+  add(withAudio ? 0.12 : 0.2, glFirstFrame);
 
   const fontSheet = document.querySelector<HTMLLinkElement>('link[href*="noto-serif-sc/font.css"]');
   const sheetReady =
@@ -373,10 +426,10 @@ function waitForReady(onProgress: (p: number) => void): Promise<void> {
           fontSheet.addEventListener('load', () => res(), { once: true });
           fontSheet.addEventListener('error', () => res(), { once: true });
         });
-  add(0.15, sheetReady);
+  add(withAudio ? 0.06 : 0.15, sheetReady);
 
-  const monoReady = document.fonts ? document.fonts.load('400 12px "IBM Plex Mono"', 'AveritA 0123456789/·') : Promise.resolve();
-  add(0.15, monoReady);
+  const monoReady = document.fonts ? document.fonts.load('400 12px "IBM Plex Mono"', 'AveritA 0123456789/·%') : Promise.resolve();
+  add(withAudio ? 0.08 : 0.15, monoReady);
 
   const serifReady = sheetReady.then(async () => {
     if (!document.fonts) return;
@@ -385,10 +438,10 @@ function waitForReady(onProgress: (p: number) => void): Promise<void> {
     await Promise.allSettled(loads);
     await document.fonts.ready;
   });
-  add(imgs.length ? 0.35 : 0.5, serifReady);
+  add(withAudio ? (imgs.length ? 0.2 : 0.26) : imgs.length ? 0.35 : 0.5, serifReady);
 
   if (imgs.length) {
-    const w = 0.15 / imgs.length;
+    const w = (withAudio ? 0.08 : 0.15) / imgs.length;
     for (const img of imgs) {
       const p = img.complete
         ? img.decode?.().catch(() => {}) ?? Promise.resolve()
@@ -399,6 +452,18 @@ function waitForReady(onProgress: (p: number) => void): Promise<void> {
           });
       add(w, p);
     }
+  }
+
+  if (withAudio) {
+    const voiceSrcs = Object.values(AVE_VOICE).map((c) => c.src);
+    let setAudioProg: ((v: number) => void) | null = null;
+    let initialAudioProg = 0;
+    const audioPromise = preloadCoreAudio(night ? 'dream' : 'wake', voiceSrcs, (v) => {
+      initialAudioProg = v;
+      setAudioProg?.(v);
+    });
+    setAudioProg = add(imgs.length ? 0.46 : 0.48, audioPromise);
+    if (initialAudioProg > 0) setAudioProg(initialAudioProg);
   }
 
   const timeout = new Promise<void>((res) => setTimeout(res, BOOT_MAX_WAIT_MS));
@@ -437,6 +502,13 @@ function frame(now: number) {
   // 加载 / 换页：格随真实加载进度一拍拍收细，全部就绪后落到 1 再放行页面
   st.coarse = 1;
   if (st.boot > 0) {
+    const dispTarget = bootReady ? 1 : bootProg;
+    bootDisp = reduced ? dispTarget : bootDisp + (dispTarget - bootDisp) * (1 - Math.exp(-dt * (bootReady ? 14 : 9)));
+    if (dispTarget - bootDisp < 0.002) bootDisp = dispTarget;
+    renderBootHud(bootDisp);
+    if (!bootReady && !bootSkippable && now - st.boot >= BOOT_SKIP_DELAY_MS) {
+      setBootSkippable(true);
+    }
     const veilTarget = bootReady ? 1 : 0.78;
     st.veil += (veilTarget - st.veil) * (1 - Math.exp(-dt * (bootReady ? 7 : 3.2)));
     if (reduced) {

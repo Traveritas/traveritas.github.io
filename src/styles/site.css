@@ -88,6 +88,88 @@ body[data-place='home'] #view.in { animation: none; }
 .outs .nx svg { width: 7px; height: 10px; fill: none; stroke: var(--amber); stroke-width: 1.3; stroke-linejoin: round; transition: fill 0.2s; }
 .outs .nx:hover svg { fill: color-mix(in srgb, var(--amber) 35%, transparent); }
 
+/* ── 初始加载：极细进度线 + 百分比 + 延迟淡入的跳过按钮 ── */
+@keyframes boot-hud-in {
+  from { opacity: 0; translate: 0 5px; }
+}
+html.booting #boot-hud,
+html.boot-fade #boot-hud {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity 0.38s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+html.boot-fade #boot-hud.is-done,
+#boot-hud.is-done {
+  opacity: 0;
+  pointer-events: none;
+}
+.boot-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  animation: boot-hud-in 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) 0.08s backwards;
+}
+.boot-pct {
+  font-size: 11px;
+  letter-spacing: 0.24em;
+  padding-left: 0.24em;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+  min-width: 4.5ch;
+  text-align: center;
+}
+.boot-bar {
+  position: relative;
+  width: min(180px, 46vw);
+  height: 1px;
+  background: var(--hair);
+  overflow: hidden;
+}
+.boot-fill {
+  position: absolute;
+  inset: 0;
+  transform-origin: 0 50%;
+  transform: scaleX(0);
+  background: linear-gradient(90deg, var(--ink-3), color-mix(in srgb, var(--amber) 52%, var(--ink)));
+  will-change: transform;
+}
+:root[data-face='wake'] .boot-fill {
+  background: linear-gradient(90deg, var(--ink-3), var(--ink));
+}
+.boot-skip {
+  margin-top: 6px;
+  padding: 8px 14px;
+  padding-left: calc(14px + 0.3em);
+  font: 500 12px/1 var(--serif);
+  letter-spacing: 0.3em;
+  color: var(--ink-3);
+  border-bottom: 1px solid transparent;
+  opacity: 0;
+  transform: translateY(5px);
+  pointer-events: none;
+  transition:
+    opacity 0.65s cubic-bezier(0.2, 0.7, 0.2, 1),
+    transform 0.65s cubic-bezier(0.2, 0.7, 0.2, 1),
+    color 0.25s,
+    border-color 0.25s;
+}
+#boot-hud.is-skippable:not(.is-done) .boot-skip {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+.boot-skip:hover,
+.boot-skip:focus-visible {
+  color: var(--ink);
+  border-color: var(--hair);
+}
+
 /* ── 加载完成后的进场编排（主页：14° 线延展 → 站名合焦 → 三处晶体与标题依次浮起 → 边缘控件） ── */
 @keyframes home-slash {
   from { opacity: 0; clip-path: inset(0 100% 0 0); }
@@ -280,7 +362,9 @@ a:hover .tag { color: var(--ink); border-color: var(--ink-3); }
   .pj-own,
   .pj-d,
   .pj-slot::before,
-  .gate-t {
+  .gate-t,
+  #boot-hud,
+  .boot-skip {
     transition: none !important;
   }
   #view.out {
@@ -288,6 +372,7 @@ a:hover .tag { color: var(--ink); border-color: var(--ink-3); }
     transform: none;
   }
   #view.in,
+  .boot-inner,
   .hit,
   .ar,
   .mo,

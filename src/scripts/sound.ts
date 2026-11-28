@@ -96,6 +96,165 @@ const chain: Partial<Record<Reality, { gain: GainNode; src: AudioBufferSourceNod
 
 const buffers = new Map<string, AudioBuffer>();
 const inflight = new Map<string, Promise<AudioBuffer | null>>();
+/** 未解码字节缓存：开屏预载阶段先拉取字节（绕开自动播放限制、拿到真实进度），
+    真正开声后再用 AudioContext 解码并释放原字节。 */
+const rawAudio = new Map<string, ArrayBuffer>();
+const rawInflight = new Map<string, Promise<ArrayBuffer | null>>();
+
+export function isSaveData(): boolean {
+  const net = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection;
+  return !!net?.saveData;
+}
+
+function fetchRaw(
+  src: string,
+  onBytes?: (loaded: number, total: number) => void,
+): Promise<ArrayBuffer | null> {
+  const cached = rawAudio.get(src);
+  if (cached) {
+    onBytes?.(cached.byteLength, cached.byteLength);
+    return Promise.resolve(cached);
+  }
+  const flying = rawInflight.get(src);
+  if (flying) {
+    return flying.then((ab) => {
+      if (ab) onBytes?.(ab.byteLength, ab.byteLength);
+      return ab;
+    });
+  }
+  const p = (async () => {
+    const res = await fetch(src);
+    if (!res.ok) throw new Error(`${src}: HTTP ${res.status}`);
+    const total = Number(res.headers.get('content-length')) || 0;
+    if (onBytes && res.body?.getReader) {
+      const reader = res.body.getReader();
+      const chunks: Uint8Array[] = [];
+      let loaded = 0;
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (value) {
+          chunks.push(value);
+          loaded += value.byteLength;
+          onBytes(loaded, total || loaded);
+        }
+      }
+      const merged = new Uint8Array(loaded);
+      let off = 0;
+      for (const c of chunks) {
+        merged.set(c, off);
+        off += c.byteLength;
+      }
+      const ab = merged.buffer;
+      rawAudio.set(src, ab);
+      onBytes(ab.byteLength, ab.byteLength);
+      return ab;
+    }
+    const ab = await res.arrayBuffer();
+    rawAudio.set(src, ab);
+    onBytes?.(ab.byteLength, ab.byteLength);
+    return ab;
+  })()
+    .catch((e) => {
+      console.warn('[sound]', e);
+      return null;
+    })
+    .finally(() => {
+      rawInflight.delete(src);
+    });
+  rawInflight.set(src, p);
+  return p;
+}
+
+let corePreloadPromise: Promise<void> | null = null;
+let loopsIdleScheduled = false;
+
+/** 开屏核心音频预载：当前面 BGM open + 全部交互音效 FX + 全部 Ave 人声（约 1.3–1.5 MB）。
+    仅拉取字节进内存缓存（不建 AudioContext、不触碰自动播放策略），提供真实字节级进度；
+    点跳过后不中止，继续在后台静默拉完。省流模式直接跳过。 */
+export function preloadCoreAudio(
+  face: Reality,
+  voiceSrcs: readonly string[],
+  onProgress?: (p: number) => void,
+): Promise<void> {
+  if (isSaveData()) {
+    onProgress?.(1);
+    return Promise.resolve();
+  }
+  if (corePreloadPromise) return corePreloadPromise;
+
+  const seen = new Set<string>();
+  const items: { src: string; loaded: number; total: number }[] = [];
+  const push = (src: string, est: number) => {
+    if (!src || seen.has(src)) return;
+    seen.add(src);
+    items.push({ src, loaded: 0, total: est });
+  };
+
+  push(url(`${face}-open`), face === 'dream' ? 953_000 : 785_000);
+  for (const id of FX_IDS) push(fxUrl(id), 16_000);
+  for (const src of voiceSrcs) push(src, 10_500);
+
+  if (!items.length) {
+    onProgress?.(1);
+    return Promise.resolve();
+  }
+
+  let highWater = 0;
+  const emit = () => {
+    let got = 0;
+    let tot = 0;
+    for (const it of items) {
+      got += Math.min(it.loaded, it.total);
+      tot += it.total;
+    }
+    const p = tot > 0 ? Math.min(1, got / tot) : 1;
+    if (p > highWater) highWater = p;
+    onProgress?.(highWater);
+  };
+
+  let cursor = 0;
+  const worker = async () => {
+    while (cursor < items.length) {
+      const it = items[cursor++];
+      await fetchRaw(it.src, (loaded, total) => {
+        if (total > 0) it.total = total;
+        it.loaded = loaded;
+        emit();
+      });
+      it.loaded = it.total;
+      emit();
+    }
+  };
+
+  const workers = Array.from({ length: Math.min(4, items.length) }, () => worker());
+  corePreloadPromise = Promise.all(workers).then(() => {
+    highWater = 1;
+    onProgress?.(1);
+  });
+  return corePreloadPromise;
+}
+
+/** 进站后闲时静默预取两态 loop 字节（先当前面、再另一面），省流模式跳过。 */
+export function prefetchLoopsIdle(face: Reality): void {
+  if (loopsIdleScheduled || isSaveData()) return;
+  loopsIdleScheduled = true;
+  const order: Reality[] = face === 'dream' ? ['dream', 'wake'] : ['wake', 'dream'];
+  const start = async () => {
+    if (corePreloadPromise) await corePreloadPromise;
+    for (const f of order) {
+      if (buf(f, 'loop')) continue;
+      await fetchRaw(url(`${f}-loop`));
+    }
+  };
+  const ric = (
+    window as unknown as {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+    }
+  ).requestIdleCallback;
+  if (ric) ric(() => void start(), { timeout: 2500 });
+  else setTimeout(() => void start(), 1500);
+}
 
 let openSrc: AudioBufferSourceNode | null = null;
 let openForm: Reality = 'dream';
@@ -134,7 +293,7 @@ const durOf = (seg: Seg, form: Reality) => buf(form, seg)?.duration ?? storedDur
 const openDur = () => Math.min(...FORMS.map((f) => durOf('open', f)));
 const loopDur = () => Math.min(...FORMS.map((f) => durOf('loop', f)));
 
-/* ── 取音频（只在开启后发生）─────────────────────────── */
+/* ── 取音频（优先命中开屏预载的字节缓存）──────────────── */
 function load(form: Reality, seg: Seg): Promise<AudioBuffer | null> {
   const key = `${form}-${seg}`;
   const got = buffers.get(key);
@@ -143,9 +302,11 @@ function load(form: Reality, seg: Seg): Promise<AudioBuffer | null> {
   if (flying) return flying;
   const p = (async () => {
     if (!ctx) return null;
-    const res = await fetch(url(key));
-    if (!res.ok) throw new Error(`${key}: HTTP ${res.status}`);
-    const decoded = await ctx.decodeAudioData(await res.arrayBuffer());
+    const src = url(key);
+    const raw = await fetchRaw(src);
+    if (!raw || !ctx) return null;
+    const decoded = await ctx.decodeAudioData(raw.slice(0));
+    rawAudio.delete(src);
     buffers.set(key, decoded);
     if (seg === 'loop') peaks.set(key, peakOf(decoded));
     if (seg === 'open' || seg === 'loop') {
@@ -273,9 +434,13 @@ export function voiceReady(): boolean {
 function loadVoice(c: AudioContext, src: string) {
   let p = voiceBufs.get(src);
   if (!p) {
-    p = fetch(src)
-      .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(String(r.status)))))
-      .then((b) => c.decodeAudioData(b))
+    p = fetchRaw(src)
+      .then((raw) => (raw ? c.decodeAudioData(raw.slice(0)) : null))
+      .then((decoded) => {
+        if (decoded) rawAudio.delete(src);
+        else voiceBufs.delete(src);
+        return decoded;
+      })
       .catch(() => {
         // 失败不记：预取时网络抖一下，不该让这一句在整次来访里永远没声
         voiceBufs.delete(src);
@@ -403,11 +568,14 @@ function loadFx(c: AudioContext, id: FxId): Promise<AudioBuffer | null> {
   if (got) return Promise.resolve(got);
   let p = fxInflight.get(id);
   if (!p) {
-    p = fetch(fxUrl(id))
-      .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(`fx/${id}: HTTP ${r.status}`))))
-      .then((ab) => c.decodeAudioData(ab))
+    const src = fxUrl(id);
+    p = fetchRaw(src)
+      .then((raw) => (raw ? c.decodeAudioData(raw.slice(0)) : null))
       .then((decoded) => {
-        fxBufs.set(id, decoded);
+        if (decoded) {
+          rawAudio.delete(src);
+          fxBufs.set(id, decoded);
+        }
         return decoded;
       })
       .catch(() => null)
@@ -1027,6 +1195,7 @@ export function initSound(): void {
         voicesWarming: voiceWarming,
         fx: `${fxBufs.size}/${FX_IDS.length}`,
         fxWarming,
+        rawCached: rawAudio.size,
       }),
       playFx,
       /* 量输出端实际电平：只看调度不算数，要看到样本在流 */
